@@ -92,7 +92,7 @@ Agents can add types and relations over time.
 
 ## Success criteria (first milestone)
 
-- [ ] `docker compose up` yields working MCP
+- [x] `docker compose up` yields working MCP (`bootstrap` only in slices 1–3)
 - [ ] Agent can create an `area`, a `project`, link them, store an HTML itinerary payload on a node, search it back
 - [ ] Agent can add a new type and use it without a human approval step
 - [ ] Activity log shows those mutations
