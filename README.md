@@ -68,6 +68,8 @@ Requires [Docker Compose](https://docs.docker.com/compose/) and a copy of this r
 
 4. Call `bootstrap` first. It returns the starter spine (`area → project → goal → habit | task`), seeded types/relations, and how to extend the ontology.
 
+   After bootstrap, an agent can `upsert` an `area` and `project`, `link` them with `child_of`, store an HTML itinerary on a `trip` node (`payload.media_type = "text/html"`), `manage_type` a custom type, and `upsert` a node of that type. Destructive tools (`delete`, `unlink`) require `confirm: true`.
+
    With Node 22 + pnpm (and Compose already up):
 
    ```bash
@@ -91,7 +93,7 @@ Never point `FOUNDATION_DATA` at an agent profile or memory directory.
 
 ## Status
 
-Slices 1–3: repo skeleton, schema/seed, MCP `bootstrap`. Later slices add upsert/get/delete, link/unlink, ontology mutation, activity/undo, and search.
+Slices 1–6: repo skeleton, schema/seed, MCP `bootstrap`, nodes/payloads (`upsert` / `get` / `delete`), edges (`link` / `unlink`), ontology mutation (`inspect_ontology` / `manage_type` / `manage_relation`). Later slices add activity/undo, search, compose polish, blobs, embeddings, and a thin viewer.
 
 Reference ideas (not a dump): [Momentum](https://github.com/dgraziosi/Momentum-React-Native) branch `replit-agent`.
 

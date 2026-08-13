@@ -30,11 +30,15 @@ export async function buildBootstrap(pool: Pool): Promise<BootstrapOutput> {
     },
     how_to_extend: {
       summary:
-        "You may manage_type and manage_relation without approval. Changes apply immediately. Safety is the activity log + undo — there is no proposal inbox. Destructive tools (delete, unlink, undo) require confirm: true.",
+        "You may manage_type and manage_relation without approval. Changes apply immediately. Safety is the activity log + undo — there is no proposal inbox. Destructive tools (delete, unlink, undo) require confirm: true. Identity is UUID. Call inspect_ontology to see system + authored types.",
       manage_type:
-        "Create or update a node type (slug, kind spine|artifact, parent_types, optional json_schema for nodes.data).",
+        "Create or update a node type (slug, kind spine|artifact, parent_types, optional json_schema for nodes.data). Applies immediately. System slugs: you may update description only; you cannot delete them. After creating a type, upsert a node with that type. Set parent_types to allow child_of placement under those parents.",
       manage_relation:
-        "Create or update a relation type (slug, kind hierarchy|associative, source_types, target_types, symmetry). Empty source/target lists mean any type.",
+        "Create or update a relation type (slug, kind hierarchy|associative, source_types, target_types, symmetry). Empty source/target lists mean any type. Applies immediately. System relations: description only.",
+      nodes:
+        "upsert creates or updates by UUID (omit id to create). Payload is typed: text/markdown, text/html, application/json, text/plain (inline). HTML itineraries belong on the node — do not round-trip through markdown. get returns the node plus incident edges. delete is a soft-delete and requires confirm: true.",
+      links:
+        "link validates then writes the edges table (the only source of truth for hierarchy and associations). child_of is the hierarchy verb; at most one per source; allowed parents come from the source type's parent_types. relates_to that fits the spine suggests child_of — it does not silently rewrite unless you pass upgrade: true. unlink requires confirm: true.",
     },
   });
 }

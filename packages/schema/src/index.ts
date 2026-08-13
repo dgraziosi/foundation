@@ -25,6 +25,46 @@ export {
   type LinkValidatorContext,
 } from "./link-validator.js";
 export {
+  DEFAULT_PAYLOAD,
+  INLINE_MEDIA_TYPES,
+  validateInlinePayload,
+  type InlineMediaType,
+} from "./payload.js";
+export {
+  assertSystemRelationPatch,
+  assertSystemTypePatch,
+  labelFromSlug,
+  missingConfirm,
+} from "./ontology-mutation.js";
+export {
+  DeleteInputSchema,
+  GetInputSchema,
+  GetSuccessSchema,
+  IncidentEdgeSchema,
+  InspectOntologyInputSchema,
+  InspectOntologySuccessSchema,
+  LinkInputSchema,
+  LinkSuccessSchema,
+  ManageRelationInputSchema,
+  ManageRelationSuccessSchema,
+  ManageTypeInputSchema,
+  ManageTypeSuccessSchema,
+  MutationOkSchema,
+  SlugSchema,
+  ToolErrorSchema,
+  UnlinkInputSchema,
+  UpsertInputSchema,
+  UpsertSuccessSchema,
+  isToolError,
+  toolError,
+  type IncidentEdge,
+  type LinkInput,
+  type ManageRelationInput,
+  type ManageTypeInput,
+  type ToolError,
+  type UpsertInput,
+} from "./mcp-io.js";
+export {
   ActivityActionSchema,
   ActivityActorSchema,
   ActivitySchema,

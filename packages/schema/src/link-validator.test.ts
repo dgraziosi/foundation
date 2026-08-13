@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { listValidRelationSlugs, validateLink } from "./link-validator.js";
+import { SEED_NODE_TYPES } from "./seeds.js";
+import type { NodeType } from "./types.js";
 
 const ids = {
   a: "11111111-1111-4111-8111-111111111111",
@@ -231,4 +233,43 @@ test("listValidRelationSlugs includes child_of for project → area", () => {
   assert.ok(slugs.includes("child_of"));
   assert.ok(slugs.includes("relates_to"));
   assert.ok(slugs.includes("supports"));
+});
+
+const meeting: NodeType = {
+  slug: "meeting",
+  label: "Meeting",
+  description: "A custom type",
+  kind: "artifact",
+  parent_types: ["project"],
+  json_schema: null,
+  is_system: false,
+};
+
+test("custom type with parent_types may child_of that parent", () => {
+  const result = validateLink(
+    {
+      from_id: ids.a,
+      to_id: ids.b,
+      relation_type: "child_of",
+      from_type: "meeting",
+      to_type: "project",
+    },
+    { nodeTypes: [...SEED_NODE_TYPES, meeting] },
+  );
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.relation_type, "child_of");
+});
+
+test("types without parent_types still cannot use child_of", () => {
+  const result = validateLink({
+    from_id: ids.a,
+    to_id: ids.b,
+    relation_type: "child_of",
+    from_type: "note",
+    to_type: "area",
+  });
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.match(result.error, /cannot be child_of|does not take a hierarchy parent/);
 });

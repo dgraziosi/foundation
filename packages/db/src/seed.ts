@@ -10,7 +10,6 @@ export async function seedSystemOntology(pool: pg.Pool): Promise<void> {
       ) VALUES ($1, $2, $3, $4, $5::text[], $6::jsonb, true)
       ON CONFLICT (slug) DO UPDATE SET
         label = EXCLUDED.label,
-        description = EXCLUDED.description,
         kind = EXCLUDED.kind,
         parent_types = EXCLUDED.parent_types,
         json_schema = EXCLUDED.json_schema,
@@ -37,7 +36,6 @@ export async function seedSystemOntology(pool: pg.Pool): Promise<void> {
       ) VALUES ($1, $2, $3, $4, $5::text[], $6::text[], $7, NULL, true)
       ON CONFLICT (slug) DO UPDATE SET
         label = EXCLUDED.label,
-        description = EXCLUDED.description,
         kind = EXCLUDED.kind,
         source_types = EXCLUDED.source_types,
         target_types = EXCLUDED.target_types,
