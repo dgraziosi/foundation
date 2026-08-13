@@ -81,6 +81,7 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
         title: "after title",
         payload: { media_type: "text/plain", storage: "inline", body: "v2" },
         status: "completed",
+        base_updated_at: created.node.updated_at,
       });
       assert.equal(isToolError(updated), false);
       if (isToolError(updated)) return;
@@ -107,6 +108,8 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
         from_id: a.node.id,
         to_id: b.node.id,
         relation_type: "inspired_by",
+        from_base_updated_at: a.node.updated_at,
+        to_base_updated_at: b.node.updated_at,
       });
       assert.equal(isToolError(linked), false);
       if (isToolError(linked)) return;
@@ -140,6 +143,8 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
         from_id: a.node.id,
         to_id: b.node.id,
         relation_type: "references",
+        from_base_updated_at: a.node.updated_at,
+        to_base_updated_at: b.node.updated_at,
       });
       assert.equal(isToolError(linked), false);
       if (isToolError(linked)) return;
@@ -158,6 +163,8 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
         from_id: a.node.id,
         to_id: b.node.id,
         relation_type: "references",
+        from_base_updated_at: a.node.updated_at,
+        to_base_updated_at: b.node.updated_at,
       });
       assert.equal(isToolError(relinked), false);
       if (isToolError(relinked)) return;
@@ -258,6 +265,8 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
         from_id: created.node.id,
         to_id: peer.node.id,
         relation_type: "references",
+        from_base_updated_at: created.node.updated_at,
+        to_base_updated_at: peer.node.updated_at,
       });
       assert.equal(isToolError(linked), false);
       if (isToolError(linked)) return;
@@ -325,6 +334,8 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
         from_id: created.node.id,
         to_id: peer.node.id,
         relation_type: "references",
+        from_base_updated_at: created.node.updated_at,
+        to_base_updated_at: peer.node.updated_at,
       });
       assert.equal(isToolError(linked), false);
       if (isToolError(linked)) return;
@@ -424,6 +435,8 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
         from_id: a.node.id,
         to_id: b.node.id,
         relation_type: "blocked_by_undo",
+        from_base_updated_at: a.node.updated_at,
+        to_base_updated_at: b.node.updated_at,
       });
       assert.equal(isToolError(linked), false);
       if (isToolError(linked)) return;
@@ -473,6 +486,7 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
         id: created.node.id,
         type: "note",
         title: "Retype me",
+        base_updated_at: created.node.updated_at,
       });
       assert.equal(isToolError(retyped), false);
       if (isToolError(retyped)) return;

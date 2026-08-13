@@ -80,6 +80,7 @@ export {
   UpsertInputSchema,
   UpsertPayloadSchema,
   UpsertSuccessSchema,
+  WriterIdentitySchema,
   isToolError,
   toolError,
   type IncidentEdge,
@@ -94,7 +95,15 @@ export {
   type UndoInput,
   type UpsertInput,
   type UpsertPayload,
+  type WriterIdentity,
 } from "./mcp-io.js";
+export {
+  LOST_UPDATE_SUGGESTION,
+  MISSING_BASE_SUGGESTION,
+  assertIfMatch,
+  parseTimestampMs,
+  timestampsEqual,
+} from "./cas.js";
 export {
   ActivityActionSchema,
   ActivityActorSchema,

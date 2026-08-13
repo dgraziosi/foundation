@@ -59,6 +59,12 @@ test(
            AND constraint_type = 'UNIQUE' AND constraint_name = 'blobs_sha256_unique'`,
       );
       assert.equal(sha[0]?.constraint_name, "blobs_sha256_unique");
+      const { rows: casCols } = await pool.query<{ column_name: string }>(
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_schema = current_schema() AND table_name = 'nodes'
+           AND column_name = 'idempotency_key'`,
+      );
+      assert.equal(casCols[0]?.column_name, "idempotency_key");
     } finally {
       await pool.end();
     }

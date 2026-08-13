@@ -23,6 +23,7 @@ export {
 } from "./queries.js";
 export {
   getActivityById,
+  getCreateActivityForNode,
   insertActivity,
   listActivity,
   markActivityUndone,
@@ -35,6 +36,7 @@ export {
   findEdge,
   getEdgeById,
   getNodeById,
+  getNodeByIdempotencyKey,
   insertEdge,
   insertNode,
   listEdgesTouching,
