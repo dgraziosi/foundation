@@ -1,4 +1,5 @@
 import {
+  countDeletedNodesByType,
   countEdgesByRelation,
   countNodesByType,
   countRelationsUsingSemanticParent,
@@ -13,6 +14,8 @@ import {
   getRelationType,
   insertActivity,
   markActivityUndone,
+  markNodeDeleteActivitiesIrreversible,
+  purgeDeletedNodesByType,
   restoreEdge,
   restoreNode,
   restoreNodeSnapshot,
@@ -200,6 +203,7 @@ async function invertUnlink(
 async function invertTypeChange(
   client: PoolClient,
   row: Activity,
+  options: { purgeDeleted?: boolean } = {},
 ): Promise<{ before: unknown; after: unknown; action: Activity["action"] } | ToolError> {
   const before = row.before == null ? null : snapshotType(row.before);
   const after = row.after == null ? null : snapshotType(row.after);
@@ -219,6 +223,13 @@ async function invertTypeChange(
         "Delete or retype those nodes first, then retry undo.",
       );
     }
+    const tombstones = await countDeletedNodesByType(client, slug);
+    if (tombstones > 0 && !options.purgeDeleted) {
+      return toolError(
+        `Cannot undo type create "${slug}": ${tombstones} deleted node(s) of that type are still restorable`,
+        "Undo those deletes to restore the nodes, or retry undo with confirm: true and purge_deleted: true to permanently drop the deleted nodes and their edges.",
+      );
+    }
     const parents = await countTypesUsingParent(client, slug);
     if (parents > 0) {
       return toolError(
@@ -233,8 +244,38 @@ async function invertTypeChange(
     if (current.is_system) {
       return toolError(`Cannot delete system type "${slug}"`);
     }
-    const removed = await deleteNodeType(client, slug);
-    return { action: "type_change", before: current, after: removed ?? null };
+    if (tombstones > 0) {
+      const purged = await purgeDeletedNodesByType(client, slug);
+      for (const edge of purged.edges) {
+        await insertActivity(client, {
+          actor: row.actor,
+          actor_label: row.actor_label,
+          action: "unlink",
+          target_kind: "edge",
+          target_id: edge.id,
+          before: edge,
+          after: null,
+          reversible: false,
+          rationale: `Purge deleted nodes while undoing type create ${slug}`,
+        });
+      }
+      await markNodeDeleteActivitiesIrreversible(
+        client,
+        purged.nodes.map((node) => node.id),
+      );
+    }
+    try {
+      const removed = await deleteNodeType(client, slug);
+      return { action: "type_change", before: current, after: removed ?? null };
+    } catch (error) {
+      if (isForeignKeyViolation(error)) {
+        return toolError(
+          `Cannot undo type create "${slug}": deleted nodes still reference it`,
+          "Undo those deletes to restore the nodes, or retry undo with confirm: true and purge_deleted: true to permanently drop the deleted nodes and their edges.",
+        );
+      }
+      throw error;
+    }
   }
 
   if (before) {
@@ -385,7 +426,9 @@ export async function undoGraphActivity(
         inverted = await invertUnlink(client, row);
         break;
       case "type_change":
-        inverted = await invertTypeChange(client, row);
+        inverted = await invertTypeChange(client, row, {
+          purgeDeleted: input.purge_deleted === true,
+        });
         break;
       case "relation_change":
         inverted = await invertRelationChange(client, row);

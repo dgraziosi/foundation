@@ -293,6 +293,14 @@ export async function countNodesByType(db: Queryable, slug: string): Promise<num
   return Number(rows[0]?.n ?? 0);
 }
 
+export async function countDeletedNodesByType(db: Queryable, slug: string): Promise<number> {
+  const { rows } = await db.query<{ n: string }>(
+    `SELECT COUNT(*)::text AS n FROM nodes WHERE type = $1 AND deleted_at IS NOT NULL`,
+    [slug],
+  );
+  return Number(rows[0]?.n ?? 0);
+}
+
 export async function countTypesUsingParent(db: Queryable, slug: string): Promise<number> {
   const { rows } = await db.query<{ n: string }>(
     `SELECT COUNT(*)::text AS n FROM node_types WHERE $1 = ANY(parent_types)`,
@@ -321,15 +329,6 @@ export async function countRelationsUsingSemanticParent(
 }
 
 export async function deleteNodeType(db: Queryable, slug: string): Promise<NodeType | undefined> {
-  // Tombstones still reference node_types(slug). Drop them (and incident edges)
-  // so undoing a type create can succeed after live nodes are gone.
-  await db.query(
-    `DELETE FROM edges
-     WHERE from_id IN (SELECT id FROM nodes WHERE type = $1 AND deleted_at IS NOT NULL)
-        OR to_id IN (SELECT id FROM nodes WHERE type = $1 AND deleted_at IS NOT NULL)`,
-    [slug],
-  );
-  await db.query(`DELETE FROM nodes WHERE type = $1 AND deleted_at IS NOT NULL`, [slug]);
   const { rows } = await db.query<NodeTypeRow>(
     `DELETE FROM node_types
      WHERE slug = $1 AND is_system = false

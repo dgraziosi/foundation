@@ -323,6 +323,28 @@ export async function deleteEdgeById(db: Queryable, id: string) {
   return rows[0] ? mapEdge(rows[0]) : undefined;
 }
 
+export async function purgeDeletedNodesByType(
+  db: Queryable,
+  slug: string,
+): Promise<{ nodes: Node[]; edges: ReturnType<typeof mapEdge>[] }> {
+  const edges = await db.query<EdgeRow>(
+    `DELETE FROM edges
+     WHERE from_id IN (SELECT id FROM nodes WHERE type = $1 AND deleted_at IS NOT NULL)
+        OR to_id IN (SELECT id FROM nodes WHERE type = $1 AND deleted_at IS NOT NULL)
+     RETURNING id, from_id, to_id, relation_type, metadata, created_at`,
+    [slug],
+  );
+  const nodes = await db.query<NodeRow>(
+    `DELETE FROM nodes WHERE type = $1 AND deleted_at IS NOT NULL
+     RETURNING id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at`,
+    [slug],
+  );
+  return {
+    nodes: nodes.rows.map(mapNode),
+    edges: edges.rows.map(mapEdge),
+  };
+}
+
 export async function restoreEdge(
   db: Queryable,
   snapshot: {

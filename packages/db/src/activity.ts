@@ -129,6 +129,26 @@ export async function listActivity(
   return rows.map(mapActivity);
 }
 
+export async function markNodeDeleteActivitiesIrreversible(
+  db: Queryable,
+  nodeIds: string[],
+): Promise<number> {
+  if (nodeIds.length === 0) {
+    return 0;
+  }
+  const { rowCount } = await db.query(
+    `UPDATE activity
+     SET reversible = false, undo_token = NULL
+     WHERE action = 'delete'
+       AND target_kind = 'node'
+       AND target_id = ANY($1::text[])
+       AND undone_at IS NULL
+       AND reversible = true`,
+    [nodeIds],
+  );
+  return rowCount ?? 0;
+}
+
 export async function markActivityUndone(
   db: Queryable,
   id: string,

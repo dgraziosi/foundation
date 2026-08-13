@@ -17,7 +17,7 @@ v1 surface is **12 tools**. Destructive tools require `confirm: true` or they re
 | `manage_type` | shipped (slice 6) | Create or update a node type. Applies immediately. |
 | `manage_relation` | shipped (slice 6) | Create or update a relation type. Applies immediately. |
 | `list_activity` | shipped (slice 7) | Read the activity log (filter by action, target, since). |
-| `undo` | shipped (slice 7) | Reverse a reversible activity row by id. Requires `confirm: true`. |
+| `undo` | shipped (slice 7) | Reverse a reversible activity row by id. Requires `confirm: true`. Type-create undo with leftover deleted nodes needs `purge_deleted: true`. |
 
 Handler contract: each tool has one zod input schema and one output schema; JSON Schema on the wire is derived; invalid input never reaches the domain; domain errors are `{ error, suggestion? }`.
 
@@ -91,7 +91,7 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 
 ### `undo`
 
-- **In:** `{ id, confirm: true }` (`id` is an activity row id)
+- **In:** `{ id, confirm: true, purge_deleted? }` (`id` is an activity row id)
 - **Out:** `{ ok, activity_id }` or `{ error, suggestion? }`
 - `activity_id` is the compensating row (`reversible = false`). Invert map (REDESIGN §4.7):
 
@@ -104,6 +104,8 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 | unlink | re-insert edge from `before` |
 | type/relation create | delete registry row if unused; else refuse |
 | type/relation update | restore `before` row |
+
+Live nodes of a type still block type-create undo. Soft-deleted nodes stay restorable via undo-of-delete while the type row exists. If only tombstones remain, undo returns `{ error, suggestion }`: restore those nodes first, or pass `purge_deleted: true` (with `confirm: true`) to hard-delete the tombstones and their incident edges, write unlink activity, and mark those prior delete rows non-reversible. Type-create undo never silently purges.
 
 Undo tokens are single-use (`undone_at`; token cleared). Expired tokens refuse. Undo of undo is the compensating row (`reversible = false`).
 

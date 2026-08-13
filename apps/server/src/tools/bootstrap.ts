@@ -40,7 +40,7 @@ export async function buildBootstrap(pool: Pool): Promise<BootstrapOutput> {
       links:
         "link validates then writes the edges table (the only source of truth for hierarchy and associations). child_of is the hierarchy verb; at most one per source; allowed parents come from the source type's parent_types. relates_to that fits the spine suggests child_of — it does not silently rewrite unless you pass upgrade: true. unlink requires confirm: true. get and link ignore edges whose endpoints are deleted; reparenting drops a stale child_of to a deleted parent and records an unlink activity row.",
       activity:
-        "list_activity filters by action, target (target_id), and since. Every mutation writes a row with before/after snapshots. undo inverts a reversible row by id and requires confirm: true. Tokens are single-use (undone_at); expired tokens refuse. Undo of undo writes a compensating row with reversible = false.",
+        "list_activity filters by action, target (target_id), and since. Every mutation writes a row with before/after snapshots. undo inverts a reversible row by id and requires confirm: true. Tokens are single-use (undone_at); expired tokens refuse. Undo of undo writes a compensating row with reversible = false. Undoing a type create while deleted nodes of that type remain requires purge_deleted: true (otherwise restore those nodes first via undo of their deletes).",
       search:
         "search uses Postgres full-text search on title plus extracted inline payload text (HTML tags stripped; JSON stringified). Filter by type. Soft-deleted nodes are excluded. This is lexical recall — search the itinerary back — not embeddings.",
     },

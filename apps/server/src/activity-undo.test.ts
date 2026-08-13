@@ -237,62 +237,170 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
       assert.match(blocked.error, /still use it/);
     });
 
-    await t.test("undo of type create succeeds after live nodes of that type are gone", async () => {
-      const byDelete = await manageType(pool, {
+    await t.test("undo of type create without purge keeps tombstones restorable", async () => {
+      const typed = await manageType(pool, {
         action: "create",
         slug: "meeting_tombstone",
         kind: "artifact",
       });
-      assert.equal(isToolError(byDelete), false);
-      if (isToolError(byDelete)) return;
-      const deletedNode = await upsertGraphNode(pool, {
+      assert.equal(isToolError(typed), false);
+      if (isToolError(typed)) return;
+      const created = await upsertGraphNode(pool, {
         type: "meeting_tombstone",
         title: "Deleted kickoff",
       });
-      assert.equal(isToolError(deletedNode), false);
-      if (isToolError(deletedNode)) return;
-      const deleted = await deleteGraphNode(pool, { id: deletedNode.node.id, confirm: true });
+      assert.equal(isToolError(created), false);
+      if (isToolError(created)) return;
+      const peer = await upsertGraphNode(pool, { type: "note", title: "peer" });
+      assert.equal(isToolError(peer), false);
+      if (isToolError(peer)) return;
+      const linked = await linkGraphNodes(pool, {
+        from_id: created.node.id,
+        to_id: peer.node.id,
+        relation_type: "references",
+      });
+      assert.equal(isToolError(linked), false);
+      if (isToolError(linked)) return;
+      const deleted = await deleteGraphNode(pool, { id: created.node.id, confirm: true });
       assert.equal(isToolError(deleted), false);
+      if (isToolError(deleted)) return;
 
-      const afterDelete = await undoGraphActivity(pool, {
-        id: byDelete.activity_id,
+      const refused = await undoGraphActivity(pool, {
+        id: typed.activity_id,
         confirm: true,
       });
-      assert.equal(isToolError(afterDelete), false);
-      if (isToolError(afterDelete)) return;
-      const ontologyAfterDelete = await inspectOntology(pool, "types");
+      assert.equal(isToolError(refused), true);
+      if (!isToolError(refused)) return;
+      assert.match(refused.error, /deleted node/);
+      assert.match(refused.suggestion ?? "", /purge_deleted: true/);
+
+      const ontology = await inspectOntology(pool, "types");
       assert.equal(
-        ontologyAfterDelete.types.some((type) => type.slug === "meeting_tombstone"),
+        ontology.types.some((type) => type.slug === "meeting_tombstone"),
+        true,
+      );
+      const listed = await listGraphActivity(pool, { action: "delete", target: created.node.id });
+      assert.equal(isToolError(listed), false);
+      if (isToolError(listed)) return;
+      assert.equal(
+        listed.activities.find((row) => row.id === deleted.activity_id)?.reversible,
+        true,
+      );
+
+      const restored = await undoGraphActivity(pool, { id: deleted.activity_id, confirm: true });
+      assert.equal(isToolError(restored), false);
+      const got = await getGraphNode(pool, created.node.id);
+      assert.equal(isToolError(got), false);
+      if (isToolError(got)) return;
+      assert.equal(got.node.title, "Deleted kickoff");
+      assert.equal(got.edges.some((edge) => edge.relation_type === "references"), true);
+
+      const blockedLive = await undoGraphActivity(pool, {
+        id: typed.activity_id,
+        confirm: true,
+      });
+      assert.equal(isToolError(blockedLive), true);
+      if (!isToolError(blockedLive)) return;
+      assert.match(blockedLive.error, /still use it/);
+    });
+
+    await t.test("undo of type create with purge_deleted drops tombstones and prior delete undos", async () => {
+      const typed = await manageType(pool, {
+        action: "create",
+        slug: "meeting_purge",
+        kind: "artifact",
+      });
+      assert.equal(isToolError(typed), false);
+      if (isToolError(typed)) return;
+      const created = await upsertGraphNode(pool, {
+        type: "meeting_purge",
+        title: "Purged kickoff",
+      });
+      assert.equal(isToolError(created), false);
+      if (isToolError(created)) return;
+      const peer = await upsertGraphNode(pool, { type: "note", title: "purge peer" });
+      assert.equal(isToolError(peer), false);
+      if (isToolError(peer)) return;
+      const linked = await linkGraphNodes(pool, {
+        from_id: created.node.id,
+        to_id: peer.node.id,
+        relation_type: "references",
+      });
+      assert.equal(isToolError(linked), false);
+      if (isToolError(linked)) return;
+      const deleted = await deleteGraphNode(pool, { id: created.node.id, confirm: true });
+      assert.equal(isToolError(deleted), false);
+      if (isToolError(deleted)) return;
+
+      const purged = await undoGraphActivity(pool, {
+        id: typed.activity_id,
+        confirm: true,
+        purge_deleted: true,
+      });
+      assert.equal(isToolError(purged), false);
+      const ontology = await inspectOntology(pool, "types");
+      assert.equal(
+        ontology.types.some((type) => type.slug === "meeting_purge"),
         false,
       );
 
-      const byUndoCreate = await manageType(pool, {
+      const listed = await listGraphActivity(pool, { action: "delete", target: created.node.id });
+      assert.equal(isToolError(listed), false);
+      if (isToolError(listed)) return;
+      assert.equal(
+        listed.activities.find((row) => row.id === deleted.activity_id)?.reversible,
+        false,
+      );
+
+      const restoreRefused = await undoGraphActivity(pool, {
+        id: deleted.activity_id,
+        confirm: true,
+      });
+      assert.equal(isToolError(restoreRefused), true);
+      if (!isToolError(restoreRefused)) return;
+      assert.match(restoreRefused.error, /not reversible/);
+
+      const gone = await getGraphNode(pool, created.node.id);
+      assert.equal(isToolError(gone), true);
+    });
+
+    await t.test("undo of type create after undoing node create still needs purge_deleted", async () => {
+      const typed = await manageType(pool, {
         action: "create",
         slug: "meeting_undone_node",
         kind: "artifact",
       });
-      assert.equal(isToolError(byUndoCreate), false);
-      if (isToolError(byUndoCreate)) return;
-      const createdNode = await upsertGraphNode(pool, {
+      assert.equal(isToolError(typed), false);
+      if (isToolError(typed)) return;
+      const created = await upsertGraphNode(pool, {
         type: "meeting_undone_node",
         title: "Undone kickoff",
       });
-      assert.equal(isToolError(createdNode), false);
-      if (isToolError(createdNode)) return;
+      assert.equal(isToolError(created), false);
+      if (isToolError(created)) return;
       const nodeUndone = await undoGraphActivity(pool, {
-        id: createdNode.activity_id,
+        id: created.activity_id,
         confirm: true,
       });
       assert.equal(isToolError(nodeUndone), false);
 
-      const afterUndoCreate = await undoGraphActivity(pool, {
-        id: byUndoCreate.activity_id,
+      const refused = await undoGraphActivity(pool, {
+        id: typed.activity_id,
         confirm: true,
       });
-      assert.equal(isToolError(afterUndoCreate), false);
-      const ontologyAfterUndo = await inspectOntology(pool, "types");
+      assert.equal(isToolError(refused), true);
+      if (!isToolError(refused)) return;
+      assert.match(refused.error, /deleted node/);
+
+      const purged = await undoGraphActivity(pool, {
+        id: typed.activity_id,
+        confirm: true,
+        purge_deleted: true,
+      });
+      assert.equal(isToolError(purged), false);
+      const ontology = await inspectOntology(pool, "types");
       assert.equal(
-        ontologyAfterUndo.types.some((type) => type.slug === "meeting_undone_node"),
+        ontology.types.some((type) => type.slug === "meeting_undone_node"),
         false,
       );
     });

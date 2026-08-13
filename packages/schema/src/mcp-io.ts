@@ -171,5 +171,7 @@ export const ListActivitySuccessSchema = z.object({
 export const UndoInputSchema = z.object({
   id: z.string().uuid(),
   confirm: z.boolean().optional(),
+  /** Permanently drop leftover soft-deleted nodes when undoing a type create. */
+  purge_deleted: z.boolean().optional(),
 });
 export type UndoInput = z.infer<typeof UndoInputSchema>;
