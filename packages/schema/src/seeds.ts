@@ -123,10 +123,10 @@ export const SEED_RELATION_TYPES: readonly RelationType[] = [
     slug: "child_of",
     label: "Child of",
     description:
-      "Hierarchy placement. Source is the child; target is the parent. At most one child_of per source node. Allowed parents come from the source type's parent_types.",
+      "Hierarchy placement. Source is the child; target is the parent. At most one child_of per source node. Allowed parents come from the source type's parent_types — including types you add with manage_type.",
     kind: "hierarchy",
-    source_types: ["project", "goal", "habit", "task", "lesson"],
-    target_types: ["area", "project", "goal"],
+    source_types: [],
+    target_types: [],
     is_symmetric: false,
     semantic_parent_slug: null,
     is_system: true,

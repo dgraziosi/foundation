@@ -3,8 +3,8 @@ import pg from "pg";
 export type Pool = pg.Pool;
 export type PoolClient = pg.PoolClient;
 
-export function createPool(databaseUrl: string): pg.Pool {
-  return new pg.Pool({ connectionString: databaseUrl });
+export function createPool(databaseUrl: string, options: pg.PoolConfig = {}): pg.Pool {
+  return new pg.Pool({ connectionString: databaseUrl, ...options });
 }
 
 export async function waitForDb(pool: pg.Pool, attempts = 30, delayMs = 1000): Promise<void> {

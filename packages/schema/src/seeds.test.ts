@@ -40,6 +40,8 @@ test("seed relations include child_of and associative verbs", () => {
   const childOf = SEED_RELATION_TYPES.find((type) => type.slug === "child_of");
   assert.equal(childOf?.kind, "hierarchy");
   assert.equal(childOf?.is_symmetric, false);
+  assert.deepEqual(childOf?.source_types, []);
+  assert.deepEqual(childOf?.target_types, []);
   const relatesTo = SEED_RELATION_TYPES.find((type) => type.slug === "relates_to");
   assert.equal(relatesTo?.is_symmetric, true);
 });
