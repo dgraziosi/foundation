@@ -6,6 +6,12 @@ Foundation is a small, self-hostable **typed knowledge graph + MCP server** for 
 
 The name is a nod to Asimov: carry structured knowledge forward so you (and your agents) are not starting from zero every time.
 
+## Docs
+
+- [`docs/SPEC.md`](docs/SPEC.md) — product contract (goals, non-goals, data/MCP/runtime principles)
+- [`docs/REDESIGN.md`](docs/REDESIGN.md) — redesign map vs Momentum (`replit-agent`): what to keep, what to discard, architecture, data model, slim MCP tools, implementation slices
+- [`docs/MCP_TOOLS.md`](docs/MCP_TOOLS.md) — proposed 12-tool MCP surface
+
 ## What it is
 
 - **Nodes** with types (e.g. area → project → goal → habit/task, plus whatever emerges)
@@ -22,7 +28,9 @@ The name is a nod to Asimov: carry structured knowledge forward so you (and your
 
 ## Status
 
-Scaffolding. Extracting the ontology kernel + MCP surface from [Momentum](https://github.com/dgraziosi/Momentum-React-Native) (`replit-agent`), then simplifying for this use case.
+Design. The redesign map is in [`docs/REDESIGN.md`](docs/REDESIGN.md). Implementation (Docker Compose + MCP) starts after that map is approved — no app scaffold yet.
+
+Reference ideas (not a dump): [Momentum](https://github.com/dgraziosi/Momentum-React-Native) branch `replit-agent`.
 
 See [docs/SPEC.md](docs/SPEC.md) for the product contract.
 
