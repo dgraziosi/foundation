@@ -452,8 +452,8 @@ export async function undoGraphActivity(
     }
 
     const compensating = await insertActivity(client, {
-      actor: row.actor,
-      actor_label: row.actor_label,
+      actor: input.actor ?? row.actor,
+      actor_label: input.actor_label ?? row.actor_label,
       action: inverted.action,
       target_kind: row.target_kind,
       target_id: row.target_id,

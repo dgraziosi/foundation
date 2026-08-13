@@ -134,7 +134,12 @@ test("blob nodes: ingest, get metadata, HTTP bytes, snapshots, delete keeps file
 
       const updated = await upsertGraphNode(
         pool,
-        { id: created.node.id, type: "note", title: "Renamed blob note" },
+        {
+          id: created.node.id,
+          type: "note",
+          title: "Renamed blob note",
+          base_updated_at: created.node.updated_at,
+        },
         blobs,
       );
       assert.equal(isToolError(updated), false);

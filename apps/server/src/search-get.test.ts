@@ -65,6 +65,8 @@ test(
         from_id: project.node.id,
         to_id: person.node.id,
         relation_type: "about",
+        from_base_updated_at: project.node.updated_at,
+        to_base_updated_at: person.node.updated_at,
       });
       assert.equal(isToolError(linked), false);
 

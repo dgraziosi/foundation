@@ -3,7 +3,9 @@ import {
   deleteEdge,
   findEdge,
   getBlobById,
+  getCreateActivityForNode,
   getNodeById,
+  getNodeByIdempotencyKey,
   getNodeType,
   getRelationType,
   ingestBlobBytes,
@@ -29,6 +31,7 @@ import {
   updateRelationType,
   updateRelationTypeDescription,
   withTransaction,
+  isUniqueViolation,
   type BlobRuntime,
   type Pool,
   type Queryable,
@@ -49,6 +52,7 @@ import {
   validateLink,
   SEARCH_MISS_SUGGESTION,
   SEARCH_UUID_SUGGESTION,
+  assertIfMatch,
   type Activity,
   type Blob,
   type Edge,
@@ -71,6 +75,36 @@ import { randomUUID } from "node:crypto";
 import { undoGraphActivity } from "./undo.js";
 
 export { undoGraphActivity };
+
+function writerOf(input: { actor?: Activity["actor"]; actor_label?: string }): {
+  actor: Activity["actor"];
+  actor_label: string | null;
+} {
+  return {
+    actor: input.actor ?? "agent",
+    actor_label: input.actor_label ?? null,
+  };
+}
+
+async function replayIdempotentCreate(
+  db: Queryable,
+  node: Node,
+): Promise<{ node: Node; activity_id: string } | ToolError> {
+  if (node.deleted_at) {
+    return toolError(
+      `Idempotency key already used by deleted node ${node.id}`,
+      "Restore via undo, or pass a new idempotency_key to create another node.",
+    );
+  }
+  const created = await getCreateActivityForNode(db, node.id);
+  if (!created) {
+    return toolError(
+      `Idempotency key already used by node ${node.id}`,
+      "Call get with that id. Do not create a twin.",
+    );
+  }
+  return { node, activity_id: created.id };
+}
 
 async function knownTypeSlugs(pool: Pool): Promise<string> {
   const types = await listNodeTypes(pool);
@@ -302,12 +336,24 @@ export async function upsertGraphNode(
 
   let createdBlobAbs: string | undefined;
   let pendingUploadUnlink: string | undefined;
+  let discardCreatedBlob = false;
+  const writer = writerOf(input);
+
+  async function applyResolvedPayload(resolved: ResolvedStoredPayload): Promise<void> {
+    pendingUploadUnlink = resolved.pendingUploadUnlink;
+    if (resolved.created && resolved.blob && blobs) {
+      const abs = resolveBlobFilePath(blobs.dataDir, resolved.blob.path);
+      if (typeof abs === "string") {
+        createdBlobAbs = abs;
+      }
+    }
+  }
 
   try {
     const result = await withTransaction(pool, async (client) => {
       let existing: Node | undefined;
       if (input.id) {
-        existing = await getNodeById(client, input.id, { includeDeleted: true });
+        existing = await getNodeById(client, input.id, { includeDeleted: true, forUpdate: true });
         if (existing?.deleted_at) {
           return toolError(
             `Node ${input.id} is deleted`,
@@ -316,19 +362,25 @@ export async function upsertGraphNode(
         }
       }
 
-      const resolved = await resolveStoredPayload(client, input.payload, blobs);
-      if ("error" in resolved) {
-        return resolved;
-      }
-      pendingUploadUnlink = resolved.pendingUploadUnlink;
-      if (resolved.created && resolved.blob && blobs) {
-        const abs = resolveBlobFilePath(blobs.dataDir, resolved.blob.path);
-        if (typeof abs === "string") {
-          createdBlobAbs = abs;
+      if (!existing && input.idempotency_key) {
+        const replay = await getNodeByIdempotencyKey(client, input.idempotency_key, {
+          includeDeleted: true,
+        });
+        if (replay) {
+          return replayIdempotentCreate(client, replay);
         }
       }
 
       if (existing) {
+        const resolved = await resolveStoredPayload(client, input.payload, blobs);
+        if ("error" in resolved) {
+          return resolved;
+        }
+        await applyResolvedPayload(resolved);
+        const stale = assertIfMatch("base_updated_at", input.base_updated_at, existing.updated_at);
+        if (stale) {
+          return stale;
+        }
         const node = await updateNode(client, input.id!, {
           type: input.type,
           title: input.title,
@@ -336,11 +388,18 @@ export async function upsertGraphNode(
           payload: resolved.payload,
           data: input.data,
           metadata: input.metadata,
+          base_updated_at: input.base_updated_at,
         });
         if (!node) {
-          return toolError(`Node not found: ${input.id}`);
+          const current = await getNodeById(client, input.id!);
+          if (!current) {
+            return toolError(`Node not found: ${input.id}`);
+          }
+          return assertIfMatch("base_updated_at", input.base_updated_at, current.updated_at) ??
+            toolError(`Node not found: ${input.id}`);
         }
         const activity = await insertActivity(client, {
+          ...writer,
           action: "update",
           target_kind: "node",
           target_id: node.id,
@@ -350,30 +409,56 @@ export async function upsertGraphNode(
         return { node, activity_id: activity.id };
       }
 
-      const node = await insertNode(client, {
-        id: input.id ?? randomUUID(),
-        type: input.type,
-        title: input.title,
-        status: input.status ?? "active",
-        payload: resolved.payload ?? DEFAULT_PAYLOAD,
-        data: input.data ?? {},
-        metadata: input.metadata ?? {},
-      });
-      const activity = await insertActivity(client, {
-        action: "create",
-        target_kind: "node",
-        target_id: node.id,
-        before: null,
-        after: await snapshotNodeForActivity(client, node, resolved.blob),
-      });
-      return { node, activity_id: activity.id };
+      await client.query("SAVEPOINT upsert_insert");
+      try {
+        const resolved = await resolveStoredPayload(client, input.payload, blobs);
+        if ("error" in resolved) {
+          return resolved;
+        }
+        await applyResolvedPayload(resolved);
+        const node = await insertNode(client, {
+          id: input.id ?? randomUUID(),
+          type: input.type,
+          title: input.title,
+          status: input.status ?? "active",
+          payload: resolved.payload ?? DEFAULT_PAYLOAD,
+          data: input.data ?? {},
+          metadata: input.metadata ?? {},
+          idempotency_key: input.idempotency_key ?? null,
+        });
+        await client.query("RELEASE SAVEPOINT upsert_insert");
+        const activity = await insertActivity(client, {
+          ...writer,
+          action: "create",
+          target_kind: "node",
+          target_id: node.id,
+          before: null,
+          after: await snapshotNodeForActivity(client, node, resolved.blob),
+        });
+        return { node, activity_id: activity.id };
+      } catch (error) {
+        if (isUniqueViolation(error) && input.idempotency_key) {
+          await client.query("ROLLBACK TO SAVEPOINT upsert_insert");
+          discardCreatedBlob = true;
+          pendingUploadUnlink = undefined;
+          const replay = await getNodeByIdempotencyKey(client, input.idempotency_key, {
+            includeDeleted: true,
+          });
+          if (replay) {
+            return replayIdempotentCreate(client, replay);
+          }
+        }
+        throw error;
+      }
     });
 
-    if (isToolError(result)) {
+    if (isToolError(result) || discardCreatedBlob) {
       if (createdBlobAbs) {
         await unlinkQuiet(createdBlobAbs);
       }
-      return result;
+      if (isToolError(result)) {
+        return result;
+      }
     }
     if (pendingUploadUnlink) {
       await unlinkQuiet(pendingUploadUnlink);
@@ -389,12 +474,13 @@ export async function upsertGraphNode(
 
 export async function deleteGraphNode(
   pool: Pool,
-  input: { id: string; confirm?: boolean },
+  input: { id: string; confirm?: boolean; actor?: Activity["actor"]; actor_label?: string },
 ): Promise<{ ok: true; activity_id: string } | ToolError> {
   const confirmErr = missingConfirm("delete", input.confirm);
   if (confirmErr) {
     return confirmErr;
   }
+  const writer = writerOf(input);
   return withTransaction(pool, async (client) => {
     const before = await getNodeById(client, input.id);
     if (!before) {
@@ -408,6 +494,7 @@ export async function deleteGraphNode(
       return toolError(`Node not found: ${input.id}`);
     }
     const activity = await insertActivity(client, {
+      ...writer,
       action: "delete",
       target_kind: "node",
       target_id: after.id,
@@ -422,17 +509,36 @@ export async function linkGraphNodes(
   pool: Pool,
   input: LinkInput,
 ): Promise<{ edge: Edge; activity_id: string; suggestion?: string } | ToolError> {
+  const writer = writerOf(input);
   return withTransaction(pool, async (client) => {
-    const from = await getNodeById(client, input.from_id);
-    const to = await getNodeById(client, input.to_id);
-    if (!from) {
-      return toolError(
-        `from_id not found: ${input.from_id}`,
-        "Pass a live node UUID from upsert.",
-      );
+    const lockOrder =
+      input.from_id <= input.to_id
+        ? [input.from_id, input.to_id]
+        : [input.to_id, input.from_id];
+    const locked = new Map<string, Node>();
+    for (const id of lockOrder) {
+      if (locked.has(id)) {
+        continue;
+      }
+      const node = await getNodeById(client, id, { forUpdate: true });
+      if (!node) {
+        const which = id === input.from_id ? "from_id" : "to_id";
+        return toolError(
+          `${which} not found: ${id}`,
+          "Pass a live node UUID from upsert.",
+        );
+      }
+      locked.set(id, node);
     }
-    if (!to) {
-      return toolError(`to_id not found: ${input.to_id}`, "Pass a live node UUID from upsert.");
+    const from = locked.get(input.from_id)!;
+    const to = locked.get(input.to_id)!;
+    const fromStale = assertIfMatch("from_base_updated_at", input.from_base_updated_at, from.updated_at);
+    if (fromStale) {
+      return fromStale;
+    }
+    const toStale = assertIfMatch("to_base_updated_at", input.to_base_updated_at, to.updated_at);
+    if (toStale) {
+      return toStale;
     }
 
     const nodeTypes = await listNodeTypes(client);
@@ -462,6 +568,7 @@ export async function linkGraphNodes(
     });
     for (const dropped of droppedStaleChildOf) {
       await insertActivity(client, {
+        ...writer,
         action: "unlink",
         target_kind: "edge",
         target_id: dropped.id,
@@ -470,6 +577,7 @@ export async function linkGraphNodes(
       });
     }
     const activity = await insertActivity(client, {
+      ...writer,
       action: "link",
       target_kind: "edge",
       target_id: edge.id,
@@ -486,12 +594,20 @@ export async function linkGraphNodes(
 
 export async function unlinkGraphNodes(
   pool: Pool,
-  input: { from_id: string; to_id: string; relation_type: string; confirm?: boolean },
+  input: {
+    from_id: string;
+    to_id: string;
+    relation_type: string;
+    confirm?: boolean;
+    actor?: Activity["actor"];
+    actor_label?: string;
+  },
 ): Promise<{ ok: true; activity_id: string } | ToolError> {
   const confirmErr = missingConfirm("unlink", input.confirm);
   if (confirmErr) {
     return confirmErr;
   }
+  const writer = writerOf(input);
   return withTransaction(pool, async (client) => {
     const before = await findEdge(client, input.from_id, input.to_id, input.relation_type);
     if (!before) {
@@ -502,6 +618,7 @@ export async function unlinkGraphNodes(
     }
     const deleted = await deleteEdge(client, input.from_id, input.to_id, input.relation_type);
     const activity = await insertActivity(client, {
+      ...writer,
       action: "unlink",
       target_kind: "edge",
       target_id: before.id,
@@ -525,6 +642,7 @@ export async function manageType(
   pool: Pool,
   input: ManageTypeInput,
 ): Promise<{ type: NodeType; activity_id: string } | ToolError> {
+  const writer = writerOf(input);
   const existing = await getNodeType(pool, input.slug);
 
   if (input.action === "create") {
@@ -549,6 +667,7 @@ export async function manageType(
         json_schema: input.json_schema ?? null,
       });
       const activity = await insertActivity(client, {
+        ...writer,
         action: "type_change",
         target_kind: "type",
         target_id: type.slug,
@@ -586,6 +705,7 @@ export async function manageType(
         return toolError(`Type "${input.slug}" not found`);
       }
       const activity = await insertActivity(client, {
+        ...writer,
         action: "type_change",
         target_kind: "type",
         target_id: type.slug,
@@ -614,6 +734,7 @@ export async function manageType(
       return toolError(`Type "${input.slug}" not found`);
     }
     const activity = await insertActivity(client, {
+      ...writer,
       action: "type_change",
       target_kind: "type",
       target_id: type.slug,
@@ -628,6 +749,7 @@ export async function manageRelation(
   pool: Pool,
   input: ManageRelationInput,
 ): Promise<{ relation: RelationType; activity_id: string } | ToolError> {
+  const writer = writerOf(input);
   const existing = await getRelationType(pool, input.slug);
 
   if (input.action === "create") {
@@ -666,6 +788,7 @@ export async function manageRelation(
         semantic_parent_slug: input.semantic_parent_slug ?? null,
       });
       const activity = await insertActivity(client, {
+        ...writer,
         action: "relation_change",
         target_kind: "relation",
         target_id: relation.slug,
@@ -705,6 +828,7 @@ export async function manageRelation(
         return toolError(`Relation "${input.slug}" not found`);
       }
       const activity = await insertActivity(client, {
+        ...writer,
         action: "relation_change",
         target_kind: "relation",
         target_id: relation.slug,
@@ -753,6 +877,7 @@ export async function manageRelation(
       return toolError(`Relation "${input.slug}" not found`);
     }
     const activity = await insertActivity(client, {
+      ...writer,
       action: "relation_change",
       target_kind: "relation",
       target_id: relation.slug,

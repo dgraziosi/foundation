@@ -47,6 +47,9 @@ Names are locked. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md).
 
 - Destructive tools (`delete`, `unlink`, `undo`) require `confirm: true`
 - Identity is UUID. If you already have a UUID, call `get` — do not `search`
+- Updates (`upsert` with an existing id, `link`) are if-match: pass `base_updated_at` / endpoint timestamps from `get`. Mismatch → `{ error, suggestion }` (get and retry). Not a write-ACL.
+- `upsert` **merges** `data` on update (partial patch does not wipe other keys). Create accepts `idempotency_key` so a retry does not twin a node.
+- Activity stores optional `actor` / `actor_label` (who wrote). Not a permission gate.
 - `search` is Postgres FTS (title + `data` + extracted inline payload text). Not embeddings
 - No `get_vault_health` / `run_maintenance` / `audit_links` tools — those jobs are Librarian operator routines ([`VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md))
 

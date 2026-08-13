@@ -94,6 +94,20 @@ export async function insertActivity(
   return { id: rows[0]!.id };
 }
 
+export async function getCreateActivityForNode(
+  db: Queryable,
+  nodeId: string,
+): Promise<{ id: string } | undefined> {
+  const { rows } = await db.query<{ id: string }>(
+    `SELECT id FROM activity
+     WHERE target_kind = 'node' AND target_id = $1 AND action = 'create'
+     ORDER BY created_at ASC
+     LIMIT 1`,
+    [nodeId],
+  );
+  return rows[0];
+}
+
 export async function getActivityById(
   db: Queryable,
   id: string,

@@ -88,6 +88,7 @@ test(
           type: "note",
           title: "Renamed",
           status: "active",
+          base_updated_at: created.node.updated_at,
         });
         assert.equal(isToolError(updated), false);
         if (isToolError(updated)) return;
@@ -152,6 +153,8 @@ test(
           from_id: project.node.id,
           to_id: area.node.id,
           relation_type: "child_of",
+          from_base_updated_at: project.node.updated_at,
+          to_base_updated_at: area.node.updated_at,
         });
         assert.equal(isToolError(linked), false);
         if (isToolError(linked)) return;
@@ -173,6 +176,8 @@ test(
           from_id: project.node.id,
           to_id: area.node.id,
           relation_type: "child_of",
+          from_base_updated_at: project.node.updated_at,
+          to_base_updated_at: area.node.updated_at,
         });
         assert.equal(isToolError(second), true);
         if (!isToolError(second)) return;
@@ -192,6 +197,8 @@ test(
           from_id: project.node.id,
           to_id: oldArea.node.id,
           relation_type: "child_of",
+          from_base_updated_at: project.node.updated_at,
+          to_base_updated_at: oldArea.node.updated_at,
         });
         if (isToolError(linked)) {
           assert.fail(linked.error);
@@ -210,6 +217,8 @@ test(
           from_id: project.node.id,
           to_id: newArea.node.id,
           relation_type: "child_of",
+          from_base_updated_at: project.node.updated_at,
+          to_base_updated_at: newArea.node.updated_at,
         });
         assert.equal(isToolError(reparented), false);
         if (isToolError(reparented)) return;
@@ -260,6 +269,8 @@ test(
           from_id: project.node.id,
           to_id: area.node.id,
           relation_type: "relates_to",
+          from_base_updated_at: project.node.updated_at,
+          to_base_updated_at: area.node.updated_at,
         });
         assert.equal(isToolError(linked), false);
         if (isToolError(linked)) return;
@@ -278,6 +289,8 @@ test(
           from_id: a.node.id,
           to_id: b.node.id,
           relation_type: "inspired_by",
+          from_base_updated_at: a.node.updated_at,
+          to_base_updated_at: b.node.updated_at,
         });
         if (isToolError(linked)) {
           assert.fail(linked.error);
@@ -338,6 +351,8 @@ test(
           from_id: node.node.id,
           to_id: project.node.id,
           relation_type: "child_of",
+          from_base_updated_at: node.node.updated_at,
+          to_base_updated_at: project.node.updated_at,
         });
         assert.equal(isToolError(linked), false);
         if (isToolError(linked)) return;
@@ -391,6 +406,8 @@ test(
           from_id: a.node.id,
           to_id: b.node.id,
           relation_type: "blocked_by",
+          from_base_updated_at: a.node.updated_at,
+          to_base_updated_at: b.node.updated_at,
         });
         assert.equal(isToolError(linked), false);
       });

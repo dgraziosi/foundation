@@ -2,6 +2,7 @@ import { z } from "zod";
 import { BLOB_BASE64_MAX_CHARS } from "./blobs.js";
 import {
   ActivityActionSchema,
+  ActivityActorSchema,
   ActivitySchema,
   BlobSchema,
   EdgeSchema,
@@ -109,6 +110,13 @@ export const UpsertPayloadSchema = z
   });
 export type UpsertPayload = z.infer<typeof UpsertPayloadSchema>;
 
+/** Who wrote — stored on the activity row. Not a permission gate. */
+export const WriterIdentitySchema = z.object({
+  actor: ActivityActorSchema.optional(),
+  actor_label: z.string().trim().min(1).max(200).optional(),
+});
+export type WriterIdentity = z.infer<typeof WriterIdentitySchema>;
+
 export const UpsertInputSchema = z.object({
   id: z.string().uuid().optional(),
   type: z.string().min(1),
@@ -117,6 +125,12 @@ export const UpsertInputSchema = z.object({
   data: JsonObjectSchema.optional(),
   status: NodeStatusSchema.optional(),
   metadata: JsonObjectSchema.optional(),
+  /** Required on update: node's current `updated_at` from get. */
+  base_updated_at: z.string().min(1).optional(),
+  /** Create only: same key returns the existing node instead of a twin. */
+  idempotency_key: z.string().trim().min(1).max(200).optional(),
+  actor: ActivityActorSchema.optional(),
+  actor_label: z.string().trim().min(1).max(200).optional(),
 });
 export type UpsertInput = z.infer<typeof UpsertInputSchema>;
 
@@ -128,6 +142,8 @@ export const UpsertSuccessSchema = z.object({
 export const DeleteInputSchema = z.object({
   id: z.string().uuid(),
   confirm: z.boolean().optional(),
+  actor: ActivityActorSchema.optional(),
+  actor_label: z.string().trim().min(1).max(200).optional(),
 });
 
 export const MutationOkSchema = z.object({
@@ -141,6 +157,12 @@ export const LinkInputSchema = z.object({
   relation_type: z.string().min(1),
   upgrade: z.boolean().optional(),
   metadata: JsonObjectSchema.optional(),
+  /** Required: `from` node's `updated_at` from get. */
+  from_base_updated_at: z.string().min(1).optional(),
+  /** Required: `to` node's `updated_at` from get. */
+  to_base_updated_at: z.string().min(1).optional(),
+  actor: ActivityActorSchema.optional(),
+  actor_label: z.string().trim().min(1).max(200).optional(),
 });
 export type LinkInput = z.infer<typeof LinkInputSchema>;
 
@@ -155,6 +177,8 @@ export const UnlinkInputSchema = z.object({
   to_id: z.string().uuid(),
   relation_type: z.string().min(1),
   confirm: z.boolean().optional(),
+  actor: ActivityActorSchema.optional(),
+  actor_label: z.string().trim().min(1).max(200).optional(),
 });
 
 export const InspectOntologyInputSchema = z.object({
@@ -174,6 +198,8 @@ export const ManageTypeInputSchema = z.object({
   kind: TypeKindSchema.optional(),
   parent_types: z.array(z.string()).optional(),
   json_schema: z.unknown().nullable().optional(),
+  actor: ActivityActorSchema.optional(),
+  actor_label: z.string().trim().min(1).max(200).optional(),
 });
 export type ManageTypeInput = z.infer<typeof ManageTypeInputSchema>;
 
@@ -192,6 +218,8 @@ export const ManageRelationInputSchema = z.object({
   target_types: z.array(z.string()).optional(),
   is_symmetric: z.boolean().optional(),
   semantic_parent_slug: z.string().nullable().optional(),
+  actor: ActivityActorSchema.optional(),
+  actor_label: z.string().trim().min(1).max(200).optional(),
 });
 export type ManageRelationInput = z.infer<typeof ManageRelationInputSchema>;
 
@@ -245,5 +273,7 @@ export const UndoInputSchema = z.object({
   confirm: z.boolean().optional(),
   /** Permanently drop leftover soft-deleted nodes when undoing a type create. */
   purge_deleted: z.boolean().optional(),
+  actor: ActivityActorSchema.optional(),
+  actor_label: z.string().trim().min(1).max(200).optional(),
 });
 export type UndoInput = z.infer<typeof UndoInputSchema>;

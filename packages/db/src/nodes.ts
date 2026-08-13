@@ -33,15 +33,32 @@ export function mapNode(row: NodeRow): Node {
 export async function getNodeById(
   db: Queryable,
   id: string,
+  options: { includeDeleted?: boolean; forUpdate?: boolean } = {},
+): Promise<Node | undefined> {
+  const lock = options.forUpdate ? " FOR UPDATE" : "";
+  const { rows } = await db.query<NodeRow>(
+    options.includeDeleted
+      ? `SELECT id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at
+         FROM nodes WHERE id = $1${lock}`
+      : `SELECT id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at
+         FROM nodes WHERE id = $1 AND deleted_at IS NULL${lock}`,
+    [id],
+  );
+  return rows[0] ? mapNode(rows[0]) : undefined;
+}
+
+export async function getNodeByIdempotencyKey(
+  db: Queryable,
+  key: string,
   options: { includeDeleted?: boolean } = {},
 ): Promise<Node | undefined> {
   const { rows } = await db.query<NodeRow>(
     options.includeDeleted
       ? `SELECT id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at
-         FROM nodes WHERE id = $1`
+         FROM nodes WHERE idempotency_key = $1`
       : `SELECT id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at
-         FROM nodes WHERE id = $1 AND deleted_at IS NULL`,
-    [id],
+         FROM nodes WHERE idempotency_key = $1 AND deleted_at IS NULL`,
+    [key],
   );
   return rows[0] ? mapNode(rows[0]) : undefined;
 }
@@ -56,11 +73,15 @@ export async function insertNode(
     payload: Payload;
     data: Record<string, unknown>;
     metadata: Record<string, unknown>;
+    idempotency_key?: string | null;
   },
 ): Promise<Node> {
   const { rows } = await db.query<NodeRow>(
-    `INSERT INTO nodes (id, type, title, status, payload, data, metadata)
-     VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb)
+    `INSERT INTO nodes (id, type, title, status, payload, data, metadata, idempotency_key, created_at, updated_at)
+     VALUES (
+       $1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8,
+       date_trunc('milliseconds', now()), date_trunc('milliseconds', now())
+     )
      RETURNING id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at`,
     [
       input.id,
@@ -70,6 +91,7 @@ export async function insertNode(
       JSON.stringify(input.payload),
       JSON.stringify(input.data),
       JSON.stringify(input.metadata),
+      input.idempotency_key ?? null,
     ],
   );
   return mapNode(rows[0]!);
@@ -85,6 +107,8 @@ export async function updateNode(
     payload?: Payload;
     data?: Record<string, unknown>;
     metadata?: Record<string, unknown>;
+    /** When set, refuse the write unless current updated_at matches (if-match). */
+    base_updated_at?: string;
   },
 ): Promise<Node | undefined> {
   const { rows } = await db.query<NodeRow>(
@@ -93,10 +117,18 @@ export async function updateNode(
        title = $3,
        status = COALESCE($4, status),
        payload = COALESCE($5::jsonb, payload),
-       data = COALESCE($6::jsonb, data),
+       data = CASE
+         WHEN $6::jsonb IS NULL THEN data
+         ELSE COALESCE(data, '{}'::jsonb) || $6::jsonb
+       END,
        metadata = COALESCE($7::jsonb, metadata),
-       updated_at = now()
+       updated_at = date_trunc('milliseconds', now())
      WHERE id = $1 AND deleted_at IS NULL
+       AND (
+         $8::timestamptz IS NULL
+         OR (EXTRACT(EPOCH FROM updated_at) * 1000)::bigint
+           = (EXTRACT(EPOCH FROM $8::timestamptz) * 1000)::bigint
+       )
      RETURNING id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at`,
     [
       id,
@@ -106,6 +138,7 @@ export async function updateNode(
       patch.payload === undefined ? null : JSON.stringify(patch.payload),
       patch.data === undefined ? null : JSON.stringify(patch.data),
       patch.metadata === undefined ? null : JSON.stringify(patch.metadata),
+      patch.base_updated_at ?? null,
     ],
   );
   return rows[0] ? mapNode(rows[0]) : undefined;
@@ -113,7 +146,7 @@ export async function updateNode(
 
 export async function softDeleteNode(db: Queryable, id: string): Promise<Node | undefined> {
   const { rows } = await db.query<NodeRow>(
-    `UPDATE nodes SET deleted_at = now(), updated_at = now()
+    `UPDATE nodes SET deleted_at = now(), updated_at = date_trunc('milliseconds', now())
      WHERE id = $1 AND deleted_at IS NULL
      RETURNING id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at`,
     [id],
@@ -123,7 +156,7 @@ export async function softDeleteNode(db: Queryable, id: string): Promise<Node | 
 
 export async function restoreNode(db: Queryable, id: string): Promise<Node | undefined> {
   const { rows } = await db.query<NodeRow>(
-    `UPDATE nodes SET deleted_at = NULL, updated_at = now()
+    `UPDATE nodes SET deleted_at = NULL, updated_at = date_trunc('milliseconds', now())
      WHERE id = $1 AND deleted_at IS NOT NULL
      RETURNING id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at`,
     [id],
@@ -143,7 +176,7 @@ export async function restoreNodeSnapshot(
        payload = $5::jsonb,
        data = $6::jsonb,
        metadata = $7::jsonb,
-       updated_at = now()
+       updated_at = date_trunc('milliseconds', now())
      WHERE id = $1
      RETURNING id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at`,
     [

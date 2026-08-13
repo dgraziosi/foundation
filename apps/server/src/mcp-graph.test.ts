@@ -114,7 +114,13 @@ test(
       const linked = asObject(
         await client.callTool({
           name: "link",
-          arguments: { from_id: projectId, to_id: areaId, relation_type: "child_of" },
+          arguments: {
+            from_id: projectId,
+            to_id: areaId,
+            relation_type: "child_of",
+            from_base_updated_at: (project.node as { updated_at: string }).updated_at,
+            to_base_updated_at: (area.node as { updated_at: string }).updated_at,
+          },
         }),
       );
       assert.equal(linked.error, undefined);
