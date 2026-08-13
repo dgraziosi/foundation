@@ -336,7 +336,18 @@ export async function upsertGraphNode(
 
   let createdBlobAbs: string | undefined;
   let pendingUploadUnlink: string | undefined;
+  let discardCreatedBlob = false;
   const writer = writerOf(input);
+
+  async function applyResolvedPayload(resolved: ResolvedStoredPayload): Promise<void> {
+    pendingUploadUnlink = resolved.pendingUploadUnlink;
+    if (resolved.created && resolved.blob && blobs) {
+      const abs = resolveBlobFilePath(blobs.dataDir, resolved.blob.path);
+      if (typeof abs === "string") {
+        createdBlobAbs = abs;
+      }
+    }
+  }
 
   try {
     const result = await withTransaction(pool, async (client) => {
@@ -360,19 +371,12 @@ export async function upsertGraphNode(
         }
       }
 
-      const resolved = await resolveStoredPayload(client, input.payload, blobs);
-      if ("error" in resolved) {
-        return resolved;
-      }
-      pendingUploadUnlink = resolved.pendingUploadUnlink;
-      if (resolved.created && resolved.blob && blobs) {
-        const abs = resolveBlobFilePath(blobs.dataDir, resolved.blob.path);
-        if (typeof abs === "string") {
-          createdBlobAbs = abs;
-        }
-      }
-
       if (existing) {
+        const resolved = await resolveStoredPayload(client, input.payload, blobs);
+        if ("error" in resolved) {
+          return resolved;
+        }
+        await applyResolvedPayload(resolved);
         const stale = assertIfMatch("base_updated_at", input.base_updated_at, existing.updated_at);
         if (stale) {
           return stale;
@@ -407,6 +411,11 @@ export async function upsertGraphNode(
 
       await client.query("SAVEPOINT upsert_insert");
       try {
+        const resolved = await resolveStoredPayload(client, input.payload, blobs);
+        if ("error" in resolved) {
+          return resolved;
+        }
+        await applyResolvedPayload(resolved);
         const node = await insertNode(client, {
           id: input.id ?? randomUUID(),
           type: input.type,
@@ -430,6 +439,8 @@ export async function upsertGraphNode(
       } catch (error) {
         if (isUniqueViolation(error) && input.idempotency_key) {
           await client.query("ROLLBACK TO SAVEPOINT upsert_insert");
+          discardCreatedBlob = true;
+          pendingUploadUnlink = undefined;
           const replay = await getNodeByIdempotencyKey(client, input.idempotency_key, {
             includeDeleted: true,
           });
@@ -441,11 +452,13 @@ export async function upsertGraphNode(
       }
     });
 
-    if (isToolError(result)) {
+    if (isToolError(result) || discardCreatedBlob) {
       if (createdBlobAbs) {
         await unlinkQuiet(createdBlobAbs);
       }
-      return result;
+      if (isToolError(result)) {
+        return result;
+      }
     }
     if (pendingUploadUnlink) {
       await unlinkQuiet(pendingUploadUnlink);
@@ -498,17 +511,27 @@ export async function linkGraphNodes(
 ): Promise<{ edge: Edge; activity_id: string; suggestion?: string } | ToolError> {
   const writer = writerOf(input);
   return withTransaction(pool, async (client) => {
-    const from = await getNodeById(client, input.from_id, { forUpdate: true });
-    const to = await getNodeById(client, input.to_id, { forUpdate: true });
-    if (!from) {
-      return toolError(
-        `from_id not found: ${input.from_id}`,
-        "Pass a live node UUID from upsert.",
-      );
+    const lockOrder =
+      input.from_id <= input.to_id
+        ? [input.from_id, input.to_id]
+        : [input.to_id, input.from_id];
+    const locked = new Map<string, Node>();
+    for (const id of lockOrder) {
+      if (locked.has(id)) {
+        continue;
+      }
+      const node = await getNodeById(client, id, { forUpdate: true });
+      if (!node) {
+        const which = id === input.from_id ? "from_id" : "to_id";
+        return toolError(
+          `${which} not found: ${id}`,
+          "Pass a live node UUID from upsert.",
+        );
+      }
+      locked.set(id, node);
     }
-    if (!to) {
-      return toolError(`to_id not found: ${input.to_id}`, "Pass a live node UUID from upsert.");
-    }
+    const from = locked.get(input.from_id)!;
+    const to = locked.get(input.to_id)!;
     const fromStale = assertIfMatch("from_base_updated_at", input.from_base_updated_at, from.updated_at);
     if (fromStale) {
       return fromStale;
