@@ -15,6 +15,14 @@ AS $$
   SELECT public.unaccent('public.unaccent'::regdictionary, txt)
 $$;
 
+-- Same unaccent+english_stem pipeline as the wrapper, for ts_headline so
+-- fragment selection lines up with folded lexemes while snippets keep diacritics.
+DROP TEXT SEARCH CONFIGURATION IF EXISTS foundation_english;
+CREATE TEXT SEARCH CONFIGURATION foundation_english (COPY = english);
+ALTER TEXT SEARCH CONFIGURATION foundation_english
+  ALTER MAPPING FOR hword, hword_part, word
+  WITH unaccent, english_stem;
+
 DROP INDEX IF EXISTS nodes_search_tsv_idx;
 ALTER TABLE nodes DROP COLUMN IF EXISTS search_tsv;
 

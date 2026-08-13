@@ -205,7 +205,7 @@ export async function searchNodes(
      )
      SELECT id, type, title, status,
             ts_headline(
-              'english',
+              'foundation_english',
               foundation_node_search_text(title, payload, data),
               q.tsq,
               'MaxWords=24, MinWords=5, MaxFragments=1'

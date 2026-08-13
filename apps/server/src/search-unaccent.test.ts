@@ -75,6 +75,8 @@ test(
           return;
         }
         assert.ok(fiancee.nodes.some((node) => node.id === accented.node.id));
+        const fianceeHit = fiancee.nodes.find((node) => node.id === accented.node.id);
+        assert.match(fianceeHit?.snippet ?? "", /fiancée/);
 
         const naive = await searchGraphNodes(pool, { query: "naive" });
         assert.equal(isToolError(naive), false);

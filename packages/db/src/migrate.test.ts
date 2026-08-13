@@ -54,6 +54,11 @@ test(
       );
       assert.equal(unaccentFn[0]?.proname, "foundation_unaccent");
       assert.equal(unaccentFn[0]?.provolatile, "i");
+      const { rows: tsConfig } = await pool.query<{ cfgname: string }>(
+        `SELECT cfgname FROM pg_ts_config
+         WHERE cfgname = 'foundation_english' AND cfgnamespace = current_schema()::regnamespace`,
+      );
+      assert.equal(tsConfig[0]?.cfgname, "foundation_english");
       const { rows: blobCols } = await pool.query<{ column_name: string }>(
         `SELECT column_name FROM information_schema.columns
          WHERE table_schema = current_schema() AND table_name = 'blobs'
