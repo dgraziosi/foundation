@@ -73,6 +73,10 @@ test(
       assert.equal((boot.how_to_extend as { nodes: string }).nodes.includes("upsert"), true);
       assert.equal((boot.how_to_extend as { activity: string }).activity.includes("list_activity"), true);
       assert.equal((boot.how_to_extend as { search: string }).search.includes("full-text"), true);
+      assert.equal(
+        (boot.how_to_extend as { summary: string }).summary.includes("operator routine"),
+        true,
+      );
 
       const area = asObject(
         await client.callTool({

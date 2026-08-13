@@ -33,6 +33,7 @@ Named after Asimov’s Foundation: carry structured knowledge forward so you and
 - Dual write to a markdown vault + database (one store)
 - Proposal/approve inbox for ontology changes (agents may mutate types/relations directly; keep an activity log + undo)
 - Cloning Momentum’s full product surface
+- Porting `get_vault_health` / `run_maintenance` / `audit_links` as MCP tools (that job is an operator [vault-keeping](./VAULT_KEEPING.md) routine)
 
 ## Source material
 
@@ -89,6 +90,7 @@ Agents can add types and relations over time.
 - Docker Compose for local/box bring-up
 - Data and code under an isolated workspace path when running on Grok Bot computer — never write into agent profile/memory directories
 - Localhost MCP + API key auth for v1
+- Periodic instance + graph health is vault-keeping (Seldon’s Time Vault metaphor): an agent routine, not the store and not a product named Vault — [`docs/VAULT_KEEPING.md`](./VAULT_KEEPING.md), stand-up in [`docs/AGENTS.md`](./AGENTS.md)
 
 ## Success criteria (first milestone)
 
