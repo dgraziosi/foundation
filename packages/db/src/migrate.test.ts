@@ -44,6 +44,16 @@ test(
          WHERE table_schema = current_schema() AND table_name = 'nodes' AND column_name = 'search_tsv'`,
       );
       assert.equal(fts[0]?.column_name, "search_tsv");
+      const { rows: unaccentExt } = await pool.query<{ extname: string }>(
+        `SELECT extname FROM pg_extension WHERE extname = 'unaccent'`,
+      );
+      assert.equal(unaccentExt[0]?.extname, "unaccent");
+      const { rows: unaccentFn } = await pool.query<{ proname: string; provolatile: string }>(
+        `SELECT proname, provolatile FROM pg_proc
+         WHERE proname = 'foundation_unaccent' AND pronamespace = current_schema()::regnamespace`,
+      );
+      assert.equal(unaccentFn[0]?.proname, "foundation_unaccent");
+      assert.equal(unaccentFn[0]?.provolatile, "i");
       const { rows: blobCols } = await pool.query<{ column_name: string }>(
         `SELECT column_name FROM information_schema.columns
          WHERE table_schema = current_schema() AND table_name = 'blobs'

@@ -95,7 +95,7 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 
 - **In:** `{ query, type?, limit? }`
 - **Out:** `{ nodes: [{ id, type, title, status, snippet }], suggestion? }` or `{ error, suggestion? }`
-- Postgres FTS on `title` (weighted highest) + string values from `data` + extracted inline payload text. HTML: tag text plus `alt` / `title` / `aria-label` / `placeholder`. JSON: string values from the parsed body — **not** `JSON.stringify` of the payload wrapper (`media_type`, `storage`, …). Filter by `type`. Soft-deleted nodes are excluded. Lexical recall only (no embeddings).
+- Postgres FTS on `title` (weighted highest) + string values from `data` + extracted inline payload text. HTML: tag text plus `alt` / `title` / `aria-label` / `placeholder`. JSON: string values from the parsed body — **not** `JSON.stringify` of the payload wrapper (`media_type`, `storage`, …). Latin diacritics are folded (`fiancee` matches `fiancée` and vice versa). Filter by `type`. Soft-deleted nodes are excluded. Lexical recall only (no embeddings).
 - Hits are lean (id/type/title/snippet). Call `get` to load payload and neighbor titles.
 - If `query` is a UUID, search resolves it like `get` and returns `suggestion` to prefer `get` next time.
 - **An empty result is not a license to upsert a duplicate.** The `suggestion` says so. Try a shorter token or a type filter; only upsert if the entity is new. If you already have a UUID, call `get`.
