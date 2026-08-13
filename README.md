@@ -2,7 +2,7 @@
 
 A personal ontology your agents can grow.
 
-Foundation is a small, self-hostable **typed knowledge graph + MCP server** for AI agents (Grok Bot, Cursor, Claude, …). It gives them durable structure — not just chat memory — and lets that structure evolve as your life does.
+Foundation is a small, self-hostable **typed knowledge graph + MCP server** for AI agents (Cursor, Claude, and other MCP clients). It gives them durable structure — not just chat memory — and lets that structure evolve as your life does.
 
 The name is a nod to Asimov: carry structured knowledge forward so you (and your agents) are not starting from zero every time.
 
@@ -31,7 +31,7 @@ Do not commit personal life data, documents, or secrets to this repository. Thos
 
 - Not a mobile app, billing system, or hosted SaaS you must buy
 - Not a second brain you have to maintain by hand (agents are the primary users)
-- Run it on your own machine (including a Grok Bot computer)
+- Run Compose on a machine your agents can reach at localhost MCP
 
 ## Install
 
@@ -162,7 +162,7 @@ Never point `FOUNDATION_DATA` at an agent profile or memory directory.
 
 ## Intended use
 
-1. Run Foundation where your agents already live (e.g. Grok Bot computer)
+1. Run Compose on a machine your agents can reach at localhost MCP
 2. Point agents at the local MCP endpoint
 3. Stand up Seldon (architect) + Chief (writer) + Librarian at init, with the three routines ([`docs/AGENTS.md`](docs/AGENTS.md))
 

@@ -1,6 +1,6 @@
 # Foundation — product contract
 
-Living spec. Cloud agents and humans update this as decisions land.
+Living spec. Keep this current as decisions land.
 
 ## Purpose
 
@@ -20,13 +20,12 @@ Obsidian analog: Obsidian = app, a vault = one folder, graph = links inside.
 - **Vault** — one running instance: one `FOUNDATION_DATA`, one Postgres. A clone gets their own vault, not yours. Postgres vault, not markdown. Do **not** call the graph “the Vault.”
 - **Graph** — the knowledge in that vault (people, projects, edges, blobs). Daily word.
 - **Blob** — a file on a graph node.
-- **Seldon** — architect of Foundation the product.
-- **Chief** — primary writer (human dumps ideas).
-- **Librarian** — agent from day one. Owns vault health, graph hygiene, and applying git updates to the computer.
+
+Optional named roles: see [`AGENTS.md`](./AGENTS.md).
 
 ## Primary users
 
-1. **Agents** (Grok Bot, Cursor, Claude, …) via MCP — default interface
+1. **Agents** via MCP — default interface (Cursor, Claude, and other MCP clients)
 2. **Humans** via conversation with those agents; optional thin viewer later (Mac/web)
 
 ## Starter spine
@@ -52,12 +51,12 @@ Names are locked. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md).
 - Activity stores optional `actor` / `actor_label` (who wrote). Not a permission gate.
 - `search` is Postgres FTS (title + `data` + extracted inline payload text; Latin accents folded). `query` is optional when `type`, `status`, `under` (child_of parent), `since`, or `origin` is set, so agents can list without a word. Not embeddings. No `list_nodes`.
 - Live nodes are unique on `data.origin.{system,id}` for `gmail` | `calendar` | `drive` | `github`. Look up with `search` `{ origin }` (then `get`). Store the ref only — do not fetch or mirror those systems’ bodies.
-- No `get_vault_health` / `run_maintenance` / `audit_links` tools — those jobs are Librarian operator routines ([`VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md))
+- No `get_vault_health` / `run_maintenance` / `audit_links` tools — those jobs are Librarian operator routines ([`AGENTS.md`](./AGENTS.md), [`VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md))
 
 ## Runtime
 
 - Docker Compose: Postgres 16 + Foundation server
-- Durable files under `FOUNDATION_DATA` (never an agent profile/memory directory)
+- Durable files under `FOUNDATION_DATA`
 - Localhost MCP at `http://127.0.0.1:8787/mcp` with `Authorization: ApiKey <FOUNDATION_API_KEY>`
 - Blobs: `$FOUNDATION_DATA/blobs/<uuid>`; ingest on `upsert`; bytes via `GET /blobs/:id`
 
@@ -77,4 +76,4 @@ Names are locked. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md).
 
 ## Merge bar
 
-Typecheck and tests pass. Destructive MCP tools stay behind `confirm: true`. Cloud agents must not put vault contents, `FOUNDATION_DATA` files, or graph dumps in pull requests. When a slice changes the graph or vault shape, update [`ARCHITECTURE.md`](./ARCHITECTURE.md) in the same PR — **ARCHITECTURE.md still true.**
+Typecheck and tests pass. Destructive MCP tools stay behind `confirm: true`. Do not put vault contents, `FOUNDATION_DATA` files, or graph dumps in pull requests. When a slice changes the graph or vault shape, update [`ARCHITECTURE.md`](./ARCHITECTURE.md) in the same PR — **ARCHITECTURE.md still true.**

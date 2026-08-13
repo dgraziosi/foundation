@@ -30,4 +30,4 @@ Do not run graph hygiene (duplicate titles, zero-edge nodes, type soup) on this 
 - Do not add get_vault_health, run_maintenance, audit_links, or any other health/reorganize tool.
 - Do not mutate the graph on this routine (no upsert/delete/unlink/undo/manage_type) unless the operator explicitly asked for a repair in this conversation.
 - Do not wipe the vault (no compose down -v, no deleting FOUNDATION_DATA).
-- Do not invent a write-ACL. Do not write graph data from a cloud VM that cannot reach box MCP.
+- Do not invent a write-ACL. An agent that can reach the vault MCP may read/write; one that cannot does not get the API key and does not upsert.

@@ -2,9 +2,9 @@ You are updating the computer that runs this Foundation vault: git fetch/pull th
 
 Intent below; do not freeze JSON schemas. Call bootstrap only if you need the current tool surface after the rebuild.
 
-Foundation is the product (this GitHub clone, Docker, MCP). A vault is this running instance (FOUNDATION_DATA + Postgres). The graph lives in the vault. Do not call the graph “the Vault.” Do not write graph data from a cloud VM.
+Foundation is the product (this GitHub clone, Docker, MCP). A vault is this running instance (FOUNDATION_DATA + Postgres). The graph lives in the vault. Do not call the graph “the Vault.” An agent that can reach the vault MCP may read/write; one that cannot does not get the API key and does not upsert.
 
-Do not commit personal life data, documents, or secrets to this repository. Those belong in the operator’s vault, not in git. After pulling product updates, Librarian launches a cloud agent to scan the tree and recent diffs for secrets and personal data. Report-only; quiet if clean. Prompt: prompts/repo-leak-scan.md.
+Do not commit personal life data, documents, or secrets to this repository. Those belong in the operator’s vault, not in git. After pulling product updates, an optional agent that reads git (no vault key) scans the tree and recent diffs for secrets and personal data. Report-only; quiet if clean. Prompt: prompts/repo-leak-scan.md.
 
 ## Schedule and voice
 
@@ -22,8 +22,8 @@ Seldon may ping you after a whole batch lands on main (one ping, PR numbers + SH
 
 1. In the Foundation clone: `git fetch origin`.
 2. If HEAD is `main` (or the branch tracking `origin/main`) and `origin/main` is ahead, `git pull --ff-only`. Never `--force`. Never reset hard.
-3. If you pulled: `docker compose up --build -d`. Wait until GET /health returns { ok: true, service: "foundation", db: "up" }. Then launch a Cursor cloud agent on this repo with [`prompts/repo-leak-scan.md`](repo-leak-scan.md) (report-only; quiet if clean).
-4. If you did **not** pull: stay quiet **unless** it is Monday and nothing was pulled this week — then still launch the leak-scan agent (the Monday backup). Health green and no pull on other weekdays: stay quiet.
+3. If you pulled: `docker compose up --build -d`. Wait until GET /health returns { ok: true, service: "foundation", db: "up" }. Then an optional agent that reads git (no vault key) runs [`prompts/repo-leak-scan.md`](repo-leak-scan.md) (report-only; quiet if clean).
+4. If you did **not** pull: stay quiet **unless** it is Monday and nothing was pulled this week — then still run the leak-scan agent (the Monday backup). Health green and no pull on other weekdays: stay quiet.
 
 ## Stop and ping (do not continue)
 
@@ -41,6 +41,6 @@ Do not upsert graph data on this routine. Do not run vault health or graph hygie
 - Never force-pull. Never `docker compose down -v`. Never delete FOUNDATION_DATA.
 - If pull would wipe the vault, stop and ping.
 - Do not add get_vault_health or any other MCP tool.
-- Do not invent a write-ACL. Do not write graph data from a cloud VM that cannot reach box MCP.
+- Do not invent a write-ACL. An agent that can reach the vault MCP may read/write; one that cannot does not get the API key and does not upsert.
 - Do not open a PR about graph data.
 - Leak-scan is report-only. Do not rewrite git history. Do not put findings’ secret values into git or a pull request.

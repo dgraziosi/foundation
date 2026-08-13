@@ -31,6 +31,6 @@ Product code, generic docs, and generic prompts are expected. Seed types, synthe
 
 - Do not put findings’ secret values back into git.
 - Do not rewrite history.
-- Do not upsert graph data. Do not read `FOUNDATION_DATA` on a box as source material for this scan — scan the **git tree**, not the vault.
+- Do not upsert graph data. Do not read `FOUNDATION_DATA` as source material for this scan — scan the **git tree**, not the vault. This agent has no vault key.
 - Do not invent a write-ACL. Do not add MCP tools.
 - Never `docker compose down -v`. Never delete `FOUNDATION_DATA`.

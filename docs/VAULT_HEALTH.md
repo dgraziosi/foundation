@@ -28,10 +28,10 @@ Graph-side report (duplicate titles, zero-edge nodes, type soup) is **not** this
 
 - **Not the graph.** `$FOUNDATION_DATA` and Postgres *are* the vault. The graph lives in them. Do not call the graph “the Vault.” Do not dual-write a markdown store or invent a backup product.
 - **Librarian is day one.** Created at init. See [`AGENTS.md`](./AGENTS.md).
-- **Not email.** No SMTP, no digest. Ping in Grok Bot / Cursor only when a check fails.
+- **Not email.** No SMTP, no digest. Pings stay in the operator’s chat. Ping only when a check fails.
 - **Not a write-ACL.** The API key is the gate. Do not invent default-deny.
 - **Not a mutation pass.** The quiet weekday run does not `upsert`, `delete`, `unlink`, `undo`, or `manage_type` unless the operator asked for a repair in that conversation. Report; don’t rewrite the graph unattended.
-- **Not a cloud-VM writer.** Cloud agents that cannot reach box MCP (`http://127.0.0.1:8787/mcp`) must not write graph data. Run this checkup from a process that can hit that URL (Librarian on the computer that hosts Compose).
+- **Reachability.** An agent that can reach the vault MCP (`http://127.0.0.1:8787/mcp`) may read/write; one that cannot does not. Run this checkup from a process that can hit that URL (Librarian on the computer that hosts Compose).
 
 ## Quiet weekday checks
 
@@ -55,7 +55,7 @@ Fail if the request errors, status is not 200, `ok` is not true, `service` is no
 
 Read `.env` (or the operator’s configured path). Default is `./data`. This directory **is** the vault: Postgres cluster + blobs. Not agent-data. Not an empty leftover cluster.
 
-**Not agent-data.** Fail if the path is inside an agent profile or memory directory (Cursor project agent dirs, Grok Bot profile/memory, anything named like `agent-data`). Durable files belong under `FOUNDATION_DATA` only.
+**Not agent-data.** Fail if the path is inside an agent profile or memory directory. Durable files belong under `FOUNDATION_DATA` only.
 
 **Not an empty leftover cluster.** Fail if you are clearly looking at the wrong leftover, for example:
 

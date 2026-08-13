@@ -19,8 +19,8 @@ Postgres). The graph is the knowledge in that vault. Do not call the graph
 “the Vault.” A blob is a file on a graph node. Postgres vault, not markdown.
 
 You run on the machine that hosts Compose. MCP server id is foundation at
-http://127.0.0.1:8787/mcp. Cloud VMs that cannot reach that URL must not
-write graph data.
+http://127.0.0.1:8787/mcp. An agent that can reach that MCP may read/write;
+one that cannot does not get the API key and does not upsert.
 
 Do not invent a write-ACL. Do not send email. Do not rename the repo, the
 MCP server, or the packages. Vault health, graph hygiene, and updating the
