@@ -22,6 +22,7 @@ import {
   updateRelationType,
   updateRelationTypeDescription,
   withTransaction,
+  isForeignKeyViolation,
   isUniqueViolation,
   type Pool,
   type PoolClient,
@@ -103,11 +104,21 @@ async function invertUpdateNode(
   if (!current) {
     return toolError(`Cannot undo update: node ${before.id} not found`);
   }
-  const restored = await restoreNodeSnapshot(client, before);
-  if (!restored) {
-    return toolError(`Cannot undo update: node ${before.id} not found`);
+  try {
+    const restored = await restoreNodeSnapshot(client, before);
+    if (!restored) {
+      return toolError(`Cannot undo update: node ${before.id} not found`);
+    }
+    return { action: "update", before: current, after: restored };
+  } catch (error) {
+    if (isForeignKeyViolation(error)) {
+      return toolError(
+        `Cannot undo update: restoring node ${before.id} references a missing type`,
+        "Restore the type first, then retry undo.",
+      );
+    }
+    throw error;
   }
-  return { action: "update", before: current, after: restored };
 }
 
 async function invertDeleteNode(
@@ -174,6 +185,12 @@ async function invertUnlink(
       return toolError(
         "Cannot undo unlink: restoring this edge would duplicate a live child_of or exact edge",
         "Unlink the current edge first, or leave the graph as-is.",
+      );
+    }
+    if (isForeignKeyViolation(error)) {
+      return toolError(
+        "Cannot undo unlink: restoring this edge references a missing relation or node",
+        "Restore the relation (or endpoints) first, then retry undo.",
       );
     }
     throw error;
