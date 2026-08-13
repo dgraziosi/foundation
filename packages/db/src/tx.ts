@@ -1,3 +1,4 @@
+import { isToolError } from "@foundation/schema";
 import type pg from "pg";
 
 export type Queryable = pg.Pool | pg.PoolClient;
@@ -14,6 +15,12 @@ export async function withTransaction<T>(
   try {
     await client.query("BEGIN");
     const result = await fn(client);
+    // Tool errors are returned as values; COMMIT would persist side effects
+    // (e.g. a blobs INSERT) from a failed upsert.
+    if (isToolError(result)) {
+      await client.query("ROLLBACK");
+      return result;
+    }
     await client.query("COMMIT");
     return result;
   } catch (error) {

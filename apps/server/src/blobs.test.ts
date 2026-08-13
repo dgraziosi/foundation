@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { access, mkdtemp, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -164,6 +165,7 @@ test("blob nodes: ingest, get metadata, HTTP bytes, snapshots, delete keeps file
       if (isToolError(created)) return;
       const blobPath = join(dataDir, "blobs", created.node.payload.blob_id!);
       assert.deepEqual(await readFile(blobPath), pdf);
+      await assert.rejects(() => access(join(dataDir, "uploads", "moved.pdf"), fsConstants.F_OK));
 
       const traversal = await upsertGraphNode(
         pool,
@@ -239,6 +241,75 @@ test("blob nodes: ingest, get metadata, HTTP bytes, snapshots, delete keeps file
       assert.ok(json.length < bulky.byteLength);
       assert.equal(got.node.payload.body, undefined);
       assert.equal(json.includes(bulky.toString("base64")), false);
+    });
+
+    await t.test("failed upsert to a deleted node does not ingest or consume the upload", async () => {
+      const created = await upsertGraphNode(pool, { type: "note", title: "doomed" });
+      assert.equal(isToolError(created), false);
+      if (isToolError(created)) return;
+      const deleted = await deleteGraphNode(pool, { id: created.node.id, confirm: true });
+      assert.equal(isToolError(deleted), false);
+
+      const uniquePdf = Buffer.from(`%PDF-1.1\norphan-${created.node.id}\n%%EOF\n`, "utf8");
+      const digest = createHash("sha256").update(uniquePdf).digest("hex");
+      await mkdir(join(dataDir, "uploads"), { recursive: true });
+      const uploadName = `keep-me-${created.node.id}.pdf`;
+      const uploadPath = join(dataDir, "uploads", uploadName);
+      await writeFile(uploadPath, uniquePdf);
+
+      const failedUpload = await upsertGraphNode(
+        pool,
+        {
+          id: created.node.id,
+          type: "note",
+          title: "should fail",
+          payload: {
+            media_type: "application/pdf",
+            storage: "blob",
+            source_path: uploadName,
+          },
+        },
+        blobs,
+      );
+      assert.equal(isToolError(failedUpload), true);
+      if (!isToolError(failedUpload)) return;
+      assert.match(failedUpload.error, /deleted/);
+      await access(uploadPath, fsConstants.F_OK);
+      const { rows: uploadRows } = await pool.query<{ id: string }>(
+        "SELECT id FROM blobs WHERE sha256 = $1",
+        [digest],
+      );
+      assert.equal(uploadRows.length, 0);
+
+      const uniqueB64 = Buffer.from(`%PDF-1.1\nb64-${created.node.id}\n%%EOF\n`, "utf8");
+      const b64Digest = createHash("sha256").update(uniqueB64).digest("hex");
+      const failedB64 = await upsertGraphNode(
+        pool,
+        {
+          id: created.node.id,
+          type: "note",
+          title: "should fail too",
+          payload: {
+            media_type: "application/pdf",
+            storage: "blob",
+            bytes_base64: uniqueB64.toString("base64"),
+          },
+        },
+        blobs,
+      );
+      assert.equal(isToolError(failedB64), true);
+      const { rows: b64Rows } = await pool.query<{ id: string }>(
+        "SELECT id FROM blobs WHERE sha256 = $1",
+        [b64Digest],
+      );
+      assert.equal(b64Rows.length, 0);
+
+      const names = await readdir(join(dataDir, "blobs"));
+      for (const name of names) {
+        const bytes = await readFile(join(dataDir, "blobs", name));
+        assert.notDeepEqual(bytes, uniquePdf);
+        assert.notDeepEqual(bytes, uniqueB64);
+      }
     });
 
     await t.test("soft-delete does not remove blob bytes", async () => {

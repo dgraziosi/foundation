@@ -50,6 +50,7 @@ export {
 export {
   BLOB_DIR_MODE,
   BLOB_FILE_MODE,
+  UPLOAD_DIR_MODE,
   decodeBytesBase64,
   ensureBlobLayout,
   getBlobById,
@@ -61,6 +62,8 @@ export {
   resolveBlobFilePath,
   resolveUploadPath,
   sha256Hex,
+  unlinkQuiet,
+  type BlobIngestResult,
   type BlobRuntime,
 } from "./blobs.js";
 export { isForeignKeyViolation, isUniqueViolation, withTransaction, type Queryable } from "./tx.js";

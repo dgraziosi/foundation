@@ -149,7 +149,7 @@ trailer<</Root 1 0 R>>
      -o /tmp/sample.pdf
    ```
 
-   Operator drop-box (no base64): copy a file into `$FOUNDATION_DATA/uploads/` then `upsert` with `payload.source_path` set to the filename. The server moves it to `blobs/<uuid>`.
+   Operator drop-box (no base64): copy a file into `$FOUNDATION_DATA/uploads/` then `upsert` with `payload.source_path` set to the filename. The server moves it to `blobs/<uuid>`. Compose `db-init` creates `uploads/` mode 1777 (sticky) so the host user can write on a bind mount; `blobs/` stays 0700.
 
    If Postgres fails to start on a bind-mounted data dir, Compose already runs a `db-init` step that `chown`s `$FOUNDATION_DATA/postgres` to uid 999. To reset local data: `docker compose down` and remove `./data` (this deletes the graph).
 

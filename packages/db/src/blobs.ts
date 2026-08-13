@@ -11,10 +11,20 @@ import {
 import { createHash, randomUUID } from "node:crypto";
 import { chmod, mkdir, readFile, realpath, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
-import { iso, isUniqueViolation, type Queryable } from "./tx.js";
+import { iso, type Queryable } from "./tx.js";
 
 export const BLOB_DIR_MODE = 0o700;
 export const BLOB_FILE_MODE = 0o600;
+/** Host drop-box under FOUNDATION_DATA/uploads: sticky world-writable, not blobs/. */
+export const UPLOAD_DIR_MODE = 0o1777;
+
+export type BlobIngestResult = {
+  blob: Blob;
+  /** True when this call inserted a new blobs row and wrote a new file. */
+  created: boolean;
+  /** Absolute upload path to unlink only after the surrounding upsert commits. */
+  sourceAbs?: string;
+};
 
 export type BlobRuntime = {
   dataDir: string;
@@ -45,9 +55,9 @@ export async function ensureBlobLayout(dataDir: string): Promise<void> {
   const blobs = join(dataDir, "blobs");
   const uploads = join(dataDir, "uploads");
   await mkdir(blobs, { recursive: true, mode: BLOB_DIR_MODE });
-  await mkdir(uploads, { recursive: true, mode: BLOB_DIR_MODE });
+  await mkdir(uploads, { recursive: true, mode: UPLOAD_DIR_MODE });
   await chmod(blobs, BLOB_DIR_MODE);
-  await chmod(uploads, BLOB_DIR_MODE);
+  await chmod(uploads, UPLOAD_DIR_MODE);
 }
 
 export async function getBlobById(db: Queryable, id: string): Promise<Blob | undefined> {
@@ -165,7 +175,7 @@ export async function ingestBlobBytes(
   db: Queryable,
   runtime: BlobRuntime,
   input: { mediaType: string; bytes: Buffer; sourceAbs?: string },
-): Promise<Blob | ToolError> {
+): Promise<BlobIngestResult | ToolError> {
   const maxBytes = runtime.maxBytes ?? BLOB_MAX_BYTES;
   if (input.bytes.byteLength > maxBytes) {
     return formatBlobSizeCapError(maxBytes);
@@ -178,10 +188,7 @@ export async function ingestBlobBytes(
     if (pathErr) {
       return pathErr;
     }
-    if (input.sourceAbs) {
-      await unlinkQuiet(input.sourceAbs);
-    }
-    return existing;
+    return { blob: existing, created: false, sourceAbs: input.sourceAbs };
   }
 
   const id = randomUUID();
@@ -207,27 +214,28 @@ export async function ingestBlobBytes(
   }
 
   try {
+    // ON CONFLICT avoids aborting an open upsert transaction on a sha256 race.
     const { rows } = await db.query<BlobRow>(
       `INSERT INTO blobs (id, media_type, byte_size, sha256, path)
        VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (sha256) DO NOTHING
        RETURNING id, media_type, byte_size, sha256, path, created_at`,
       [id, input.mediaType, input.bytes.byteLength, digest, storedPath],
     );
-    if (input.sourceAbs) {
-      await unlinkQuiet(input.sourceAbs);
+    if (rows[0]) {
+      return { blob: mapBlob(rows[0]), created: true, sourceAbs: input.sourceAbs };
     }
-    return mapBlob(rows[0]!);
-  } catch (error) {
-    if (isUniqueViolation(error)) {
-      await unlinkQuiet(abs);
-      const raced = await getBlobBySha256(db, digest);
-      if (raced) {
-        if (input.sourceAbs) {
-          await unlinkQuiet(input.sourceAbs);
-        }
-        return raced;
+    await unlinkQuiet(abs);
+    const raced = await getBlobBySha256(db, digest);
+    if (raced) {
+      const racedPathErr = validateBlobRelativePath(raced.path);
+      if (racedPathErr) {
+        return racedPathErr;
       }
+      return { blob: raced, created: false, sourceAbs: input.sourceAbs };
     }
+    throw new Error(`blob sha256 conflict but row missing: ${digest}`);
+  } catch (error) {
     await unlinkQuiet(abs);
     throw error;
   }
@@ -237,7 +245,7 @@ export async function ingestBlobFromUpload(
   db: Queryable,
   runtime: BlobRuntime,
   input: { mediaType: string; sourcePath: string },
-): Promise<Blob | ToolError> {
+): Promise<BlobIngestResult | ToolError> {
   const maxBytes = runtime.maxBytes ?? BLOB_MAX_BYTES;
   const abs = resolveUploadPath(runtime.dataDir, input.sourcePath);
   if (typeof abs !== "string") {
@@ -285,7 +293,7 @@ export async function ingestBlobFromUpload(
   });
 }
 
-async function unlinkQuiet(path: string): Promise<void> {
+export async function unlinkQuiet(path: string): Promise<void> {
   try {
     await unlink(path);
   } catch {

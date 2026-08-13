@@ -19,8 +19,10 @@ import {
   listNodeTypes,
   listRelationTypes,
   readBlobBytes,
+  resolveBlobFilePath,
   searchNodes,
   softDeleteNode,
+  unlinkQuiet,
   updateNode,
   updateNodeType,
   updateNodeTypeDescription,
@@ -38,6 +40,7 @@ import {
   assertSystemTypePatch,
   labelFromSlug,
   missingConfirm,
+  isToolError,
   storedBlobPayload,
   toolError,
   validateBlobRelativePath,
@@ -141,11 +144,18 @@ async function presentBlobNode(
   };
 }
 
+type ResolvedStoredPayload = {
+  payload: Payload;
+  blob?: Blob;
+  created?: boolean;
+  pendingUploadUnlink?: string;
+};
+
 async function resolveStoredPayload(
   db: Queryable,
   payload: UpsertPayload | undefined,
   blobs?: BlobRuntime,
-): Promise<{ payload: Payload; blob?: Blob } | ToolError> {
+): Promise<ResolvedStoredPayload | ToolError> {
   if (!payload) {
     return { payload: DEFAULT_PAYLOAD };
   }
@@ -192,25 +202,34 @@ async function resolveStoredPayload(
     if ("error" in bytes) {
       return bytes;
     }
-    const blob = await ingestBlobBytes(db, blobs, {
+    const ingested = await ingestBlobBytes(db, blobs, {
       mediaType: payload.media_type,
       bytes,
     });
-    if ("error" in blob) {
-      return blob;
+    if ("error" in ingested) {
+      return ingested;
     }
-    return { payload: storedBlobPayload(payload.media_type, blob.id), blob };
+    return {
+      payload: storedBlobPayload(payload.media_type, ingested.blob.id),
+      blob: ingested.blob,
+      created: ingested.created,
+    };
   }
 
   if (payload.source_path !== undefined) {
-    const blob = await ingestBlobFromUpload(db, blobs, {
+    const ingested = await ingestBlobFromUpload(db, blobs, {
       mediaType: payload.media_type,
       sourcePath: payload.source_path,
     });
-    if ("error" in blob) {
-      return blob;
+    if ("error" in ingested) {
+      return ingested;
     }
-    return { payload: storedBlobPayload(payload.media_type, blob.id), blob };
+    return {
+      payload: storedBlobPayload(payload.media_type, ingested.blob.id),
+      blob: ingested.blob,
+      created: ingested.created,
+      pendingUploadUnlink: ingested.sourceAbs,
+    };
   }
 
   return toolError(
@@ -277,22 +296,36 @@ export async function upsertGraphNode(
     );
   }
 
-  return withTransaction(pool, async (client) => {
-    const resolved = await resolveStoredPayload(client, input.payload, blobs);
-    if ("error" in resolved) {
-      return resolved;
-    }
+  let createdBlobAbs: string | undefined;
+  let pendingUploadUnlink: string | undefined;
 
-    if (input.id) {
-      const existing = await getNodeById(client, input.id, { includeDeleted: true });
-      if (existing?.deleted_at) {
-        return toolError(
-          `Node ${input.id} is deleted`,
-          "Restore via undo. Use a new id to create another node.",
-        );
+  try {
+    const result = await withTransaction(pool, async (client) => {
+      let existing: Node | undefined;
+      if (input.id) {
+        existing = await getNodeById(client, input.id, { includeDeleted: true });
+        if (existing?.deleted_at) {
+          return toolError(
+            `Node ${input.id} is deleted`,
+            "Restore via undo. Use a new id to create another node.",
+          );
+        }
       }
+
+      const resolved = await resolveStoredPayload(client, input.payload, blobs);
+      if ("error" in resolved) {
+        return resolved;
+      }
+      pendingUploadUnlink = resolved.pendingUploadUnlink;
+      if (resolved.created && resolved.blob && blobs) {
+        const abs = resolveBlobFilePath(blobs.dataDir, resolved.blob.path);
+        if (typeof abs === "string") {
+          createdBlobAbs = abs;
+        }
+      }
+
       if (existing) {
-        const node = await updateNode(client, input.id, {
+        const node = await updateNode(client, input.id!, {
           type: input.type,
           title: input.title,
           status: input.status,
@@ -312,26 +345,42 @@ export async function upsertGraphNode(
         });
         return { node, activity_id: activity.id };
       }
-    }
 
-    const node = await insertNode(client, {
-      id: input.id ?? randomUUID(),
-      type: input.type,
-      title: input.title,
-      status: input.status ?? "active",
-      payload: resolved.payload,
-      data: input.data ?? {},
-      metadata: input.metadata ?? {},
+      const node = await insertNode(client, {
+        id: input.id ?? randomUUID(),
+        type: input.type,
+        title: input.title,
+        status: input.status ?? "active",
+        payload: resolved.payload,
+        data: input.data ?? {},
+        metadata: input.metadata ?? {},
+      });
+      const activity = await insertActivity(client, {
+        action: "create",
+        target_kind: "node",
+        target_id: node.id,
+        before: null,
+        after: await snapshotNodeForActivity(client, node, resolved.blob),
+      });
+      return { node, activity_id: activity.id };
     });
-    const activity = await insertActivity(client, {
-      action: "create",
-      target_kind: "node",
-      target_id: node.id,
-      before: null,
-      after: await snapshotNodeForActivity(client, node, resolved.blob),
-    });
-    return { node, activity_id: activity.id };
-  });
+
+    if (isToolError(result)) {
+      if (createdBlobAbs) {
+        await unlinkQuiet(createdBlobAbs);
+      }
+      return result;
+    }
+    if (pendingUploadUnlink) {
+      await unlinkQuiet(pendingUploadUnlink);
+    }
+    return result;
+  } catch (error) {
+    if (createdBlobAbs) {
+      await unlinkQuiet(createdBlobAbs);
+    }
+    throw error;
+  }
 }
 
 export async function deleteGraphNode(
