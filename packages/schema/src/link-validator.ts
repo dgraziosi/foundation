@@ -104,6 +104,34 @@ export function validateLink(
     return { ok: false, error: "Cannot link a node to itself" };
   }
 
+  const exact = existingEdges.find(
+    (edge) =>
+      edge.from_id === proposal.from_id &&
+      edge.to_id === proposal.to_id &&
+      edge.relation_type === relationType,
+  );
+  if (exact) {
+    return {
+      ok: false,
+      error: `Duplicate edge: ${relationType} already exists from ${proposal.from_id} to ${proposal.to_id}`,
+    };
+  }
+
+  if (listed.is_symmetric) {
+    const reverse = existingEdges.find(
+      (edge) =>
+        edge.from_id === proposal.to_id &&
+        edge.to_id === proposal.from_id &&
+        edge.relation_type === relationType,
+    );
+    if (reverse) {
+      return {
+        ok: false,
+        error: `Symmetric duplicate: ${relationType} already exists in the reverse direction`,
+      };
+    }
+  }
+
   let upgradeSuggestion: string | undefined;
   if (relationType === "relates_to" && canChildOf(proposal.from_type, proposal.to_type, nodeTypes)) {
     if (proposal.upgrade) {
@@ -120,34 +148,6 @@ export function validateLink(
       error: `Unknown relation_type "${relationType}"`,
       suggestion: `Known relation types: ${known.join(", ")}`,
     };
-  }
-
-  const exact = existingEdges.find(
-    (edge) =>
-      edge.from_id === proposal.from_id &&
-      edge.to_id === proposal.to_id &&
-      edge.relation_type === relationType,
-  );
-  if (exact) {
-    return {
-      ok: false,
-      error: `Duplicate edge: ${relationType} already exists from ${proposal.from_id} to ${proposal.to_id}`,
-    };
-  }
-
-  if (relation.is_symmetric) {
-    const reverse = existingEdges.find(
-      (edge) =>
-        edge.from_id === proposal.to_id &&
-        edge.to_id === proposal.from_id &&
-        edge.relation_type === relationType,
-    );
-    if (reverse) {
-      return {
-        ok: false,
-        error: `Symmetric duplicate: ${relationType} already exists in the reverse direction`,
-      };
-    }
   }
 
   if (relation.source_types.length > 0 && !relation.source_types.includes(proposal.from_type)) {
