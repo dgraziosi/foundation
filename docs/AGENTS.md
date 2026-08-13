@@ -54,7 +54,7 @@ Owns:
 
 1. **Vault health** — weekdays, morning local. Instance ops. Quiet if green. [`VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`prompts/vault-health.md`](../prompts/vault-health.md)
 2. **Graph hygiene** — weekly. Duplicate titles, zero-edge nodes, type soup. Report only unless the operator asked to repair in that conversation. [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md), [`prompts/graph-hygiene.md`](../prompts/graph-hygiene.md)
-3. **Update the computer** — weekdays, late morning local. `git fetch` / `git pull --ff-only` on main, `docker compose up --build -d`, wait for `/health`. Quiet if already up to date. [`prompts/update-foundation.md`](../prompts/update-foundation.md)
+3. **Update the computer** — weekdays, late morning local. `git fetch` / `git pull --ff-only` on main, `docker compose up --build -d`, wait for `/health`. Quiet if already up to date. After a real pull of `origin/main`, launch a Cursor cloud agent with [`prompts/repo-leak-scan.md`](../prompts/repo-leak-scan.md) (report-only; quiet if clean). Monday backup: launch that scan if nothing was pulled that week. [`prompts/update-foundation.md`](../prompts/update-foundation.md)
 
 ## Seldon ↔ Librarian
 
@@ -74,7 +74,7 @@ Seldon ships product on git. Librarian applies those commits on the box.
 - **Do not wipe the vault.** No `docker compose down -v`, no deleting `FOUNDATION_DATA`.
 - **Do not assume a live graph.** A fresh compose with seed types and zero user nodes is a valid vault.
 - **Do not call the graph “the Vault.”**
-- **Git is the product.** Do not commit personal life data, documents, or secrets to this repository. Those belong in the operator’s vault, not in git. Seldon / cloud agents must not put vault contents, `FOUNDATION_DATA` files, or graph dumps in pull requests.
+- **Git is the product.** Do not commit personal life data, documents, or secrets to this repository. Those belong in the operator’s vault, not in git. After pulling product updates, Librarian launches a cloud agent to scan the tree and recent diffs for secrets and personal data. Report-only; quiet if clean. Seldon / cloud agents must not put vault contents, `FOUNDATION_DATA` files, or graph dumps in pull requests.
 
 ## Stand-up (copy-paste)
 
@@ -123,7 +123,7 @@ If green: stay silent. If you found something: ping (report only). Paste [`promp
 
 #### 3c. Update the computer — weekdays, late morning local
 
-If already up to date and `/health` is green: stay silent. Paste [`prompts/update-foundation.md`](../prompts/update-foundation.md).
+If already up to date and `/health` is green: stay silent (except the Monday leak-scan backup). Paste [`prompts/update-foundation.md`](../prompts/update-foundation.md). After a real pull, launch a cloud agent with [`prompts/repo-leak-scan.md`](../prompts/repo-leak-scan.md).
 
 ## Where prompts live
 
@@ -135,3 +135,4 @@ If already up to date and `/health` is green: stay silent. Paste [`prompts/updat
 | [`prompts/vault-health.md`](../prompts/vault-health.md) | Weekday morning vault-health routine |
 | [`prompts/graph-hygiene.md`](../prompts/graph-hygiene.md) | Weekly graph-hygiene routine |
 | [`prompts/update-foundation.md`](../prompts/update-foundation.md) | Weekday late-morning update-the-computer routine |
+| [`prompts/repo-leak-scan.md`](../prompts/repo-leak-scan.md) | Cloud agent after a pull (and Monday backup): secrets / personal data scan |

@@ -22,7 +22,7 @@ A **quiet Librarian routine** (weekdays, morning local). Instance ops: process +
 
 Do not add `get_vault_health`, `run_maintenance`, `propose_reorganize`, `audit_links`, or `cleanup_dangling_links`. Those jobs are this routine and [graph hygiene](./GRAPH_HYGIENE.md), not MCP tools.
 
-Graph-side report (duplicate titles, zero-edge nodes, type soup) is **not** this routine. That is weekly [graph hygiene](./GRAPH_HYGIENE.md). Git pull + compose rebuild is **not** this routine. That is [`prompts/update-foundation.md`](../prompts/update-foundation.md).
+Graph-side report (duplicate titles, zero-edge nodes, type soup) is **not** this routine. That is weekly [graph hygiene](./GRAPH_HYGIENE.md). Git pull, compose rebuild, and the post-pull git-tree leak scan are **not** this routine. Those are [`prompts/update-foundation.md`](../prompts/update-foundation.md) and [`prompts/repo-leak-scan.md`](../prompts/repo-leak-scan.md).
 
 ## What it is not
 
