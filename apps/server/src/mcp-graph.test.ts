@@ -73,10 +73,11 @@ test(
       assert.equal((boot.how_to_extend as { nodes: string }).nodes.includes("upsert"), true);
       assert.equal((boot.how_to_extend as { activity: string }).activity.includes("list_activity"), true);
       assert.equal((boot.how_to_extend as { search: string }).search.includes("full-text"), true);
-      assert.equal(
-        (boot.how_to_extend as { summary: string }).summary.includes("operator routine"),
-        true,
-      );
+      const howTo = boot.how_to_extend as { summary: string };
+      assert.equal(howTo.summary.includes("operator routine"), true);
+      assert.equal(howTo.summary.includes("Librarian"), true);
+      assert.equal(howTo.summary.includes("Vault health"), true);
+      assert.equal(howTo.summary.includes("Do not add get_vault_health"), true);
 
       const area = asObject(
         await client.callTool({

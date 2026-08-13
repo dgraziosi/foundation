@@ -6,13 +6,16 @@ Foundation is a small, self-hostable **typed knowledge graph + MCP server** for 
 
 The name is a nod to Asimov: carry structured knowledge forward so you (and your agents) are not starting from zero every time.
 
+**Glossary (locked):** Foundation = the product you install. A **vault** = one running instance (`FOUNDATION_DATA` + Postgres). The **graph** = the knowledge in that vault. Do not call the graph “the Vault.” A **blob** = a file on a graph node. **Seldon** architects the product. **Chief** writes the graph. **Librarian** is created at init (vault health, graph hygiene, git updates on the computer). Postgres vault, not markdown. Obsidian analog: app / folder / links.
+
 ## Docs
 
 - [`docs/SPEC.md`](docs/SPEC.md) — product contract (goals, non-goals, data/MCP/runtime principles)
 - [`docs/REDESIGN.md`](docs/REDESIGN.md) — redesign map vs Momentum (`replit-agent`): what to keep, what to discard, architecture, data model, slim MCP tools, implementation slices
 - [`docs/MCP_TOOLS.md`](docs/MCP_TOOLS.md) — 12-tool MCP surface
-- [`docs/AGENTS.md`](docs/AGENTS.md) — Seldon (architect), Chief / writer, graph-health routine
-- [`docs/GRAPH_HEALTH.md`](docs/GRAPH_HEALTH.md) — weekday checkup for the instance and the graph
+- [`docs/AGENTS.md`](docs/AGENTS.md) — Seldon (architect), Chief (writer), Librarian (from day one)
+- [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md) — weekday instance checkup (Librarian)
+- [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md) — weekly graph report (Librarian)
 
 ## What it is
 
@@ -45,7 +48,7 @@ Requires [Docker Compose](https://docs.docker.com/compose/) and a copy of this r
    docker compose up --build
    ```
 
-   **Stand up graph health.** Foundation is the product. The system that maintains it is Seldon (architect) plus a quiet weekday graph-health routine (not new MCP tools). Follow [`docs/AGENTS.md`](docs/AGENTS.md) — paste [`prompts/architect.md`](prompts/architect.md) and attach [`prompts/graph-health.md`](prompts/graph-health.md). What “healthy” means: [`docs/GRAPH_HEALTH.md`](docs/GRAPH_HEALTH.md).
+   **Stand up Librarian.** Foundation is the product. A vault is this running instance (`FOUNDATION_DATA` + Postgres). The graph is the knowledge in that vault — do not call the graph “the Vault.” After Compose is up, create Librarian from [`prompts/librarian.md`](prompts/librarian.md) and attach three routines: [`prompts/vault-health.md`](prompts/vault-health.md) (weekdays morning), [`prompts/graph-hygiene.md`](prompts/graph-hygiene.md) (weekly), [`prompts/update-foundation.md`](prompts/update-foundation.md) (weekdays late morning). Also paste Seldon ([`prompts/architect.md`](prompts/architect.md)). Copy-paste stand-up: [`docs/AGENTS.md`](docs/AGENTS.md). What “healthy” means: [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md). Graph report: [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md). No new MCP tools.
 
 3. Point an MCP client at `http://127.0.0.1:8787/mcp` with:
 
@@ -151,7 +154,7 @@ trailer<</Root 1 0 R>>
 
    Operator drop-box (no base64): copy a file into `$FOUNDATION_DATA/uploads/` then `upsert` with `payload.source_path` set to the filename. The server moves it to `blobs/<uuid>`. Compose `db-init` creates `uploads/` mode 1777 (sticky) so the host user can write on a bind mount; `blobs/` stays 0700.
 
-   If Postgres fails to start on a bind-mounted data dir, Compose already runs a `db-init` step that `chown`s `$FOUNDATION_DATA/postgres` to uid 999. To reset local data: `docker compose down` and remove `./data` (this deletes the graph).
+   If Postgres fails to start on a bind-mounted data dir, Compose already runs a `db-init` step that `chown`s `$FOUNDATION_DATA/postgres` to uid 999. To reset local data: `docker compose down` and remove `./data` (this wipes the vault — Postgres + blobs). Never `docker compose down -v` as a casual step; that is how you destroy a vault.
 
 Never point `FOUNDATION_DATA` at an agent profile or memory directory.
 
@@ -167,7 +170,7 @@ See [docs/SPEC.md](docs/SPEC.md) for the product contract.
 
 1. Run Foundation where your agents already live (e.g. Grok Bot computer)
 2. Point agents at the local MCP endpoint
-3. Stand up Seldon (architect) + the graph-health routine ([`docs/AGENTS.md`](docs/AGENTS.md))
+3. Stand up Seldon (architect) + Librarian at init, with the three routines ([`docs/AGENTS.md`](docs/AGENTS.md))
 4. Optionally open a thin viewer later (Mac/web) against the same API
 
 ## License

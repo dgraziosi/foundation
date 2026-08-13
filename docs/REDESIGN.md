@@ -34,7 +34,7 @@ Momentum is a multi-surface consumer product (mobile + web + in-app chat + MCP +
 - Mobile, Watch, Apple auth, RevenueCat, iCloud vault sync, push, quiet hours, notification governance
 - Multi-tenant RLS, OAuth for third parties, subscription gate on MCP, per-user tool-disable catalog
 - Replit hosting glue, MCP Apps HTML renderer, ChatGPT `search`/`fetch` extras
-- In-app chat, check-ins / guides, feed, briefings, nudges, housekeeping schedulers, productized health/reorganize autonomy (the *job* returns as an operator graph-health routine, not MCP — [`docs/GRAPH_HEALTH.md`](./GRAPH_HEALTH.md))
+- In-app chat, check-ins / guides, feed, briefings, nudges, housekeeping schedulers, productized health/reorganize autonomy (the *job* returns as Librarian operator routines, not MCP — [`docs/VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`docs/GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md))
 - Gamification: XP, streaks, achievements, vacation mode
 - Skills inventory (`get_skill`) — agents already have their own tools; Foundation should not ship a second procedure library
 
@@ -63,7 +63,7 @@ Agents **mutate types and relations directly**. The activity log is the receipt;
 
 Do not port: `present_*`, `web_search`, `search_conversations`, `upload_asset` / chunked upload, `manage_vacation_mode`, `get_memories` / `add_memory`, `get_user_context` / `update_user_context`, `get_vault_health`, `suggest_parent`, `manage_view`, `propose_structure` / `manage_structure`, `place_note`, `propose_check_in` / `run_check_in`, `run_maintenance`, `propose_reorganize`, `create_person_from_mentions`, `get_skill`, habit-log pentad, `batch_update_notes`, `preview_rename`, `audit_links` / `cleanup_dangling_links` as v1 tools.
 
-The *job* `get_vault_health` / `run_maintenance` / dangling-link cleanup did is an **operator agent routine**, not a 13th tool. See [`docs/GRAPH_HEALTH.md`](./GRAPH_HEALTH.md) and [`docs/AGENTS.md`](./AGENTS.md).
+The *job* `get_vault_health` / `run_maintenance` / dangling-link cleanup did is **Librarian operator routines**, not a 13th tool. See [`docs/VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`docs/GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md), and [`docs/AGENTS.md`](./AGENTS.md).
 
 Hierarchy walk and “what’s related” fold into `get` (include incident edges) and `search` (type filter). Parent suggestion is an agent reasoning job once `bootstrap` explains the spine.
 
@@ -360,7 +360,7 @@ Twelve tools. Names are stable; descriptions stay one sentence on the wire. Full
 
 **Handler contract (keep from Momentum):** each tool has one zod input schema and one output schema; JSON Schema on the wire is derived; invalid input never reaches the domain; errors are `{ error, suggestion? }`.
 
-**Bootstrap payload (normative for agents):** spine diagram, seed types/relations, “you may `manage_type` / `manage_relation` without approval”, “destructive tools need `confirm`”, “identity is UUID”, “payloads may be HTML/JSON/markdown”, “graph health is an operator routine, not an MCP tool”.
+**Bootstrap payload (normative for agents):** spine diagram, seed types/relations, “you may `manage_type` / `manage_relation` without approval”, “destructive tools need `confirm`”, “identity is UUID”, “payloads may be HTML/JSON/markdown”, “vault health, graph hygiene, and applying Foundation git updates are Librarian operator routines, not MCP tools (no `get_vault_health`)”.
 
 ---
 
@@ -413,7 +413,7 @@ Slice 3–9 is the first milestone in SPEC. Slice 10 (blobs) is implemented; sto
 - **HTML in the graph.** Fine for agents. A future viewer must treat payload HTML as untrusted (sanitize or iframe). Do not block v1.
 - **FTS quality.** HTML/JSON extraction will be crude. Milestone only needs “search it back,” not semantic recall.
 - **Grok Bot disk.** Blobs + Postgres on a small box. Keep inline-first; blob slice has size limits.
-- **Scope creep from Momentum muscle memory.** Every “just port `get_vault_health`” request should lose to this document. The job is [`docs/GRAPH_HEALTH.md`](./GRAPH_HEALTH.md), not a new tool.
+- **Scope creep from Momentum muscle memory.** Every “just port `get_vault_health`” request should lose to this document. The job is Librarian ([`docs/VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`docs/GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md)), not a new tool.
 
 ### Open questions (need a call, not a guess)
 

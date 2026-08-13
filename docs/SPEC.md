@@ -10,6 +10,20 @@ Named after Asimov’s Foundation: carry structured knowledge forward so you and
 
 **Not for sale.** Open on GitHub so others can self-host for their own agents (e.g. on a Grok Bot computer).
 
+## Locked glossary (Obsidian-shaped)
+
+Obsidian analog: Obsidian = app, a vault = one folder, graph = links inside.
+
+- **Foundation** — the product (repo, Docker, MCP). What you install.
+- **Vault** — one running instance: one `FOUNDATION_DATA`, one Postgres. A clone gets their own vault, not yours. Postgres vault, not markdown. Do **not** call the graph “the Vault.”
+- **Graph** — the knowledge in that vault (people, projects, edges, blobs). Daily word.
+- **Blob** — a file on a graph node.
+- **Seldon** — architect of Foundation the product.
+- **Chief** — primary writer (human dumps ideas).
+- **Librarian** — agent from day one. Owns vault health, graph hygiene, and applying git updates to the computer. Not a later job title.
+
+Do not say vault-keeping. Do not name checkups after Seldon’s Time Vault. Encyclopedia Galactica is a one-line Asimov analog at most, not the everyday name for the graph.
+
 ## Primary users
 
 1. **Agents** (Grok Bot, Cursor, Claude, …) via MCP — default interface
@@ -33,7 +47,7 @@ Named after Asimov’s Foundation: carry structured knowledge forward so you and
 - Dual write to a markdown vault + database (one store)
 - Proposal/approve inbox for ontology changes (agents may mutate types/relations directly; keep an activity log + undo)
 - Cloning Momentum’s full product surface
-- Porting `get_vault_health` / `run_maintenance` / `audit_links` as MCP tools (that job is an operator [graph health](./GRAPH_HEALTH.md) routine)
+- Porting `get_vault_health` / `run_maintenance` / `audit_links` as MCP tools (those jobs are Librarian operator routines: [vault health](./VAULT_HEALTH.md), [graph hygiene](./GRAPH_HYGIENE.md))
 
 ## Source material
 
@@ -90,7 +104,7 @@ Agents can add types and relations over time.
 - Docker Compose for local/box bring-up
 - Data and code under an isolated workspace path when running on Grok Bot computer — never write into agent profile/memory directories
 - Localhost MCP + API key auth for v1
-- Periodic instance + graph health is an operator routine, not the database, and not an MCP tool — [`docs/GRAPH_HEALTH.md`](./GRAPH_HEALTH.md), stand-up in [`docs/AGENTS.md`](./AGENTS.md)
+- Periodic vault health, graph hygiene, and applying git updates are Librarian operator routines, not the database, and not MCP tools — [`docs/VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`docs/GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md), stand-up in [`docs/AGENTS.md`](./AGENTS.md)
 
 ## Success criteria (first milestone)
 

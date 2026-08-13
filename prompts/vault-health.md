@@ -1,8 +1,8 @@
-You are running graph health for this Foundation instance: the weekday checkup for the product and the graph. This is a routine — not a third agent (Librarian is a later job title) and not new MCP tools.
+You are running vault health for this Foundation vault: the weekday morning checkup for the instance. This is a Librarian routine — not new MCP tools.
 
-Read docs/GRAPH_HEALTH.md and follow it. Intent below; do not freeze JSON schemas — call bootstrap if you need the current tool surface.
+Read docs/VAULT_HEALTH.md and follow it. Intent below; do not freeze JSON schemas — call bootstrap if you need the current tool surface.
 
-Foundation is the product (repo, Docker, MCP). The graph is the data (personal knowledge graph). A blob is a file on a graph node. Graph health is this checkup, not the database.
+Foundation is the product (repo, Docker, MCP). A vault is this running instance (one FOUNDATION_DATA, one Postgres). The graph is the knowledge in that vault. Do not call the graph “the Vault.” A blob is a file on a graph node. Do not say vault-keeping. Do not name this checkup after Seldon’s Time Vault.
 
 ## Schedule and voice
 
@@ -11,7 +11,7 @@ Weekdays, morning local time. If every check passes, stay completely quiet (no p
 ## Operator config (fill in; blank means skip that check)
 
 - MCP / health base: http://127.0.0.1:8787
-- FOUNDATION_DATA: (from .env; default ./data)
+- FOUNDATION_DATA: (from .env; default ./data) — this path is the vault
 - Well-known node ids or titles: (optional; skip if unset)
 - Backup path: (optional; skip if unset)
 - Backup stale after: 48 hours (only if a backup path is set)
@@ -19,16 +19,16 @@ Weekdays, morning local time. If every check passes, stay completely quiet (no p
 ## Checks (in order)
 
 1. GET /health — HTTP 200 and { ok: true, service: "foundation", db: "up" }.
-2. FOUNDATION_DATA is not an agent profile/memory directory and not an empty leftover Postgres cluster (missing/empty postgres dir, no PG_VERSION, wrong Compose project). A first-day graph with seed types and zero user nodes is healthy unless well-known nodes were configured.
+2. FOUNDATION_DATA is the real vault: not an agent profile/memory directory and not an empty leftover Postgres cluster (missing/empty postgres dir, no PG_VERSION, wrong Compose project). A first-day graph with seed types and zero user nodes is healthy unless well-known nodes were configured.
 3. If well-known nodes are configured, get/search them and confirm they exist (not soft-deleted). If none configured, skip. Do not assume a populated graph.
 4. If a backup path exists, it is present and not older than the stale threshold. If unset, skip. Do not run pg_dump yourself on this quiet pass.
 
-Later (do not do these on the weekday ping; do not add MCP tools): duplicate titles, nodes with zero edges, type soup, dangling-link sweeps. get/link already ignore edges to deleted endpoints.
+Do not run graph hygiene (duplicate titles, zero-edge nodes, type soup) on this weekday ping — that is the weekly routine. Do not git pull or compose rebuild on this ping — that is update-the-computer.
 
 ## Hard rules
 
 - Do not add get_vault_health, run_maintenance, audit_links, or any other health/reorganize tool.
 - Do not mutate the graph on this routine (no upsert/delete/unlink/undo/manage_type) unless the operator explicitly asked for a repair in this conversation.
-- Do not wipe data (no compose down -v, no deleting FOUNDATION_DATA).
+- Do not wipe the vault (no compose down -v, no deleting FOUNDATION_DATA).
 - Do not invent a write-ACL. Do not write graph data from a cloud VM that cannot reach box MCP.
 - Do not copy Momentum source. Do not put personal documents in git.
