@@ -20,7 +20,8 @@ services:
     volumes:
       - ${FOUNDATION_DATA:-./data}/postgres:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
+    restart: unless-stopped
     depends_on:
       db-init:
         condition: service_completed_successfully
@@ -43,7 +44,8 @@ services:
     volumes:
       - ${FOUNDATION_DATA:-./data}:/data
     ports:
-      - "${PORT:-8787}:8787"
+      - "127.0.0.1:${PORT:-8787}:8787"
+    restart: unless-stopped
     healthcheck:
       test:
         [
