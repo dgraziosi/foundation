@@ -68,7 +68,10 @@ export {
   ManageTypeInputSchema,
   ManageTypeSuccessSchema,
   MutationOkSchema,
+  ORIGIN_HIT_SUGGESTION,
+  ORIGIN_MISS_SUGGESTION,
   SEARCH_MISS_SUGGESTION,
+  SEARCH_NO_SELECTOR_SUGGESTION,
   SEARCH_UUID_SUGGESTION,
   SearchHitSchema,
   SearchInputSchema,
@@ -98,6 +101,15 @@ export {
   type WriterIdentity,
 } from "./mcp-io.js";
 export {
+  ORIGIN_INCOMPLETE_SUGGESTION,
+  ORIGIN_UNKNOWN_SYSTEM_SUGGESTION,
+  isToolErrorOrigin,
+  originConflictError,
+  originFromData,
+  canonicalizeOriginInData,
+} from "./origin.js";
+export { validateDataAgainstJsonSchema } from "./json-schema.js";
+export {
   LOST_UPDATE_SUGGESTION,
   MISSING_BASE_SUGGESTION,
   assertIfMatch,
@@ -116,6 +128,9 @@ export {
   NodeSchema,
   NodeStatusSchema,
   NodeTypeSchema,
+  ORIGIN_SYSTEMS,
+  OriginRefSchema,
+  OriginSystemSchema,
   PayloadSchema,
   PayloadStorageSchema,
   RelationKindSchema,
@@ -129,6 +144,8 @@ export {
   type Node,
   type NodeStatus,
   type NodeType,
+  type OriginRef,
+  type OriginSystem,
   type Payload,
   type PayloadStorage,
   type RelationKind,

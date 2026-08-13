@@ -35,7 +35,7 @@ Obsidian analog: Obsidian = app, a vault = one folder, graph = links inside.
 area → project → goal → habit | task
 ```
 
-**Area** is the spine root (life domain + what you value). Seed artifacts include person, journal, idea, lesson, note, trip. Hierarchy verb is `child_of`. Associative seeds: relates_to, supports, inspired_by, references, about.
+**Area** is the spine root (life domain + what you value). Seed artifacts include person, company, journal, idea, lesson, note, trip, decision. Hierarchy verb is `child_of`. Associative seeds: relates_to, supports, inspired_by, references, about.
 
 Agents can add types and relations over time. No approval inbox.
 
@@ -48,9 +48,10 @@ Names are locked. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md).
 - Destructive tools (`delete`, `unlink`, `undo`) require `confirm: true`
 - Identity is UUID. If you already have a UUID, call `get` — do not `search`
 - Updates (`upsert` with an existing id, `link`) are if-match: pass `base_updated_at` / endpoint timestamps from `get`. Mismatch → `{ error, suggestion }` (get and retry). Not a write-ACL.
-- `upsert` **merges** `data` on update (partial patch does not wipe other keys). Create accepts `idempotency_key` so a retry does not twin a node.
+- `upsert` **merges** `data` on update (partial patch does not wipe other keys). Create accepts `idempotency_key` so a retry does not twin a node. When a type has `json_schema`, upsert validates merged `data` and returns `{ error, suggestion }` on a miss.
 - Activity stores optional `actor` / `actor_label` (who wrote). Not a permission gate.
-- `search` is Postgres FTS (title + `data` + extracted inline payload text; Latin accents folded). Not embeddings
+- `search` is Postgres FTS (title + `data` + extracted inline payload text; Latin accents folded). `query` is optional when `type`, `status`, `under` (child_of parent), `since`, or `origin` is set, so agents can list without a word. Not embeddings. No `list_nodes`.
+- Live nodes are unique on `data.origin.{system,id}` for `gmail` | `calendar` | `drive` | `github`. Look up with `search` `{ origin }` (then `get`). Store the ref only — do not fetch or mirror those systems’ bodies.
 - No `get_vault_health` / `run_maintenance` / `audit_links` tools — those jobs are Librarian operator routines ([`VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md))
 
 ## Runtime

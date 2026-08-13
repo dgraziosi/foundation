@@ -192,31 +192,108 @@ export async function restoreNodeSnapshot(
   return rows[0] ? mapNode(rows[0]) : undefined;
 }
 
+export async function getNodeByOrigin(
+  db: Queryable,
+  origin: { system: string; id: string },
+): Promise<Node | undefined> {
+  const { rows } = await db.query<NodeRow>(
+    `SELECT id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at
+     FROM nodes
+     WHERE deleted_at IS NULL
+       AND data #>> '{origin,system}' = $1
+       AND data #>> '{origin,id}' = $2
+     LIMIT 1`,
+    [origin.system, origin.id],
+  );
+  return rows[0] ? mapNode(rows[0]) : undefined;
+}
+
+export async function isChildOfParent(
+  db: Queryable,
+  childId: string,
+  parentId: string,
+): Promise<boolean> {
+  const { rows } = await db.query<{ ok: number }>(
+    `SELECT 1 AS ok
+     FROM edges e
+     JOIN nodes parent ON parent.id = e.to_id
+     WHERE e.from_id = $1
+       AND e.to_id = $2
+       AND e.relation_type = 'child_of'
+       AND parent.deleted_at IS NULL
+     LIMIT 1`,
+    [childId, parentId],
+  );
+  return rows.length > 0;
+}
+
 export async function searchNodes(
   db: Queryable,
-  input: { query: string; type?: string; limit?: number },
+  input: {
+    query?: string;
+    type?: string;
+    status?: Node["status"];
+    under?: string;
+    since?: Date;
+    originSystem?: string;
+    originId?: string;
+    limit?: number;
+  },
 ): Promise<SearchHit[]> {
   const limit = input.limit ?? 20;
+  const query = input.query?.trim() ? input.query.trim() : null;
   const { rows } = await db.query<
     Pick<NodeRow, "id" | "type" | "title" | "status"> & { snippet: string }
   >(
     `WITH q AS (
-       SELECT plainto_tsquery('english', foundation_unaccent($1)) AS tsq
+       SELECT CASE
+         WHEN $1::text IS NULL THEN NULL
+         ELSE plainto_tsquery('english', foundation_unaccent($1))
+       END AS tsq
      )
      SELECT id, type, title, status,
-            ts_headline(
-              'foundation_english',
-              foundation_node_search_text(title, payload, data),
-              q.tsq,
-              'MaxWords=24, MinWords=5, MaxFragments=1'
-            ) AS snippet
+            CASE
+              WHEN q.tsq IS NULL THEN title
+              ELSE ts_headline(
+                'foundation_english',
+                foundation_node_search_text(title, payload, data),
+                q.tsq,
+                'MaxWords=24, MinWords=5, MaxFragments=1'
+              )
+            END AS snippet
      FROM nodes CROSS JOIN q
      WHERE deleted_at IS NULL
        AND ($2::text IS NULL OR type = $2)
-       AND search_tsv @@ q.tsq
-     ORDER BY ts_rank_cd(search_tsv, q.tsq) DESC, updated_at DESC
-     LIMIT $3`,
-    [input.query, input.type ?? null, limit],
+       AND ($3::text IS NULL OR status = $3)
+       AND ($4::timestamptz IS NULL OR updated_at >= $4)
+       AND (
+         $5::uuid IS NULL OR EXISTS (
+           SELECT 1
+           FROM edges e
+           JOIN nodes parent ON parent.id = e.to_id
+           WHERE e.from_id = nodes.id
+             AND e.to_id = $5
+             AND e.relation_type = 'child_of'
+             AND parent.deleted_at IS NULL
+         )
+       )
+       AND ($6::text IS NULL OR data #>> '{origin,system}' = $6)
+       AND ($7::text IS NULL OR data #>> '{origin,id}' = $7)
+       AND (q.tsq IS NULL OR search_tsv @@ q.tsq)
+     ORDER BY
+       CASE WHEN q.tsq IS NULL THEN 0 ELSE ts_rank_cd(search_tsv, q.tsq) END DESC,
+       updated_at DESC
+     LIMIT $8`,
+    [
+      query,
+      input.type ?? null,
+      input.status ?? null,
+      input.since ?? null,
+      input.under ?? null,
+      input.originSystem ?? null,
+      input.originId ?? null,
+      limit,
+    ],
   );
   return rows.map((row) => ({
     id: row.id,

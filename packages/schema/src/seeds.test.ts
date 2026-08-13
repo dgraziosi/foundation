@@ -25,6 +25,8 @@ test("seed node types parse and include spine plus artifacts", () => {
   for (const slug of ARTIFACT_TYPE_SLUGS) {
     assert.ok(slugs.includes(slug), `missing artifact type ${slug}`);
   }
+  assert.ok(slugs.includes("company"));
+  assert.ok(slugs.includes("decision"));
   assert.equal(slugs.includes("core_value"), false);
 });
 

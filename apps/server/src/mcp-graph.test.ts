@@ -134,26 +134,26 @@ test(
           name: "manage_type",
           arguments: {
             action: "create",
-            slug: "decision",
-            description: "A choice we made",
+            slug: "waypoint",
+            description: "A custom authored type used in this test",
             kind: "artifact",
           },
         }),
       );
-      assert.equal((type.type as { slug: string }).slug, "decision");
+      assert.equal((type.type as { slug: string }).slug, "waypoint");
       assert.equal((type.type as { is_system: boolean }).is_system, false);
 
       const used = asObject(
         await client.callTool({
           name: "upsert",
           arguments: {
-            type: "decision",
+            type: "waypoint",
             title: "Fly into NRT",
             payload: { media_type: "text/plain", storage: "inline", body: "cheaper than HND that week" },
           },
         }),
       );
-      assert.equal((used.node as { type: string }).type, "decision");
+      assert.equal((used.node as { type: string }).type, "waypoint");
 
       const ontology = asObject(
         await client.callTool({
@@ -162,7 +162,7 @@ test(
         }),
       );
       const slugs = (ontology.types as Array<{ slug: string }>).map((row) => row.slug);
-      assert.ok(slugs.includes("decision"));
+      assert.ok(slugs.includes("waypoint"));
       assert.ok(slugs.includes("area"));
 
       const listed = asObject(

@@ -114,6 +114,12 @@ async function invertUpdateNode(
     }
     return { action: "update", before: current, after: restored };
   } catch (error) {
+    if (isUniqueViolation(error)) {
+      return toolError(
+        "Cannot undo update: restoring this node would duplicate a live origin (system, id)",
+        "Search origin to find the live node. Do not twin people. Change or delete the live origin first.",
+      );
+    }
     if (isForeignKeyViolation(error)) {
       return toolError(
         `Cannot undo update: restoring node ${before.id} references a missing type`,
@@ -142,11 +148,21 @@ async function invertDeleteNode(
       "It may already have been restored.",
     );
   }
-  const restored = await restoreNode(client, current.id);
-  if (!restored) {
-    return toolError(`Cannot undo delete: node ${deleted.id} not found`);
+  try {
+    const restored = await restoreNode(client, current.id);
+    if (!restored) {
+      return toolError(`Cannot undo delete: node ${deleted.id} not found`);
+    }
+    return { action: "restore", before: current, after: restored };
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      return toolError(
+        "Cannot undo delete: restoring this node would duplicate a live origin (system, id)",
+        "Search origin to find the live node. Do not twin people. Change or delete the live origin first.",
+      );
+    }
+    throw error;
   }
-  return { action: "restore", before: current, after: restored };
 }
 
 async function invertLink(

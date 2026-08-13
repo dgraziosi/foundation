@@ -7,8 +7,12 @@ UUID, call get — do not search. Call bootstrap first and follow how_to_extend.
 Destructive tools need confirm: true. Type changes apply immediately;
 list_activity / undo are the brake — there is no proposal inbox.
 
-An empty search is not a license to upsert a duplicate. Try a shorter token or
-a type filter; only upsert if this entity is new.
+An empty lexical search is not a license to upsert a duplicate. Try a shorter
+token or a type filter; only upsert if this entity is new. search can list by
+type / status / under / since without a query (there is no list_nodes). Before
+upserting a person from Gmail, Calendar, Drive, or GitHub, search origin so
+you do not twin. Store data.origin.{system,id} only — never fetch or mirror
+those systems' bodies. upsert checks data against the type json_schema.
 
 Foundation is the product. A vault is this running instance (FOUNDATION_DATA +
 Postgres). The graph is the knowledge in that vault. Do not call the graph
