@@ -278,12 +278,12 @@ blobs
   id            uuid PK
   media_type    text NOT NULL
   byte_size     int NOT NULL
-  sha256        text NOT NULL
-  path          text NOT NULL   -- relative to FOUNDATION_DATA
+  sha256        text NOT NULL UNIQUE
+  path          text NOT NULL   -- exactly blobs/<uuid> relative to FOUNDATION_DATA
   created_at    timestamptz
 ```
 
-v1 milestone can ship **inline payloads only** (HTML itineraries fit). Blob table is slice 9.
+Slice 10: files at `$FOUNDATION_DATA/blobs/<uuid>` (dir 0700). Ingest via `upsert` (`bytes_base64` or `FOUNDATION_DATA/uploads` `source_path`). Cap 20MB. `get` returns metadata; bytes via `GET /blobs/:id`. Activity snapshots store `blob_id` + `sha256`, not file bytes. Soft-delete keeps bytes (undo). No S3.
 
 ### 4.7 Activity log
 
@@ -356,7 +356,7 @@ Twelve tools. Names are stable; descriptions stay one sentence on the wire. Full
 | `list_activity` | Read the activity log (filter by action, target, since). |
 | `undo` | Reverse a reversible activity row by id. Requires `confirm: true`. |
 
-**Intentionally not separate tools:** restore (use `undo`), neighborhood / hierarchy tree (use `get` + `search`), habit logging, blob upload, embeddings admin.
+**Intentionally not separate tools:** restore (use `undo`), neighborhood / hierarchy tree (use `get` + `search`), habit logging, blob upload (ingest on `upsert`; fetch via `GET /blobs/:id`), embeddings admin.
 
 **Handler contract (keep from Momentum):** each tool has one zod input schema and one output schema; JSON Schema on the wire is derived; invalid input never reaches the domain; errors are `{ error, suggestion? }`.
 
@@ -380,11 +380,11 @@ Implement in this order. Each slice should be mergeable and testable. **Do not s
 | **7. Activity + undo** | Log every mutation; `list_activity` / `undo` with real inverses | Activity shows those mutations |
 | **8. Search** | FTS `search` | Search the itinerary back |
 | **9. Compose polish** | README install < 15 min; health endpoint; volume perms | README success criterion |
-| **10. Blobs** | `storage: blob` + local files (optional if inline is enough) | Large HTML/files |
+| **10. Blobs** | `storage: blob` + local files under `$FOUNDATION_DATA/blobs/<uuid>` (**shipped**) | Large HTML/files |
 | **11. Embeddings** | pgvector + hybrid search (optional) | Open decision |
 | **12. Thin viewer** | Mac/web read-only against the API (deferred) | Non-goal for v1 |
 
-Slice 3–9 is the first milestone in SPEC. Stop there before any viewer, embeddings, or habit-log sugar.
+Slice 3–9 is the first milestone in SPEC. Slice 10 (blobs) is implemented; stop before any viewer, embeddings, or habit-log sugar.
 
 **Port discipline:** when implementing a slice, read the Momentum file for the *rule*, write new Foundation code, add a test that names the rule. Never copy a handler file across.
 

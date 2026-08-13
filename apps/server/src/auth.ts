@@ -11,11 +11,16 @@ export function requireApiKey(expected: string) {
     const provided = match?.[2];
     if (!provided || provided !== expected) {
       res.setHeader("WWW-Authenticate", 'ApiKey realm="foundation"');
-      res.status(401).json({
-        jsonrpc: "2.0",
-        error: { code: -32001, message: "Unauthorized" },
-        id: null,
-      });
+      const mcp = req.baseUrl === "/mcp" || req.originalUrl.startsWith("/mcp");
+      if (mcp) {
+        res.status(401).json({
+          jsonrpc: "2.0",
+          error: { code: -32001, message: "Unauthorized" },
+          id: null,
+        });
+        return;
+      }
+      res.status(401).json({ error: "Unauthorized" });
       return;
     }
     next();

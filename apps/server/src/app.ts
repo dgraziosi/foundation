@@ -1,15 +1,18 @@
 import { pingDb, type Pool } from "@foundation/db";
-import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
-import type { Express } from "express";
+import { hostHeaderValidation } from "@modelcontextprotocol/sdk/server/middleware/hostHeaderValidation.js";
+import express, { type Express } from "express";
 import { requireApiKey } from "./auth.js";
+import { sendBlob } from "./blobs-http.js";
 import type { AppConfig } from "./config.js";
 import { handleMcpRequest } from "./mcp.js";
 
+/** 20MB blob cap as base64 plus JSON-RPC envelope. */
+const JSON_BODY_LIMIT = "32mb";
+
 export function createApp(pool: Pool, config: AppConfig): Express {
-  const app = createMcpExpressApp({
-    host: config.HOST,
-    allowedHosts: ["localhost", "127.0.0.1", "[::1]"],
-  });
+  const app = express();
+  app.use(express.json({ limit: JSON_BODY_LIMIT }));
+  app.use(hostHeaderValidation(["localhost", "127.0.0.1", "[::1]"]));
 
   app.get("/health", async (_req, res) => {
     const db = await pingDb(pool);
@@ -20,11 +23,22 @@ export function createApp(pool: Pool, config: AppConfig): Express {
     });
   });
 
+  app.get("/blobs/:id", requireApiKey(config.FOUNDATION_API_KEY), async (req, res) => {
+    try {
+      await sendBlob(pool, config, req, res);
+    } catch (error) {
+      console.error("Blob fetch failed", error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Internal server error" });
+      }
+    }
+  });
+
   app.use("/mcp", requireApiKey(config.FOUNDATION_API_KEY));
 
   app.post("/mcp", async (req, res) => {
     try {
-      await handleMcpRequest(pool, req, res);
+      await handleMcpRequest(pool, req, res, config.FOUNDATION_DATA);
     } catch (error) {
       console.error("MCP request failed", error);
       if (!res.headersSent) {

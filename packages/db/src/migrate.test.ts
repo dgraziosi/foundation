@@ -44,6 +44,21 @@ test(
          WHERE table_schema = current_schema() AND table_name = 'nodes' AND column_name = 'search_tsv'`,
       );
       assert.equal(fts[0]?.column_name, "search_tsv");
+      const { rows: blobCols } = await pool.query<{ column_name: string }>(
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_schema = current_schema() AND table_name = 'blobs'
+         ORDER BY column_name`,
+      );
+      assert.deepEqual(
+        blobCols.map((row) => row.column_name),
+        ["byte_size", "created_at", "id", "media_type", "path", "sha256"],
+      );
+      const { rows: sha } = await pool.query<{ constraint_name: string }>(
+        `SELECT constraint_name FROM information_schema.table_constraints
+         WHERE table_schema = current_schema() AND table_name = 'blobs'
+           AND constraint_type = 'UNIQUE' AND constraint_name = 'blobs_sha256_unique'`,
+      );
+      assert.equal(sha[0]?.constraint_name, "blobs_sha256_unique");
     } finally {
       await pool.end();
     }

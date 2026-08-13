@@ -25,10 +25,24 @@ export {
   type LinkValidatorContext,
 } from "./link-validator.js";
 export {
+  BLOB_BASE64_MAX_CHARS,
+  BLOB_GET_BODY_MAX_BYTES,
+  BLOB_MAX_BYTES,
+  blobRelativePath,
+  isUuid,
+  isValidBlobRelativePath,
+  isValidUploadSourcePath,
+} from "./blobs.js";
+export {
   DEFAULT_PAYLOAD,
   INLINE_MEDIA_TYPES,
   extractPayloadText,
+  formatBlobSizeCapError,
+  storedBlobPayload,
+  validateBlobRelativePath,
   validateInlinePayload,
+  validateStoredBlobPayload,
+  validateUploadSourcePath,
   type InlineMediaType,
 } from "./payload.js";
 export {
@@ -60,6 +74,7 @@ export {
   UndoInputSchema,
   UnlinkInputSchema,
   UpsertInputSchema,
+  UpsertPayloadSchema,
   UpsertSuccessSchema,
   isToolError,
   toolError,
@@ -72,6 +87,7 @@ export {
   type ToolError,
   type UndoInput,
   type UpsertInput,
+  type UpsertPayload,
 } from "./mcp-io.js";
 export {
   ActivityActionSchema,

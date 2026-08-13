@@ -1,9 +1,13 @@
 import {
+  decodeBytesBase64,
   deleteEdge,
   findEdge,
+  getBlobById,
   getNodeById,
   getNodeType,
   getRelationType,
+  ingestBlobBytes,
+  ingestBlobFromUpload,
   insertActivity,
   insertEdge,
   insertNode,
@@ -14,6 +18,7 @@ import {
   listIncidentEdges,
   listNodeTypes,
   listRelationTypes,
+  readBlobBytes,
   searchNodes,
   softDeleteNode,
   updateNode,
@@ -22,18 +27,24 @@ import {
   updateRelationType,
   updateRelationTypeDescription,
   withTransaction,
+  type BlobRuntime,
   type Pool,
+  type Queryable,
 } from "@foundation/db";
 import {
+  BLOB_GET_BODY_MAX_BYTES,
   DEFAULT_PAYLOAD,
   assertSystemRelationPatch,
   assertSystemTypePatch,
   labelFromSlug,
   missingConfirm,
+  storedBlobPayload,
   toolError,
+  validateBlobRelativePath,
   validateInlinePayload,
   validateLink,
   type Activity,
+  type Blob,
   type Edge,
   type IncidentEdge,
   type LinkInput,
@@ -42,10 +53,12 @@ import {
   type ManageTypeInput,
   type Node,
   type NodeType,
+  type Payload,
   type RelationType,
   type SearchInput,
   type ToolError,
   type UpsertInput,
+  type UpsertPayload,
 } from "@foundation/schema";
 import { randomUUID } from "node:crypto";
 import { undoGraphActivity } from "./undo.js";
@@ -60,6 +73,150 @@ async function knownTypeSlugs(pool: Pool): Promise<string> {
 async function knownRelationSlugs(pool: Pool): Promise<string> {
   const relations = await listRelationTypes(pool);
   return relations.map((type) => type.slug).join(", ");
+}
+
+async function snapshotNodeForActivity(
+  db: Queryable,
+  node: Node,
+  blob?: Blob,
+): Promise<unknown> {
+  if (node.payload.storage !== "blob" || !node.payload.blob_id) {
+    return node;
+  }
+  const meta =
+    blob ??
+    (await getBlobById(db, node.payload.blob_id)) ??
+    undefined;
+  return {
+    ...node,
+    payload: storedBlobPayload(node.payload.media_type, node.payload.blob_id),
+    blob: meta
+      ? {
+          blob_id: meta.id,
+          sha256: meta.sha256,
+          byte_size: meta.byte_size,
+          media_type: meta.media_type,
+        }
+      : { blob_id: node.payload.blob_id },
+  };
+}
+
+async function presentBlobNode(
+  node: Node,
+  blob: Blob | undefined,
+  options: { include_body?: boolean; blobs?: BlobRuntime },
+): Promise<Node | ToolError> {
+  const payload: Payload = storedBlobPayload(
+    node.payload.media_type,
+    node.payload.blob_id!,
+  );
+  if (!options.include_body) {
+    return { ...node, payload };
+  }
+  if (!blob) {
+    return toolError(
+      `Blob not found: ${node.payload.blob_id}`,
+      "The node points at a blob_id that is not in the blobs table.",
+    );
+  }
+  if (blob.byte_size > BLOB_GET_BODY_MAX_BYTES) {
+    return toolError(
+      "Blob is too large to inline in get",
+      `Fetch bytes with HTTP GET /blobs/${blob.id} (API key). get include_body inlines at most ${BLOB_GET_BODY_MAX_BYTES} bytes.`,
+    );
+  }
+  if (!options.blobs) {
+    return toolError(
+      "Blob body is not available",
+      `Fetch bytes with HTTP GET /blobs/${blob.id} (API key).`,
+    );
+  }
+  const bytes = await readBlobBytes(options.blobs.dataDir, blob);
+  if ("error" in bytes) {
+    return bytes;
+  }
+  return {
+    ...node,
+    payload: { ...payload, body: bytes.toString("base64") },
+  };
+}
+
+async function resolveStoredPayload(
+  db: Queryable,
+  payload: UpsertPayload | undefined,
+  blobs?: BlobRuntime,
+): Promise<{ payload: Payload; blob?: Blob } | ToolError> {
+  if (!payload) {
+    return { payload: DEFAULT_PAYLOAD };
+  }
+  if (payload.storage !== "blob") {
+    const stored: Payload = {
+      media_type: payload.media_type,
+      storage: "inline",
+      body: payload.body ?? "",
+    };
+    const err = validateInlinePayload(stored);
+    if (err) {
+      return err;
+    }
+    return { payload: stored };
+  }
+
+  if (payload.blob_id) {
+    const blob = await getBlobById(db, payload.blob_id);
+    if (!blob) {
+      return toolError(
+        `Blob not found: ${payload.blob_id}`,
+        "Ingest first with payload.bytes_base64 or payload.source_path under FOUNDATION_DATA/uploads.",
+      );
+    }
+    const pathErr = validateBlobRelativePath(blob.path);
+    if (pathErr) {
+      return pathErr;
+    }
+    return {
+      payload: storedBlobPayload(payload.media_type, blob.id),
+      blob,
+    };
+  }
+
+  if (!blobs) {
+    return toolError(
+      "Blob ingest requires FOUNDATION_DATA",
+      "Canonical files are stored under FOUNDATION_DATA/blobs, not agent-data.",
+    );
+  }
+
+  if (payload.bytes_base64 !== undefined) {
+    const bytes = decodeBytesBase64(payload.bytes_base64);
+    if ("error" in bytes) {
+      return bytes;
+    }
+    const blob = await ingestBlobBytes(db, blobs, {
+      mediaType: payload.media_type,
+      bytes,
+    });
+    if ("error" in blob) {
+      return blob;
+    }
+    return { payload: storedBlobPayload(payload.media_type, blob.id), blob };
+  }
+
+  if (payload.source_path !== undefined) {
+    const blob = await ingestBlobFromUpload(db, blobs, {
+      mediaType: payload.media_type,
+      sourcePath: payload.source_path,
+    });
+    if ("error" in blob) {
+      return blob;
+    }
+    return { payload: storedBlobPayload(payload.media_type, blob.id), blob };
+  }
+
+  return toolError(
+    "blob payload requires blob_id, bytes_base64, or source_path",
+    "Ingest with bytes_base64 (small files) or source_path under FOUNDATION_DATA/uploads, or pass an existing blob_id.",
+  );
 }
 
 async function assertTypeSlugsExist(
@@ -82,7 +239,8 @@ async function assertTypeSlugsExist(
 export async function getGraphNode(
   pool: Pool,
   id: string,
-): Promise<{ node: Node; edges: IncidentEdge[] } | ToolError> {
+  options: { include_body?: boolean; blobs?: BlobRuntime } = {},
+): Promise<{ node: Node; edges: IncidentEdge[]; blob?: Blob } | ToolError> {
   const node = await getNodeById(pool, id);
   if (!node) {
     return toolError(
@@ -91,12 +249,25 @@ export async function getGraphNode(
     );
   }
   const edges = await listIncidentEdges(pool, id);
-  return { node, edges };
+  if (node.payload.storage !== "blob" || !node.payload.blob_id) {
+    return { node, edges };
+  }
+  const blob = await getBlobById(pool, node.payload.blob_id);
+  const presented = await presentBlobNode(node, blob, options);
+  if ("error" in presented) {
+    return presented;
+  }
+  return {
+    node: presented,
+    edges,
+    ...(blob ? { blob } : {}),
+  };
 }
 
 export async function upsertGraphNode(
   pool: Pool,
   input: UpsertInput,
+  blobs?: BlobRuntime,
 ): Promise<{ node: Node; activity_id: string } | ToolError> {
   const type = await getNodeType(pool, input.type);
   if (!type) {
@@ -105,14 +276,13 @@ export async function upsertGraphNode(
       `Call inspect_ontology or bootstrap, or manage_type to add it. Known types: ${await knownTypeSlugs(pool)}`,
     );
   }
-  if (input.payload) {
-    const payloadErr = validateInlinePayload(input.payload);
-    if (payloadErr) {
-      return payloadErr;
-    }
-  }
 
   return withTransaction(pool, async (client) => {
+    const resolved = await resolveStoredPayload(client, input.payload, blobs);
+    if ("error" in resolved) {
+      return resolved;
+    }
+
     if (input.id) {
       const existing = await getNodeById(client, input.id, { includeDeleted: true });
       if (existing?.deleted_at) {
@@ -126,7 +296,7 @@ export async function upsertGraphNode(
           type: input.type,
           title: input.title,
           status: input.status,
-          payload: input.payload,
+          payload: resolved.payload,
           data: input.data,
           metadata: input.metadata,
         });
@@ -137,8 +307,8 @@ export async function upsertGraphNode(
           action: "update",
           target_kind: "node",
           target_id: node.id,
-          before: existing,
-          after: node,
+          before: await snapshotNodeForActivity(client, existing),
+          after: await snapshotNodeForActivity(client, node, resolved.blob),
         });
         return { node, activity_id: activity.id };
       }
@@ -149,7 +319,7 @@ export async function upsertGraphNode(
       type: input.type,
       title: input.title,
       status: input.status ?? "active",
-      payload: input.payload ?? DEFAULT_PAYLOAD,
+      payload: resolved.payload,
       data: input.data ?? {},
       metadata: input.metadata ?? {},
     });
@@ -158,7 +328,7 @@ export async function upsertGraphNode(
       target_kind: "node",
       target_id: node.id,
       before: null,
-      after: node,
+      after: await snapshotNodeForActivity(client, node, resolved.blob),
     });
     return { node, activity_id: activity.id };
   });
@@ -188,8 +358,8 @@ export async function deleteGraphNode(
       action: "delete",
       target_kind: "node",
       target_id: after.id,
-      before,
-      after,
+      before: await snapshotNodeForActivity(client, before),
+      after: await snapshotNodeForActivity(client, after),
     });
     return { ok: true as const, activity_id: activity.id };
   });

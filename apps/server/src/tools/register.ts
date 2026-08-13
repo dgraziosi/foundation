@@ -13,11 +13,11 @@ import { registerUndoTool } from "./undo.js";
 import { registerUnlinkTool } from "./unlink.js";
 import { registerUpsertTool } from "./upsert.js";
 
-export function registerTools(server: McpServer, pool: Pool): void {
+export function registerTools(server: McpServer, pool: Pool, dataDir: string): void {
   registerBootstrapTool(server, pool);
   registerSearchTool(server, pool);
-  registerGetTool(server, pool);
-  registerUpsertTool(server, pool);
+  registerGetTool(server, pool, dataDir);
+  registerUpsertTool(server, pool, dataDir);
   registerDeleteTool(server, pool);
   registerLinkTool(server, pool);
   registerUnlinkTool(server, pool);

@@ -47,4 +47,20 @@ export {
   softDeleteNode,
   updateNode,
 } from "./nodes.js";
+export {
+  BLOB_DIR_MODE,
+  BLOB_FILE_MODE,
+  decodeBytesBase64,
+  ensureBlobLayout,
+  getBlobById,
+  getBlobBySha256,
+  ingestBlobBytes,
+  ingestBlobFromUpload,
+  mapBlob,
+  readBlobBytes,
+  resolveBlobFilePath,
+  resolveUploadPath,
+  sha256Hex,
+  type BlobRuntime,
+} from "./blobs.js";
 export { isForeignKeyViolation, isUniqueViolation, withTransaction, type Queryable } from "./tx.js";
