@@ -200,18 +200,21 @@ export async function searchNodes(
   const { rows } = await db.query<
     Pick<NodeRow, "id" | "type" | "title" | "status"> & { snippet: string }
   >(
-    `SELECT id, type, title, status,
+    `WITH q AS (
+       SELECT plainto_tsquery('english', foundation_unaccent($1)) AS tsq
+     )
+     SELECT id, type, title, status,
             ts_headline(
-              'english',
+              'foundation_english',
               foundation_node_search_text(title, payload, data),
-              plainto_tsquery('english', $1),
+              q.tsq,
               'MaxWords=24, MinWords=5, MaxFragments=1'
             ) AS snippet
-     FROM nodes
+     FROM nodes CROSS JOIN q
      WHERE deleted_at IS NULL
        AND ($2::text IS NULL OR type = $2)
-       AND search_tsv @@ plainto_tsquery('english', $1)
-     ORDER BY ts_rank_cd(search_tsv, plainto_tsquery('english', $1)) DESC, updated_at DESC
+       AND search_tsv @@ q.tsq
+     ORDER BY ts_rank_cd(search_tsv, q.tsq) DESC, updated_at DESC
      LIMIT $3`,
     [input.query, input.type ?? null, limit],
   );
