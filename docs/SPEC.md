@@ -33,7 +33,7 @@ Named after Asimov’s Foundation: carry structured knowledge forward so you and
 - Dual write to a markdown vault + database (one store)
 - Proposal/approve inbox for ontology changes (agents may mutate types/relations directly; keep an activity log + undo)
 - Cloning Momentum’s full product surface
-- Porting `get_vault_health` / `run_maintenance` / `audit_links` as MCP tools (that job is an operator [vault-keeping](./VAULT_KEEPING.md) routine)
+- Porting `get_vault_health` / `run_maintenance` / `audit_links` as MCP tools (that job is an operator [graph health](./GRAPH_HEALTH.md) routine)
 
 ## Source material
 
@@ -56,7 +56,7 @@ Spine (Life Map):
 area → project → goal → habit | task
 ```
 
-Plus common artifact types as seeds (person, journal, idea, lesson, note, …) — exact set TBD in redesign. **Area** is the vault root (life domain + what you value); it replaces Momentum’s retired `core_value`.
+Plus common artifact types as seeds (person, journal, idea, lesson, note, …) — exact set TBD in redesign. **Area** is the spine root (life domain + what you value); it replaces Momentum’s retired `core_value`.
 
 Hierarchy relation seeds (names may be simplified in redesign):
 
@@ -90,7 +90,7 @@ Agents can add types and relations over time.
 - Docker Compose for local/box bring-up
 - Data and code under an isolated workspace path when running on Grok Bot computer — never write into agent profile/memory directories
 - Localhost MCP + API key auth for v1
-- Periodic instance + graph health is vault-keeping (Seldon’s Time Vault analog): an agent routine, not the database, and not a name for the graph — [`docs/VAULT_KEEPING.md`](./VAULT_KEEPING.md), stand-up in [`docs/AGENTS.md`](./AGENTS.md)
+- Periodic instance + graph health is an operator routine, not the database, and not an MCP tool — [`docs/GRAPH_HEALTH.md`](./GRAPH_HEALTH.md), stand-up in [`docs/AGENTS.md`](./AGENTS.md)
 
 ## Success criteria (first milestone)
 

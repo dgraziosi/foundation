@@ -27,7 +27,7 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 
 - **In:** none
 - **Out:** `{ spine, types, relations, rules, how_to_extend }`
-- `how_to_extend` includes `manage_type`, `manage_relation`, `nodes`, `links`, `activity`, and `search`. Summary notes that vault-keeping is an operator routine, not a tool ([`docs/VAULT_KEEPING.md`](./VAULT_KEEPING.md)).
+- `how_to_extend` includes `manage_type`, `manage_relation`, `nodes`, `links`, `activity`, and `search`. Summary notes that graph health is an operator routine, not a tool ([`docs/GRAPH_HEALTH.md`](./GRAPH_HEALTH.md)).
 
 ### `get`
 
@@ -124,4 +124,4 @@ Undo tokens are single-use (`undone_at`; token cleared). Expired tokens refuse. 
 
 ## Not in v1
 
-Restore as a separate tool (use `undo`), hierarchy tree, parent suggestion, habit logging, a dedicated blob-upload tool (ingest is on `upsert`), embeddings admin, memories, pending proposals, chat presentation, web search, skills, `get_vault_health` / `run_maintenance` / `audit_links` (operator [vault-keeping](./VAULT_KEEPING.md) routine instead).
+Restore as a separate tool (use `undo`), hierarchy tree, parent suggestion, habit logging, a dedicated blob-upload tool (ingest is on `upsert`), embeddings admin, memories, pending proposals, chat presentation, web search, skills, `get_vault_health` / `run_maintenance` / `audit_links` (operator [graph health](./GRAPH_HEALTH.md) routine instead).

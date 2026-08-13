@@ -14,7 +14,7 @@ export async function buildBootstrap(pool: Pool): Promise<BootstrapOutput> {
       diagram: SPINE_DIAGRAM,
       root: "area",
       description:
-        "Area is the vault root (life domain + what you value). Place work with child_of: project → area, goal → project, habit|task → goal. Identity is UUID; edges are the only source of truth.",
+        "Area is the spine root (life domain + what you value). Place work with child_of: project → area, goal → project, habit|task → goal. Identity is UUID; edges are the only source of truth.",
     },
     types,
     relations,
@@ -30,7 +30,7 @@ export async function buildBootstrap(pool: Pool): Promise<BootstrapOutput> {
     },
     how_to_extend: {
       summary:
-        "You may manage_type and manage_relation without approval. Changes apply immediately. Safety is the activity log + undo — there is no proposal inbox. Destructive tools (delete, unlink, undo) require confirm: true. Identity is UUID. Call inspect_ontology to see system + authored types. After mutating, list_activity to read receipts and undo to invert a reversible row. search finds nodes by title and inline payload text (HTML tags stripped). Large files are blobs under FOUNDATION_DATA/blobs, ingested via upsert (bytes_base64 or uploads source_path). Vault-keeping (instance + graph health) is an operator routine, not an MCP tool.",
+        "You may manage_type and manage_relation without approval. Changes apply immediately. Safety is the activity log + undo — there is no proposal inbox. Destructive tools (delete, unlink, undo) require confirm: true. Identity is UUID. Call inspect_ontology to see system + authored types. After mutating, list_activity to read receipts and undo to invert a reversible row. search finds nodes by title and inline payload text (HTML tags stripped). Large files are blobs under FOUNDATION_DATA/blobs, ingested via upsert (bytes_base64 or uploads source_path). Graph health (instance + graph checkup) is an operator routine, not an MCP tool.",
       manage_type:
         "Create or update a node type (slug, kind spine|artifact, parent_types, optional json_schema for nodes.data). Applies immediately. System slugs: you may update description only; you cannot delete them. After creating a type, upsert a node with that type. Set parent_types to allow child_of placement under those parents.",
       manage_relation:

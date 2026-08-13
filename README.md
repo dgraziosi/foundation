@@ -11,8 +11,8 @@ The name is a nod to Asimov: carry structured knowledge forward so you (and your
 - [`docs/SPEC.md`](docs/SPEC.md) — product contract (goals, non-goals, data/MCP/runtime principles)
 - [`docs/REDESIGN.md`](docs/REDESIGN.md) — redesign map vs Momentum (`replit-agent`): what to keep, what to discard, architecture, data model, slim MCP tools, implementation slices
 - [`docs/MCP_TOOLS.md`](docs/MCP_TOOLS.md) — 12-tool MCP surface
-- [`docs/AGENTS.md`](docs/AGENTS.md) — Seldon (architect), Chief / writer, vault-keeping routine
-- [`docs/VAULT_KEEPING.md`](docs/VAULT_KEEPING.md) — periodic health checkup (not the database, not a name for the graph)
+- [`docs/AGENTS.md`](docs/AGENTS.md) — Seldon (architect), Chief / writer, graph-health routine
+- [`docs/GRAPH_HEALTH.md`](docs/GRAPH_HEALTH.md) — weekday checkup for the instance and the graph
 
 ## What it is
 
@@ -45,7 +45,7 @@ Requires [Docker Compose](https://docs.docker.com/compose/) and a copy of this r
    docker compose up --build
    ```
 
-   **Stand up the keeper.** Foundation is the product. The system that maintains it is Seldon (architect) plus a quiet weekday vault-keeping routine (not new MCP tools). Follow [`docs/AGENTS.md`](docs/AGENTS.md) — paste [`prompts/architect.md`](prompts/architect.md) and attach [`prompts/vault-keeper.md`](prompts/vault-keeper.md). What “healthy” means: [`docs/VAULT_KEEPING.md`](docs/VAULT_KEEPING.md).
+   **Stand up graph health.** Foundation is the product. The system that maintains it is Seldon (architect) plus a quiet weekday graph-health routine (not new MCP tools). Follow [`docs/AGENTS.md`](docs/AGENTS.md) — paste [`prompts/architect.md`](prompts/architect.md) and attach [`prompts/graph-health.md`](prompts/graph-health.md). What “healthy” means: [`docs/GRAPH_HEALTH.md`](docs/GRAPH_HEALTH.md).
 
 3. Point an MCP client at `http://127.0.0.1:8787/mcp` with:
 
@@ -167,7 +167,7 @@ See [docs/SPEC.md](docs/SPEC.md) for the product contract.
 
 1. Run Foundation where your agents already live (e.g. Grok Bot computer)
 2. Point agents at the local MCP endpoint
-3. Stand up Seldon (architect) + the vault-keeping routine ([`docs/AGENTS.md`](docs/AGENTS.md))
+3. Stand up Seldon (architect) + the graph-health routine ([`docs/AGENTS.md`](docs/AGENTS.md))
 4. Optionally open a thin viewer later (Mac/web) against the same API
 
 ## License

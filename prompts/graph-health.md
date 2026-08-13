@@ -1,8 +1,8 @@
-You are running vault-keeping for this Foundation instance: the periodic health checkup (Seldon’s Time Vault analog). This is a routine — not a third agent (Librarian is a later job title) and not new MCP tools.
+You are running graph health for this Foundation instance: the weekday checkup for the product and the graph. This is a routine — not a third agent (Librarian is a later job title) and not new MCP tools.
 
-Read docs/VAULT_KEEPING.md and follow it. Intent below; do not freeze JSON schemas — call bootstrap if you need the current tool surface.
+Read docs/GRAPH_HEALTH.md and follow it. Intent below; do not freeze JSON schemas — call bootstrap if you need the current tool surface.
 
-Foundation is the product (repo, Docker, MCP). The graph is the data. A blob is a file on a graph node. Do not call the graph “the Vault.” Do not treat vault-keeping as the database.
+Foundation is the product (repo, Docker, MCP). The graph is the data (personal knowledge graph). A blob is a file on a graph node. Graph health is this checkup, not the database.
 
 ## Schedule and voice
 

@@ -327,18 +327,18 @@ test(
         const described = await manageType(pool, {
           action: "update",
           slug: "area",
-          description: "Vault root — updated by an agent",
+          description: "Spine root — updated by an agent",
         });
         assert.equal(isToolError(described), false);
         if (isToolError(described)) return;
-        assert.equal(described.type.description, "Vault root — updated by an agent");
+        assert.equal(described.type.description, "Spine root — updated by an agent");
         assert.equal(described.type.kind, "spine");
 
         await seedSystemOntology(pool);
         const still = await inspectOntology(pool, "types");
         assert.equal(
           still.types.find((type) => type.slug === "area")?.description,
-          "Vault root — updated by an agent",
+          "Spine root — updated by an agent",
         );
       });
 

@@ -1,18 +1,18 @@
-# Vault-keeping
+# Graph health
 
-The periodic health checkup for a running Foundation instance and its graph. Not the database. Not an MCP tool.
+The weekday checkup for a running Foundation instance and its graph. Not the database. Not an MCP tool.
 
 ## Glossary
 
 - **Foundation** — the product (repo, Docker, MCP). What you clone. Do not rename the GitHub repo or the MCP server `foundation`.
 - **Graph** — the data (people, companies, projects, decisions, places, blobs). Daily word. Encyclopedia Galactica is the Asimov analog, not the everyday name.
-- **Vault-keeping** — this checkup (Seldon’s Time Vault analog). Not the database. Do not call the graph “the Vault” (collides with Momentum and with the Time Vault).
+- **Graph health** — this checkup. Not the database. Not an MCP tool.
 - **Blob** — a file on a graph node.
-- **Seldon** — architect of Foundation the product.
+- **Seldon** — product architect.
 - **Chief / writer** — human dumps ideas; this agent writes the graph.
-- **Librarian** — later job title only. Start vault-keeping as a routine, not a third agent.
+- **Librarian** — later job title only. Start graph health as a routine, not a third agent.
 
-Stand-up: [`AGENTS.md`](./AGENTS.md). Paste: [`prompts/vault-keeper.md`](../prompts/vault-keeper.md).
+Stand-up: [`AGENTS.md`](./AGENTS.md). Paste: [`prompts/graph-health.md`](../prompts/graph-health.md).
 
 ## What it is
 
@@ -24,9 +24,7 @@ It emulates the *job* Momentum split across `get_vault_health`, `run_maintenance
 
 ## What it is not
 
-- **Not the database.** `$FOUNDATION_DATA` and Postgres hold the graph. Vault-keeping looks at them. It does not replace them, dual-write a markdown store, or invent a backup product.
-- **Not a name for the graph.** Do not call the graph “the Vault.”
-- **Not Momentum Vault.** Do not reuse that name for this repo, the MCP server (`foundation`), or packages.
+- **Not the database.** `$FOUNDATION_DATA` and Postgres hold the graph. Graph health looks at them. It does not replace them, dual-write a markdown store, or invent a backup product.
 - **Not a third agent.** Start as a routine on the writer (or Seldon, if that process can reach the box — usually it cannot). **Librarian** is a later job title, when this is a real weekly job. See [`AGENTS.md`](./AGENTS.md).
 - **Not email.** No SMTP, no digest. Ping in Grok Bot / Cursor only when a check fails.
 - **Not a write-ACL.** The API key is the gate. Do not invent default-deny.
