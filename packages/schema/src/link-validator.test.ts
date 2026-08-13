@@ -174,6 +174,44 @@ test("relates_to upgrade to child_of when types match and upgrade is true", () =
   assert.equal(result.relation_type, "child_of");
 });
 
+test("upgrade still rejects an exact relates_to duplicate", () => {
+  const result = validateLink(
+    {
+      from_id: ids.a,
+      to_id: ids.b,
+      relation_type: "relates_to",
+      from_type: "project",
+      to_type: "area",
+      upgrade: true,
+    },
+    {
+      existingEdges: [{ from_id: ids.a, to_id: ids.b, relation_type: "relates_to" }],
+    },
+  );
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.match(result.error, /Duplicate edge/);
+});
+
+test("upgrade still rejects a symmetric relates_to duplicate", () => {
+  const result = validateLink(
+    {
+      from_id: ids.a,
+      to_id: ids.b,
+      relation_type: "relates_to",
+      from_type: "project",
+      to_type: "area",
+      upgrade: true,
+    },
+    {
+      existingEdges: [{ from_id: ids.b, to_id: ids.a, relation_type: "relates_to" }],
+    },
+  );
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.match(result.error, /Symmetric duplicate/);
+});
+
 test("relates_to does not silently rewrite; it suggests child_of", () => {
   const result = validateLink({
     from_id: ids.a,
