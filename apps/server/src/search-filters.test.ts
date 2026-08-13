@@ -225,6 +225,45 @@ test(
           assert.match(badSystem.error, /Unknown origin.system/);
           assert.match(badSystem.suggestion ?? "", /do not fetch or mirror/i);
         }
+
+        const padded = await upsertGraphNode(pool, {
+          type: "person",
+          title: "Throwaway padded origin",
+          data: { origin: { system: "calendar", id: "  evt-fixture-1  " } },
+        });
+        assert.equal(isToolError(padded), false);
+        if (isToolError(padded)) {
+          return;
+        }
+        assert.deepEqual(padded.node.data.origin, { system: "calendar", id: "evt-fixture-1" });
+        const paddedHit = await searchGraphNodes(pool, {
+          origin: { system: "calendar", id: "evt-fixture-1" },
+        });
+        assert.equal(isToolError(paddedHit), false);
+        if (!isToolError(paddedHit)) {
+          assert.ok(paddedHit.nodes.some((node) => node.id === padded.node.id));
+        }
+
+        const keyed = await upsertGraphNode(pool, {
+          type: "person",
+          title: "Throwaway keyed origin",
+          data: { origin: { system: "drive", id: "file-fixture-1" } },
+          idempotency_key: "origin-idem-fixture",
+        });
+        assert.equal(isToolError(keyed), false);
+        if (isToolError(keyed)) {
+          return;
+        }
+        const replay = await upsertGraphNode(pool, {
+          type: "person",
+          title: "Throwaway keyed origin retry",
+          data: { origin: { system: "drive", id: "file-fixture-1" } },
+          idempotency_key: "origin-idem-fixture",
+        });
+        assert.equal(isToolError(replay), false);
+        if (!isToolError(replay)) {
+          assert.equal(replay.node.id, keyed.node.id);
+        }
       });
 
       await t.test("schema miss on upsert returns error and suggestion", async () => {

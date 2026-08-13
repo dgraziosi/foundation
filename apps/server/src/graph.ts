@@ -60,6 +60,7 @@ import {
   isToolError,
   originConflictError,
   originFromData,
+  canonicalizeOriginInData,
   validateDataAgainstJsonSchema,
   type Activity,
   type Blob,
@@ -413,7 +414,7 @@ export async function upsertGraphNode(
         }
       }
 
-      const nextData = mergedNodeData(existing, input.data);
+      const nextData = canonicalizeOriginInData(mergedNodeData(existing, input.data));
       const dataErr = validateUpsertData(type, nextData);
       if (dataErr) {
         return dataErr;
@@ -435,7 +436,7 @@ export async function upsertGraphNode(
             title: input.title,
             status: input.status,
             payload: resolved.payload,
-            data: input.data,
+            data: input.data === undefined ? undefined : nextData,
             metadata: input.metadata,
             base_updated_at: input.base_updated_at,
           });
@@ -480,7 +481,7 @@ export async function upsertGraphNode(
           title: input.title,
           status: input.status ?? "active",
           payload: resolved.payload ?? DEFAULT_PAYLOAD,
-          data: input.data ?? {},
+          data: nextData,
           metadata: input.metadata ?? {},
           idempotency_key: input.idempotency_key ?? null,
         });
@@ -499,10 +500,6 @@ export async function upsertGraphNode(
           await client.query("ROLLBACK TO SAVEPOINT upsert_insert");
           discardCreatedBlob = true;
           pendingUploadUnlink = undefined;
-          const originErr = await originUniqueError(client, nextData);
-          if (originErr) {
-            return originErr;
-          }
           if (input.idempotency_key) {
             const replay = await getNodeByIdempotencyKey(client, input.idempotency_key, {
               includeDeleted: true,
@@ -510,6 +507,10 @@ export async function upsertGraphNode(
             if (replay) {
               return replayIdempotentCreate(client, replay);
             }
+          }
+          const originErr = await originUniqueError(client, nextData);
+          if (originErr) {
+            return originErr;
           }
         }
         throw error;

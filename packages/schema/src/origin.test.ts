@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { isToolError } from "./mcp-io.js";
-import { ORIGIN_SYSTEMS, originConflictError, originFromData } from "./origin.js";
+import { ORIGIN_SYSTEMS, canonicalizeOriginInData, originConflictError, originFromData } from "./origin.js";
 
 test("originFromData ignores missing or empty origin", () => {
   assert.equal(originFromData({}), undefined);
@@ -46,4 +46,11 @@ test("originConflictError points at the live node", () => {
   assert.match(err.error, /github:user:42/);
   assert.match(err.error, /11111111-1111-4111-8111-111111111111/);
   assert.match(err.suggestion ?? "", /do not create a twin/i);
+});
+
+test("canonicalizeOriginInData persists trimmed system and id", () => {
+  const canonical = canonicalizeOriginInData({
+    origin: { system: "gmail", id: "  msg-9  ", extra: true },
+  });
+  assert.deepEqual(canonical.origin, { system: "gmail", id: "msg-9", extra: true });
 });

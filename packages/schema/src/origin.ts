@@ -54,8 +54,9 @@ export function originFromData(data: Record<string, unknown>): OriginRef | ToolE
   if (typeof rec.system !== "string") {
     return toolError("data.origin.system must be a string", ORIGIN_UNKNOWN_SYSTEM_SUGGESTION);
   }
-  if (!ORIGIN_SYSTEMS.includes(rec.system as OriginSystem)) {
-    return toolError(`Unknown origin.system "${rec.system}"`, ORIGIN_UNKNOWN_SYSTEM_SUGGESTION);
+  const system = rec.system.trim();
+  if (!ORIGIN_SYSTEMS.includes(system as OriginSystem)) {
+    return toolError(`Unknown origin.system "${rec.system.trim()}"`, ORIGIN_UNKNOWN_SYSTEM_SUGGESTION);
   }
   if (typeof rec.id !== "string") {
     return toolError("data.origin.id must be a string", ORIGIN_INCOMPLETE_SUGGESTION);
@@ -64,7 +65,20 @@ export function originFromData(data: Record<string, unknown>): OriginRef | ToolE
   if (!id) {
     return toolError("data.origin requires system and id", ORIGIN_INCOMPLETE_SUGGESTION);
   }
-  return { system: rec.system as OriginSystem, id };
+  return { system: system as OriginSystem, id };
+}
+
+/** Persist the trimmed origin ref so uniqueness and search match lookups. */
+export function canonicalizeOriginInData(data: Record<string, unknown>): Record<string, unknown> {
+  const origin = originFromData(data);
+  if (!origin || isToolErrorOrigin(origin)) {
+    return data;
+  }
+  const raw = data.origin as Record<string, unknown>;
+  if (raw.system === origin.system && raw.id === origin.id) {
+    return data;
+  }
+  return { ...data, origin: { ...raw, system: origin.system, id: origin.id } };
 }
 
 export function isToolErrorOrigin(value: OriginRef | ToolError | undefined): value is ToolError {

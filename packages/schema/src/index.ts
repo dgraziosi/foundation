@@ -106,6 +106,7 @@ export {
   isToolErrorOrigin,
   originConflictError,
   originFromData,
+  canonicalizeOriginInData,
 } from "./origin.js";
 export { validateDataAgainstJsonSchema } from "./json-schema.js";
 export {
