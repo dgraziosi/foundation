@@ -159,6 +159,7 @@ export async function listIncidentEdges(db: Queryable, nodeId: string): Promise<
   }));
 }
 
+/** Live edges only: both endpoints must not be soft-deleted. Used by link validation. */
 export async function listEdgesTouching(
   db: Queryable,
   nodeIds: string[],
@@ -167,12 +168,24 @@ export async function listEdgesTouching(
     return [];
   }
   const { rows } = await db.query<{ from_id: string; to_id: string; relation_type: string }>(
-    `SELECT from_id, to_id, relation_type
-     FROM edges
-     WHERE from_id = ANY($1::uuid[]) OR to_id = ANY($1::uuid[])`,
+    `SELECT e.from_id, e.to_id, e.relation_type
+     FROM edges e
+     JOIN nodes src ON src.id = e.from_id AND src.deleted_at IS NULL
+     JOIN nodes dst ON dst.id = e.to_id AND dst.deleted_at IS NULL
+     WHERE e.from_id = ANY($1::uuid[]) OR e.to_id = ANY($1::uuid[])`,
     [nodeIds],
   );
   return rows;
+}
+
+export async function deleteEdgesTouching(db: Queryable, nodeId: string) {
+  const { rows } = await db.query<EdgeRow>(
+    `DELETE FROM edges
+     WHERE from_id = $1 OR to_id = $1
+     RETURNING id, from_id, to_id, relation_type, metadata, created_at`,
+    [nodeId],
+  );
+  return rows.map(mapEdge);
 }
 
 export async function findEdge(

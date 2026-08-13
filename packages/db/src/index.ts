@@ -17,6 +17,7 @@ export {
 export { insertActivity } from "./activity.js";
 export {
   deleteEdge,
+  deleteEdgesTouching,
   findEdge,
   getNodeById,
   insertEdge,

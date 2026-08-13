@@ -312,13 +312,15 @@ activity
 | --- | --- |
 | create node | soft-delete |
 | update node | restore `before` payload/data/title/type/status |
-| delete node | clear `deleted_at` (restore) |
+| delete node | clear `deleted_at` (restore) and re-insert incident edges from the snapshot |
 | link | delete that edge |
 | unlink | re-insert edge from `before` |
 | type/relation create | delete registry row if unused; else refuse |
 | type/relation update | restore `before` row |
 
 Undo of undo is a new compensating row (`reversible = false`). Expired tokens refuse. Destructive MCP tools still require `confirm: true` *in addition to* the log.
+
+Soft-delete also removes incident edges so `get`, `link` validation, and `child_of` uniqueness agree on the live graph. The delete activity snapshot is `{ node, edges }` so undo can restore both.
 
 ### 4.8 Search (v1 vs later)
 

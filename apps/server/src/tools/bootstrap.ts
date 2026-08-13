@@ -36,7 +36,7 @@ export async function buildBootstrap(pool: Pool): Promise<BootstrapOutput> {
       manage_relation:
         "Create or update a relation type (slug, kind hierarchy|associative, source_types, target_types, symmetry). Empty source/target lists mean any type. Applies immediately. System relations: description only.",
       nodes:
-        "upsert creates or updates by UUID (omit id to create). Payload is typed: text/markdown, text/html, application/json, text/plain (inline). HTML itineraries belong on the node — do not round-trip through markdown. get returns the node plus incident edges. delete is a soft-delete and requires confirm: true.",
+        "upsert creates or updates by UUID (omit id to create). Payload is typed: text/markdown, text/html, application/json, text/plain (inline). HTML itineraries belong on the node — do not round-trip through markdown. get returns the node plus incident edges. delete is a soft-delete (confirm: true) that also removes incident edges so children can take a new parent.",
       links:
         "link validates then writes the edges table (the only source of truth for hierarchy and associations). child_of is the hierarchy verb; at most one per source; allowed parents come from the source type's parent_types. relates_to that fits the spine suggests child_of — it does not silently rewrite unless you pass upgrade: true. unlink requires confirm: true.",
     },

@@ -46,7 +46,7 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 
 - **In:** `{ id, confirm: true }`
 - **Out:** `{ ok, activity_id }` or `{ error, suggestion? }`
-- Soft-delete (`deleted_at`). `get` hides deleted nodes.
+- Soft-delete (`deleted_at`). Cascades removal of incident edges so `get`, `link` validation, and `child_of` uniqueness agree on the live graph. Activity `before`/`after` is `{ node, edges }` so undo (slice 7) can restore the node and those edges. `get` hides deleted nodes.
 
 ### `link`
 
