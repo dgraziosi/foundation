@@ -24,6 +24,8 @@ The name is a nod to Asimov: carry structured knowledge forward so you (and your
 
 Scaffolding. Extracting the ontology kernel + MCP surface from [Momentum](https://github.com/dgraziosi/Momentum-React-Native) (`replit-agent`), then simplifying for this use case.
 
+See [docs/SPEC.md](docs/SPEC.md) for the product contract.
+
 ## Intended use
 
 1. Run Foundation where your agents already live (e.g. Grok Bot computer)
@@ -32,4 +34,4 @@ Scaffolding. Extracting the ontology kernel + MCP surface from [Momentum](https:
 
 ## License
 
-TBD.
+[MIT](LICENSE) © 2026 Danny Graziosi
