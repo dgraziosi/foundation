@@ -165,6 +165,9 @@ test(
         assert.equal(got.edges.length, 1);
         assert.equal(got.edges[0]?.relation_type, "child_of");
         assert.equal(got.edges[0]?.direction, "out");
+        assert.equal(got.edges[0]?.neighbor.title, "Health");
+        assert.equal(got.edges[0]?.neighbor.type, "area");
+        assert.equal(got.edges[0]?.neighbor.id, area.node.id);
 
         const second = await linkGraphNodes(pool, {
           from_id: project.node.id,

@@ -4,7 +4,7 @@ Weekly, report-only look at the **graph** in this vault. Quiet if green. Not vau
 
 ## Glossary
 
-Same locked terms as [`VAULT_HEALTH.md`](./VAULT_HEALTH.md): Foundation = product; vault = this instance (`FOUNDATION_DATA` + Postgres); graph = the knowledge in that vault; blob = file on a node; Librarian = day-one agent. Do **not** call the graph “the Vault.” Do not say vault-keeping.
+Same locked terms as [`VAULT_HEALTH.md`](./VAULT_HEALTH.md): Foundation = product; vault = this instance (`FOUNDATION_DATA` + Postgres); graph = the knowledge in that vault; blob = file on a node; Librarian = day-one agent. Do **not** call the graph “the Vault.”
 
 Stand-up: [`AGENTS.md`](./AGENTS.md). Agent: [`prompts/librarian.md`](../prompts/librarian.md). Paste: [`prompts/graph-hygiene.md`](../prompts/graph-hygiene.md).
 
@@ -16,11 +16,9 @@ A **quiet Librarian routine** (weekly, local time). It reports:
 - Nodes with zero edges
 - Type soup (authored types that fight the spine)
 
-When everything is fine, it stays silent. It pings the operator **only when it found something**. It does **not** mutate unless the operator asked for a repair **in that conversation**.
+When everything is fine, it stays silent. It pings the operator **only when it found something**. It does **not** mutate unless the operator asked for a repair **in that conversation**. Still not a new MCP tool.
 
-This was the “later Librarian job” in the old weekday ping. It is now this weekly split. Still not a new MCP tool.
-
-[`REDESIGN.md`](./REDESIGN.md) forbids `get_vault_health`, `run_maintenance`, `propose_reorganize`, `audit_links`, and `cleanup_dangling_links` as v1 tools. Do not add them. Do not add `list_nodes`.
+Do not add `get_vault_health`, `run_maintenance`, `propose_reorganize`, `audit_links`, or `cleanup_dangling_links`. Do not add `list_nodes`.
 
 ## What it is not
 

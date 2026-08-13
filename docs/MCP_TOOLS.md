@@ -1,27 +1,27 @@
 # Foundation MCP tools
 
-Canonical list and rationale: [`docs/REDESIGN.md`](./REDESIGN.md) §5. Product contract: [`docs/SPEC.md`](./SPEC.md).
+Product contract: [`docs/SPEC.md`](./SPEC.md).
 
-v1 surface is **12 tools**. Destructive tools require `confirm: true` or they return `{ error, suggestion }`. Identity is UUID. Ontology mutations apply immediately (activity log + `undo`; no proposal inbox).
+v1 surface is **12 tools**. Destructive tools require `confirm: true` or they return `{ error, suggestion }`. Identity is UUID. If you already have a UUID, call `get` — do not `search`. Ontology mutations apply immediately (activity log + `undo`; no proposal inbox).
 
-| Tool | Status | Purpose |
-| --- | --- | --- |
-| `bootstrap` | shipped | Return starter ontology, how to extend it, and current type/relation inventory. Call first. |
-| `search` | shipped (slice 8) | Find nodes by text query and optional type filter. |
-| `get` | shipped (slice 4; blobs in slice 10) | Fetch a node by id, including payload and incident edges. Blob payloads return metadata, not bytes. |
-| `upsert` | shipped (slice 4; blobs in slice 10) | Create or update a node (title, type, payload, data, status). Blob ingest via `bytes_base64` or `source_path`. |
-| `delete` | shipped (slice 4) | Soft-delete a node. Requires `confirm: true`. |
-| `link` | shipped (slice 5) | Create a typed edge after validation. |
-| `unlink` | shipped (slice 5) | Remove a typed edge. Requires `confirm: true`. |
-| `inspect_ontology` | shipped (slice 6) | List type and relation registry rows (system + authored). |
-| `manage_type` | shipped (slice 6) | Create or update a node type. Applies immediately. |
-| `manage_relation` | shipped (slice 6) | Create or update a relation type. Applies immediately. |
-| `list_activity` | shipped (slice 7) | Read the activity log (filter by action, target, since). |
-| `undo` | shipped (slice 7) | Reverse a reversible activity row by id. Requires `confirm: true`. Type-create undo with leftover deleted nodes needs `purge_deleted: true`. |
+| Tool | Purpose |
+| --- | --- |
+| `bootstrap` | Return starter ontology, how to extend it, and current type/relation inventory. Call first. |
+| `search` | Find nodes by text query and optional type filter. Hits are id/type/title/snippet. |
+| `get` | Fetch a node by id, including payload and incident edges with neighbor titles. Blob payloads return metadata, not bytes. |
+| `upsert` | Create or update a node (title, type, payload, data, status). Blob ingest via `bytes_base64` or `source_path`. |
+| `delete` | Soft-delete a node. Requires `confirm: true`. |
+| `link` | Create a typed edge after validation. |
+| `unlink` | Remove a typed edge. Requires `confirm: true`. |
+| `inspect_ontology` | List type and relation registry rows (system + authored). |
+| `manage_type` | Create or update a node type. Applies immediately. |
+| `manage_relation` | Create or update a relation type. Applies immediately. |
+| `list_activity` | Read the activity log (filter by action, target, since). |
+| `undo` | Reverse a reversible activity row by id. Requires `confirm: true`. Type-create undo with leftover deleted nodes needs `purge_deleted: true`. |
 
 Handler contract: each tool has one zod input schema and one output schema; JSON Schema on the wire is derived; invalid input never reaches the domain; domain errors are `{ error, suggestion? }`.
 
-## Parameters (slices 4–10)
+## Parameters
 
 ### `bootstrap`
 
@@ -32,7 +32,8 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 ### `get`
 
 - **In:** `{ id, include_body? }`
-- **Out:** `{ node, edges: [{ id, from_id, to_id, relation_type, direction, metadata, created_at }], blob? }` or `{ error, suggestion? }`
+- **Out:** `{ node, edges: [{ id, from_id, to_id, relation_type, direction, metadata, created_at, neighbor: { id, title, type } }], blob? }` or `{ error, suggestion? }`
+- Each incident edge includes **neighbor title and type**, not UUID-only hops. Use those titles to `search` or `get` the other node.
 - Inline payloads still return `payload.body`. Blob payloads return `{ storage: "blob", blob_id, media_type }` plus `blob: { id, sha256, media_type, byte_size, path }`. Bytes are **not** dumped into the JSON by default.
 - `include_body: true` may add base64 `payload.body` for small blobs (256KB cap). Larger files: HTTP `GET /blobs/:id` with `Authorization: ApiKey <FOUNDATION_API_KEY>`.
 
@@ -87,8 +88,11 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 ### `search`
 
 - **In:** `{ query, type?, limit? }`
-- **Out:** `{ nodes }` or `{ error, suggestion? }`
-- Postgres FTS on `title` + extracted inline payload text (HTML tags stripped; JSON stringified). Filter by `type`. Soft-deleted nodes are excluded. Lexical recall only (no embeddings).
+- **Out:** `{ nodes: [{ id, type, title, status, snippet }], suggestion? }` or `{ error, suggestion? }`
+- Postgres FTS on `title` (weighted highest) + string values from `data` + extracted inline payload text. HTML: tag text plus `alt` / `title` / `aria-label` / `placeholder`. JSON: string values from the parsed body — **not** `JSON.stringify` of the payload wrapper (`media_type`, `storage`, …). Filter by `type`. Soft-deleted nodes are excluded. Lexical recall only (no embeddings).
+- Hits are lean (id/type/title/snippet). Call `get` to load payload and neighbor titles.
+- If `query` is a UUID, search resolves it like `get` and returns `suggestion` to prefer `get` next time.
+- **An empty result is not a license to upsert a duplicate.** The `suggestion` says so. Try a shorter token or a type filter; only upsert if the entity is new. If you already have a UUID, call `get`.
 
 ### `list_activity`
 
@@ -101,7 +105,7 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 
 - **In:** `{ id, confirm: true, purge_deleted? }` (`id` is an activity row id)
 - **Out:** `{ ok, activity_id }` or `{ error, suggestion? }`
-- `activity_id` is the compensating row (`reversible = false`). Invert map (REDESIGN §4.7):
+- `activity_id` is the compensating row (`reversible = false`). Invert map:
 
 | action | inverse |
 | --- | --- |

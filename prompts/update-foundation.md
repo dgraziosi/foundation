@@ -2,11 +2,15 @@ You are updating the computer that runs this Foundation vault: git fetch/pull th
 
 Intent below; do not freeze JSON schemas. Call bootstrap only if you need the current tool surface after the rebuild.
 
-Foundation is the product (this GitHub clone, Docker, MCP). A vault is this running instance (FOUNDATION_DATA + Postgres). The graph lives in the vault. Do not call the graph “the Vault.” Do not write life-graph data from a cloud VM. Do not say vault-keeping.
+Foundation is the product (this GitHub clone, Docker, MCP). A vault is this running instance (FOUNDATION_DATA + Postgres). The graph lives in the vault. Do not call the graph “the Vault.” Do not write graph data from a cloud VM.
+
+Do not commit personal life data, documents, or secrets to this repository. Those belong in the operator’s vault, not in git.
 
 ## Schedule and voice
 
 Weekdays, late morning local time. If the clone is already up to date and /health is green, stay completely quiet (no ping, no email, no digest). Ping the operator only when you pulled, rebuilt, failed, or stopped because a pull would risk the vault.
+
+Seldon may ping you after a whole batch lands on main (one ping, PR numbers + SHAs). That is the primary apply path. This weekday routine is the backup.
 
 ## Operator config (fill in)
 
@@ -30,7 +34,7 @@ Weekdays, late morning local time. If the clone is already up to date and /healt
 - `.env` or volume paths would point the vault at a different leftover cluster.
 - Health does not come back after rebuild.
 
-Do not upsert graph data on this routine. Do not run vault health or graph hygiene here (those are their own schedules).
+Do not upsert graph data on this routine. Do not run vault health or graph hygiene here (those are their own schedules). Product bugs go to Seldon — do not patch the repo.
 
 ## Hard rules
 
@@ -38,5 +42,4 @@ Do not upsert graph data on this routine. Do not run vault health or graph hygie
 - If pull would wipe the vault, stop and ping.
 - Do not add get_vault_health or any other MCP tool.
 - Do not invent a write-ACL. Do not write graph data from a cloud VM that cannot reach box MCP.
-- Do not copy Momentum source. Do not put personal documents in git.
 - Do not open a PR about graph data.

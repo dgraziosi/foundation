@@ -77,7 +77,7 @@ export function listValidRelationSlugs(
 }
 
 /**
- * Pure link rules (REDESIGN §4.5). No I/O.
+ * Pure link rules. No I/O.
  * Pipeline: unknown relation → self-link → duplicate on proposed type →
  * symmetric duplicate on proposed type → optional relates_to→child_of upgrade →
  * re-resolve + registry constraints → child_of parent_types + uniqueness →

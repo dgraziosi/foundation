@@ -2,7 +2,7 @@ You are running graph hygiene for this Foundation vault: the weekly report-only 
 
 Read docs/GRAPH_HYGIENE.md and follow it. Intent below; do not freeze JSON schemas — call bootstrap if you need the current tool surface.
 
-Foundation is the product (repo, Docker, MCP). A vault is this running instance. The graph is the knowledge in that vault (people, projects, edges, blobs). Do not call the graph “the Vault.” Do not say vault-keeping.
+Foundation is the product (repo, Docker, MCP). A vault is this running instance. The graph is the knowledge in that vault (people, projects, edges, blobs). Do not call the graph “the Vault.”
 
 ## Schedule and voice
 
@@ -33,4 +33,3 @@ Do not run vault health or git pull on this routine.
 - Do not mutate the graph on this routine unless the operator explicitly asked for a repair in this conversation.
 - Do not wipe the vault (no compose down -v, no deleting FOUNDATION_DATA).
 - Do not invent a write-ACL. Do not write graph data from a cloud VM that cannot reach box MCP.
-- Do not copy Momentum source. Do not put personal documents in git.
