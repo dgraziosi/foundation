@@ -226,6 +226,25 @@ test("relates_to does not silently rewrite; it suggests child_of", () => {
   assert.match(result.suggestion ?? "", /child_of/);
 });
 
+test("relates_to does not suggest child_of when the source already has a parent", () => {
+  const result = validateLink(
+    {
+      from_id: ids.a,
+      to_id: ids.c,
+      relation_type: "relates_to",
+      from_type: "project",
+      to_type: "area",
+    },
+    {
+      existingEdges: [{ from_id: ids.a, to_id: ids.b, relation_type: "child_of" }],
+    },
+  );
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.relation_type, "relates_to");
+  assert.equal(result.suggestion, undefined);
+});
+
 test("listValidRelationSlugs includes child_of for project → area", () => {
   const slugs = listValidRelationSlugs("project", "area");
   assert.ok(slugs.includes("child_of"));

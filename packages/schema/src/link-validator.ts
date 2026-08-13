@@ -137,7 +137,12 @@ export function validateLink(
     if (proposal.upgrade) {
       relationType = "child_of";
     } else {
-      upgradeSuggestion = `These types fit the spine as child_of (${proposal.from_type} → ${proposal.to_type}). Retry with relation_type "child_of", or pass upgrade: true.`;
+      const existingParent = existingEdges.find(
+        (edge) => edge.from_id === proposal.from_id && edge.relation_type === "child_of",
+      );
+      if (!existingParent) {
+        upgradeSuggestion = `These types fit the spine as child_of (${proposal.from_type} → ${proposal.to_type}). Retry with relation_type "child_of", or pass upgrade: true.`;
+      }
     }
   }
 
