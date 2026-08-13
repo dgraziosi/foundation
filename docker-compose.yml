@@ -1,0 +1,43 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: foundation
+      POSTGRES_PASSWORD: foundation
+      POSTGRES_DB: foundation
+    volumes:
+      - ${FOUNDATION_DATA:-./data}/postgres:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U foundation -d foundation"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  foundation:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      FOUNDATION_API_KEY: ${FOUNDATION_API_KEY:?Set FOUNDATION_API_KEY in .env (see .env.example)}
+      DATABASE_URL: postgres://foundation:foundation@db:5432/foundation
+      FOUNDATION_DATA: /data
+      PORT: "8787"
+    volumes:
+      - ${FOUNDATION_DATA:-./data}:/data
+    ports:
+      - "${PORT:-8787}:8787"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8787/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s

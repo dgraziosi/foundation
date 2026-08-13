@@ -26,9 +26,72 @@ The name is a nod to Asimov: carry structured knowledge forward so you (and your
 - Not a second brain you have to maintain by hand (agents are the primary users)
 - Not a hosted SaaS you must buy — run it on your own machine (including a Grok Bot computer)
 
+## Install
+
+Requires [Docker Compose](https://docs.docker.com/compose/) and a copy of this repo. Node 22 is only needed if you run the app on the host instead of in Compose.
+
+1. Copy the env file and set an API key (do not commit `.env`):
+
+   ```bash
+   cp .env.example .env
+   # set FOUNDATION_API_KEY to a long random string
+   ```
+
+2. Start Postgres 16 (pgvector image; vector unused for now) and the Foundation server. Durable files go under `FOUNDATION_DATA` (default `./data`):
+
+   ```bash
+   docker compose up --build
+   ```
+
+3. Point an MCP client at `http://127.0.0.1:8787/mcp` with:
+
+   ```http
+   Authorization: ApiKey <FOUNDATION_API_KEY>
+   ```
+
+   `Authorization: Bearer <FOUNDATION_API_KEY>` is accepted as an equivalent.
+
+   Cursor / Claude-style MCP config:
+
+   ```json
+   {
+     "mcpServers": {
+       "foundation": {
+         "url": "http://127.0.0.1:8787/mcp",
+         "headers": {
+           "Authorization": "ApiKey YOUR_KEY"
+         }
+       }
+     }
+   }
+   ```
+
+4. Call `bootstrap` first. It returns the starter spine (`area → project → goal → habit | task`), seeded types/relations, and how to extend the ontology.
+
+   With Node 22 + pnpm (and Compose already up):
+
+   ```bash
+   pnpm bootstrap
+   ```
+
+   Or with curl (SSE JSON-RPC; look for the `data:` line):
+
+   ```bash
+   set -a && source .env && set +a
+   curl -sS http://127.0.0.1:8787/mcp \
+     -H "Authorization: ApiKey ${FOUNDATION_API_KEY}" \
+     -H "Content-Type: application/json" \
+     -H "Accept: application/json, text/event-stream" \
+     -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"bootstrap","arguments":{}}}'
+   ```
+
+Health (no auth): `GET http://127.0.0.1:8787/health`.
+
+Never point `FOUNDATION_DATA` at an agent profile or memory directory.
+
 ## Status
 
-Design. The redesign map is in [`docs/REDESIGN.md`](docs/REDESIGN.md). Implementation (Docker Compose + MCP) starts after that map is approved — no app scaffold yet.
+Slices 1–3: repo skeleton, schema/seed, MCP `bootstrap`. Later slices add upsert/get/delete, link/unlink, ontology mutation, activity/undo, and search.
 
 Reference ideas (not a dump): [Momentum](https://github.com/dgraziosi/Momentum-React-Native) branch `replit-agent`.
 
