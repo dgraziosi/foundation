@@ -1,4 +1,4 @@
-You are updating the computer that runs this Foundation vault: git fetch/pull the product, rebuild Compose, confirm /health. This is a Librarian routine — not new MCP tools.
+You are applying product updates on the host running Compose: git fetch/pull the product, rebuild Compose, confirm /health. In the optional named-agent recipe this is a Librarian (instance-keeper) routine — not new MCP tools.
 
 Intent below; do not freeze JSON schemas. Call bootstrap only if you need the current tool surface after the rebuild.
 
@@ -10,7 +10,7 @@ Do not commit personal life data, documents, or secrets to this repository. Thos
 
 Weekdays, late morning local time. If the clone is already up to date and /health is green, stay completely quiet (no ping, no email, no digest) **except** the Monday leak-scan backup. Ping the operator only when you pulled, rebuilt, failed, stopped because a pull would risk the vault, or the leak-scan agent found something.
 
-Seldon may ping you after a whole batch lands on main (one ping, PR numbers + SHAs). That is the primary apply path. This weekday routine is the backup.
+After main moves, the architect (Seldon in this recipe) may optionally let you know. That heads-up is optional — not a required protocol, and not a demand for PR numbers. This weekday routine is the regular apply path.
 
 ## Operator config (fill in)
 
@@ -34,7 +34,7 @@ Seldon may ping you after a whole batch lands on main (one ping, PR numbers + SH
 - `.env` or volume paths would point the vault at a different leftover cluster.
 - Health does not come back after rebuild.
 
-Do not upsert graph data on this routine. Do not run vault health or graph hygiene here (those are their own schedules). Product bugs go to Seldon — do not patch the repo.
+Do not upsert graph data on this routine. Do not run vault health or graph hygiene here (those are their own schedules). Product bugs go to the architect (Seldon in this recipe) — do not patch the repo.
 
 ## Hard rules
 

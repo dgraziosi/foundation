@@ -75,7 +75,7 @@ test(
       assert.equal((boot.how_to_extend as { search: string }).search.includes("full-text"), true);
       const howTo = boot.how_to_extend as { summary: string };
       assert.equal(howTo.summary.includes("operator routine"), true);
-      assert.equal(howTo.summary.includes("Librarian"), true);
+      assert.equal(howTo.summary.includes("docs/AGENTS.md"), true);
       assert.equal(howTo.summary.includes("Vault health"), true);
       assert.equal(howTo.summary.includes("Do not add get_vault_health"), true);
 
