@@ -100,6 +100,8 @@ Agents can add types and relations over time.
 
 ## Open decisions
 
+Proposed answers live in [`docs/REDESIGN.md`](./REDESIGN.md) (especially §5 tools, §8 open questions). Until that map is approved, these remain open:
+
 - Exact slim MCP tool names
 - Whether v1 includes embeddings/hybrid search or text search only
 - License (TBD)
