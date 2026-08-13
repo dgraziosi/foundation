@@ -33,14 +33,15 @@ export function mapNode(row: NodeRow): Node {
 export async function getNodeById(
   db: Queryable,
   id: string,
-  options: { includeDeleted?: boolean } = {},
+  options: { includeDeleted?: boolean; forUpdate?: boolean } = {},
 ): Promise<Node | undefined> {
+  const lock = options.forUpdate ? " FOR UPDATE" : "";
   const { rows } = await db.query<NodeRow>(
     options.includeDeleted
       ? `SELECT id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at
-         FROM nodes WHERE id = $1`
+         FROM nodes WHERE id = $1${lock}`
       : `SELECT id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at
-         FROM nodes WHERE id = $1 AND deleted_at IS NULL`,
+         FROM nodes WHERE id = $1 AND deleted_at IS NULL${lock}`,
     [id],
   );
   return rows[0] ? mapNode(rows[0]) : undefined;
@@ -125,8 +126,8 @@ export async function updateNode(
      WHERE id = $1 AND deleted_at IS NULL
        AND (
          $8::timestamptz IS NULL
-         OR date_trunc('milliseconds', updated_at)
-           = date_trunc('milliseconds', $8::timestamptz)
+         OR (EXTRACT(EPOCH FROM updated_at) * 1000)::bigint
+           = (EXTRACT(EPOCH FROM $8::timestamptz) * 1000)::bigint
        )
      RETURNING id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at`,
     [

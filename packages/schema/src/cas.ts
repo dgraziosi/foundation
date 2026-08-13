@@ -6,7 +6,14 @@ export const LOST_UPDATE_SUGGESTION =
 export const MISSING_BASE_SUGGESTION =
   "Pass the node's updated_at from get, then retry. This is if-match, not a write-ACL.";
 
+/** Instant from get (`toISOString`) or an equivalent ISO-8601 timestamptz. */
+const ISO_INSTANT =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
+
 export function parseTimestampMs(value: string): number | null {
+  if (!ISO_INSTANT.test(value)) {
+    return null;
+  }
   const ms = Date.parse(value);
   return Number.isNaN(ms) ? null : ms;
 }

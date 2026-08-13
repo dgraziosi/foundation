@@ -342,7 +342,7 @@ export async function upsertGraphNode(
     const result = await withTransaction(pool, async (client) => {
       let existing: Node | undefined;
       if (input.id) {
-        existing = await getNodeById(client, input.id, { includeDeleted: true });
+        existing = await getNodeById(client, input.id, { includeDeleted: true, forUpdate: true });
         if (existing?.deleted_at) {
           return toolError(
             `Node ${input.id} is deleted`,
@@ -498,8 +498,8 @@ export async function linkGraphNodes(
 ): Promise<{ edge: Edge; activity_id: string; suggestion?: string } | ToolError> {
   const writer = writerOf(input);
   return withTransaction(pool, async (client) => {
-    const from = await getNodeById(client, input.from_id);
-    const to = await getNodeById(client, input.to_id);
+    const from = await getNodeById(client, input.from_id, { forUpdate: true });
+    const to = await getNodeById(client, input.to_id, { forUpdate: true });
     if (!from) {
       return toolError(
         `from_id not found: ${input.from_id}`,
