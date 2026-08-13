@@ -112,6 +112,45 @@ test("blob nodes: ingest, get metadata, HTTP bytes, snapshots, delete keeps file
       assert.equal(JSON.stringify(row).includes(pdf.toString("base64")), false);
     });
 
+    await t.test("title-only upsert preserves blob_id", async () => {
+      const pdf = tinyPdf();
+      const created = await upsertGraphNode(
+        pool,
+        {
+          type: "note",
+          title: "Keep blob",
+          payload: {
+            media_type: "application/pdf",
+            storage: "blob",
+            bytes_base64: pdf.toString("base64"),
+          },
+        },
+        blobs,
+      );
+      assert.equal(isToolError(created), false);
+      if (isToolError(created)) return;
+      const blobId = created.node.payload.blob_id;
+      assert.ok(blobId);
+
+      const updated = await upsertGraphNode(
+        pool,
+        { id: created.node.id, type: "note", title: "Renamed blob note" },
+        blobs,
+      );
+      assert.equal(isToolError(updated), false);
+      if (isToolError(updated)) return;
+      assert.equal(updated.node.title, "Renamed blob note");
+      assert.equal(updated.node.payload.storage, "blob");
+      assert.equal(updated.node.payload.blob_id, blobId);
+      assert.equal(updated.node.payload.body, undefined);
+
+      const got = await getGraphNode(pool, created.node.id, { blobs });
+      assert.equal(isToolError(got), false);
+      if (isToolError(got)) return;
+      assert.equal(got.node.payload.blob_id, blobId);
+      assert.equal(got.blob?.id, blobId);
+    });
+
     await t.test("HTTP GET /blobs/:id returns bytes with API key", async () => {
       const pdf = tinyPdf();
       const created = await upsertGraphNode(

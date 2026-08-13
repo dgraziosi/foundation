@@ -73,6 +73,31 @@ test(
         assert.deepEqual(fetched.edges, []);
       });
 
+      await t.test("update without payload preserves the stored body", async () => {
+        const created = await upsertGraphNode(pool, {
+          type: "note",
+          title: "Keep body",
+          payload: { media_type: "text/markdown", storage: "inline", body: "# Keep me" },
+          data: { source: "agent" },
+        });
+        assert.equal(isToolError(created), false);
+        if (isToolError(created)) return;
+
+        const updated = await upsertGraphNode(pool, {
+          id: created.node.id,
+          type: "note",
+          title: "Renamed",
+          status: "active",
+        });
+        assert.equal(isToolError(updated), false);
+        if (isToolError(updated)) return;
+        assert.equal(updated.node.title, "Renamed");
+        assert.equal(updated.node.payload.media_type, "text/markdown");
+        assert.equal(updated.node.payload.storage, "inline");
+        assert.equal(updated.node.payload.body, "# Keep me");
+        assert.equal(updated.node.data.source, "agent");
+      });
+
       await t.test("inline markdown, json, and plain payloads round-trip", async () => {
         for (const payload of [
           { media_type: "text/markdown", storage: "inline" as const, body: "# Hello" },

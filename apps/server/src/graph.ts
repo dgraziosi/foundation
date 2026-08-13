@@ -145,7 +145,7 @@ async function presentBlobNode(
 }
 
 type ResolvedStoredPayload = {
-  payload: Payload;
+  payload?: Payload;
   blob?: Blob;
   created?: boolean;
   pendingUploadUnlink?: string;
@@ -157,7 +157,7 @@ async function resolveStoredPayload(
   blobs?: BlobRuntime,
 ): Promise<ResolvedStoredPayload | ToolError> {
   if (!payload) {
-    return { payload: DEFAULT_PAYLOAD };
+    return {};
   }
   if (payload.storage !== "blob") {
     const stored: Payload = {
@@ -351,7 +351,7 @@ export async function upsertGraphNode(
         type: input.type,
         title: input.title,
         status: input.status ?? "active",
-        payload: resolved.payload,
+        payload: resolved.payload ?? DEFAULT_PAYLOAD,
         data: input.data ?? {},
         metadata: input.metadata ?? {},
       });
