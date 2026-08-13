@@ -1,6 +1,10 @@
 -- Search quality: FTS on title + extracted payload body + nodes.data.
 -- Do not index the payload wrapper (media_type / storage / blob_id).
 -- HTML: visible text plus alt/title/aria-label/placeholder attribute values.
+-- Script/style: two non-greedy passes (same as extractPayloadText). Postgres ARE
+-- sets whole-RE greediness from the first quantified atom, so
+-- `<(script|style)[^>]*>.*?</\1>` still spans the first opener to the last
+-- same-name closer and drops body text between two scripts.
 -- JSON: string/number/boolean values from the parsed body, not JSON.stringify of the wrapper.
 -- pgvector remains unused.
 
@@ -43,8 +47,13 @@ AS $$
     || ' ' ||
     regexp_replace(
       regexp_replace(
-        coalesce(html, ''),
-        '<(script|style)[^>]*>.*</\1>',
+        regexp_replace(
+          coalesce(html, ''),
+          '<script[^>]*?>.*?</script>',
+          ' ',
+          'gi'
+        ),
+        '<style[^>]*?>.*?</style>',
         ' ',
         'gi'
       ),

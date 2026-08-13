@@ -82,6 +82,20 @@ test(
         return;
       }
 
+      const htmlScripts = await upsertGraphNode(pool, {
+        type: "note",
+        title: "Throwaway html script sandwich",
+        payload: {
+          media_type: "text/html",
+          storage: "inline",
+          body: '<html><head><script>var HEADTOKEN="drop-me";</script></head><body><p>visible meadow report</p></body><script>var FOOTTOKEN="drop-me-too";</script></html>',
+        },
+      });
+      assert.equal(isToolError(htmlScripts), false);
+      if (isToolError(htmlScripts)) {
+        return;
+      }
+
       await t.test("paraphrase Liz hits data, not an echoed full title", async () => {
         const hits = await searchGraphNodes(pool, { query: "Liz", type: "person" });
         assert.equal(isToolError(hits), false);
@@ -134,6 +148,35 @@ test(
         }
         assert.ok(hits.nodes.some((node) => node.id === project.node.id));
         assert.ok(hits.nodes.every((node) => node.type === "project"));
+      });
+
+      await t.test("HTML with scripts in head and footer still indexes body text between them", async () => {
+        const bodyHits = await searchGraphNodes(pool, { query: "meadow" });
+        assert.equal(isToolError(bodyHits), false);
+        if (isToolError(bodyHits)) {
+          return;
+        }
+        assert.ok(bodyHits.nodes.some((node) => node.id === htmlScripts.node.id));
+
+        const headHits = await searchGraphNodes(pool, { query: "HEADTOKEN" });
+        assert.equal(isToolError(headHits), false);
+        if (isToolError(headHits)) {
+          return;
+        }
+        assert.equal(
+          headHits.nodes.some((node) => node.id === htmlScripts.node.id),
+          false,
+        );
+
+        const footHits = await searchGraphNodes(pool, { query: "FOOTTOKEN" });
+        assert.equal(isToolError(footHits), false);
+        if (isToolError(footHits)) {
+          return;
+        }
+        assert.equal(
+          footHits.nodes.some((node) => node.id === htmlScripts.node.id),
+          false,
+        );
       });
 
       await t.test("JSON body values are indexed; payload wrapper keys are not", async () => {

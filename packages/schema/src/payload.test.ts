@@ -96,6 +96,17 @@ test("extractPayloadText strips HTML tags and keeps attribute values", () => {
   assert.equal(text.includes("<"), false);
 });
 
+test("extractPayloadText keeps body text between a head script and a footer script", () => {
+  const text = extractPayloadText({
+    media_type: "text/html",
+    storage: "inline",
+    body: '<html><head><script>var HEADTOKEN="drop-me";</script></head><body><p>visible meadow report</p></body><script>var FOOTTOKEN="drop-me-too";</script></html>',
+  });
+  assert.match(text, /visible meadow report/);
+  assert.equal(text.includes("HEADTOKEN"), false);
+  assert.equal(text.includes("FOOTTOKEN"), false);
+});
+
 test("extractPayloadText pulls JSON string values, not the payload wrapper", () => {
   const text = extractPayloadText({
     media_type: "application/json",
