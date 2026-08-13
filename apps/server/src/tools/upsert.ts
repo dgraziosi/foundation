@@ -4,12 +4,12 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { upsertGraphNode } from "../graph.js";
 import { defineTool } from "./define-tool.js";
 
-export function registerUpsertTool(server: McpServer, pool: Pool): void {
+export function registerUpsertTool(server: McpServer, pool: Pool, dataDir: string): void {
   defineTool(server, {
     name: "upsert",
     description: "Create or update a node (title, type, payload, data, status).",
     input: UpsertInputSchema.shape,
     output: UpsertSuccessSchema,
-    handler: async (input) => upsertGraphNode(pool, input),
+    handler: async (input) => upsertGraphNode(pool, input, { dataDir }),
   });
 }

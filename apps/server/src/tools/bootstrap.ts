@@ -14,14 +14,14 @@ export async function buildBootstrap(pool: Pool): Promise<BootstrapOutput> {
       diagram: SPINE_DIAGRAM,
       root: "area",
       description:
-        "Area is the vault root (life domain + what you value). Place work with child_of: project → area, goal → project, habit|task → goal. Identity is UUID; edges are the only source of truth.",
+        "Area is the spine root (life domain + what you value). Place work with child_of: project → area, goal → project, habit|task → goal. Identity is UUID; edges are the only source of truth.",
     },
     types,
     relations,
     rules: {
       identity: "uuid",
       payloads:
-        "Typed payloads: media_type text/markdown | text/html | application/json | text/plain | …; storage inline | blob. HTML itineraries belong on the node, not round-tripped through markdown.",
+        "Typed payloads: media_type text/markdown | text/html | application/json | text/plain | …; storage inline | blob. HTML itineraries belong on the node, not round-tripped through markdown. Large files use storage blob (blob_id); fetch bytes via HTTP GET /blobs/:id.",
       destructive_confirm: true,
       ontology_writable: true,
       no_proposal_inbox: true,
@@ -30,13 +30,13 @@ export async function buildBootstrap(pool: Pool): Promise<BootstrapOutput> {
     },
     how_to_extend: {
       summary:
-        "You may manage_type and manage_relation without approval. Changes apply immediately. Safety is the activity log + undo — there is no proposal inbox. Destructive tools (delete, unlink, undo) require confirm: true. Identity is UUID. Call inspect_ontology to see system + authored types. After mutating, list_activity to read receipts and undo to invert a reversible row. search finds nodes by title and inline payload text (HTML tags stripped). Vault-keeping (instance + graph health) is an operator routine, not an MCP tool.",
+        "You may manage_type and manage_relation without approval. Changes apply immediately. Safety is the activity log + undo — there is no proposal inbox. Destructive tools (delete, unlink, undo) require confirm: true. Identity is UUID. Call inspect_ontology to see system + authored types. After mutating, list_activity to read receipts and undo to invert a reversible row. search finds nodes by title and inline payload text (HTML tags stripped). Large files are blobs under FOUNDATION_DATA/blobs, ingested via upsert (bytes_base64 or uploads source_path). Vault health, graph hygiene, and applying Foundation git updates are Librarian operator routines, not MCP tools. Do not add get_vault_health.",
       manage_type:
         "Create or update a node type (slug, kind spine|artifact, parent_types, optional json_schema for nodes.data). Applies immediately. System slugs: you may update description only; you cannot delete them. After creating a type, upsert a node with that type. Set parent_types to allow child_of placement under those parents.",
       manage_relation:
         "Create or update a relation type (slug, kind hierarchy|associative, source_types, target_types, symmetry). Empty source/target lists mean any type. Applies immediately. System relations: description only.",
       nodes:
-        "upsert creates or updates by UUID (omit id to create). Payload is typed: text/markdown, text/html, application/json, text/plain (inline). HTML itineraries belong on the node — do not round-trip through markdown. get returns the node plus incident edges. delete is a soft-delete and requires confirm: true. Undo of delete restores the node (incident edges were kept).",
+        "upsert creates or updates by UUID (omit id to create). Payload is typed: text/markdown, text/html, application/json, text/plain (inline), or storage blob for large files. Blob ingest: payload.bytes_base64 (cap 20MB) or payload.source_path under FOUNDATION_DATA/uploads (server moves the file into blobs/<uuid>). Stored payload is { storage: blob, blob_id, media_type } — get does not dump bytes; fetch with HTTP GET /blobs/:id (API key) or get include_body for small blobs. HTML itineraries belong on the node — do not round-trip through markdown. get returns the node plus incident edges (and blob metadata when storage is blob). delete is a soft-delete and requires confirm: true; it does not delete blob bytes (undo can restore the node). Undo of delete restores the node (incident edges were kept).",
       links:
         "link validates then writes the edges table (the only source of truth for hierarchy and associations). child_of is the hierarchy verb; at most one per source; allowed parents come from the source type's parent_types. relates_to that fits the spine suggests child_of — it does not silently rewrite unless you pass upgrade: true. unlink requires confirm: true. get and link ignore edges whose endpoints are deleted; reparenting drops a stale child_of to a deleted parent and records an unlink activity row.",
       activity:

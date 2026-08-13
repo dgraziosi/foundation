@@ -8,8 +8,8 @@ v1 surface is **12 tools**. Destructive tools require `confirm: true` or they re
 | --- | --- | --- |
 | `bootstrap` | shipped | Return starter ontology, how to extend it, and current type/relation inventory. Call first. |
 | `search` | shipped (slice 8) | Find nodes by text query and optional type filter. |
-| `get` | shipped (slice 4) | Fetch a node by id, including payload and incident edges. |
-| `upsert` | shipped (slice 4) | Create or update a node (title, type, payload, data, status). |
+| `get` | shipped (slice 4; blobs in slice 10) | Fetch a node by id, including payload and incident edges. Blob payloads return metadata, not bytes. |
+| `upsert` | shipped (slice 4; blobs in slice 10) | Create or update a node (title, type, payload, data, status). Blob ingest via `bytes_base64` or `source_path`. |
 | `delete` | shipped (slice 4) | Soft-delete a node. Requires `confirm: true`. |
 | `link` | shipped (slice 5) | Create a typed edge after validation. |
 | `unlink` | shipped (slice 5) | Remove a typed edge. Requires `confirm: true`. |
@@ -21,32 +21,39 @@ v1 surface is **12 tools**. Destructive tools require `confirm: true` or they re
 
 Handler contract: each tool has one zod input schema and one output schema; JSON Schema on the wire is derived; invalid input never reaches the domain; domain errors are `{ error, suggestion? }`.
 
-## Parameters (slices 4–9)
+## Parameters (slices 4–10)
 
 ### `bootstrap`
 
 - **In:** none
 - **Out:** `{ spine, types, relations, rules, how_to_extend }`
-- `how_to_extend` includes `manage_type`, `manage_relation`, `nodes`, `links`, `activity`, and `search`. Summary notes that vault-keeping is an operator routine, not a tool ([`docs/VAULT_KEEPING.md`](./VAULT_KEEPING.md)).
+- `how_to_extend` includes `manage_type`, `manage_relation`, `nodes`, `links`, `activity`, and `search`. Summary notes that vault health, graph hygiene, and applying git updates are Librarian operator routines, not tools ([`docs/VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`docs/GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md)). No `get_vault_health` tool.
 
 ### `get`
 
-- **In:** `{ id }`
-- **Out:** `{ node, edges: [{ id, from_id, to_id, relation_type, direction, metadata, created_at }] }` or `{ error, suggestion? }`
+- **In:** `{ id, include_body? }`
+- **Out:** `{ node, edges: [{ id, from_id, to_id, relation_type, direction, metadata, created_at }], blob? }` or `{ error, suggestion? }`
+- Inline payloads still return `payload.body`. Blob payloads return `{ storage: "blob", blob_id, media_type }` plus `blob: { id, sha256, media_type, byte_size, path }`. Bytes are **not** dumped into the JSON by default.
+- `include_body: true` may add base64 `payload.body` for small blobs (256KB cap). Larger files: HTTP `GET /blobs/:id` with `Authorization: ApiKey <FOUNDATION_API_KEY>`.
 
 ### `upsert`
 
 - **In:** `{ id?, type, title, payload?, data?, status?, metadata? }`
 - **Out:** `{ node, activity_id }` or `{ error, suggestion? }`
-- `payload`: `{ media_type, storage: "inline"|"blob", body?, blob_id? }`
-- Inline media types in v1: `text/markdown`, `text/html`, `application/json`, `text/plain`. Blob storage is rejected until slice 10.
+- `payload`: `{ media_type, storage: "inline"|"blob", body?, blob_id?, bytes_base64?, source_path? }`
+- Inline media types: `text/markdown`, `text/html`, `application/json`, `text/plain`.
+- **Blob ingest (no browser, no S3):** pass exactly one of:
+  1. `bytes_base64` — MCP-native; good for small files. Size cap **20MB** (decoded). JSON body limit is 32MB so a 20MB file can round-trip.
+  2. `source_path` — relative file under `$FOUNDATION_DATA/uploads` (filename or `uploads/filename`). The server **moves** it to `$FOUNDATION_DATA/blobs/<uuid>`. Rejects `..` and absolute paths.
+  3. `blob_id` — attach an already-ingested blob (sha256 dedup may reuse an existing row).
+- Stored payload is `{ storage: "blob", blob_id, media_type }`. Over cap → `{ error, suggestion }`.
 - Omit `id` to create. Pass `id` to update, or to create with a chosen UUID.
 
 ### `delete`
 
 - **In:** `{ id, confirm: true }`
 - **Out:** `{ ok, activity_id }` or `{ error, suggestion? }`
-- Soft-delete (`deleted_at`). `get` hides deleted nodes. Incident edges stay in place for undo; `get` and `link` validation ignore edges to deleted endpoints. Reparenting drops a stale `child_of` to a deleted parent so uniqueness matches the live graph, and records an `unlink` activity row with a `before` snapshot of the dropped edge. Restore via `undo` of the delete row.
+- Soft-delete (`deleted_at`). `get` hides deleted nodes. Incident edges stay in place for undo; `get` and `link` validation ignore edges to deleted endpoints. Reparenting drops a stale `child_of` to a deleted parent so uniqueness matches the live graph, and records an `unlink` activity row with a `before` snapshot of the dropped edge. Restore via `undo` of the delete row. Soft-delete does **not** delete blob bytes (so undo can restore a blob node).
 
 ### `link`
 
@@ -88,6 +95,7 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 - **In:** `{ action?, target?, since?, limit? }`
 - **Out:** `{ activities }`
 - `target` is `target_id` (node UUID, edge UUID, or type/relation slug). `since` is an ISO-8601 timestamp. Rows include `before` / `after`, `reversible`, `undo_token`, `token_expires_at`, and `undone_at`.
+- Blob node snapshots store `payload.blob_id` plus `blob: { blob_id, sha256, byte_size, media_type }` — not PDF/file bytes.
 
 ### `undo`
 
@@ -109,6 +117,11 @@ Live nodes of a type still block type-create undo. Soft-deleted nodes stay resto
 
 Undo tokens are single-use (`undone_at`; token cleared). Expired tokens refuse. Undo of undo is the compensating row (`reversible = false`).
 
+## HTTP (not an MCP tool)
+
+- `GET /blobs/:id` — raw bytes. Requires `Authorization: ApiKey <FOUNDATION_API_KEY>` (Bearer accepted). `Content-Type` is the blob `media_type`. This is how agents fetch large files without inlining them in MCP JSON.
+- Files live at `$FOUNDATION_DATA/blobs/<uuid>` (directory mode 0700). `FOUNDATION_DATA` must not be an agent profile/memory directory.
+
 ## Not in v1
 
-Restore as a separate tool (use `undo`), hierarchy tree, parent suggestion, habit logging, blob upload, embeddings admin, memories, pending proposals, chat presentation, web search, skills, `get_vault_health` / `run_maintenance` / `audit_links` (operator [vault-keeping](./VAULT_KEEPING.md) routine instead).
+Restore as a separate tool (use `undo`), hierarchy tree, parent suggestion, habit logging, a dedicated blob-upload tool (ingest is on `upsert`), embeddings admin, memories, pending proposals, chat presentation, web search, skills, `get_vault_health` / `run_maintenance` / `audit_links` (Librarian operator routines instead: [vault health](./VAULT_HEALTH.md), [graph hygiene](./GRAPH_HYGIENE.md)).

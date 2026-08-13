@@ -1,13 +1,15 @@
 import { z } from "zod";
+import { BLOB_BASE64_MAX_CHARS } from "./blobs.js";
 import {
   ActivityActionSchema,
   ActivitySchema,
+  BlobSchema,
   EdgeSchema,
   JsonObjectSchema,
   NodeSchema,
   NodeStatusSchema,
   NodeTypeSchema,
-  PayloadSchema,
+  PayloadStorageSchema,
   RelationKindSchema,
   RelationTypeSchema,
   TypeKindSchema,
@@ -42,6 +44,8 @@ export const SlugSchema = z
 
 export const GetInputSchema = z.object({
   id: z.string().uuid(),
+  /** When true, blob payloads may include a base64 `body` if under the inline cap. Default false. */
+  include_body: z.boolean().optional(),
 });
 
 export const IncidentEdgeSchema = EdgeSchema.extend({
@@ -52,13 +56,55 @@ export type IncidentEdge = z.infer<typeof IncidentEdgeSchema>;
 export const GetSuccessSchema = z.object({
   node: NodeSchema,
   edges: z.array(IncidentEdgeSchema),
+  blob: BlobSchema.optional(),
 });
+
+/** Upsert ingest: inline body, existing blob_id, bytes_base64, or uploads source_path. */
+export const UpsertPayloadSchema = z
+  .object({
+    media_type: z.string().min(1),
+    storage: PayloadStorageSchema,
+    body: z.string().optional(),
+    blob_id: z.string().uuid().optional(),
+    bytes_base64: z.string().max(BLOB_BASE64_MAX_CHARS).optional(),
+    source_path: z.string().min(1).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.storage === "inline") {
+      if (value.body === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "inline payload requires body",
+          path: ["body"],
+        });
+      }
+      return;
+    }
+    const methods = [value.blob_id, value.bytes_base64, value.source_path].filter(
+      (item) => item !== undefined,
+    );
+    if (methods.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "blob payload requires blob_id, bytes_base64, or source_path",
+        path: ["blob_id"],
+      });
+    }
+    if (methods.length > 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "pass only one of blob_id, bytes_base64, or source_path",
+        path: ["blob_id"],
+      });
+    }
+  });
+export type UpsertPayload = z.infer<typeof UpsertPayloadSchema>;
 
 export const UpsertInputSchema = z.object({
   id: z.string().uuid().optional(),
   type: z.string().min(1),
   title: z.string().min(1),
-  payload: PayloadSchema.optional(),
+  payload: UpsertPayloadSchema.optional(),
   data: JsonObjectSchema.optional(),
   status: NodeStatusSchema.optional(),
   metadata: JsonObjectSchema.optional(),

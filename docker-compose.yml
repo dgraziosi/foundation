@@ -1,5 +1,6 @@
 services:
-  # Ensure FOUNDATION_DATA is writable by Postgres (uid 999) and the app (blobs).
+  # Postgres data is uid 999. blobs/ stays 0700 for the server user (not world-writable).
+  # uploads/ is 1777 (sticky drop-box) so a host user can write on typical Linux bind mounts.
   db-init:
     image: pgvector/pgvector:pg16
     user: "0"
@@ -7,7 +8,7 @@ services:
       - ${FOUNDATION_DATA:-./data}:/data
     entrypoint: ["/bin/bash", "-c"]
     command:
-      - mkdir -p /data/postgres /data/blobs && chown -R 999:999 /data/postgres && chmod 1777 /data/blobs
+      - mkdir -p /data/postgres /data/blobs /data/uploads && chown -R 999:999 /data/postgres && chmod 0700 /data/blobs && chmod 1777 /data/uploads
     restart: "no"
 
   db:
@@ -19,7 +20,8 @@ services:
     volumes:
       - ${FOUNDATION_DATA:-./data}/postgres:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
+    restart: unless-stopped
     depends_on:
       db-init:
         condition: service_completed_successfully
@@ -42,7 +44,8 @@ services:
     volumes:
       - ${FOUNDATION_DATA:-./data}:/data
     ports:
-      - "${PORT:-8787}:8787"
+      - "127.0.0.1:${PORT:-8787}:8787"
+    restart: unless-stopped
     healthcheck:
       test:
         [
