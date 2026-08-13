@@ -40,7 +40,7 @@ async function poolForSchema(schema: string): Promise<Pool> {
 }
 
 test(
-  "MCP agent flow: bootstrap, upsert area+project+HTML trip, link, manage_type, use it",
+  "MCP agent flow: bootstrap, upsert, link, search, list_activity, undo",
   { skip: !databaseUrl },
   async () => {
     if (!databaseUrl) {
@@ -71,6 +71,8 @@ test(
       const boot = asObject(await client.callTool({ name: "bootstrap", arguments: {} }));
       assert.equal((boot.spine as { diagram: string }).diagram, "area → project → goal → habit | task");
       assert.equal((boot.how_to_extend as { nodes: string }).nodes.includes("upsert"), true);
+      assert.equal((boot.how_to_extend as { activity: string }).activity.includes("list_activity"), true);
+      assert.equal((boot.how_to_extend as { search: string }).search.includes("full-text"), true);
 
       const area = asObject(
         await client.callTool({
@@ -151,6 +153,46 @@ test(
       const slugs = (ontology.types as Array<{ slug: string }>).map((row) => row.slug);
       assert.ok(slugs.includes("decision"));
       assert.ok(slugs.includes("area"));
+
+      const listed = asObject(
+        await client.callTool({
+          name: "list_activity",
+          arguments: { action: "create", target: tripId },
+        }),
+      );
+      const activities = listed.activities as Array<{ id: string; action: string; target_id: string }>;
+      assert.ok(activities.some((row) => row.target_id === tripId && row.action === "create"));
+      const tripCreateId = activities.find((row) => row.target_id === tripId)?.id;
+      assert.ok(tripCreateId);
+
+      const found = asObject(
+        await client.callTool({
+          name: "search",
+          arguments: { query: "arrive NRT", type: "trip" },
+        }),
+      );
+      const nodes = found.nodes as Array<{ id: string; type: string }>;
+      assert.ok(nodes.some((node) => node.id === tripId && node.type === "trip"));
+
+      const undone = asObject(
+        await client.callTool({
+          name: "undo",
+          arguments: { id: tripCreateId, confirm: true },
+        }),
+      );
+      assert.equal(undone.error, undefined);
+      assert.equal(undone.ok, true);
+
+      const missing = asObject(await client.callTool({ name: "get", arguments: { id: tripId } }));
+      assert.equal(typeof missing.error, "string");
+
+      const confirmGate = asObject(
+        await client.callTool({
+          name: "undo",
+          arguments: { id: (project as { activity_id: string }).activity_id },
+        }),
+      );
+      assert.match(String(confirmGate.error), /confirm: true/);
     } finally {
       await client.close().catch(() => undefined);
       await new Promise<void>((resolve) => httpServer.close(() => resolve()));

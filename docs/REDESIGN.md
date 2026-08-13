@@ -318,6 +318,8 @@ activity
 | type/relation create | delete registry row if unused; else refuse |
 | type/relation update | restore `before` row |
 
+Type-create undo counts **live** nodes only for the in-use block. Soft-deleted nodes of that type stay restorable via undo-of-delete while the type row exists. If only tombstones remain, undo refuses unless `purge_deleted: true` is passed (with `confirm: true`); that hard-deletes the tombstones and incident edges, writes unlink activity, and marks those prior delete rows non-reversible. Never silently purge tombstones.
+
 Undo of undo is a new compensating row (`reversible = false`). Expired tokens refuse. Destructive MCP tools still require `confirm: true` *in addition to* the log.
 
 Soft-delete keeps incident edges so restore is `clear deleted_at`. `get` and `link` validation ignore edges whose endpoints are deleted. Inserting a new `child_of` drops a stale `child_of` to a deleted parent so the unique index matches the live graph, and writes an `unlink` activity row with a `before` snapshot of the dropped edge.

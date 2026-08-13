@@ -39,6 +39,11 @@ test(
          WHERE table_name = 'nodes' AND column_name IN ('permalink', 'parent', 'relations', 'content')`,
       );
       assert.deepEqual(rows, []);
+      const { rows: fts } = await pool.query<{ column_name: string }>(
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_schema = current_schema() AND table_name = 'nodes' AND column_name = 'search_tsv'`,
+      );
+      assert.equal(fts[0]?.column_name, "search_tsv");
     } finally {
       await pool.end();
     }

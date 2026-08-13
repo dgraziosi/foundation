@@ -92,11 +92,11 @@ Agents can add types and relations over time.
 
 ## Success criteria (first milestone)
 
-- [x] `docker compose up` yields working MCP (`bootstrap` in slices 1–3; nodes/edges/ontology tools in slices 4–6)
-- [ ] Agent can create an `area`, a `project`, link them, store an HTML itinerary payload on a node, search it back *(area/project/link/HTML itinerary: slices 4–6; search: slice 8)*
+- [x] `docker compose up` yields working MCP (`bootstrap` in slices 1–3; nodes/edges/ontology tools in slices 4–6; `list_activity` / `undo` / `search` in slices 7–8)
+- [x] Agent can create an `area`, a `project`, link them, store an HTML itinerary payload on a node, search it back
 - [x] Agent can add a new type and use it without a human approval step
-- [ ] Activity log shows those mutations *(rows are written for mutations; `list_activity` / `undo` is slice 7)*
-- [ ] README explains install for another Grok Bot user in < 15 minutes of reading
+- [x] Activity log shows those mutations; `undo` inverts them (confirm required)
+- [x] README explains install for another Grok Bot user in < 15 minutes of reading
 
 ## Decisions
 

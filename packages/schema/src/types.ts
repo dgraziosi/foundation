@@ -156,6 +156,8 @@ export const BootstrapOutputSchema = z.object({
     manage_relation: z.string(),
     nodes: z.string(),
     links: z.string(),
+    activity: z.string(),
+    search: z.string(),
   }),
 });
 export type BootstrapOutput = z.infer<typeof BootstrapOutputSchema>;

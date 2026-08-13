@@ -9,10 +9,12 @@ import {
   insertNode,
   insertNodeType,
   insertRelationType,
+  listActivity,
   listEdgesTouching,
   listIncidentEdges,
   listNodeTypes,
   listRelationTypes,
+  searchNodes,
   softDeleteNode,
   updateNode,
   updateNodeType,
@@ -31,18 +33,24 @@ import {
   toolError,
   validateInlinePayload,
   validateLink,
+  type Activity,
   type Edge,
   type IncidentEdge,
   type LinkInput,
+  type ListActivityInput,
   type ManageRelationInput,
   type ManageTypeInput,
   type Node,
   type NodeType,
   type RelationType,
+  type SearchInput,
   type ToolError,
   type UpsertInput,
 } from "@foundation/schema";
 import { randomUUID } from "node:crypto";
+import { undoGraphActivity } from "./undo.js";
+
+export { undoGraphActivity };
 
 async function knownTypeSlugs(pool: Pool): Promise<string> {
   const types = await listNodeTypes(pool);
@@ -79,7 +87,7 @@ export async function getGraphNode(
   if (!node) {
     return toolError(
       `Node not found: ${id}`,
-      "Use a live node UUID from upsert. Deleted nodes are hidden until undo (slice 7).",
+      "Use a live node UUID from upsert. Deleted nodes are hidden until restored via undo.",
     );
   }
   const edges = await listIncidentEdges(pool, id);
@@ -110,7 +118,7 @@ export async function upsertGraphNode(
       if (existing?.deleted_at) {
         return toolError(
           `Node ${input.id} is deleted`,
-          "Restore via undo (slice 7). Use a new id to create another node.",
+          "Restore via undo. Use a new id to create another node.",
         );
       }
       if (existing) {
@@ -530,4 +538,49 @@ export async function manageRelation(
     });
     return { relation, activity_id: activity.id };
   });
+}
+
+export async function listGraphActivity(
+  pool: Pool,
+  input: ListActivityInput,
+): Promise<{ activities: Activity[] } | ToolError> {
+  let since: Date | undefined;
+  if (input.since) {
+    const parsed = Date.parse(input.since);
+    if (Number.isNaN(parsed)) {
+      return toolError(
+        `Invalid since timestamp: ${input.since}`,
+        "Pass an ISO-8601 timestamp, e.g. 2026-08-13T00:00:00Z.",
+      );
+    }
+    since = new Date(parsed);
+  }
+  const activities = await listActivity(pool, {
+    action: input.action,
+    target: input.target,
+    since,
+    limit: input.limit,
+  });
+  return { activities };
+}
+
+export async function searchGraphNodes(
+  pool: Pool,
+  input: SearchInput,
+): Promise<{ nodes: Node[] } | ToolError> {
+  if (input.type) {
+    const type = await getNodeType(pool, input.type);
+    if (!type) {
+      return toolError(
+        `Unknown type "${input.type}"`,
+        `Call inspect_ontology. Known types: ${await knownTypeSlugs(pool)}`,
+      );
+    }
+  }
+  const nodes = await searchNodes(pool, {
+    query: input.query,
+    type: input.type,
+    limit: input.limit,
+  });
+  return { nodes };
 }

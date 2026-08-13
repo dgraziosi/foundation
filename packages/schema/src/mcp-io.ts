@@ -1,5 +1,7 @@
 import { z } from "zod";
 import {
+  ActivityActionSchema,
+  ActivitySchema,
   EdgeSchema,
   JsonObjectSchema,
   NodeSchema,
@@ -22,18 +24,13 @@ export function toolError(error: string, suggestion?: string): ToolError {
 }
 
 export function isToolError(value: unknown): value is ToolError {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "error" in value &&
-    typeof (value as { error: unknown }).error === "string" &&
-    !("node" in value) &&
-    !("edge" in value) &&
-    !("type" in value) &&
-    !("relation" in value) &&
-    !("types" in value) &&
-    !("ok" in value)
-  );
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  if (!("error" in value) || typeof (value as { error: unknown }).error !== "string") {
+    return false;
+  }
+  return Object.keys(value).every((key) => key === "error" || key === "suggestion");
 }
 
 export const SlugSchema = z
@@ -147,3 +144,34 @@ export const ManageRelationSuccessSchema = z.object({
   relation: RelationTypeSchema,
   activity_id: z.string().uuid(),
 });
+
+export const SearchInputSchema = z.object({
+  query: z.string().trim().min(1),
+  type: z.string().min(1).optional(),
+  limit: z.number().int().min(1).max(100).optional(),
+});
+export type SearchInput = z.infer<typeof SearchInputSchema>;
+
+export const SearchSuccessSchema = z.object({
+  nodes: z.array(NodeSchema),
+});
+
+export const ListActivityInputSchema = z.object({
+  action: ActivityActionSchema.optional(),
+  target: z.string().min(1).optional(),
+  since: z.string().min(1).optional(),
+  limit: z.number().int().min(1).max(200).optional(),
+});
+export type ListActivityInput = z.infer<typeof ListActivityInputSchema>;
+
+export const ListActivitySuccessSchema = z.object({
+  activities: z.array(ActivitySchema),
+});
+
+export const UndoInputSchema = z.object({
+  id: z.string().uuid(),
+  confirm: z.boolean().optional(),
+  /** Permanently drop leftover soft-deleted nodes when undoing a type create. */
+  purge_deleted: z.boolean().optional(),
+});
+export type UndoInput = z.infer<typeof UndoInputSchema>;

@@ -17,6 +17,34 @@ export const DEFAULT_PAYLOAD: Payload = {
   body: "",
 };
 
+/** Extract searchable text from an inline payload (REDESIGN §4.8). */
+export function extractPayloadText(payload: Payload): string {
+  if (payload.storage !== "inline" || payload.body === undefined) {
+    return "";
+  }
+  if (payload.media_type === "text/html") {
+    return payload.body
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/&lt;/gi, "<")
+      .replace(/&gt;/gi, ">")
+      .replace(/&quot;/gi, '"')
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+  if (payload.media_type === "application/json") {
+    try {
+      return JSON.stringify(JSON.parse(payload.body));
+    } catch {
+      return payload.body;
+    }
+  }
+  return payload.body;
+}
+
 export function validateInlinePayload(payload: Payload): ToolError | null {
   if (payload.storage === "blob") {
     return toolError(
