@@ -1,18 +1,16 @@
 # Foundation architecture
 
-Living picture of the **vault** and the **graph** as shipped on `main` through [PR #12](https://github.com/dgraziosi/foundation/pull/12). Conceptual, not a class dump. Product contract: [`SPEC.md`](./SPEC.md). Tool surface: [`MCP_TOOLS.md`](./MCP_TOOLS.md).
+Living picture of the **vault** and the **graph**. Conceptual, not a class dump. Product contract: [`SPEC.md`](./SPEC.md). Tool surface: [`MCP_TOOLS.md`](./MCP_TOOLS.md).
+
+When a change alters the graph or vault shape, update this file in the same PR.
 
 ## Glossary
 
 **Foundation** is the product (this repo, Docker, the MCP server). A **vault** is one running instance: one `FOUNDATION_DATA` and one Postgres. The **graph** is the knowledge in that vault. A **blob** is a file on a node. Do not call the graph “the Vault.” A git clone is the product, not this vault — `compose up` elsewhere starts a different instance.
 
-## Standing order
-
-When a slice changes the graph or vault shape (tools, storage, or what Foundation may hold vs leave in an origin system), update this file in the **same PR**. Merge bar includes **“ARCHITECTURE.md still true.”**
-
 ## Vault
 
-One vault is one running instance. Postgres files and blob files both live under `FOUNDATION_DATA`. Blobs are `$FOUNDATION_DATA/blobs/<uuid>`. Never point `FOUNDATION_DATA` at an agent profile or memory directory. Never put vault files in git.
+One vault is one running instance. Postgres files and blob files both live under `FOUNDATION_DATA` (the vault data dir). Blobs are `$FOUNDATION_DATA/blobs/<uuid>`. Never put vault files in git.
 
 ```mermaid
 flowchart TB
@@ -137,7 +135,7 @@ A blob is a file on a node, stored at `$FOUNDATION_DATA/blobs/<uuid>`. `get` ret
 
 Writes go through the graph and leave **activity**. `undo` reverses a reversible row. This is lost-update protection and a receipt, not an ACL.
 
-- **Compare-and-swap:** update and `link` are if-match. Pass `base_updated_at` (or endpoint timestamps) from `get`. Mismatch → get and retry.
+- **Compare-and-swap:** update and `link` are if-match. Pass `base_updated_at` (or endpoint timestamps) from `get`. If the node moved, the vault refuses. The caller’s next move is get and retry.
 - **data merge:** update patches `data` (`JSONB ||`). A partial patch does not wipe other keys.
 - **Create idempotency:** `idempotency_key` on create. A retry returns the same node; it does not twin.
 - Optional `actor` / `actor_label` are stored on the activity row (who wrote), not a permission gate.
@@ -188,11 +186,32 @@ flowchart LR
 
 Agents talk to the vault over MCP. That path is not the architecture — it is the door.
 
-`http://127.0.0.1:8787/mcp` with `Authorization: ApiKey <FOUNDATION_API_KEY>`. Streamable HTTP on this process, not a Cursor catalog connector. Port stays localhost.
+`http://127.0.0.1:8787/mcp` with `Authorization: ApiKey <FOUNDATION_API_KEY>`. Streamable HTTP on this process. Port stays localhost.
 
 Twelve tools: `bootstrap`, `search`, `get`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`. No thirteenth tool.
+
+An agent that can reach the vault MCP may read/write; one that cannot does not.
 
 ```mermaid
 flowchart LR
   agents["Agents"] -->|"MCP on localhost — 12 tools, ApiKey"| vault["Vault"]
+```
+
+Two agents may write the same node through that one MCP. Update and `link` are if-match. If the node moved, the vault **refuses**. The caller’s next move is get and retry.
+
+```mermaid
+sequenceDiagram
+  participant A as Agent A
+  participant MCP as Vault MCP
+  participant B as Agent B
+
+  A->>MCP: get
+  MCP-->>A: node + updated_at
+  B->>MCP: get
+  MCP-->>B: node + updated_at
+  B->>MCP: upsert if-match
+  MCP-->>B: ok
+  A->>MCP: upsert if-match (stale)
+  MCP-->>A: refuse — node moved
+  Note over A: get and retry
 ```

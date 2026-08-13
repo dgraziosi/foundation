@@ -27,13 +27,13 @@ Do not add `get_vault_health`, `run_maintenance`, `propose_reorganize`, `audit_l
 - **Not a mutation pass.** No `upsert` / `delete` / `unlink` / `undo` / `manage_type` on the quiet run.
 - **Not email.** No digest. Ping only when there is something to report.
 - **Not a write-ACL.** The API key is the gate.
-- **Not a cloud-VM writer.** Run from Librarian on the computer that can reach box MCP.
+- **Reachability.** Run from Librarian on the computer that can reach the vault MCP.
 
 A first-day vault (seed types, zero user nodes) is **healthy**. Zero user nodes is not “type soup” and not a pile of orphans. Skip duplicate/orphan reports when there is nothing to scan.
 
 ## Weekly checks (report only)
 
-Intent only — call `bootstrap` if you need the current tool surface. Prefer MCP. A read-only SQL look via `docker compose exec` on the box is allowed when MCP cannot enumerate the whole graph (there is no `list_nodes` tool). Do not add one. `search` can list by `type` / `status` / `under` without a query (limit 100); that is a sample, not a full dump.
+Intent only — call `bootstrap` if you need the current tool surface. Prefer MCP. A read-only SQL look via `docker compose exec` on the computer that hosts Compose is allowed when MCP cannot enumerate the whole graph (there is no `list_nodes` tool). Do not add one. `search` can list by `type` / `status` / `under` without a query (limit 100); that is a sample, not a full dump.
 
 ### 1. Duplicate titles
 
@@ -45,7 +45,7 @@ If you cannot scan (no SQL), use `search` with type filters (no query) as a samp
 
 Live nodes with no incident edges. Seed-only / empty graph: skip. Person/note/trip with no links yet can be real; report them, don’t delete them.
 
-`get` returns incident edges for a node you already know. For a full pass, read-only SQL on the box is OK.
+`get` returns incident edges for a node you already know. For a full pass, read-only SQL on the computer that hosts Compose is OK.
 
 ### 3. Type soup
 
@@ -64,7 +64,7 @@ Report slug, kind, parent_types. Do not `manage_type` on this routine.
 | Types vs spine | `bootstrap` / `inspect_ontology` |
 | A known node’s edges | `get` |
 | Title recall or list by type/status/under | `search` (query optional when a filter is set; not a dump of the whole graph) |
-| Full duplicate / zero-edge scan | Read-only SQL on the box, if needed |
+| Full duplicate / zero-edge scan | Read-only SQL on the computer that hosts Compose, if needed |
 | Recent writes (context, not a fail) | `list_activity` |
 
 ## Failure / findings ping

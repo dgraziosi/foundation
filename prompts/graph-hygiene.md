@@ -21,7 +21,7 @@ A first-day vault (seed types, zero user nodes) is healthy — skip duplicate/or
 2. Live nodes with zero edges. Report them; do not delete. Skip if the graph has no user nodes.
 3. Type soup: inspect_ontology / bootstrap types. Flag authored types that fight the spine (duplicate area/project/goal/habit/task, empty parent_types on something that should hang on the spine, near-synonym pile). System seeds are not soup. Do not manage_type on this run.
 
-Prefer MCP (bootstrap, inspect_ontology, get, search, list_activity). There is no list_nodes tool — do not add one. A read-only SQL look on the box is allowed if you need a full duplicate/orphan scan.
+Prefer MCP (bootstrap, inspect_ontology, get, search, list_activity). There is no list_nodes tool — do not add one. A read-only SQL look on the computer that hosts Compose is allowed if you need a full duplicate/orphan scan.
 
 Dangling-link sweeps: mention only. get/link already ignore edges to deleted endpoints. Do not add audit_links.
 
@@ -32,4 +32,4 @@ Do not run vault health or git pull on this routine.
 - Do not add get_vault_health, run_maintenance, audit_links, list_nodes, or any other health/reorganize tool.
 - Do not mutate the graph on this routine unless the operator explicitly asked for a repair in this conversation.
 - Do not wipe the vault (no compose down -v, no deleting FOUNDATION_DATA).
-- Do not invent a write-ACL. Do not write graph data from a cloud VM that cannot reach box MCP.
+- Do not invent a write-ACL. An agent that can reach the vault MCP may read/write; one that cannot does not get the API key and does not upsert.

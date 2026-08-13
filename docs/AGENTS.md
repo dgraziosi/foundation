@@ -16,6 +16,8 @@ Obsidian analog: Obsidian = app, a vault = one folder, graph = links inside.
 
 Do not commit personal life data, documents, or secrets to this repository. Those belong in the operator’s vault, not in git.
 
+**Reachability.** An agent that can reach the vault MCP (`http://127.0.0.1:8787/mcp` on the machine running Compose) may read/write the graph. An agent that cannot reach that MCP does not get the API key and does not upsert.
+
 After Compose is up ([README](../README.md)), a new operator does three pastes:
 
 1. **Seldon** (architect) — [`prompts/architect.md`](../prompts/architect.md)
@@ -28,21 +30,19 @@ Checks live in [`VAULT_HEALTH.md`](./VAULT_HEALTH.md) and [`GRAPH_HYGIENE.md`](.
 
 ### Seldon (architect)
 
-Owns **product** work on this GitHub repo: SPEC, cloud agents, the merge bar.
+Owns **product** work on this GitHub repo: SPEC, docs, git.
 
-**Think the work through before launching cloud agents.** Scope, constraints, and merge bar first; then one agent (or a batch), not a swarm of half-specified jobs.
+Does **not** own day-to-day graph writes. Those belong to Chief on a machine that can reach the vault MCP.
 
-Does **not** own day-to-day graph writes. Those belong to Chief on a machine that can reach box MCP.
+Does **not** apply git updates to the computer that hosts Compose, and does **not** run vault health or graph hygiene. That is Librarian.
 
-Does **not** apply git updates to the computer that hosts the vault, and does **not** run vault health or graph hygiene. That is Librarian.
-
-Typical host: Cursor cloud agent on this repo (or your fork) — **not** a VM that pretends it can `upsert` to `127.0.0.1` on someone else’s box.
+Typical host: an agent with GitHub on this repo. Do not give it the vault API key unless that same agent can actually call the vault MCP.
 
 ### Chief (writer)
 
 The human dumps messy ideas. This agent decides what becomes a node (or an update, a link, or nothing) and writes the graph.
 
-Typical host: the same computer that runs Compose, with MCP `foundation` at `http://127.0.0.1:8787/mcp`.
+Typical host: an agent on the computer running Compose, with MCP pointed at the vault (`http://127.0.0.1:8787/mcp`).
 
 Call `bootstrap` first. Follow the spine (`area → project → goal → habit | task`). Identity is UUID. If you already have a UUID, call `get`. Destructive tools need `confirm: true`. Type/relation writes apply immediately; safety is `list_activity` + `undo`.
 
@@ -50,40 +50,40 @@ Call `bootstrap` first. Follow the spine (`area → project → goal → habit |
 
 Created at init — one extra agent is the pack, not ceremony.
 
-Typical host: the computer that hosts Compose (needs git, docker compose, `GET /health`, and usually box MCP).
+Typical host: the computer that hosts Compose (needs git, docker compose, `GET /health`, and usually the vault MCP).
 
 Owns:
 
 1. **Vault health** — weekdays, morning local. Instance ops. Quiet if green. [`VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`prompts/vault-health.md`](../prompts/vault-health.md)
 2. **Graph hygiene** — weekly. Duplicate titles, zero-edge nodes, type soup. Report only unless the operator asked to repair in that conversation. [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md), [`prompts/graph-hygiene.md`](../prompts/graph-hygiene.md)
-3. **Update the computer** — weekdays, late morning local. `git fetch` / `git pull --ff-only` on main, `docker compose up --build -d`, wait for `/health`. Quiet if already up to date. After a real pull of `origin/main`, launch a Cursor cloud agent with [`prompts/repo-leak-scan.md`](../prompts/repo-leak-scan.md) (report-only; quiet if clean). Monday backup: launch that scan if nothing was pulled that week. [`prompts/update-foundation.md`](../prompts/update-foundation.md)
+3. **Update the computer** — weekdays, late morning local. `git fetch` / `git pull --ff-only` on main, `docker compose up --build -d`, wait for `/health`. Quiet if already up to date. After a real pull of `origin/main`, an optional agent that reads git (no vault key) runs [`prompts/repo-leak-scan.md`](../prompts/repo-leak-scan.md) (report-only; quiet if clean). Monday backup: run that scan if nothing was pulled that week. [`prompts/update-foundation.md`](../prompts/update-foundation.md)
 
 ## Seldon ↔ Librarian
 
-Tight loop. Seldon ships product on git. Librarian applies it on the box and keeps the instance healthy. They do not share jobs.
+Tight loop. Seldon ships product on git. Librarian applies it on the computer that hosts Compose and keeps the instance healthy. They do not share jobs.
 
 **Seldon → Librarian** (one ping, only after a whole Foundation batch is on `main`):
 
-- Think the work through **before** launching cloud agents. Do not ping Librarian per draft, per PR, or mid-batch. Drafts stay off the box.
-- When the batch is on `main`, send **one message**: PR numbers + SHAs. That ping means: product landed; apply it (git-pull onto the computer). Vault health and graph hygiene stay Librarian’s scheduled routines on the new code — Seldon does not run them and does not ping for each one.
+- Do not ping Librarian per draft, per PR, or mid-batch. Drafts stay off the computer that hosts Compose.
+- When the batch is on `main`, send **one message**: PR numbers + SHAs. That ping means: product landed; apply it (git-pull onto the computer that hosts Compose). Vault health and graph hygiene stay Librarian’s scheduled routines on the new code — Seldon does not run them and does not ping for each one.
 - Librarian then `git fetch` / `git pull --ff-only` on `main` and `docker compose up --build -d`, wait for `/health`. **Never** `docker compose down -v`. **Never** delete `FOUNDATION_DATA`.
 - The weekday late-morning update routine is the backup if Seldon did not ping.
 
 **Librarian → Seldon:**
 
-- Product bugs and enhancements (wrong search, tool errors, docs vs box) go to **Seldon**.
+- Product bugs and enhancements (wrong search, tool errors, docs vs the running vault) go to **Seldon**.
 - Librarian does **not** patch the repo. No drive-by PRs, no force-push, no history rewrite.
 
 ## Constraints (all roles)
 
 - **No write-ACL / default-deny.** The API key is the gate.
-- **No email.** Failure pings stay in Grok Bot / Cursor. Healthy runs stay quiet.
-- **Cloud agents must not write graph data** from VMs that cannot reach box MCP. Seldon works on git; Chief writes the graph; Librarian maintains the vault on the box.
+- **No email.** Failure pings stay in the operator’s chat. Healthy runs stay quiet.
+- **Reachability.** An agent that can reach the vault MCP may read/write; one that cannot does not get the API key and does not upsert. Seldon works on git; Chief writes the graph; Librarian maintains the vault on the computer that hosts Compose.
 - **No new MCP tools** for health, reorganize, or `audit_links`. No `get_vault_health`.
 - **Do not wipe the vault.** No `docker compose down -v`, no deleting `FOUNDATION_DATA`.
 - **Do not assume a live graph.** A fresh compose with seed types and zero user nodes is a valid vault.
 - **Do not call the graph “the Vault.”**
-- **Git is the product.** Do not commit personal life data, documents, or secrets to this repository. Those belong in the operator’s vault, not in git. After pulling product updates, Librarian launches a cloud agent to scan the tree and recent diffs for secrets and personal data. Report-only; quiet if clean. Seldon / cloud agents must not put vault contents, `FOUNDATION_DATA` files, or graph dumps in pull requests.
+- **Git is the product.** Do not commit personal life data, documents, or secrets to this repository. Those belong in the operator’s vault, not in git. After pulling product updates, an optional agent that reads git (no vault key) scans the tree and recent diffs for secrets and personal data. Report-only; quiet if clean. Do not put vault contents, `FOUNDATION_DATA` files, or graph dumps in pull requests.
 
 ## Stand-up (copy-paste)
 
@@ -93,13 +93,13 @@ Paste the prompt files as agent descriptions. Do not invent a thirteenth MCP too
 
 ### 1. Seldon (architect)
 
-Create a Cursor cloud agent (or Grok Bot agent) on this repo. Paste [`prompts/architect.md`](../prompts/architect.md).
+Create an agent with GitHub on this repo. Paste [`prompts/architect.md`](../prompts/architect.md).
 
-Give it GitHub on this repo. Do **not** give it a Foundation API key unless it can actually call box MCP (almost never true for cloud VMs).
+Do **not** give it the vault API key unless that same agent can actually call the vault MCP.
 
 ### 2. Chief (writer)
 
-Create a **local** agent (Grok Bot computer or Cursor on the box) with MCP server `foundation`:
+Create an agent on the computer running Compose, with MCP server `foundation` pointed at the vault:
 
 ```json
 {
@@ -118,7 +118,7 @@ Paste [`prompts/chief.md`](../prompts/chief.md).
 
 ### 3. Librarian (from day one)
 
-Create a **local** agent on the computer that hosts Compose (git + Docker + `GET /health`; MCP `foundation` at `http://127.0.0.1:8787/mcp` the same as Chief). Paste [`prompts/librarian.md`](../prompts/librarian.md).
+Create an agent on the computer that hosts Compose (git + Docker + `GET /health`; MCP `foundation` at `http://127.0.0.1:8787/mcp` the same as Chief). Paste [`prompts/librarian.md`](../prompts/librarian.md).
 
 Then attach **three routines**. Fill in the operator config blocks (data dir, optional well-known nodes, optional backup path, clone path).
 
@@ -132,7 +132,7 @@ If green: stay silent. If you found something: ping (report only). Paste [`promp
 
 #### 3c. Update the computer — weekdays, late morning local
 
-If already up to date and `/health` is green: stay silent (except the Monday leak-scan backup). Paste [`prompts/update-foundation.md`](../prompts/update-foundation.md). After a real pull, launch a cloud agent with [`prompts/repo-leak-scan.md`](../prompts/repo-leak-scan.md).
+If already up to date and `/health` is green: stay silent (except the Monday leak-scan backup). Paste [`prompts/update-foundation.md`](../prompts/update-foundation.md). After a real pull, an optional agent that reads git (no vault key) runs [`prompts/repo-leak-scan.md`](../prompts/repo-leak-scan.md).
 
 ## Where prompts live
 
@@ -144,4 +144,4 @@ If already up to date and `/health` is green: stay silent (except the Monday lea
 | [`prompts/vault-health.md`](../prompts/vault-health.md) | Weekday morning vault-health routine |
 | [`prompts/graph-hygiene.md`](../prompts/graph-hygiene.md) | Weekly graph-hygiene routine |
 | [`prompts/update-foundation.md`](../prompts/update-foundation.md) | Weekday late-morning update-the-computer routine |
-| [`prompts/repo-leak-scan.md`](../prompts/repo-leak-scan.md) | Cloud agent after a pull (and Monday backup): secrets / personal data scan |
+| [`prompts/repo-leak-scan.md`](../prompts/repo-leak-scan.md) | Optional agent after a pull (reads git, no vault key): secrets / personal data scan |
