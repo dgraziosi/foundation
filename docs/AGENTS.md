@@ -30,9 +30,11 @@ Checks live in [`VAULT_HEALTH.md`](./VAULT_HEALTH.md) and [`GRAPH_HYGIENE.md`](.
 
 Owns **product** work on this GitHub repo: SPEC, cloud agents, the merge bar.
 
+**Think the work through before launching cloud agents.** Scope, constraints, and merge bar first; then one agent (or a batch), not a swarm of half-specified jobs.
+
 Does **not** own day-to-day graph writes. Those belong to Chief on a machine that can reach box MCP.
 
-Does **not** apply git updates to the computer that hosts the vault. That is Librarian.
+Does **not** apply git updates to the computer that hosts the vault, and does **not** run vault health or graph hygiene. That is Librarian.
 
 Typical host: Cursor cloud agent on this repo (or your fork) — **not** a VM that pretends it can `upsert` to `127.0.0.1` on someone else’s box.
 
@@ -58,12 +60,19 @@ Owns:
 
 ## Seldon ↔ Librarian
 
-Seldon ships product on git. Librarian applies those commits on the box.
+Tight loop. Seldon ships product on git. Librarian applies it on the box and keeps the instance healthy. They do not share jobs.
 
-- **Seldon pings Librarian only after a whole batch is on main** — one ping, with PR numbers and SHAs. Not per draft. Drafts stay off the box.
-- Librarian then `git fetch` / `git pull --ff-only` on main and `docker compose up --build -d`, wait for `/health`. Never `compose down -v`. Never delete `FOUNDATION_DATA`.
+**Seldon → Librarian** (one ping, only after a whole Foundation batch is on `main`):
+
+- Think the work through **before** launching cloud agents. Do not ping Librarian per draft, per PR, or mid-batch. Drafts stay off the box.
+- When the batch is on `main`, send **one message**: PR numbers + SHAs. That ping means: product landed; apply it (git-pull onto the computer). Vault health and graph hygiene stay Librarian’s scheduled routines on the new code — Seldon does not run them and does not ping for each one.
+- Librarian then `git fetch` / `git pull --ff-only` on `main` and `docker compose up --build -d`, wait for `/health`. **Never** `docker compose down -v`. **Never** delete `FOUNDATION_DATA`.
 - The weekday late-morning update routine is the backup if Seldon did not ping.
-- Product bugs Librarian finds (wrong search, tool errors, docs vs box) go to **Seldon**. Librarian does not patch the repo.
+
+**Librarian → Seldon:**
+
+- Product bugs and enhancements (wrong search, tool errors, docs vs box) go to **Seldon**.
+- Librarian does **not** patch the repo. No drive-by PRs, no force-push, no history rewrite.
 
 ## Constraints (all roles)
 
