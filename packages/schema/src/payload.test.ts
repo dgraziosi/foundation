@@ -8,6 +8,7 @@ import {
 } from "./blobs.js";
 import {
   DEFAULT_PAYLOAD,
+  extractDataText,
   extractPayloadText,
   storedBlobPayload,
   validateBlobRelativePath,
@@ -83,25 +84,46 @@ test("application/json body must parse as JSON", () => {
   assert.match(err.error, /valid JSON/);
 });
 
-test("extractPayloadText strips HTML tags for itinerary search", () => {
+test("extractPayloadText strips HTML tags and keeps attribute values", () => {
   const text = extractPayloadText({
     media_type: "text/html",
     storage: "inline",
-    body: "<html><body><h1>Kyoto</h1><ol><li>Fushimi Inari</li></ol></body></html>",
+    body: '<html><body><h1>Kyoto</h1><img alt="fiancée at the lake" src="x.jpg"><ol><li>Fushimi Inari</li></ol></body></html>',
   });
   assert.match(text, /Kyoto/);
   assert.match(text, /Fushimi Inari/);
+  assert.match(text, /fiancée at the lake/);
   assert.equal(text.includes("<"), false);
 });
 
-test("extractPayloadText stringifies JSON payloads", () => {
+test("extractPayloadText keeps body text between a head script and a footer script", () => {
+  const text = extractPayloadText({
+    media_type: "text/html",
+    storage: "inline",
+    body: '<html><head><script>var HEADTOKEN="drop-me";</script></head><body><p>visible meadow report</p></body><script>var FOOTTOKEN="drop-me-too";</script></html>',
+  });
+  assert.match(text, /visible meadow report/);
+  assert.equal(text.includes("HEADTOKEN"), false);
+  assert.equal(text.includes("FOOTTOKEN"), false);
+});
+
+test("extractPayloadText pulls JSON string values, not the payload wrapper", () => {
   const text = extractPayloadText({
     media_type: "application/json",
     storage: "inline",
     body: '{"city":"Osaka","days":3}',
   });
   assert.match(text, /Osaka/);
-  assert.match(text, /days/);
+  assert.match(text, /3/);
+  assert.equal(text.includes("media_type"), false);
+  assert.equal(text.includes("storage"), false);
+});
+
+test("extractDataText walks nested string values", () => {
+  const text = extractDataText({ nickname: "Liz", relation: "fiancée", extra: { note: "lake" } });
+  assert.match(text, /Liz/);
+  assert.match(text, /fiancée/);
+  assert.match(text, /lake/);
 });
 
 test("extractPayloadText ignores blob payloads", () => {

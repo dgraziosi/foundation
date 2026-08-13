@@ -48,8 +48,17 @@ export const GetInputSchema = z.object({
   include_body: z.boolean().optional(),
 });
 
+export const NeighborRefSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string().min(1),
+  type: z.string().min(1),
+});
+export type NeighborRef = z.infer<typeof NeighborRefSchema>;
+
 export const IncidentEdgeSchema = EdgeSchema.extend({
   direction: z.enum(["in", "out"]),
+  /** The other endpoint. Agents should read title here, not UUID-only hops. */
+  neighbor: NeighborRefSchema,
 });
 export type IncidentEdge = z.infer<typeof IncidentEdgeSchema>;
 
@@ -198,8 +207,25 @@ export const SearchInputSchema = z.object({
 });
 export type SearchInput = z.infer<typeof SearchInputSchema>;
 
+export const SearchHitSchema = z.object({
+  id: z.string().uuid(),
+  type: z.string().min(1),
+  title: z.string().min(1),
+  status: NodeStatusSchema,
+  snippet: z.string(),
+});
+export type SearchHit = z.infer<typeof SearchHitSchema>;
+
+/** Shown on an empty lexical miss so agents do not treat it as “create a new node”. */
+export const SEARCH_MISS_SUGGESTION =
+  "No lexical hits. Do not upsert a duplicate. If you already have a UUID, call get. Try a shorter token or a type filter; only upsert if this entity is new.";
+
+export const SEARCH_UUID_SUGGESTION =
+  "This query is a node UUID. Prefer get when you already have an id.";
+
 export const SearchSuccessSchema = z.object({
-  nodes: z.array(NodeSchema),
+  nodes: z.array(SearchHitSchema),
+  suggestion: z.string().optional(),
 });
 
 export const ListActivityInputSchema = z.object({

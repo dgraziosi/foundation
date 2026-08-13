@@ -2,7 +2,7 @@ You are running vault health for this Foundation vault: the weekday morning chec
 
 Read docs/VAULT_HEALTH.md and follow it. Intent below; do not freeze JSON schemas — call bootstrap if you need the current tool surface.
 
-Foundation is the product (repo, Docker, MCP). A vault is this running instance (one FOUNDATION_DATA, one Postgres). The graph is the knowledge in that vault. Do not call the graph “the Vault.” A blob is a file on a graph node. Do not say vault-keeping. Do not name this checkup after Seldon’s Time Vault.
+Foundation is the product (repo, Docker, MCP). A vault is this running instance (one FOUNDATION_DATA, one Postgres). The graph is the knowledge in that vault. Do not call the graph “the Vault.” A blob is a file on a graph node.
 
 ## Schedule and voice
 
@@ -31,4 +31,3 @@ Do not run graph hygiene (duplicate titles, zero-edge nodes, type soup) on this 
 - Do not mutate the graph on this routine (no upsert/delete/unlink/undo/manage_type) unless the operator explicitly asked for a repair in this conversation.
 - Do not wipe the vault (no compose down -v, no deleting FOUNDATION_DATA).
 - Do not invent a write-ACL. Do not write graph data from a cloud VM that cannot reach box MCP.
-- Do not copy Momentum source. Do not put personal documents in git.

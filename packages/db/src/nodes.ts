@@ -1,4 +1,4 @@
-import type { IncidentEdge, Node, Payload } from "@foundation/schema";
+import type { IncidentEdge, Node, Payload, SearchHit } from "@foundation/schema";
 import type { Queryable } from "./tx.js";
 import { iso } from "./tx.js";
 
@@ -162,10 +162,18 @@ export async function restoreNodeSnapshot(
 export async function searchNodes(
   db: Queryable,
   input: { query: string; type?: string; limit?: number },
-): Promise<Node[]> {
+): Promise<SearchHit[]> {
   const limit = input.limit ?? 20;
-  const { rows } = await db.query<NodeRow>(
-    `SELECT id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at
+  const { rows } = await db.query<
+    Pick<NodeRow, "id" | "type" | "title" | "status"> & { snippet: string }
+  >(
+    `SELECT id, type, title, status,
+            ts_headline(
+              'english',
+              foundation_node_search_text(title, payload, data),
+              plainto_tsquery('english', $1),
+              'MaxWords=24, MinWords=5, MaxFragments=1'
+            ) AS snippet
      FROM nodes
      WHERE deleted_at IS NULL
        AND ($2::text IS NULL OR type = $2)
@@ -174,7 +182,13 @@ export async function searchNodes(
      LIMIT $3`,
     [input.query, input.type ?? null, limit],
   );
-  return rows.map(mapNode);
+  return rows.map((row) => ({
+    id: row.id,
+    type: row.type,
+    title: row.title,
+    status: row.status,
+    snippet: row.snippet ?? "",
+  }));
 }
 
 type EdgeRow = {
@@ -185,6 +199,9 @@ type EdgeRow = {
   metadata: Record<string, unknown>;
   created_at: Date;
   direction?: "in" | "out";
+  neighbor_id?: string;
+  neighbor_title?: string;
+  neighbor_type?: string;
 };
 
 export function mapEdge(row: EdgeRow) {
@@ -201,7 +218,10 @@ export function mapEdge(row: EdgeRow) {
 export async function listIncidentEdges(db: Queryable, nodeId: string): Promise<IncidentEdge[]> {
   const { rows } = await db.query<EdgeRow>(
     `SELECT e.id, e.from_id, e.to_id, e.relation_type, e.metadata, e.created_at,
-            CASE WHEN e.from_id = $1 THEN 'out' ELSE 'in' END AS direction
+            CASE WHEN e.from_id = $1 THEN 'out' ELSE 'in' END AS direction,
+            other.id AS neighbor_id,
+            other.title AS neighbor_title,
+            other.type AS neighbor_type
      FROM edges e
      JOIN nodes other ON other.id = CASE WHEN e.from_id = $1 THEN e.to_id ELSE e.from_id END
      WHERE (e.from_id = $1 OR e.to_id = $1)
@@ -212,6 +232,11 @@ export async function listIncidentEdges(db: Queryable, nodeId: string): Promise<
   return rows.map((row) => ({
     ...mapEdge(row),
     direction: row.direction === "in" ? "in" : "out",
+    neighbor: {
+      id: row.neighbor_id ?? (row.direction === "out" ? row.to_id : row.from_id),
+      title: row.neighbor_title ?? "",
+      type: row.neighbor_type ?? "",
+    },
   }));
 }
 

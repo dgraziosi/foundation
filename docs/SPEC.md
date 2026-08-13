@@ -1,4 +1,4 @@
-# Foundation — Product & architecture spec
+# Foundation — product contract
 
 Living spec. Cloud agents and humans update this as decisions land.
 
@@ -8,9 +8,11 @@ Foundation is a **personal ontology + MCP server** for AI agents. It is durable 
 
 Named after Asimov’s Foundation: carry structured knowledge forward so you and your agents are not starting from zero.
 
-**Not for sale.** Open on GitHub so others can self-host for their own agents (e.g. on a Grok Bot computer).
+**Not for sale.** Open on GitHub so others can self-host for their own agents.
 
-## Locked glossary (Obsidian-shaped)
+Do not commit personal life data, documents, or secrets to this repository. Those belong in the operator’s vault, not in git.
+
+## Locked glossary
 
 Obsidian analog: Obsidian = app, a vault = one folder, graph = links inside.
 
@@ -20,108 +22,55 @@ Obsidian analog: Obsidian = app, a vault = one folder, graph = links inside.
 - **Blob** — a file on a graph node.
 - **Seldon** — architect of Foundation the product.
 - **Chief** — primary writer (human dumps ideas).
-- **Librarian** — agent from day one. Owns vault health, graph hygiene, and applying git updates to the computer. Not a later job title.
-
-Do not say vault-keeping. Do not name checkups after Seldon’s Time Vault. Encyclopedia Galactica is a one-line Asimov analog at most, not the everyday name for the graph.
+- **Librarian** — agent from day one. Owns vault health, graph hygiene, and applying git updates to the computer.
 
 ## Primary users
 
 1. **Agents** (Grok Bot, Cursor, Claude, …) via MCP — default interface
 2. **Humans** via conversation with those agents; optional thin viewer later (Mac/web)
 
-## Goals
-
-- One durable graph of a person’s life/work
-- Clear starter vocabulary so day one is not tag soup
-- Vocabulary can grow (types + relations) without painful migrations
-- Flexible node payloads (markdown, HTML, JSON, files) — e.g. a trip itinerary stored and re-shown as HTML
-- Runs well on a single-user machine (Grok Bot computer / Docker)
-- Boring install: `docker compose up`, API key, point MCP client at it
-- Iterate via Cursor cloud agents on this repo
-
-## Non-goals (v1)
-
-- Mobile app, Watch, Apple auth, RevenueCat, iCloud vault sync
-- Multi-tenant SaaS, billing, complex OAuth for third parties
-- Replit-specific hosting glue
-- Dual write to a markdown vault + database (one store)
-- Proposal/approve inbox for ontology changes (agents may mutate types/relations directly; keep an activity log + undo)
-- Cloning Momentum’s full product surface
-- Porting `get_vault_health` / `run_maintenance` / `audit_links` as MCP tools (those jobs are Librarian operator routines: [vault health](./VAULT_HEALTH.md), [graph hygiene](./GRAPH_HYGIENE.md))
-
-## Source material
-
-Reference implementation ideas from [`dgraziosi/Momentum-React-Native`](https://github.com/dgraziosi/Momentum-React-Native) branch **`replit-agent`** (not stale `main`).
-
-**Extract with judgment.** Do not copy at face value. Redesign for the goals above. Prefer delete and simplify over porting chat-era tool sprawl, multi-tenant auth, and UI-coupled paths.
-
-Useful Momentum areas to study (then rethink):
-
-- `lib/shared-types/src/schema/` — notes, hierarchy, ontology shapes
-- Link validation / relation matrix concepts
-- MCP tool surface under `artifacts/api-server/src/tools/` and auth under `artifacts/api-server/src/auth/mcp.ts`
-- Area-as-root hierarchy (area → project → goal → habit/task)
-
-## Starter ontology (default seed)
-
-Spine (Life Map):
+## Starter spine
 
 ```text
 area → project → goal → habit | task
 ```
 
-Plus common artifact types as seeds (person, journal, idea, lesson, note, …) — exact set TBD in redesign. **Area** is the spine root (life domain + what you value); it replaces Momentum’s retired `core_value`.
+**Area** is the spine root (life domain + what you value). Seed artifacts include person, journal, idea, lesson, note, trip. Hierarchy verb is `child_of`. Associative seeds: relates_to, supports, inspired_by, references, about.
 
-Hierarchy relation seeds (names may be simplified in redesign):
+Agents can add types and relations over time. No approval inbox.
 
-- project/lesson → area
-- goal → project
-- habit/task → goal
+## Agent API (12 tools)
 
-Associative relations as seeds: relates_to, supports, inspired_by, references, about, …
+Names are locked. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md).
 
-Agents can add types and relations over time.
+`bootstrap`, `search`, `get`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`.
 
-## Data model principles
+- Destructive tools (`delete`, `unlink`, `undo`) require `confirm: true`
+- Identity is UUID. If you already have a UUID, call `get` — do not `search`
+- `search` is Postgres FTS (title + `data` + extracted inline payload text). Not embeddings
+- No `get_vault_health` / `run_maintenance` / `audit_links` tools — those jobs are Librarian operator routines ([`VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md))
 
-1. **Node** = id, type, title, timestamps, metadata, **payload**
-2. **Payload** is typed by content format (`text/markdown`, `text/html`, `application/json`, …) and/or storage (inline body vs blob ref)
-3. **Edge** = from_id, to_id, relation_type, optional metadata
-4. **Type registry** + **relation registry** are data (per instance), seeded from defaults
-5. **Activity log** for creates/updates/deletes/type changes — enough to undo
-6. Single-user v1: no RLS theater required; simple `user_id` or single-tenant DB is fine
+## Runtime
 
-## Agent API principles (MCP)
+- Docker Compose: Postgres 16 + Foundation server
+- Durable files under `FOUNDATION_DATA` (never an agent profile/memory directory)
+- Localhost MCP at `http://127.0.0.1:8787/mcp` with `Authorization: ApiKey <FOUNDATION_API_KEY>`
+- Blobs: `$FOUNDATION_DATA/blobs/<uuid>`; ingest on `upsert`; bytes via `GET /blobs/:id`
 
-- Small, stable tool list aimed at agents (bootstrap, search, get, capture/upsert, link/unlink, list types/relations, manage type/relation, activity/undo)
-- Destructive tools require explicit confirm
-- Bootstrap tool returns starter ontology + how to extend it
-- No requirement for a human proposal queue
+## Locked (do not reopen)
 
-## Runtime principles
+- **12 tools** — names above. New tools need a SPEC amendment
+- **FTS now** — embeddings/hybrid search is later optional work, not current search
+- **Viewer deferred** — optional thin Mac/web viewer against the same API, not v1
 
-- Postgres preferred (paths open for vectors later); SQLite only if we consciously drop vectors for v1
-- Docker Compose for local/box bring-up
-- Data and code under an isolated workspace path when running on Grok Bot computer — never write into agent profile/memory directories
-- Localhost MCP + API key auth for v1
-- Periodic vault health, graph hygiene, and applying git updates are Librarian operator routines, not the database, and not MCP tools — [`docs/VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`docs/GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md), stand-up in [`docs/AGENTS.md`](./AGENTS.md)
+## Non-goals (v1)
 
-## Success criteria (first milestone)
+- Mobile app, Watch, Apple auth, billing, iCloud vault sync
+- Multi-tenant SaaS, complex OAuth for third parties
+- Dual write to a markdown vault + database (one store)
+- Proposal/approve inbox for ontology changes
+- Write-ACL / default-deny (the API key is the gate)
 
-- [x] `docker compose up` yields working MCP (`bootstrap` in slices 1–3; nodes/edges/ontology tools in slices 4–6; `list_activity` / `undo` / `search` in slices 7–8; blobs in slice 10)
-- [x] Agent can create an `area`, a `project`, link them, store an HTML itinerary payload on a node, search it back
-- [x] Agent can add a new type and use it without a human approval step
-- [x] Activity log shows those mutations; `undo` inverts them (confirm required)
-- [x] README explains install for another Grok Bot user in < 15 minutes of reading
+## Merge bar
 
-## Decisions
-
-- **License: MIT** (Copyright 2026 Danny Graziosi) — see `/LICENSE`
-
-## Open decisions
-
-Proposed answers live in [`docs/REDESIGN.md`](./REDESIGN.md) (especially §5 tools, §8 open questions). Until that map is approved, these remain open:
-
-- Exact slim MCP tool names
-- Whether v1 includes embeddings/hybrid search or text search only
-- Optional viewer: defer until API is stable
+Typecheck and tests pass. Destructive MCP tools stay behind `confirm: true`. Cloud agents must not put vault contents, `FOUNDATION_DATA` files, or graph dumps in pull requests.

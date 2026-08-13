@@ -17,8 +17,7 @@ export const SEED_NODE_TYPES: readonly NodeType[] = [
   {
     slug: "area",
     label: "Area",
-    description:
-      "Spine root. A life domain and what you value (Health, Work, Family, …). Not a type-library lane.",
+    description: "Spine root. A life domain and what you value (Health, Work, Family, …).",
     kind: "spine",
     parent_types: [],
     json_schema: null,

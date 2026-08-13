@@ -39,6 +39,7 @@ import {
   assertSystemRelationPatch,
   assertSystemTypePatch,
   labelFromSlug,
+  isUuid,
   missingConfirm,
   isToolError,
   storedBlobPayload,
@@ -46,6 +47,8 @@ import {
   validateBlobRelativePath,
   validateInlinePayload,
   validateLink,
+  SEARCH_MISS_SUGGESTION,
+  SEARCH_UUID_SUGGESTION,
   type Activity,
   type Blob,
   type Edge,
@@ -58,6 +61,7 @@ import {
   type NodeType,
   type Payload,
   type RelationType,
+  type SearchHit,
   type SearchInput,
   type ToolError,
   type UpsertInput,
@@ -264,7 +268,7 @@ export async function getGraphNode(
   if (!node) {
     return toolError(
       `Node not found: ${id}`,
-      "Use a live node UUID from upsert. Deleted nodes are hidden until restored via undo.",
+      "If you already have a UUID, call get. Search is for lexical recall, not a substitute for get. Deleted nodes are hidden until restored via undo.",
     );
   }
   const edges = await listIncidentEdges(pool, id);
@@ -786,7 +790,7 @@ export async function listGraphActivity(
 export async function searchGraphNodes(
   pool: Pool,
   input: SearchInput,
-): Promise<{ nodes: Node[] } | ToolError> {
+): Promise<{ nodes: SearchHit[]; suggestion?: string } | ToolError> {
   if (input.type) {
     const type = await getNodeType(pool, input.type);
     if (!type) {
@@ -796,10 +800,31 @@ export async function searchGraphNodes(
       );
     }
   }
+  if (isUuid(input.query)) {
+    const node = await getNodeById(pool, input.query);
+    if (!node || (input.type && node.type !== input.type)) {
+      return { nodes: [], suggestion: SEARCH_MISS_SUGGESTION };
+    }
+    return {
+      nodes: [
+        {
+          id: node.id,
+          type: node.type,
+          title: node.title,
+          status: node.status,
+          snippet: node.title,
+        },
+      ],
+      suggestion: SEARCH_UUID_SUGGESTION,
+    };
+  }
   const nodes = await searchNodes(pool, {
     query: input.query,
     type: input.type,
     limit: input.limit,
   });
+  if (nodes.length === 0) {
+    return { nodes: [], suggestion: SEARCH_MISS_SUGGESTION };
+  }
   return { nodes };
 }

@@ -8,10 +8,11 @@ The name is a nod to Asimov: carry structured knowledge forward so you (and your
 
 **Glossary (locked):** Foundation = the product you install. A **vault** = one running instance (`FOUNDATION_DATA` + Postgres). The **graph** = the knowledge in that vault. Do not call the graph “the Vault.” A **blob** = a file on a graph node. **Seldon** architects the product. **Chief** writes the graph. **Librarian** is created at init (vault health, graph hygiene, git updates on the computer). Postgres vault, not markdown. Obsidian analog: app / folder / links.
 
+Do not commit personal life data, documents, or secrets to this repository. Those belong in the operator’s vault, not in git.
+
 ## Docs
 
-- [`docs/SPEC.md`](docs/SPEC.md) — product contract (goals, non-goals, data/MCP/runtime principles)
-- [`docs/REDESIGN.md`](docs/REDESIGN.md) — redesign map vs Momentum (`replit-agent`): what to keep, what to discard, architecture, data model, slim MCP tools, implementation slices
+- [`docs/SPEC.md`](docs/SPEC.md) — product contract
 - [`docs/MCP_TOOLS.md`](docs/MCP_TOOLS.md) — 12-tool MCP surface
 - [`docs/AGENTS.md`](docs/AGENTS.md) — Seldon (architect), Chief (writer), Librarian (from day one)
 - [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md) — weekday instance checkup (Librarian)
@@ -27,9 +28,9 @@ The name is a nod to Asimov: carry structured knowledge forward so you (and your
 
 ## What it is not
 
-- Not a mobile app, billing system, or full Momentum product clone
+- Not a mobile app, billing system, or hosted SaaS you must buy
 - Not a second brain you have to maintain by hand (agents are the primary users)
-- Not a hosted SaaS you must buy — run it on your own machine (including a Grok Bot computer)
+- Run it on your own machine (including a Grok Bot computer)
 
 ## Install
 
@@ -42,13 +43,13 @@ Requires [Docker Compose](https://docs.docker.com/compose/) and a copy of this r
    # set FOUNDATION_API_KEY to a long random string
    ```
 
-2. Start Postgres 16 (pgvector image; vector unused for now) and the Foundation server. Durable files go under `FOUNDATION_DATA` (default `./data`):
+2. Start Postgres and the Foundation server. Durable files go under `FOUNDATION_DATA` (default `./data`):
 
    ```bash
    docker compose up --build
    ```
 
-   **Stand up Librarian.** Foundation is the product. A vault is this running instance (`FOUNDATION_DATA` + Postgres). The graph is the knowledge in that vault — do not call the graph “the Vault.” After Compose is up, create Librarian from [`prompts/librarian.md`](prompts/librarian.md) and attach three routines: [`prompts/vault-health.md`](prompts/vault-health.md) (weekdays morning), [`prompts/graph-hygiene.md`](prompts/graph-hygiene.md) (weekly), [`prompts/update-foundation.md`](prompts/update-foundation.md) (weekdays late morning). Also paste Seldon ([`prompts/architect.md`](prompts/architect.md)). Copy-paste stand-up: [`docs/AGENTS.md`](docs/AGENTS.md). What “healthy” means: [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md). Graph report: [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md). No new MCP tools.
+   **Stand up the agents.** Foundation is the product. A vault is this running instance (`FOUNDATION_DATA` + Postgres). The graph is the knowledge in that vault — do not call the graph “the Vault.” After Compose is up, create Librarian from [`prompts/librarian.md`](prompts/librarian.md) and attach three routines: [`prompts/vault-health.md`](prompts/vault-health.md) (weekdays morning), [`prompts/graph-hygiene.md`](prompts/graph-hygiene.md) (weekly), [`prompts/update-foundation.md`](prompts/update-foundation.md) (weekdays late morning). Paste Seldon ([`prompts/architect.md`](prompts/architect.md)) and Chief ([`prompts/chief.md`](prompts/chief.md)). Copy-paste stand-up: [`docs/AGENTS.md`](docs/AGENTS.md). What “healthy” means: [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md). Graph report: [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md). No new MCP tools.
 
 3. Point an MCP client at `http://127.0.0.1:8787/mcp` with:
 
@@ -75,7 +76,7 @@ Requires [Docker Compose](https://docs.docker.com/compose/) and a copy of this r
 
 4. Call `bootstrap` first. It returns the starter spine (`area → project → goal → habit | task`), seeded types/relations, and how to extend the ontology.
 
-   After bootstrap, an agent can `upsert` an `area` and `project`, `link` them with `child_of`, store an HTML itinerary on a `trip` node (`payload.media_type = "text/html"`), `search` that itinerary back, attach a PDF blob on a `note` (`payload.storage = "blob"`), `manage_type` a custom type, `list_activity` for receipts, and `undo` a reversible mutation. Destructive tools (`delete`, `unlink`, `undo`) require `confirm: true`.
+   After bootstrap, an agent can `upsert` an `area` and `project`, `link` them with `child_of`, store an HTML itinerary on a `trip` node (`payload.media_type = "text/html"`), `search` that itinerary back, attach a PDF blob on a `note` (`payload.storage = "blob"`), `manage_type` a custom type, `list_activity` for receipts, and `undo` a reversible mutation. Destructive tools (`delete`, `unlink`, `undo`) require `confirm: true`. If you already have a UUID, call `get`. An empty `search` is not a reason to upsert a duplicate.
 
    With Node 22 + pnpm (and Compose already up):
 
@@ -111,7 +112,7 @@ Requires [Docker Compose](https://docs.docker.com/compose/) and a copy of this r
      -H "Authorization: ApiKey ${FOUNDATION_API_KEY}" \
      -H "Content-Type: application/json" \
      -H "Accept: application/json, text/event-stream" \
-     -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"upsert","arguments":{"type":"trip","title":"Tokyo week","payload":{"media_type":"text/html","storage":"inline","body":"<html><body><h1>Itinerary</h1><p>Day 1: arrive NRT</p></body></html>"}}}}'
+     -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"upsert","arguments":{"type":"trip","title":"Sample itinerary","payload":{"media_type":"text/html","storage":"inline","body":"<html><body><h1>Itinerary</h1><p>Day 1: arrive NRT</p></body></html>"}}}}'
 
    # search the itinerary back
    curl -sS http://127.0.0.1:8787/mcp \
@@ -154,24 +155,15 @@ trailer<</Root 1 0 R>>
 
    Operator drop-box (no base64): copy a file into `$FOUNDATION_DATA/uploads/` then `upsert` with `payload.source_path` set to the filename. The server moves it to `blobs/<uuid>`. Compose `db-init` creates `uploads/` mode 1777 (sticky) so the host user can write on a bind mount; `blobs/` stays 0700.
 
-   If Postgres fails to start on a bind-mounted data dir, Compose already runs a `db-init` step that `chown`s `$FOUNDATION_DATA/postgres` to uid 999. To reset local data: `docker compose down` and remove `./data` (this wipes the vault — Postgres + blobs). Never `docker compose down -v` as a casual step; that is how you destroy a vault.
+   If Postgres fails to start on a bind-mounted data dir, Compose already runs a `db-init` step that `chown`s `$FOUNDATION_DATA/postgres` to uid 999. Never `docker compose down -v` as a casual step; that is how you destroy a vault. Never delete `FOUNDATION_DATA`.
 
 Never point `FOUNDATION_DATA` at an agent profile or memory directory.
-
-## Status
-
-Slices 1–10: repo skeleton, schema/seed, MCP `bootstrap`, nodes/payloads (`upsert` / `get` / `delete`), edges (`link` / `unlink`), ontology mutation (`inspect_ontology` / `manage_type` / `manage_relation`), activity + undo (`list_activity` / `undo` with real inverses), FTS `search`, compose polish, **blobs** (`storage: blob` under `$FOUNDATION_DATA/blobs/<uuid>`). Later slices add embeddings and a thin viewer.
-
-Reference ideas (not a dump): [Momentum](https://github.com/dgraziosi/Momentum-React-Native) branch `replit-agent`.
-
-See [docs/SPEC.md](docs/SPEC.md) for the product contract.
 
 ## Intended use
 
 1. Run Foundation where your agents already live (e.g. Grok Bot computer)
 2. Point agents at the local MCP endpoint
-3. Stand up Seldon (architect) + Librarian at init, with the three routines ([`docs/AGENTS.md`](docs/AGENTS.md))
-4. Optionally open a thin viewer later (Mac/web) against the same API
+3. Stand up Seldon (architect) + Chief (writer) + Librarian at init, with the three routines ([`docs/AGENTS.md`](docs/AGENTS.md))
 
 ## License
 

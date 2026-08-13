@@ -1,6 +1,6 @@
 # Vault health
 
-Weekday morning checkup for a running Foundation **vault** (the instance). Quiet if green. Not the graph. Not an MCP tool. Not vault-keeping. Not Seldon’s Time Vault.
+Weekday morning checkup for a running Foundation **vault** (the instance). Quiet if green. Not the graph. Not an MCP tool.
 
 ## Glossary
 
@@ -20,17 +20,14 @@ Stand-up: [`AGENTS.md`](./AGENTS.md). Agent: [`prompts/librarian.md`](../prompts
 
 A **quiet Librarian routine** (weekdays, morning local). Instance ops: process + db, the data dir is the real vault, optional canaries, optional backup freshness. It uses HTTP, the host filesystem, and existing MCP tools the same way a careful operator would. When everything is fine, it stays silent. It pings the operator **only on failure**.
 
-It emulates the *job* Momentum split across `get_vault_health` / `run_maintenance` — as reasoning on the box, not as new Foundation tools.
+Do not add `get_vault_health`, `run_maintenance`, `propose_reorganize`, `audit_links`, or `cleanup_dangling_links`. Those jobs are this routine and [graph hygiene](./GRAPH_HYGIENE.md), not MCP tools.
 
-[`REDESIGN.md`](./REDESIGN.md) forbids those as v1 MCP tools. Do not add `get_vault_health`, `run_maintenance`, `propose_reorganize`, `audit_links`, or `cleanup_dangling_links`.
-
-Graph-side report (duplicate titles, zero-edge nodes, type soup) is **not** this routine. That is weekly [graph hygiene](./GRAPH_HYGIENE.md). Git pull + compose rebuild is **not** this routine. That is [`prompts/update-foundation.md`](../prompts/update-foundation.md).
+Graph-side report (duplicate titles, zero-edge nodes, type soup) is **not** this routine. That is weekly [graph hygiene](./GRAPH_HYGIENE.md). Git pull, compose rebuild, and the post-pull git-tree leak scan are **not** this routine. Those are [`prompts/update-foundation.md`](../prompts/update-foundation.md) and [`prompts/repo-leak-scan.md`](../prompts/repo-leak-scan.md).
 
 ## What it is not
 
 - **Not the graph.** `$FOUNDATION_DATA` and Postgres *are* the vault. The graph lives in them. Do not call the graph “the Vault.” Do not dual-write a markdown store or invent a backup product.
-- **Not vault-keeping** and **not** a Time Vault analog. Everyday words: vault health, graph hygiene, update the computer.
-- **Not a later job title.** Librarian is created at init. See [`AGENTS.md`](./AGENTS.md).
+- **Librarian is day one.** Created at init. See [`AGENTS.md`](./AGENTS.md).
 - **Not email.** No SMTP, no digest. Ping in Grok Bot / Cursor only when a check fails.
 - **Not a write-ACL.** The API key is the gate. Do not invent default-deny.
 - **Not a mutation pass.** The quiet weekday run does not `upsert`, `delete`, `unlink`, `undo`, or `manage_type` unless the operator asked for a repair in that conversation. Report; don’t rewrite the graph unattended.

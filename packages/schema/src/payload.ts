@@ -22,27 +22,75 @@ export const DEFAULT_PAYLOAD: Payload = {
   body: "",
 };
 
-/** Extract searchable text from an inline payload (REDESIGN §4.8). */
+const HTML_ATTR_RE =
+  /(?:alt|title|aria-label|aria-description|placeholder)\s*=\s*(?:"([^"]*)"|'([^']*)')/gi;
+
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'");
+}
+
+function collectJsonStrings(value: unknown, parts: string[]): void {
+  if (typeof value === "string") {
+    if (value.trim()) {
+      parts.push(value);
+    }
+    return;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    parts.push(String(value));
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectJsonStrings(item, parts);
+    }
+    return;
+  }
+  if (value && typeof value === "object") {
+    for (const item of Object.values(value)) {
+      collectJsonStrings(item, parts);
+    }
+  }
+}
+
+/** String values from `nodes.data` (not JSON keys, not the payload wrapper). */
+export function extractDataText(data: unknown): string {
+  const parts: string[] = [];
+  collectJsonStrings(data, parts);
+  return parts.join(" ").replace(/\s+/g, " ").trim();
+}
+
+/** Extract searchable text from an inline payload body — not the payload wrapper. */
 export function extractPayloadText(payload: Payload): string {
   if (payload.storage !== "inline" || payload.body === undefined) {
     return "";
   }
   if (payload.media_type === "text/html") {
-    return payload.body
+    const attrs: string[] = [];
+    payload.body.replace(HTML_ATTR_RE, (_match, doubleQuoted: string, singleQuoted: string) => {
+      const value = doubleQuoted ?? singleQuoted ?? "";
+      if (value.trim()) {
+        attrs.push(value);
+      }
+      return "";
+    });
+    const visible = payload.body
       .replace(/<script[\s\S]*?<\/script>/gi, " ")
       .replace(/<style[\s\S]*?<\/style>/gi, " ")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/&nbsp;/gi, " ")
-      .replace(/&amp;/gi, "&")
-      .replace(/&lt;/gi, "<")
-      .replace(/&gt;/gi, ">")
-      .replace(/&quot;/gi, '"')
+      .replace(/<[^>]+>/g, " ");
+    return decodeHtmlEntities([...attrs, visible].join(" "))
       .replace(/\s+/g, " ")
       .trim();
   }
   if (payload.media_type === "application/json") {
     try {
-      return JSON.stringify(JSON.parse(payload.body));
+      return extractDataText(JSON.parse(payload.body));
     } catch {
       return payload.body;
     }
