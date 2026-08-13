@@ -170,22 +170,14 @@ export async function listEdgesTouching(
   const { rows } = await db.query<{ from_id: string; to_id: string; relation_type: string }>(
     `SELECT e.from_id, e.to_id, e.relation_type
      FROM edges e
-     JOIN nodes src ON src.id = e.from_id AND src.deleted_at IS NULL
-     JOIN nodes dst ON dst.id = e.to_id AND dst.deleted_at IS NULL
-     WHERE e.from_id = ANY($1::uuid[]) OR e.to_id = ANY($1::uuid[])`,
+     JOIN nodes from_node ON from_node.id = e.from_id
+     JOIN nodes to_node ON to_node.id = e.to_id
+     WHERE (e.from_id = ANY($1::uuid[]) OR e.to_id = ANY($1::uuid[]))
+       AND from_node.deleted_at IS NULL
+       AND to_node.deleted_at IS NULL`,
     [nodeIds],
   );
   return rows;
-}
-
-export async function deleteEdgesTouching(db: Queryable, nodeId: string) {
-  const { rows } = await db.query<EdgeRow>(
-    `DELETE FROM edges
-     WHERE from_id = $1 OR to_id = $1
-     RETURNING id, from_id, to_id, relation_type, metadata, created_at`,
-    [nodeId],
-  );
-  return rows.map(mapEdge);
 }
 
 export async function findEdge(
@@ -212,6 +204,19 @@ export async function insertEdge(
     metadata?: Record<string, unknown>;
   },
 ) {
+  if (input.relation_type === "child_of") {
+    // Soft-delete leaves edges in place for undo, but the unique child_of
+    // index still counts a ghost parent. Drop it so a live child can reparent.
+    await db.query(
+      `DELETE FROM edges e
+       USING nodes parent
+       WHERE e.from_id = $1
+         AND e.relation_type = 'child_of'
+         AND parent.id = e.to_id
+         AND parent.deleted_at IS NOT NULL`,
+      [input.from_id],
+    );
+  }
   const { rows } = await db.query<EdgeRow>(
     `INSERT INTO edges (from_id, to_id, relation_type, metadata)
      VALUES ($1, $2, $3, $4::jsonb)

@@ -1,6 +1,5 @@
 import {
   deleteEdge,
-  deleteEdgesTouching,
   findEdge,
   getNodeById,
   getNodeType,
@@ -177,15 +176,12 @@ export async function deleteGraphNode(
     if (!after) {
       return toolError(`Node not found: ${input.id}`);
     }
-    // Drop incident edges so get / link validation / child_of uniqueness agree on
-    // the live graph. Snapshot them for slice 7 undo (restore node + re-insert edges).
-    const removedEdges = await deleteEdgesTouching(client, input.id);
     const activity = await insertActivity(client, {
       action: "delete",
       target_kind: "node",
       target_id: after.id,
-      before: { node: before, edges: removedEdges },
-      after: { node: after, edges: [] },
+      before,
+      after,
     });
     return { ok: true as const, activity_id: activity.id };
   });

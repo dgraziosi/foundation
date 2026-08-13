@@ -116,59 +116,6 @@ test(
         assert.equal(isToolError(gone), true);
       });
 
-      await t.test("soft-delete parent lets child take a new child_of parent", async () => {
-        const parentA = await upsertGraphNode(pool, { type: "area", title: "Old home" });
-        const parentB = await upsertGraphNode(pool, { type: "area", title: "New home" });
-        const child = await upsertGraphNode(pool, { type: "project", title: "Move" });
-        if (isToolError(parentA) || isToolError(parentB) || isToolError(child)) {
-          assert.fail("upsert failed");
-          return;
-        }
-
-        const firstLink = await linkGraphNodes(pool, {
-          from_id: child.node.id,
-          to_id: parentA.node.id,
-          relation_type: "child_of",
-        });
-        assert.equal(isToolError(firstLink), false);
-        if (isToolError(firstLink)) return;
-
-        const deleted = await deleteGraphNode(pool, { id: parentA.node.id, confirm: true });
-        assert.equal(isToolError(deleted), false);
-        if (isToolError(deleted)) return;
-
-        const afterDelete = await getGraphNode(pool, child.node.id);
-        assert.equal(isToolError(afterDelete), false);
-        if (isToolError(afterDelete)) return;
-        assert.equal(afterDelete.edges.length, 0);
-
-        const { rows } = await pool.query<{
-          before: { node?: { id?: string }; edges?: Array<{ relation_type: string; to_id: string }> };
-        }>("SELECT before FROM activity WHERE id = $1", [deleted.activity_id]);
-        assert.equal(rows[0]?.before.node?.id, parentA.node.id);
-        assert.equal(rows[0]?.before.edges?.length, 1);
-        assert.equal(rows[0]?.before.edges?.[0]?.relation_type, "child_of");
-        assert.equal(rows[0]?.before.edges?.[0]?.to_id, parentA.node.id);
-
-        const relinked = await linkGraphNodes(pool, {
-          from_id: child.node.id,
-          to_id: parentB.node.id,
-          relation_type: "child_of",
-        });
-        assert.equal(isToolError(relinked), false);
-        if (isToolError(relinked)) return;
-        assert.equal(relinked.edge.relation_type, "child_of");
-        assert.equal(relinked.edge.to_id, parentB.node.id);
-
-        const afterRelink = await getGraphNode(pool, child.node.id);
-        assert.equal(isToolError(afterRelink), false);
-        if (isToolError(afterRelink)) return;
-        assert.equal(afterRelink.edges.length, 1);
-        assert.equal(afterRelink.edges[0]?.relation_type, "child_of");
-        assert.equal(afterRelink.edges[0]?.to_id, parentB.node.id);
-        assert.ok(afterRelink.edges[0]?.to_id !== parentA.node.id);
-      });
-
       await t.test("create area + project and link with child_of", async () => {
         const area = await upsertGraphNode(pool, { type: "area", title: "Health" });
         const project = await upsertGraphNode(pool, { type: "project", title: "Sleep well" });
@@ -202,6 +149,51 @@ test(
         assert.equal(isToolError(second), true);
         if (!isToolError(second)) return;
         assert.match(second.error, /already has a child_of parent|Duplicate edge/);
+      });
+
+      await t.test("soft-deleted parent does not block reparenting a child", async () => {
+        const oldArea = await upsertGraphNode(pool, { type: "area", title: "Old home" });
+        const newArea = await upsertGraphNode(pool, { type: "area", title: "New home" });
+        const project = await upsertGraphNode(pool, { type: "project", title: "Move me" });
+        if (isToolError(oldArea) || isToolError(newArea) || isToolError(project)) {
+          assert.fail("upsert failed");
+          return;
+        }
+
+        const linked = await linkGraphNodes(pool, {
+          from_id: project.node.id,
+          to_id: oldArea.node.id,
+          relation_type: "child_of",
+        });
+        if (isToolError(linked)) {
+          assert.fail(linked.error);
+          return;
+        }
+
+        const deleted = await deleteGraphNode(pool, { id: oldArea.node.id, confirm: true });
+        assert.equal(isToolError(deleted), false);
+
+        const orphaned = await getGraphNode(pool, project.node.id);
+        assert.equal(isToolError(orphaned), false);
+        if (isToolError(orphaned)) return;
+        assert.equal(orphaned.edges.length, 0);
+
+        const reparented = await linkGraphNodes(pool, {
+          from_id: project.node.id,
+          to_id: newArea.node.id,
+          relation_type: "child_of",
+        });
+        assert.equal(isToolError(reparented), false);
+        if (isToolError(reparented)) return;
+        assert.equal(reparented.edge.relation_type, "child_of");
+        assert.equal(reparented.edge.to_id, newArea.node.id);
+
+        const got = await getGraphNode(pool, project.node.id);
+        assert.equal(isToolError(got), false);
+        if (isToolError(got)) return;
+        assert.equal(got.edges.length, 1);
+        assert.equal(got.edges[0]?.relation_type, "child_of");
+        assert.equal(got.edges[0]?.to_id, newArea.node.id);
       });
 
       await t.test("relates_to does not silently rewrite to child_of", async () => {
