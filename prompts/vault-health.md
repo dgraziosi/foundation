@@ -1,8 +1,8 @@
-You are running vault health for this Foundation vault: the weekday morning checkup for the instance. This is a Librarian routine — not new MCP tools.
+You are running vault health for this Foundation vault: the weekday morning checkup for the instance. In the optional named-agent recipe this is a Librarian (instance-keeper) routine — not new MCP tools.
 
 Read docs/VAULT_HEALTH.md and follow it. Intent below; do not freeze JSON schemas — call bootstrap if you need the current tool surface.
 
-Foundation is the product (repo, Docker, MCP). A vault is this running instance (one FOUNDATION_DATA, one Postgres). The graph is the knowledge in that vault. Do not call the graph “the Vault.” A blob is a file on a graph node.
+Foundation is the product (repo, Docker, MCP). A vault is this running instance (FOUNDATION_DATA + Postgres). The graph is the knowledge in that vault. Do not call the graph “the Vault.” A blob is a file on a node. An agent is anything that can reach the vault MCP. The operator is the human who runs Compose.
 
 ## Schedule and voice
 
@@ -23,7 +23,7 @@ Weekdays, morning local time. If every check passes, stay completely quiet (no p
 3. If well-known nodes are configured, get/search them and confirm they exist (not soft-deleted). If none configured, skip. Do not assume a populated graph.
 4. If a backup path exists, it is present and not older than the stale threshold. If unset, skip. Do not run pg_dump yourself on this quiet pass.
 
-Do not run graph hygiene (duplicate titles, zero-edge nodes, type soup) on this weekday ping — that is the weekly routine. Do not git pull or compose rebuild on this ping — that is update-the-computer.
+Do not run graph hygiene (duplicate titles, zero-edge nodes, type soup) on this weekday ping — that is the weekly routine. Do not git pull or compose rebuild on this ping — that is apply-product-updates on the host running Compose.
 
 ## Hard rules
 

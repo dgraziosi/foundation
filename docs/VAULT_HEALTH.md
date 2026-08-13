@@ -4,21 +4,22 @@ Weekday morning checkup for a running Foundation **vault** (the instance). Quiet
 
 ## Glossary
 
-Obsidian analog: Obsidian = app, a vault = one folder, graph = links inside.
+Short analog: app / folder / links → Foundation / vault / graph.
 
-- **Foundation** — the product (repo, Docker, MCP). What you install. Do not rename the GitHub repo or the MCP server `foundation`.
-- **Vault** — one running instance: one `FOUNDATION_DATA`, one Postgres. A clone gets their own vault, not yours. Postgres vault, not markdown. Do **not** call the graph “the Vault.”
-- **Graph** — the knowledge in that vault (people, projects, edges, blobs). Daily word.
-- **Blob** — a file on a graph node.
-- **Seldon** — architect of Foundation the product.
-- **Chief** — primary writer (human dumps ideas).
-- **Librarian** — agent from day one. Owns vault health, [graph hygiene](./GRAPH_HYGIENE.md), and applying git updates to the computer.
+- **Foundation** — the product
+- **vault** — one instance (`FOUNDATION_DATA` + Postgres)
+- **graph** — the knowledge in that vault
+- **blob** — a file on a node
+- **agent** — anything that can reach the vault MCP
+- **operator** — the human who runs Compose
 
-Stand-up: [`AGENTS.md`](./AGENTS.md). Agent: [`prompts/librarian.md`](../prompts/librarian.md). Paste: [`prompts/vault-health.md`](../prompts/vault-health.md).
+Do not call the graph “the Vault.”
+
+Optional named agents: see [`AGENTS.md`](./AGENTS.md). Paste: [`prompts/vault-health.md`](../prompts/vault-health.md).
 
 ## What it is
 
-A **quiet Librarian routine** (weekdays, morning local). Instance ops: process + db, the data dir is the real vault, optional canaries, optional backup freshness. It uses HTTP, the host filesystem, and existing MCP tools the same way a careful operator would. When everything is fine, it stays silent. It pings the operator **only on failure**.
+A **quiet operator routine** (weekdays, morning local). Instance ops: process + db, the data dir is the real vault, optional canaries, optional backup freshness. It uses HTTP, the host filesystem, and existing MCP tools the same way a careful operator would. When everything is fine, it stays silent. It pings the operator **only on failure**.
 
 Do not add `get_vault_health`, `run_maintenance`, `propose_reorganize`, `audit_links`, or `cleanup_dangling_links`. Those jobs are this routine and [graph hygiene](./GRAPH_HYGIENE.md), not MCP tools.
 
@@ -27,11 +28,11 @@ Graph-side report (duplicate titles, zero-edge nodes, type soup) is **not** this
 ## What it is not
 
 - **Not the graph.** `$FOUNDATION_DATA` and Postgres *are* the vault. The graph lives in them. Do not call the graph “the Vault.” Do not dual-write a markdown store or invent a backup product.
-- **Librarian is day one.** Created at init. See [`AGENTS.md`](./AGENTS.md).
+- **Optional stand-up.** Named agents are a clone recipe, not product ontology. See [`AGENTS.md`](./AGENTS.md).
 - **Not email.** No SMTP, no digest. Pings stay in the operator’s chat. Ping only when a check fails.
 - **Not a write-ACL.** The API key is the gate. Do not invent default-deny.
 - **Not a mutation pass.** The quiet weekday run does not `upsert`, `delete`, `unlink`, `undo`, or `manage_type` unless the operator asked for a repair in that conversation. Report; don’t rewrite the graph unattended.
-- **Reachability.** An agent that can reach the vault MCP (`http://127.0.0.1:8787/mcp`) may read/write; one that cannot does not. Run this checkup from a process that can hit that URL (Librarian on the computer that hosts Compose).
+- **Reachability.** An agent that can reach the vault MCP (`http://127.0.0.1:8787/mcp`) may read/write; one that cannot does not. Run this checkup from a process that can hit that URL on the host running Compose.
 
 ## Quiet weekday checks
 

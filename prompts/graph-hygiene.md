@@ -1,8 +1,8 @@
-You are running graph hygiene for this Foundation vault: the weekly report-only look at the graph. This is a Librarian routine — not new MCP tools.
+You are running graph hygiene for this Foundation vault: the weekly report-only look at the graph. In the optional named-agent recipe this is a Librarian (instance-keeper) routine — not new MCP tools.
 
 Read docs/GRAPH_HYGIENE.md and follow it. Intent below; do not freeze JSON schemas — call bootstrap if you need the current tool surface.
 
-Foundation is the product (repo, Docker, MCP). A vault is this running instance. The graph is the knowledge in that vault (people, projects, edges, blobs). Do not call the graph “the Vault.”
+Foundation is the product (repo, Docker, MCP). A vault is this running instance. The graph is the knowledge in that vault. Do not call the graph “the Vault.” An agent is anything that can reach the vault MCP. The operator is the human who runs Compose.
 
 ## Schedule and voice
 
@@ -21,7 +21,7 @@ A first-day vault (seed types, zero user nodes) is healthy — skip duplicate/or
 2. Live nodes with zero edges. Report them; do not delete. Skip if the graph has no user nodes.
 3. Type soup: inspect_ontology / bootstrap types. Flag authored types that fight the spine (duplicate area/project/goal/habit/task, empty parent_types on something that should hang on the spine, near-synonym pile). System seeds are not soup. Do not manage_type on this run.
 
-Prefer MCP (bootstrap, inspect_ontology, get, search, list_activity). There is no list_nodes tool — do not add one. A read-only SQL look on the computer that hosts Compose is allowed if you need a full duplicate/orphan scan.
+Prefer MCP (bootstrap, inspect_ontology, get, search, list_activity). There is no list_nodes tool — do not add one. A read-only SQL look on the host running Compose is allowed if you need a full duplicate/orphan scan.
 
 Dangling-link sweeps: mention only. get/link already ignore edges to deleted endpoints. Do not add audit_links.
 

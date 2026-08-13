@@ -6,7 +6,7 @@ Foundation is a small, self-hostable **typed knowledge graph + MCP server** for 
 
 The name is a nod to Asimov: carry structured knowledge forward so you (and your agents) are not starting from zero every time.
 
-**Glossary (locked):** Foundation = the product you install. A **vault** = one running instance (`FOUNDATION_DATA` + Postgres). The **graph** = the knowledge in that vault. Do not call the graph “the Vault.” A **blob** = a file on a graph node. **Seldon** architects the product. **Chief** writes the graph. **Librarian** is created at init (vault health, graph hygiene, git updates on the computer). Postgres vault, not markdown. Obsidian analog: app / folder / links.
+**Glossary (locked):** **Foundation** = the product. A **vault** = one instance (`FOUNDATION_DATA` + Postgres). The **graph** = the knowledge in that vault. A **blob** = a file on a node. An **agent** = anything that can reach the vault MCP. The **operator** = the human who runs Compose. Do not call the graph “the Vault.” Short analog: app / folder / links → Foundation / vault / graph.
 
 Do not commit personal life data, documents, or secrets to this repository. Those belong in the operator’s vault, not in git.
 
@@ -15,9 +15,9 @@ Do not commit personal life data, documents, or secrets to this repository. Thos
 - [`docs/SPEC.md`](docs/SPEC.md) — product contract
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — living vault and graph
 - [`docs/MCP_TOOLS.md`](docs/MCP_TOOLS.md) — 12-tool MCP surface
-- [`docs/AGENTS.md`](docs/AGENTS.md) — Seldon (architect), Chief (writer), Librarian (from day one)
-- [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md) — weekday instance checkup (Librarian)
-- [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md) — weekly graph report (Librarian)
+- [`docs/AGENTS.md`](docs/AGENTS.md) — optional named-agent stand-up
+- [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md) — weekday instance checkup
+- [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md) — weekly graph report
 
 ## What it is
 
@@ -50,7 +50,7 @@ Requires [Docker Compose](https://docs.docker.com/compose/) and a copy of this r
    docker compose up --build
    ```
 
-   **Stand up the agents.** Foundation is the product. A vault is this running instance (`FOUNDATION_DATA` + Postgres). The graph is the knowledge in that vault — do not call the graph “the Vault.” After Compose is up, create Librarian from [`prompts/librarian.md`](prompts/librarian.md) and attach three routines: [`prompts/vault-health.md`](prompts/vault-health.md) (weekdays morning), [`prompts/graph-hygiene.md`](prompts/graph-hygiene.md) (weekly), [`prompts/update-foundation.md`](prompts/update-foundation.md) (weekdays late morning). Paste Seldon ([`prompts/architect.md`](prompts/architect.md)) and Chief ([`prompts/chief.md`](prompts/chief.md)). Copy-paste stand-up: [`docs/AGENTS.md`](docs/AGENTS.md). What “healthy” means: [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md). Graph report: [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md). No new MCP tools.
+   **Optional stand-up.** After Compose is up, see [`docs/AGENTS.md`](docs/AGENTS.md) for an optional named-agent recipe and three routines. What “healthy” means: [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md). Graph report: [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md). No new MCP tools.
 
 3. Point an MCP client at `http://127.0.0.1:8787/mcp` with:
 
@@ -164,7 +164,7 @@ Never point `FOUNDATION_DATA` at an agent profile or memory directory.
 
 1. Run Compose on a machine your agents can reach at localhost MCP
 2. Point agents at the local MCP endpoint
-3. Stand up Seldon (architect) + Chief (writer) + Librarian at init, with the three routines ([`docs/AGENTS.md`](docs/AGENTS.md))
+3. Optionally stand up named agents and the three routines ([`docs/AGENTS.md`](docs/AGENTS.md))
 
 ## License
 

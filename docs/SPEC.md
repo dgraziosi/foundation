@@ -14,19 +14,23 @@ Do not commit personal life data, documents, or secrets to this repository. Thos
 
 ## Locked glossary
 
-Obsidian analog: Obsidian = app, a vault = one folder, graph = links inside.
+Short analog: app / folder / links → Foundation / vault / graph.
 
-- **Foundation** — the product (repo, Docker, MCP). What you install.
-- **Vault** — one running instance: one `FOUNDATION_DATA`, one Postgres. A clone gets their own vault, not yours. Postgres vault, not markdown. Do **not** call the graph “the Vault.”
-- **Graph** — the knowledge in that vault (people, projects, edges, blobs). Daily word.
-- **Blob** — a file on a graph node.
+- **Foundation** — the product
+- **vault** — one instance (`FOUNDATION_DATA` + Postgres)
+- **graph** — the knowledge in that vault
+- **blob** — a file on a node
+- **agent** — anything that can reach the vault MCP
+- **operator** — the human who runs Compose
 
-Optional named roles: see [`AGENTS.md`](./AGENTS.md).
+Do not call the graph “the Vault.”
+
+Optional named agents: see [`AGENTS.md`](./AGENTS.md).
 
 ## Primary users
 
 1. **Agents** via MCP — default interface (Cursor, Claude, and other MCP clients)
-2. **Humans** via conversation with those agents; optional thin viewer later (Mac/web)
+2. **Operators** via conversation with those agents; optional thin viewer later (Mac/web)
 
 ## Starter spine
 
@@ -51,7 +55,7 @@ Names are locked. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md).
 - Activity stores optional `actor` / `actor_label` (who wrote). Not a permission gate.
 - `search` is Postgres FTS (title + `data` + extracted inline payload text; Latin accents folded). `query` is optional when `type`, `status`, `under` (child_of parent), `since`, or `origin` is set, so agents can list without a word. Not embeddings. No `list_nodes`.
 - Live nodes are unique on `data.origin.{system,id}` for `gmail` | `calendar` | `drive` | `github`. Look up with `search` `{ origin }` (then `get`). Store the ref only — do not fetch or mirror those systems’ bodies.
-- No `get_vault_health` / `run_maintenance` / `audit_links` tools — those jobs are Librarian operator routines ([`AGENTS.md`](./AGENTS.md), [`VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md))
+- No `get_vault_health` / `run_maintenance` / `audit_links` tools — those jobs are operator routines ([`AGENTS.md`](./AGENTS.md), [`VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md))
 
 ## Runtime
 
@@ -74,6 +78,6 @@ Names are locked. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md).
 - Proposal/approve inbox for ontology changes
 - Write-ACL / default-deny (the API key is the gate)
 
-## Merge bar
+## Contributor checklist
 
-Typecheck and tests pass. Destructive MCP tools stay behind `confirm: true`. Do not put vault contents, `FOUNDATION_DATA` files, or graph dumps in pull requests. When a slice changes the graph or vault shape, update [`ARCHITECTURE.md`](./ARCHITECTURE.md) in the same PR — **ARCHITECTURE.md still true.**
+Typecheck and tests pass. Destructive MCP tools stay behind `confirm: true`. Do not put vault contents, `FOUNDATION_DATA` files, or graph dumps in pull requests. When a slice changes the graph or vault shape, update [`ARCHITECTURE.md`](./ARCHITECTURE.md) in the same PR.

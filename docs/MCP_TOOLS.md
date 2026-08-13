@@ -27,7 +27,7 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 
 - **In:** none
 - **Out:** `{ spine, types, relations, rules, how_to_extend }`
-- `how_to_extend` includes `manage_type`, `manage_relation`, `nodes`, `links`, `activity`, and `search`. Summary notes that vault health, graph hygiene, and applying git updates are Librarian operator routines, not tools ([`docs/VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`docs/GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md)). No `get_vault_health` tool.
+- `how_to_extend` includes `manage_type`, `manage_relation`, `nodes`, `links`, `activity`, and `search`. Summary notes that vault health, graph hygiene, and applying git updates are operator routines, not tools ([`docs/AGENTS.md`](./AGENTS.md), [`docs/VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`docs/GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md)). No `get_vault_health` tool.
 
 ### `get`
 
@@ -138,4 +138,4 @@ Undo tokens are single-use (`undone_at`; token cleared). Expired tokens refuse. 
 
 ## Not in v1
 
-Restore as a separate tool (use `undo`), hierarchy tree, parent suggestion, habit logging, a dedicated blob-upload tool (ingest is on `upsert`), embeddings admin, memories, pending proposals, chat presentation, web search, skills, `get_vault_health` / `run_maintenance` / `audit_links` (Librarian operator routines instead: [vault health](./VAULT_HEALTH.md), [graph hygiene](./GRAPH_HYGIENE.md)).
+Restore as a separate tool (use `undo`), hierarchy tree, parent suggestion, habit logging, a dedicated blob-upload tool (ingest is on `upsert`), embeddings admin, memories, pending proposals, chat presentation, web search, skills, `get_vault_health` / `run_maintenance` / `audit_links` (operator routines instead: [AGENTS.md](./AGENTS.md), [vault health](./VAULT_HEALTH.md), [graph hygiene](./GRAPH_HYGIENE.md)).
