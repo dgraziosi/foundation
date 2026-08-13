@@ -121,6 +121,62 @@ export async function softDeleteNode(db: Queryable, id: string): Promise<Node | 
   return rows[0] ? mapNode(rows[0]) : undefined;
 }
 
+export async function restoreNode(db: Queryable, id: string): Promise<Node | undefined> {
+  const { rows } = await db.query<NodeRow>(
+    `UPDATE nodes SET deleted_at = NULL, updated_at = now()
+     WHERE id = $1 AND deleted_at IS NOT NULL
+     RETURNING id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at`,
+    [id],
+  );
+  return rows[0] ? mapNode(rows[0]) : undefined;
+}
+
+export async function restoreNodeSnapshot(
+  db: Queryable,
+  snapshot: Node,
+): Promise<Node | undefined> {
+  const { rows } = await db.query<NodeRow>(
+    `UPDATE nodes SET
+       type = $2,
+       title = $3,
+       status = $4,
+       payload = $5::jsonb,
+       data = $6::jsonb,
+       metadata = $7::jsonb,
+       updated_at = now()
+     WHERE id = $1
+     RETURNING id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at`,
+    [
+      snapshot.id,
+      snapshot.type,
+      snapshot.title,
+      snapshot.status,
+      JSON.stringify(snapshot.payload),
+      JSON.stringify(snapshot.data),
+      JSON.stringify(snapshot.metadata),
+    ],
+  );
+  return rows[0] ? mapNode(rows[0]) : undefined;
+}
+
+export async function searchNodes(
+  db: Queryable,
+  input: { query: string; type?: string; limit?: number },
+): Promise<Node[]> {
+  const limit = input.limit ?? 20;
+  const { rows } = await db.query<NodeRow>(
+    `SELECT id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at
+     FROM nodes
+     WHERE deleted_at IS NULL
+       AND ($2::text IS NULL OR type = $2)
+       AND search_tsv @@ plainto_tsquery('english', $1)
+     ORDER BY ts_rank_cd(search_tsv, plainto_tsquery('english', $1)) DESC, updated_at DESC
+     LIMIT $3`,
+    [input.query, input.type ?? null, limit],
+  );
+  return rows.map(mapNode);
+}
+
 type EdgeRow = {
   id: string;
   from_id: string;
@@ -195,6 +251,15 @@ export async function findEdge(
   return rows[0] ? mapEdge(rows[0]) : undefined;
 }
 
+export async function getEdgeById(db: Queryable, id: string) {
+  const { rows } = await db.query<EdgeRow>(
+    `SELECT id, from_id, to_id, relation_type, metadata, created_at
+     FROM edges WHERE id = $1`,
+    [id],
+  );
+  return rows[0] ? mapEdge(rows[0]) : undefined;
+}
+
 export async function insertEdge(
   db: Queryable,
   input: {
@@ -246,4 +311,41 @@ export async function deleteEdge(
     [fromId, toId, relationType],
   );
   return rows[0] ? mapEdge(rows[0]) : undefined;
+}
+
+export async function deleteEdgeById(db: Queryable, id: string) {
+  const { rows } = await db.query<EdgeRow>(
+    `DELETE FROM edges
+     WHERE id = $1
+     RETURNING id, from_id, to_id, relation_type, metadata, created_at`,
+    [id],
+  );
+  return rows[0] ? mapEdge(rows[0]) : undefined;
+}
+
+export async function restoreEdge(
+  db: Queryable,
+  snapshot: {
+    id: string;
+    from_id: string;
+    to_id: string;
+    relation_type: string;
+    metadata: Record<string, unknown>;
+    created_at: string;
+  },
+) {
+  const { rows } = await db.query<EdgeRow>(
+    `INSERT INTO edges (id, from_id, to_id, relation_type, metadata, created_at)
+     VALUES ($1, $2, $3, $4, $5::jsonb, $6::timestamptz)
+     RETURNING id, from_id, to_id, relation_type, metadata, created_at`,
+    [
+      snapshot.id,
+      snapshot.from_id,
+      snapshot.to_id,
+      snapshot.relation_type,
+      JSON.stringify(snapshot.metadata ?? {}),
+      snapshot.created_at,
+    ],
+  );
+  return mapEdge(rows[0]!);
 }

@@ -5,13 +5,17 @@ import { registerDeleteTool } from "./delete.js";
 import { registerGetTool } from "./get.js";
 import { registerInspectOntologyTool } from "./inspect-ontology.js";
 import { registerLinkTool } from "./link.js";
+import { registerListActivityTool } from "./list-activity.js";
 import { registerManageRelationTool } from "./manage-relation.js";
 import { registerManageTypeTool } from "./manage-type.js";
+import { registerSearchTool } from "./search.js";
+import { registerUndoTool } from "./undo.js";
 import { registerUnlinkTool } from "./unlink.js";
 import { registerUpsertTool } from "./upsert.js";
 
 export function registerTools(server: McpServer, pool: Pool): void {
   registerBootstrapTool(server, pool);
+  registerSearchTool(server, pool);
   registerGetTool(server, pool);
   registerUpsertTool(server, pool);
   registerDeleteTool(server, pool);
@@ -20,4 +24,6 @@ export function registerTools(server: McpServer, pool: Pool): void {
   registerInspectOntologyTool(server, pool);
   registerManageTypeTool(server, pool);
   registerManageRelationTool(server, pool);
+  registerListActivityTool(server, pool);
+  registerUndoTool(server, pool);
 }

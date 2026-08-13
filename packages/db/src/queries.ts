@@ -284,3 +284,63 @@ export async function pingDb(pool: pg.Pool): Promise<boolean> {
     return false;
   }
 }
+
+export async function countNodesByType(db: Queryable, slug: string): Promise<number> {
+  const { rows } = await db.query<{ n: string }>(
+    `SELECT COUNT(*)::text AS n FROM nodes WHERE type = $1`,
+    [slug],
+  );
+  return Number(rows[0]?.n ?? 0);
+}
+
+export async function countTypesUsingParent(db: Queryable, slug: string): Promise<number> {
+  const { rows } = await db.query<{ n: string }>(
+    `SELECT COUNT(*)::text AS n FROM node_types WHERE $1 = ANY(parent_types)`,
+    [slug],
+  );
+  return Number(rows[0]?.n ?? 0);
+}
+
+export async function countEdgesByRelation(db: Queryable, slug: string): Promise<number> {
+  const { rows } = await db.query<{ n: string }>(
+    `SELECT COUNT(*)::text AS n FROM edges WHERE relation_type = $1`,
+    [slug],
+  );
+  return Number(rows[0]?.n ?? 0);
+}
+
+export async function countRelationsUsingSemanticParent(
+  db: Queryable,
+  slug: string,
+): Promise<number> {
+  const { rows } = await db.query<{ n: string }>(
+    `SELECT COUNT(*)::text AS n FROM relation_types WHERE semantic_parent_slug = $1`,
+    [slug],
+  );
+  return Number(rows[0]?.n ?? 0);
+}
+
+export async function deleteNodeType(db: Queryable, slug: string): Promise<NodeType | undefined> {
+  const { rows } = await db.query<NodeTypeRow>(
+    `DELETE FROM node_types
+     WHERE slug = $1 AND is_system = false
+     RETURNING slug, label, description, kind, parent_types, json_schema, is_system,
+               created_at, updated_at`,
+    [slug],
+  );
+  return rows[0] ? mapNodeType(rows[0]) : undefined;
+}
+
+export async function deleteRelationType(
+  db: Queryable,
+  slug: string,
+): Promise<RelationType | undefined> {
+  const { rows } = await db.query<RelationTypeRow>(
+    `DELETE FROM relation_types
+     WHERE slug = $1 AND is_system = false
+     RETURNING slug, label, description, kind, source_types, target_types,
+               is_symmetric, semantic_parent_slug, is_system, created_at, updated_at`,
+    [slug],
+  );
+  return rows[0] ? mapRelationType(rows[0]) : undefined;
+}
