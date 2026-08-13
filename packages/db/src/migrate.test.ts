@@ -8,6 +8,16 @@ import { seedSystemOntology } from "./seed.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 
+async function poolForSchema(schema: string) {
+  const admin = createPool(databaseUrl!);
+  await admin.query("CREATE EXTENSION IF NOT EXISTS pgcrypto");
+  await admin.query("CREATE EXTENSION IF NOT EXISTS vector");
+  await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+  await admin.query(`CREATE SCHEMA ${schema}`);
+  await admin.end();
+  return createPool(databaseUrl!, { options: `-c search_path=${schema},public` });
+}
+
 test(
   "migrate + seed writes system types and relations",
   { skip: !databaseUrl },
@@ -15,7 +25,7 @@ test(
     if (!databaseUrl) {
       return;
     }
-    const pool = createPool(databaseUrl);
+    const pool = await poolForSchema("migrate_seed");
     try {
       await migrate(pool);
       await seedSystemOntology(pool);
@@ -80,6 +90,13 @@ test(
            AND column_name = 'idempotency_key'`,
       );
       assert.equal(casCols[0]?.column_name, "idempotency_key");
+      const { rows: originIdx } = await pool.query<{ indexname: string }>(
+        `SELECT indexname FROM pg_indexes
+         WHERE schemaname = current_schema() AND indexname = 'nodes_origin_live_uidx'`,
+      );
+      assert.equal(originIdx[0]?.indexname, "nodes_origin_live_uidx");
+      assert.ok(typeSlugs.includes("company"));
+      assert.ok(typeSlugs.includes("decision"));
     } finally {
       await pool.end();
     }

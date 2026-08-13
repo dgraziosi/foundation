@@ -33,13 +33,13 @@ A first-day vault (seed types, zero user nodes) is **healthy**. Zero user nodes 
 
 ## Weekly checks (report only)
 
-Intent only — call `bootstrap` if you need the current tool surface. Prefer MCP. A read-only SQL look via `docker compose exec` on the box is allowed when MCP cannot enumerate the whole graph (there is no `list_nodes` tool). Do not add one.
+Intent only — call `bootstrap` if you need the current tool surface. Prefer MCP. A read-only SQL look via `docker compose exec` on the box is allowed when MCP cannot enumerate the whole graph (there is no `list_nodes` tool). Do not add one. `search` can list by `type` / `status` / `under` without a query (limit 100); that is a sample, not a full dump.
 
 ### 1. Duplicate titles
 
 Live nodes (`deleted_at` is null) that share the same title (case-insensitive is enough). Report id, type, title. Do not merge them.
 
-If you cannot scan (no SQL, search cannot list everything), say so and stop that check — do not invent a tool.
+If you cannot scan (no SQL), use `search` with type filters (no query) as a sample, say so, and stop a full-graph check — do not invent a tool.
 
 ### 2. Nodes with zero edges
 
@@ -63,7 +63,7 @@ Report slug, kind, parent_types. Do not `manage_type` on this routine.
 | --- | --- |
 | Types vs spine | `bootstrap` / `inspect_ontology` |
 | A known node’s edges | `get` |
-| Title recall | `search` (lexical; not a full listing) |
+| Title recall or list by type/status/under | `search` (query optional when a filter is set; not a dump of the whole graph) |
 | Full duplicate / zero-edge scan | Read-only SQL on the box, if needed |
 | Recent writes (context, not a fail) | `list_activity` |
 

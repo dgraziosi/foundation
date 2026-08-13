@@ -7,7 +7,7 @@ v1 surface is **12 tools**. Destructive tools require `confirm: true` or they re
 | Tool | Purpose |
 | --- | --- |
 | `bootstrap` | Return starter ontology, how to extend it, and current type/relation inventory. Call first. |
-| `search` | Find nodes by text query and optional type filter. Hits are id/type/title/snippet. |
+| `search` | Find nodes by text query and/or filters (`type`, `status`, `under`, `since`, `origin`). Query is optional when a filter is set. Hits are id/type/title/snippet. |
 | `get` | Fetch a node by id, including payload and incident edges with neighbor titles. Blob payloads return metadata, not bytes. |
 | `upsert` | Create or update a node (title, type, payload, data, status). Updates require `base_updated_at`. Create accepts `idempotency_key`. Blob ingest via `bytes_base64` or `source_path`. |
 | `delete` | Soft-delete a node. Requires `confirm: true`. |
@@ -51,6 +51,8 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 - Omit `id` to create. Pass `id` to update, or to create with a chosen UUID.
 - **Update if-match:** when `id` already exists, `base_updated_at` is required and must match the node's current `updated_at`. Mismatch or omit → `{ error, suggestion }` (call `get` and retry). This is lost-update protection, not a write-ACL.
 - **`data` merges** on update (`JSONB ||`, top-level keys). A partial `data` patch does not wipe other keys. Omit `data` to leave it unchanged.
+- **`json_schema`:** if the type has `json_schema`, upsert validates the **merged** `data` object against it. Miss → `{ error, suggestion }` (inspect_ontology, fix data or the type schema). Types with `json_schema: null` skip this check.
+- **`data.origin`:** optional `{ system, id }` for `gmail` | `calendar` | `drive` | `github`. Unique on **live** nodes. Look up with `search` `{ origin }` (or `get` once you have the UUID) so agents do not twin people. Foundation stores the ref only — **never fetch or mirror** those systems' bodies.
 - **Create idempotency:** `idempotency_key` on create. A retry with the same key returns the existing node and original `activity_id` — it does not twin. A key already used by a deleted node refuses (undo, or a new key).
 - **`actor` / `actor_label`:** optional who-wrote fields stored on the activity row (`actor` is `agent` | `user` | `system`; default `agent`). Not a permission gate.
 
@@ -93,12 +95,14 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 
 ### `search`
 
-- **In:** `{ query, type?, limit? }`
+- **In:** `{ query?, type?, status?, under?, since?, origin?, limit? }`
 - **Out:** `{ nodes: [{ id, type, title, status, snippet }], suggestion? }` or `{ error, suggestion? }`
-- Postgres FTS on `title` (weighted highest) + string values from `data` + extracted inline payload text. HTML: tag text plus `alt` / `title` / `aria-label` / `placeholder`. JSON: string values from the parsed body — **not** `JSON.stringify` of the payload wrapper (`media_type`, `storage`, …). Latin diacritics are folded (`fiancee` matches `fiancée` and vice versa). Filter by `type`. Soft-deleted nodes are excluded. Lexical recall only (no embeddings).
+- Postgres FTS on `title` (weighted highest) + string values from `data` + extracted inline payload text. HTML: tag text plus `alt` / `title` / `aria-label` / `placeholder`. JSON: string values from the parsed body — **not** `JSON.stringify` of the payload wrapper (`media_type`, `storage`, …). Latin diacritics are folded (`fiancee` matches `fiancée` and vice versa). Soft-deleted nodes are excluded. Lexical recall only (no embeddings).
+- **`query` is optional** when `type`, `status`, `under`, `since`, or `origin` is set. That is how agents list without a word: all people (`type: "person"`), all open tasks (`type: "task", status: "active"`), children of a parent (`under: <parent uuid>` = live `child_of`), or nodes updated `since` an ISO-8601 timestamp. Empty `{}` → `{ error, suggestion }` (do not add `list_nodes`).
+- `origin: { system, id }` looks up the unique live `data.origin` ref (`gmail` | `calendar` | `drive` | `github`).
 - Hits are lean (id/type/title/snippet). Call `get` to load payload and neighbor titles.
 - If `query` is a UUID, search resolves it like `get` and returns `suggestion` to prefer `get` next time.
-- **An empty result is not a license to upsert a duplicate.** The `suggestion` says so. Try a shorter token or a type filter; only upsert if the entity is new. If you already have a UUID, call `get`.
+- **An empty lexical result is not a license to upsert a duplicate.** The `suggestion` says so. Try a shorter token or a type filter; only upsert if the entity is new. If you already have a UUID, call `get`. An origin miss means you may upsert with that `data.origin` (ref only).
 
 ### `list_activity`
 

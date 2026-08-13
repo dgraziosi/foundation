@@ -32,13 +32,19 @@ test("lesson may hang under area, project, or goal", () => {
 
 test("artifacts without parent_types do not require a parent", () => {
   for (const slug of ARTIFACT_TYPE_SLUGS) {
-    if (slug === "lesson") {
+    if (slug === "lesson" || slug === "decision") {
       assert.equal(requiresHierarchyParent(slug), true);
       continue;
     }
     assert.equal(requiresHierarchyParent(slug), false);
     assert.equal(isArtifactType(slug), true);
   }
+});
+
+test("decision may hang under area, project, or goal", () => {
+  assert.deepEqual(getParentTypes("decision"), ["area", "project", "goal"]);
+  assert.equal(canChildOf("decision", "area"), true);
+  assert.equal(canChildOf("decision", "habit"), false);
 });
 
 test("area is the spine root", () => {

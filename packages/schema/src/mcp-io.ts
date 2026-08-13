@@ -10,6 +10,7 @@ import {
   NodeSchema,
   NodeStatusSchema,
   NodeTypeSchema,
+  OriginRefSchema,
   PayloadStorageSchema,
   RelationKindSchema,
   RelationTypeSchema,
@@ -229,8 +230,16 @@ export const ManageRelationSuccessSchema = z.object({
 });
 
 export const SearchInputSchema = z.object({
-  query: z.string().trim().min(1),
+  /** Lexical query. Optional when type, status, under, since, or origin is set. */
+  query: z.string().optional(),
   type: z.string().min(1).optional(),
+  status: NodeStatusSchema.optional(),
+  /** UUID of a live parent; lists nodes with child_of to that parent. */
+  under: z.string().uuid().optional(),
+  /** ISO-8601 timestamp; live nodes with updated_at >= since. */
+  since: z.string().min(1).optional(),
+  /** Unique origin ref lookup (gmail | calendar | drive | github). */
+  origin: OriginRefSchema.optional(),
   limit: z.number().int().min(1).max(100).optional(),
 });
 export type SearchInput = z.infer<typeof SearchInputSchema>;
@@ -250,6 +259,15 @@ export const SEARCH_MISS_SUGGESTION =
 
 export const SEARCH_UUID_SUGGESTION =
   "This query is a node UUID. Prefer get when you already have an id.";
+
+export const SEARCH_NO_SELECTOR_SUGGESTION =
+  "Pass query for lexical recall, or type, status, under (child_of parent UUID), since, or origin to list without a word. Do not add list_nodes.";
+
+export const ORIGIN_MISS_SUGGESTION =
+  "No live node has that origin. You may upsert with data.origin.system and data.origin.id. Foundation stores the ref only — do not fetch or mirror Gmail, Calendar, Drive, or GitHub bodies.";
+
+export const ORIGIN_HIT_SUGGESTION =
+  "This origin is unique on live nodes. Prefer get with that id. Do not upsert a twin.";
 
 export const SearchSuccessSchema = z.object({
   nodes: z.array(SearchHitSchema),

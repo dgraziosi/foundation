@@ -7,10 +7,12 @@ export const SPINE_TYPE_SLUGS = ["area", "project", "goal", "habit", "task"] as 
 export const ARTIFACT_TYPE_SLUGS = [
   "lesson",
   "person",
+  "company",
   "journal",
   "idea",
   "note",
   "trip",
+  "decision",
 ] as const;
 
 export const SEED_NODE_TYPES: readonly NodeType[] = [
@@ -79,6 +81,15 @@ export const SEED_NODE_TYPES: readonly NodeType[] = [
     is_system: true,
   },
   {
+    slug: "company",
+    label: "Company",
+    description: "An organization (employer, vendor, school, …).",
+    kind: "artifact",
+    parent_types: [],
+    json_schema: null,
+    is_system: true,
+  },
+  {
     slug: "journal",
     label: "Journal",
     description: "A dated reflection or log entry.",
@@ -112,6 +123,15 @@ export const SEED_NODE_TYPES: readonly NodeType[] = [
       "A journey. Motivating payload example: store an HTML itinerary (text/html, inline) and re-show it as HTML.",
     kind: "artifact",
     parent_types: [],
+    json_schema: null,
+    is_system: true,
+  },
+  {
+    slug: "decision",
+    label: "Decision",
+    description: "A choice that was made. May hang under an area, project, or goal.",
+    kind: "artifact",
+    parent_types: ["area", "project", "goal"],
     json_schema: null,
     is_system: true,
   },

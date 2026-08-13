@@ -6,6 +6,7 @@ import {
   getCreateActivityForNode,
   getNodeById,
   getNodeByIdempotencyKey,
+  getNodeByOrigin,
   getNodeType,
   getRelationType,
   ingestBlobBytes,
@@ -15,6 +16,7 @@ import {
   insertNode,
   insertNodeType,
   insertRelationType,
+  isChildOfParent,
   listActivity,
   listEdgesTouching,
   listIncidentEdges,
@@ -44,15 +46,21 @@ import {
   labelFromSlug,
   isUuid,
   missingConfirm,
-  isToolError,
   storedBlobPayload,
   toolError,
   validateBlobRelativePath,
   validateInlinePayload,
   validateLink,
   SEARCH_MISS_SUGGESTION,
+  SEARCH_NO_SELECTOR_SUGGESTION,
   SEARCH_UUID_SUGGESTION,
+  ORIGIN_HIT_SUGGESTION,
+  ORIGIN_MISS_SUGGESTION,
   assertIfMatch,
+  isToolError,
+  originConflictError,
+  originFromData,
+  validateDataAgainstJsonSchema,
   type Activity,
   type Blob,
   type Edge,
@@ -84,6 +92,40 @@ function writerOf(input: { actor?: Activity["actor"]; actor_label?: string }): {
     actor: input.actor ?? "agent",
     actor_label: input.actor_label ?? null,
   };
+}
+
+function mergedNodeData(
+  existing: Node | undefined,
+  patch: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  if (patch === undefined) {
+    return existing?.data ?? {};
+  }
+  return { ...(existing?.data ?? {}), ...patch };
+}
+
+function validateUpsertData(type: NodeType, data: Record<string, unknown>): ToolError | null {
+  const origin = originFromData(data);
+  if (isToolError(origin)) {
+    return origin;
+  }
+  return validateDataAgainstJsonSchema(data, type.json_schema, type.slug);
+}
+
+async function originUniqueError(
+  db: Queryable,
+  data: Record<string, unknown>,
+  selfId?: string,
+): Promise<ToolError | null> {
+  const origin = originFromData(data);
+  if (!origin || isToolError(origin)) {
+    return null;
+  }
+  const existing = await getNodeByOrigin(db, origin);
+  if (existing && existing.id !== selfId) {
+    return originConflictError(existing.id, origin);
+  }
+  return null;
 }
 
 async function replayIdempotentCreate(
@@ -371,6 +413,12 @@ export async function upsertGraphNode(
         }
       }
 
+      const nextData = mergedNodeData(existing, input.data);
+      const dataErr = validateUpsertData(type, nextData);
+      if (dataErr) {
+        return dataErr;
+      }
+
       if (existing) {
         const resolved = await resolveStoredPayload(client, input.payload, blobs);
         if ("error" in resolved) {
@@ -381,32 +429,42 @@ export async function upsertGraphNode(
         if (stale) {
           return stale;
         }
-        const node = await updateNode(client, input.id!, {
-          type: input.type,
-          title: input.title,
-          status: input.status,
-          payload: resolved.payload,
-          data: input.data,
-          metadata: input.metadata,
-          base_updated_at: input.base_updated_at,
-        });
-        if (!node) {
-          const current = await getNodeById(client, input.id!);
-          if (!current) {
-            return toolError(`Node not found: ${input.id}`);
+        try {
+          const node = await updateNode(client, input.id!, {
+            type: input.type,
+            title: input.title,
+            status: input.status,
+            payload: resolved.payload,
+            data: input.data,
+            metadata: input.metadata,
+            base_updated_at: input.base_updated_at,
+          });
+          if (!node) {
+            const current = await getNodeById(client, input.id!);
+            if (!current) {
+              return toolError(`Node not found: ${input.id}`);
+            }
+            return assertIfMatch("base_updated_at", input.base_updated_at, current.updated_at) ??
+              toolError(`Node not found: ${input.id}`);
           }
-          return assertIfMatch("base_updated_at", input.base_updated_at, current.updated_at) ??
-            toolError(`Node not found: ${input.id}`);
+          const activity = await insertActivity(client, {
+            ...writer,
+            action: "update",
+            target_kind: "node",
+            target_id: node.id,
+            before: await snapshotNodeForActivity(client, existing),
+            after: await snapshotNodeForActivity(client, node, resolved.blob),
+          });
+          return { node, activity_id: activity.id };
+        } catch (error) {
+          if (isUniqueViolation(error)) {
+            const originErr = await originUniqueError(client, nextData, existing.id);
+            if (originErr) {
+              return originErr;
+            }
+          }
+          throw error;
         }
-        const activity = await insertActivity(client, {
-          ...writer,
-          action: "update",
-          target_kind: "node",
-          target_id: node.id,
-          before: await snapshotNodeForActivity(client, existing),
-          after: await snapshotNodeForActivity(client, node, resolved.blob),
-        });
-        return { node, activity_id: activity.id };
       }
 
       await client.query("SAVEPOINT upsert_insert");
@@ -437,15 +495,21 @@ export async function upsertGraphNode(
         });
         return { node, activity_id: activity.id };
       } catch (error) {
-        if (isUniqueViolation(error) && input.idempotency_key) {
+        if (isUniqueViolation(error)) {
           await client.query("ROLLBACK TO SAVEPOINT upsert_insert");
           discardCreatedBlob = true;
           pendingUploadUnlink = undefined;
-          const replay = await getNodeByIdempotencyKey(client, input.idempotency_key, {
-            includeDeleted: true,
-          });
-          if (replay) {
-            return replayIdempotentCreate(client, replay);
+          const originErr = await originUniqueError(client, nextData);
+          if (originErr) {
+            return originErr;
+          }
+          if (input.idempotency_key) {
+            const replay = await getNodeByIdempotencyKey(client, input.idempotency_key, {
+              includeDeleted: true,
+            });
+            if (replay) {
+              return replayIdempotentCreate(client, replay);
+            }
           }
         }
         throw error;
@@ -916,6 +980,10 @@ export async function searchGraphNodes(
   pool: Pool,
   input: SearchInput,
 ): Promise<{ nodes: SearchHit[]; suggestion?: string } | ToolError> {
+  const query = input.query?.trim() ? input.query.trim() : undefined;
+  if (!query && !input.type && !input.status && !input.under && !input.since && !input.origin) {
+    return toolError("search requires a query or a filter", SEARCH_NO_SELECTOR_SUGGESTION);
+  }
   if (input.type) {
     const type = await getNodeType(pool, input.type);
     if (!type) {
@@ -925,9 +993,46 @@ export async function searchGraphNodes(
       );
     }
   }
-  if (isUuid(input.query)) {
-    const node = await getNodeById(pool, input.query);
-    if (!node || (input.type && node.type !== input.type)) {
+  let since: Date | undefined;
+  if (input.since) {
+    const parsed = Date.parse(input.since);
+    if (Number.isNaN(parsed)) {
+      return toolError(
+        `Invalid since timestamp: ${input.since}`,
+        "Pass an ISO-8601 timestamp, e.g. 2026-08-13T00:00:00Z.",
+      );
+    }
+    since = new Date(parsed);
+  }
+  if (input.under) {
+    const parent = await getNodeById(pool, input.under);
+    if (!parent) {
+      return toolError(
+        `under parent not found: ${input.under}`,
+        "Pass a live node UUID. under lists nodes with child_of to that parent.",
+      );
+    }
+  }
+  if (query && isUuid(query)) {
+    const node = await getNodeById(pool, query);
+    if (!node || (input.type && node.type !== input.type) || (input.status && node.status !== input.status)) {
+      return { nodes: [], suggestion: SEARCH_MISS_SUGGESTION };
+    }
+    if (since && Date.parse(node.updated_at) < since.getTime()) {
+      return { nodes: [], suggestion: SEARCH_MISS_SUGGESTION };
+    }
+    if (input.origin) {
+      const origin = originFromData(node.data);
+      if (
+        isToolError(origin) ||
+        !origin ||
+        origin.system !== input.origin.system ||
+        origin.id !== input.origin.id
+      ) {
+        return { nodes: [], suggestion: ORIGIN_MISS_SUGGESTION };
+      }
+    }
+    if (input.under && !(await isChildOfParent(pool, node.id, input.under))) {
       return { nodes: [], suggestion: SEARCH_MISS_SUGGESTION };
     }
     return {
@@ -944,12 +1049,26 @@ export async function searchGraphNodes(
     };
   }
   const nodes = await searchNodes(pool, {
-    query: input.query,
+    query,
     type: input.type,
+    status: input.status,
+    under: input.under,
+    since,
+    originSystem: input.origin?.system,
+    originId: input.origin?.id,
     limit: input.limit,
   });
   if (nodes.length === 0) {
-    return { nodes: [], suggestion: SEARCH_MISS_SUGGESTION };
+    if (query) {
+      return { nodes: [], suggestion: SEARCH_MISS_SUGGESTION };
+    }
+    if (input.origin) {
+      return { nodes: [], suggestion: ORIGIN_MISS_SUGGESTION };
+    }
+    return { nodes: [] };
+  }
+  if (input.origin) {
+    return { nodes, suggestion: ORIGIN_HIT_SUGGESTION };
   }
   return { nodes };
 }
