@@ -13,6 +13,7 @@ Do not commit personal life data, documents, or secrets to this repository. Thos
 ## Docs
 
 - [`docs/SPEC.md`](docs/SPEC.md) — product contract
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — living vault and graph
 - [`docs/MCP_TOOLS.md`](docs/MCP_TOOLS.md) — 12-tool MCP surface
 - [`docs/AGENTS.md`](docs/AGENTS.md) — Seldon (architect), Chief (writer), Librarian (from day one)
 - [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md) — weekday instance checkup (Librarian)

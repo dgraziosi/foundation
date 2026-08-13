@@ -77,4 +77,4 @@ Names are locked. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md).
 
 ## Merge bar
 
-Typecheck and tests pass. Destructive MCP tools stay behind `confirm: true`. Cloud agents must not put vault contents, `FOUNDATION_DATA` files, or graph dumps in pull requests.
+Typecheck and tests pass. Destructive MCP tools stay behind `confirm: true`. Cloud agents must not put vault contents, `FOUNDATION_DATA` files, or graph dumps in pull requests. When a slice changes the graph or vault shape, update [`ARCHITECTURE.md`](./ARCHITECTURE.md) in the same PR — **ARCHITECTURE.md still true.**
