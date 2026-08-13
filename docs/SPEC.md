@@ -98,9 +98,12 @@ Agents can add types and relations over time.
 - [ ] Activity log shows those mutations
 - [ ] README explains install for another Grok Bot user in < 15 minutes of reading
 
+## Decisions
+
+- **License: MIT** (Copyright 2026 Danny Graziosi) — see `/LICENSE`
+
 ## Open decisions
 
 - Exact slim MCP tool names
 - Whether v1 includes embeddings/hybrid search or text search only
-- License (TBD)
 - Optional viewer: defer until API is stable
