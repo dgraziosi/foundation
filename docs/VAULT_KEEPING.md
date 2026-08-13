@@ -1,28 +1,37 @@
 # Vault-keeping
 
-Periodic health of **this Foundation instance** and **the graph**. Not a product, not a store, not an MCP tool.
+The periodic health checkup for a running Foundation instance and its graph. Not the database. Not an MCP tool.
 
-Asimov mapping: this is Seldon’s Vault / the Time Vault — a scheduled opening that reports whether the plan (the box, Compose, the graph) is still intact. It is **not** Momentum’s “vault” product name. It is **not** Postgres, `$FOUNDATION_DATA`, or the encyclopedia (the graph of nodes / edges / blobs). Those are the store. Vault-keeping *looks at* them.
+## Glossary
 
-Operators: after `docker compose up`, stand up the routine from [`AGENTS.md`](./AGENTS.md). Pasteable text: [`prompts/vault-keeper.md`](../prompts/vault-keeper.md).
+- **Foundation** — the product (repo, Docker, MCP). What you clone. Do not rename the GitHub repo or the MCP server `foundation`.
+- **Graph** — the data (people, companies, projects, decisions, places, blobs). Daily word. Encyclopedia Galactica is the Asimov analog, not the everyday name.
+- **Vault-keeping** — this checkup (Seldon’s Time Vault analog). Not the database. Do not call the graph “the Vault” (collides with Momentum and with the Time Vault).
+- **Blob** — a file on a graph node.
+- **Seldon** — architect of Foundation the product.
+- **Chief / writer** — human dumps ideas; this agent writes the graph.
+- **Librarian** — later job title only. Start vault-keeping as a routine, not a third agent.
+
+Stand-up: [`AGENTS.md`](./AGENTS.md). Paste: [`prompts/vault-keeper.md`](../prompts/vault-keeper.md).
 
 ## What it is
 
-A **quiet agent routine** (weekdays, morning local). It uses HTTP + the existing MCP tools the same way a careful operator would. When everything is fine, it stays silent. It pings the operator **only on failure**.
+A **quiet agent routine** (weekdays, morning local). It uses HTTP and the existing MCP tools the same way a careful operator would. When everything is fine, it stays silent. It pings the operator **only on failure**.
 
-It emulates the *job* Momentum split across `get_vault_health`, `run_maintenance`, and dangling-link cleanup — as reasoning over the live box, not as new Foundation tools.
+It emulates the *job* Momentum split across `get_vault_health`, `run_maintenance`, and dangling-link cleanup — as reasoning on the box, not as new Foundation tools.
 
-[`REDESIGN.md`](./REDESIGN.md) forbids porting those as v1 MCP tools. Do not add `get_vault_health`, `run_maintenance`, `propose_reorganize`, `audit_links`, or `cleanup_dangling_links`.
+[`REDESIGN.md`](./REDESIGN.md) forbids those as v1 MCP tools. Do not add `get_vault_health`, `run_maintenance`, `propose_reorganize`, `audit_links`, or `cleanup_dangling_links`.
 
 ## What it is not
 
-- **Not the store.** `$FOUNDATION_DATA` and Postgres *are* Foundation’s data. Vault-keeping does not replace them, dual-write a markdown vault, or invent a second backup product.
+- **Not the database.** `$FOUNDATION_DATA` and Postgres hold the graph. Vault-keeping looks at them. It does not replace them, dual-write a markdown store, or invent a backup product.
+- **Not a name for the graph.** Do not call the graph “the Vault.”
 - **Not Momentum Vault.** Do not reuse that name for this repo, the MCP server (`foundation`), or packages.
-- **Not a third always-on agent** until the weekday check has become a real weekly job (duplicates, type soup, orphans). Start as a routine on the writer (or architect). See [`AGENTS.md`](./AGENTS.md).
-- **Not email.** No SMTP, no pager duty, no “daily digest.” Ping in the agent host (Grok Bot / Cursor) only when a check fails.
-- **Not a write-ACL.** Do not invent default-deny, per-tool allowlists, or a second auth layer. The API key is the gate.
-- **Not a mutation pass.** The quiet weekday run **does not** `upsert`, `delete`, `unlink`, `undo`, or `manage_type` unless the operator explicitly asked for a repair in that conversation. Report; don’t “fix” the encyclopedia unattended.
-- **Not a cloud-VM writer.** Cloud agents that cannot reach the box MCP (`http://127.0.0.1:8787/mcp`) must not write life data. Health-check the instance from a process that can actually hit that URL.
+- **Not a third agent.** Start as a routine on the writer (or Seldon, if that process can reach the box — usually it cannot). **Librarian** is a later job title, when this is a real weekly job. See [`AGENTS.md`](./AGENTS.md).
+- **Not email.** No SMTP, no digest. Ping in Grok Bot / Cursor only when a check fails.
+- **Not a write-ACL.** The API key is the gate. Do not invent default-deny.
+- **Not a mutation pass.** The quiet weekday run does not `upsert`, `delete`, `unlink`, `undo`, or `manage_type` unless the operator asked for a repair in that conversation. Report; don’t rewrite the graph unattended.
+- **Not a cloud-VM writer.** Cloud agents that cannot reach box MCP (`http://127.0.0.1:8787/mcp`) must not write graph data. Run this checkup from a process that can hit that URL.
 
 ## Quiet weekday checks
 
@@ -46,7 +55,7 @@ Fail if the request errors, status is not 200, `ok` is not true, `service` is no
 
 Read `.env` (or the operator’s configured path). Default is `./data`.
 
-**Not agent-data.** Fail if the path is inside an agent profile or memory directory (Cursor project agent dirs, Grok Bot profile/memory, anything named like `agent-data`). Foundation already documents this; the routine enforces it. Compose durable files belong under `FOUNDATION_DATA` only.
+**Not agent-data.** Fail if the path is inside an agent profile or memory directory (Cursor project agent dirs, Grok Bot profile/memory, anything named like `agent-data`). Durable files belong under `FOUNDATION_DATA` only.
 
 **Not an empty leftover cluster.** Fail if you are clearly looking at the wrong leftover, for example:
 
@@ -54,7 +63,7 @@ Read `.env` (or the operator’s configured path). Default is `./data`.
 - `$FOUNDATION_DATA/postgres` missing, empty, or with no `PG_VERSION` (not a Postgres cluster)
 - A second leftover Compose project / volume the operator did not mean (wrong cwd, wrong project name, bind mount that isn’t the `.env` path)
 
-A **first-day empty encyclopedia** (seed types/relations, zero user nodes) is **not** a failure. That is a new clone. Only treat “empty” as failure when the operator configured well-known nodes (check 3) or explicitly said this instance should already hold a graph.
+A **first-day empty graph** (seed types/relations, zero user nodes) is **not** a failure. That is a new clone. Only treat “empty” as failure when the operator configured well-known nodes (check 3) or explicitly said this instance should already hold a graph.
 
 ### 3. Well-known nodes (if configured)
 
@@ -69,7 +78,7 @@ Foundation does not ship a backup tool. If the operator named a backup path (for
 - The path exists and is readable
 - The newest artifact is newer than the operator’s stale threshold (default: 48 hours)
 
-If no backup path is configured, **skip**. Do not nag. Do not start dumping the database from the quiet routine.
+If no backup path is configured, **skip**. Do not nag. Do not dump the database from the quiet routine.
 
 ### Later (do not implement as MCP)
 
@@ -78,9 +87,9 @@ Mention only. Do **not** add tools for these in v1:
 - Duplicate titles
 - Nodes with zero edges
 - Type soup (authored types that fight the spine)
-- Dangling-link sweeps — `get` / `link` already ignore edges whose endpoints are deleted; a future librarian pass can look at orphans. Not `audit_links` / `cleanup_dangling_links` on the wire.
+- Dangling-link sweeps — `get` / `link` already ignore edges whose endpoints are deleted; a future pass can look at orphans. Not `audit_links` / `cleanup_dangling_links` on the wire.
 
-When those become a **weekly job** (someone actually does the work), then consider splitting a Librarian agent. Until then, they stay out of the weekday ping.
+When those become a **weekly job** (someone actually does the work), then the job title is Librarian. Until then, they stay out of the weekday ping.
 
 ## How to check (existing surface)
 
@@ -89,7 +98,7 @@ Intent only — tool JSON schemas change; call `bootstrap` and use what the serv
 | Check | Use |
 | --- | --- |
 | Process + db | `GET /health` |
-| Ontology still seeded | `bootstrap` or `inspect_ontology` (types/relations present). Seed-only is OK on day one. |
+| Types still seeded | `bootstrap` or `inspect_ontology`. Seed-only is OK on day one. |
 | Canary nodes | `get` / `search` |
 | Recent writes (optional context, not a fail) | `list_activity` with a `since` window |
 | Data dir | Host filesystem + `.env` `FOUNDATION_DATA` |
@@ -99,4 +108,4 @@ Auth for `/mcp`: `Authorization: ApiKey <FOUNDATION_API_KEY>` (Bearer equivalent
 
 ## Failure ping
 
-Say what failed, what you observed, and the smallest next look (restart Compose, fix `FOUNDATION_DATA`, restore from the operator’s backup). Do not email. Do not silently mutate. Do not open a PR about life data.
+Say what failed, what you observed, and the smallest next look (restart Compose, fix `FOUNDATION_DATA`, restore from the operator’s backup). Do not email. Do not silently mutate. Do not open a PR about graph data.

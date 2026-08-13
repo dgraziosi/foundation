@@ -90,7 +90,7 @@ Agents can add types and relations over time.
 - Docker Compose for local/box bring-up
 - Data and code under an isolated workspace path when running on Grok Bot computer — never write into agent profile/memory directories
 - Localhost MCP + API key auth for v1
-- Periodic instance + graph health is vault-keeping (Seldon’s Time Vault metaphor): an agent routine, not the store and not a product named Vault — [`docs/VAULT_KEEPING.md`](./VAULT_KEEPING.md), stand-up in [`docs/AGENTS.md`](./AGENTS.md)
+- Periodic instance + graph health is vault-keeping (Seldon’s Time Vault analog): an agent routine, not the database, and not a name for the graph — [`docs/VAULT_KEEPING.md`](./VAULT_KEEPING.md), stand-up in [`docs/AGENTS.md`](./AGENTS.md)
 
 ## Success criteria (first milestone)
 
