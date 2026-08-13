@@ -188,6 +188,31 @@ test(
         assert.equal(reparented.edge.relation_type, "child_of");
         assert.equal(reparented.edge.to_id, newArea.node.id);
 
+        const { rows: unlinks } = await pool.query<{
+          action: string;
+          target_kind: string;
+          target_id: string;
+          before: {
+            id: string;
+            from_id: string;
+            to_id: string;
+            relation_type: string;
+          };
+          after: unknown;
+        }>(
+          `SELECT action, target_kind, target_id, before, after
+           FROM activity
+           WHERE action = 'unlink' AND target_id = $1`,
+          [linked.edge.id],
+        );
+        assert.equal(unlinks.length, 1);
+        assert.equal(unlinks[0]?.target_kind, "edge");
+        assert.equal(unlinks[0]?.before.id, linked.edge.id);
+        assert.equal(unlinks[0]?.before.from_id, project.node.id);
+        assert.equal(unlinks[0]?.before.to_id, oldArea.node.id);
+        assert.equal(unlinks[0]?.before.relation_type, "child_of");
+        assert.equal(unlinks[0]?.after, null);
+
         const got = await getGraphNode(pool, project.node.id);
         assert.equal(isToolError(got), false);
         if (isToolError(got)) return;

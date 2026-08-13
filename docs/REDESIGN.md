@@ -320,7 +320,7 @@ activity
 
 Undo of undo is a new compensating row (`reversible = false`). Expired tokens refuse. Destructive MCP tools still require `confirm: true` *in addition to* the log.
 
-Soft-delete keeps incident edges so restore is `clear deleted_at`. `get` and `link` validation ignore edges whose endpoints are deleted. Inserting a new `child_of` drops a stale `child_of` to a deleted parent so the unique index matches the live graph.
+Soft-delete keeps incident edges so restore is `clear deleted_at`. `get` and `link` validation ignore edges whose endpoints are deleted. Inserting a new `child_of` drops a stale `child_of` to a deleted parent so the unique index matches the live graph, and writes an `unlink` activity row with a `before` snapshot of the dropped edge.
 
 ### 4.8 Search (v1 vs later)
 

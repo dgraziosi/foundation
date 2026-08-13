@@ -203,19 +203,26 @@ export async function insertEdge(
     relation_type: string;
     metadata?: Record<string, unknown>;
   },
-) {
+): Promise<{
+  edge: ReturnType<typeof mapEdge>;
+  droppedStaleChildOf: Array<ReturnType<typeof mapEdge>>;
+}> {
+  let droppedStaleChildOf: Array<ReturnType<typeof mapEdge>> = [];
   if (input.relation_type === "child_of") {
     // Soft-delete leaves edges in place for undo, but the unique child_of
     // index still counts a ghost parent. Drop it so a live child can reparent.
-    await db.query(
+    // Callers must write an unlink activity row for each returned snapshot.
+    const dropped = await db.query<EdgeRow>(
       `DELETE FROM edges e
        USING nodes parent
        WHERE e.from_id = $1
          AND e.relation_type = 'child_of'
          AND parent.id = e.to_id
-         AND parent.deleted_at IS NOT NULL`,
+         AND parent.deleted_at IS NOT NULL
+       RETURNING e.id, e.from_id, e.to_id, e.relation_type, e.metadata, e.created_at`,
       [input.from_id],
     );
+    droppedStaleChildOf = dropped.rows.map(mapEdge);
   }
   const { rows } = await db.query<EdgeRow>(
     `INSERT INTO edges (from_id, to_id, relation_type, metadata)
@@ -223,7 +230,7 @@ export async function insertEdge(
      RETURNING id, from_id, to_id, relation_type, metadata, created_at`,
     [input.from_id, input.to_id, input.relation_type, JSON.stringify(input.metadata ?? {})],
   );
-  return mapEdge(rows[0]!);
+  return { edge: mapEdge(rows[0]!), droppedStaleChildOf };
 }
 
 export async function deleteEdge(

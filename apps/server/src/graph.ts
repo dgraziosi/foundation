@@ -223,12 +223,21 @@ export async function linkGraphNodes(
       return toolError(result.error, result.suggestion);
     }
 
-    const edge = await insertEdge(client, {
+    const { edge, droppedStaleChildOf } = await insertEdge(client, {
       from_id: from.id,
       to_id: to.id,
       relation_type: result.relation_type,
       metadata: input.metadata ?? {},
     });
+    for (const dropped of droppedStaleChildOf) {
+      await insertActivity(client, {
+        action: "unlink",
+        target_kind: "edge",
+        target_id: dropped.id,
+        before: dropped,
+        after: null,
+      });
+    }
     const activity = await insertActivity(client, {
       action: "link",
       target_kind: "edge",

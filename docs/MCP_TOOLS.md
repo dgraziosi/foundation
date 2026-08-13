@@ -46,7 +46,7 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 
 - **In:** `{ id, confirm: true }`
 - **Out:** `{ ok, activity_id }` or `{ error, suggestion? }`
-- Soft-delete (`deleted_at`). `get` hides deleted nodes. Incident edges stay in place for undo; `get` and `link` validation ignore edges to deleted endpoints. Reparenting drops a stale `child_of` to a deleted parent so uniqueness matches the live graph.
+- Soft-delete (`deleted_at`). `get` hides deleted nodes. Incident edges stay in place for undo; `get` and `link` validation ignore edges to deleted endpoints. Reparenting drops a stale `child_of` to a deleted parent so uniqueness matches the live graph, and records an `unlink` activity row with a `before` snapshot of the dropped edge.
 
 ### `link`
 
