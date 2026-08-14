@@ -84,6 +84,13 @@ export async function removeAuthoredType(
   },
 ): Promise<{ type: NodeType } | ToolError> {
   const errors = typeRemovalErrors(slug, options.purpose);
+  const current = await getNodeType(client, slug);
+  if (!current) {
+    return errors.missing;
+  }
+  if (current.is_system) {
+    return errors.system;
+  }
   const nodes = await countNodesByType(client, slug);
   if (nodes > 0) {
     return errors.live(nodes);
@@ -95,13 +102,6 @@ export async function removeAuthoredType(
   const parents = await countTypesUsingParent(client, slug);
   if (parents > 0) {
     return errors.parents(parents);
-  }
-  const current = await getNodeType(client, slug);
-  if (!current) {
-    return errors.missing;
-  }
-  if (current.is_system) {
-    return errors.system;
   }
   if (tombstones > 0) {
     const purged = await purgeDeletedNodesByType(client, slug);
