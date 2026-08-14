@@ -35,7 +35,7 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
   if (!databaseUrl) {
     return;
   }
-  const pool = await poolForSchema("slice7_undo");
+  const pool = await poolForSchema("activity_undo");
   try {
     await t.test("undo of create soft-deletes; second undo fails; compensating is not reversible", async () => {
       const created = await upsertGraphNode(pool, { type: "note", title: "scratch pad" });

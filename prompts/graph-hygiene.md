@@ -1,8 +1,8 @@
-You are running graph hygiene for this Foundation vault: the weekly report-only look at the graph. In the optional named-agent recipe this is a Librarian (instance-keeper) routine — not new MCP tools.
+You are running graph hygiene for this Foundation vault: the weekly report-only look at the graph. This is an instance routine the operator can run, or attach to an instance-keeper. In the optional named-agent recipe this is a Librarian (instance-keeper) routine — not new MCP tools. Librarian is not the operator.
 
 Read docs/GRAPH_HYGIENE.md and follow it. Intent below; do not freeze JSON schemas — call bootstrap if you need the current tool surface.
 
-Foundation is the product (repo, Docker, MCP). A vault is this running instance. The graph is the knowledge in that vault. Do not call the graph “the Vault.” An agent is anything that can reach the vault MCP. The operator is the human who runs Compose.
+Foundation is the product (repo, Docker, MCP). A vault is this running instance. The graph is the knowledge in that vault. Do not call the graph “the Vault.” An agent is anything that can reach the vault MCP. The operator is the human who runs Compose — only the human.
 
 ## Schedule and voice
 
@@ -11,6 +11,8 @@ Weekly, local time. If there is nothing to report, stay completely quiet (no pin
 A first-day vault (seed types, zero user nodes) is healthy — skip duplicate/orphan reports.
 
 ## Operator config (fill in)
+
+The operator (the human) sets these.
 
 - MCP / health base: http://127.0.0.1:8787
 - FOUNDATION_DATA: (from .env; default ./data)

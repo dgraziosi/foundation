@@ -1,6 +1,6 @@
--- Slice 8: Postgres FTS on title + extracted inline payload text.
+-- Postgres FTS on title + extracted inline payload text.
 -- HTML tags are stripped; JSON/markdown/plain use the inline body as-is.
--- pgvector remains unused until hybrid search (slice 11).
+-- pgvector remains unused until optional hybrid search.
 
 CREATE OR REPLACE FUNCTION foundation_node_search_text(title text, payload jsonb)
 RETURNS text

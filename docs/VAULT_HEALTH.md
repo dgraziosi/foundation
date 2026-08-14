@@ -11,15 +11,15 @@ Short analog: app / folder / links → Foundation / vault / graph.
 - **graph** — the knowledge in that vault
 - **blob** — a file on a node
 - **agent** — anything that can reach the vault MCP
-- **operator** — the human who runs Compose
+- **operator** — the human who runs Compose. Only the human, not an agent.
 
 Do not call the graph “the Vault.”
 
-Optional named agents: see [`AGENTS.md`](./AGENTS.md). Paste: [`prompts/vault-health.md`](../prompts/vault-health.md).
+The operator can run this checkup, or attach it to an instance-keeper agent ([`AGENTS.md`](./AGENTS.md)). Paste: [`prompts/vault-health.md`](../prompts/vault-health.md).
 
 ## What it is
 
-A **quiet operator routine** (weekdays, morning local). Instance ops: process + db, the data dir is the real vault, optional canaries, optional backup freshness. It uses HTTP, the host filesystem, and existing MCP tools the same way a careful operator would. When everything is fine, it stays silent. It pings the operator **only on failure**.
+A **quiet instance routine** (weekdays, morning local). Instance ops: process + db, the data dir is the real vault, optional canaries, optional backup freshness. It uses HTTP, the host filesystem, and existing MCP tools the same way a careful operator would. When everything is fine, it stays silent. It pings the operator **only on failure**.
 
 Do not add `get_vault_health`, `run_maintenance`, `propose_reorganize`, `audit_links`, or `cleanup_dangling_links`. Those jobs are this routine and [graph hygiene](./GRAPH_HYGIENE.md), not MCP tools.
 
