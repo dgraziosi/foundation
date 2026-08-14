@@ -90,6 +90,13 @@ test(
            AND column_name = 'idempotency_key'`,
       );
       assert.equal(casCols[0]?.column_name, "idempotency_key");
+      const { rows: tsDefault } = await pool.query<{ column_default: string }>(
+        `SELECT column_default FROM information_schema.columns
+         WHERE table_schema = current_schema() AND table_name = 'nodes'
+           AND column_name = 'updated_at'`,
+      );
+      assert.match(tsDefault[0]?.column_default ?? "", /date_trunc/);
+      assert.match(tsDefault[0]?.column_default ?? "", /milliseconds/);
       const { rows: originIdx } = await pool.query<{ indexname: string }>(
         `SELECT indexname FROM pg_indexes
          WHERE schemaname = current_schema() AND indexname = 'nodes_origin_live_uidx'`,

@@ -385,6 +385,111 @@ test(
         );
       });
 
+      await t.test("manage_type retires an empty authored type and refuses unsafe retire", async () => {
+        const created = await manageType(pool, {
+          action: "create",
+          slug: "waypoint_retire",
+          kind: "artifact",
+        });
+        assert.equal(isToolError(created), false);
+        if (isToolError(created)) return;
+
+        const noConfirm = await manageType(pool, {
+          action: "retire",
+          slug: "waypoint_retire",
+        });
+        assert.equal(isToolError(noConfirm), true);
+        if (!isToolError(noConfirm)) return;
+        assert.match(noConfirm.error, /confirm: true/);
+
+        const system = await manageType(pool, {
+          action: "retire",
+          slug: "area",
+          confirm: true,
+        });
+        assert.equal(isToolError(system), true);
+        if (!isToolError(system)) return;
+        assert.match(system.error, /system type "area"/);
+
+        const retired = await manageType(pool, {
+          action: "retire",
+          slug: "waypoint_retire",
+          confirm: true,
+        });
+        assert.equal(isToolError(retired), false);
+        if (isToolError(retired)) return;
+        assert.equal(retired.type.slug, "waypoint_retire");
+
+        const ontology = await inspectOntology(pool, "types");
+        assert.equal(
+          ontology.types.some((type) => type.slug === "waypoint_retire"),
+          false,
+        );
+
+        const liveType = await manageType(pool, {
+          action: "create",
+          slug: "waypoint_live",
+          kind: "artifact",
+        });
+        assert.equal(isToolError(liveType), false);
+        if (isToolError(liveType)) return;
+        const liveNode = await upsertGraphNode(pool, {
+          type: "waypoint_live",
+          title: "Synthetic live type node",
+        });
+        assert.equal(isToolError(liveNode), false);
+        if (isToolError(liveNode)) return;
+
+        const blockedLive = await manageType(pool, {
+          action: "retire",
+          slug: "waypoint_live",
+          confirm: true,
+        });
+        assert.equal(isToolError(blockedLive), true);
+        if (!isToolError(blockedLive)) return;
+        assert.match(blockedLive.error, /still use it/);
+        assert.match(blockedLive.suggestion ?? "", /Delete or retype/);
+
+        const tombType = await manageType(pool, {
+          action: "create",
+          slug: "waypoint_tomb",
+          kind: "artifact",
+        });
+        assert.equal(isToolError(tombType), false);
+        if (isToolError(tombType)) return;
+        const tombNode = await upsertGraphNode(pool, {
+          type: "waypoint_tomb",
+          title: "Synthetic retired tombstone",
+        });
+        assert.equal(isToolError(tombNode), false);
+        if (isToolError(tombNode)) return;
+        const deleted = await deleteGraphNode(pool, { id: tombNode.node.id, confirm: true });
+        assert.equal(isToolError(deleted), false);
+
+        const blockedTomb = await manageType(pool, {
+          action: "retire",
+          slug: "waypoint_tomb",
+          confirm: true,
+        });
+        assert.equal(isToolError(blockedTomb), true);
+        if (!isToolError(blockedTomb)) return;
+        assert.match(blockedTomb.error, /deleted node/);
+        assert.match(blockedTomb.suggestion ?? "", /purge_deleted: true/);
+
+        const purged = await manageType(pool, {
+          action: "retire",
+          slug: "waypoint_tomb",
+          confirm: true,
+          purge_deleted: true,
+        });
+        assert.equal(isToolError(purged), false);
+        const afterPurge = await inspectOntology(pool, "types");
+        assert.equal(
+          afterPurge.types.some((type) => type.slug === "waypoint_tomb"),
+          false,
+        );
+      });
+
       await t.test("manage_relation creates an associative verb immediately", async () => {
         const created = await manageRelation(pool, {
           action: "create",

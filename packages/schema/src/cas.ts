@@ -18,6 +18,7 @@ export function parseTimestampMs(value: string): number | null {
   return Number.isNaN(ms) ? null : ms;
 }
 
+/** Millisecond equality — SQL if-match must use date_trunc('milliseconds'), not epoch-ms bigint. */
 export function timestampsEqual(left: string, right: string): boolean {
   const a = parseTimestampMs(left);
   const b = parseTimestampMs(right);

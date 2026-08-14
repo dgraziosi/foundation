@@ -139,7 +139,7 @@ A blob is a file on a node, stored at `$FOUNDATION_DATA/blobs/<uuid>`. `get` ret
 
 Writes go through the graph and leave **activity**. `undo` reverses a reversible row. This is lost-update protection and a receipt, not an ACL.
 
-- **Compare-and-swap:** update and `link` are if-match. Pass `base_updated_at` (or endpoint timestamps) from `get`. If the node moved, the vault refuses. The caller’s next move is get and retry.
+- **Compare-and-swap:** update and `link` are if-match. Pass `base_updated_at` (or endpoint timestamps) from `get`. Compared at millisecond precision so a never-updated node (including rows that still store leftover microseconds from `now()`) can be written when the caller passes `updated_at` from `get`. If the node moved, the vault refuses with stale (get and retry) — a CAS miss is never “node not found.”
 - **data merge:** update patches `data` (`JSONB ||`). A partial patch does not wipe other keys.
 - **Create idempotency:** `idempotency_key` on create. A retry returns the same node; it does not twin.
 - Optional `actor` / `actor_label` are stored on the activity row (who wrote), not a permission gate.
