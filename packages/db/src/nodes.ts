@@ -237,13 +237,17 @@ export async function searchNodes(
     since?: Date;
     originSystem?: string;
     originId?: string;
+    dueOnOrAfter?: string;
+    dueOnOrBefore?: string;
+    dueBefore?: string;
+    dueExact?: string;
     limit?: number;
   },
 ): Promise<SearchHit[]> {
   const limit = input.limit ?? 20;
   const query = input.query?.trim() ? input.query.trim() : null;
   const { rows } = await db.query<
-    Pick<NodeRow, "id" | "type" | "title" | "status"> & { snippet: string }
+    Pick<NodeRow, "id" | "type" | "title" | "status"> & { snippet: string; due: string | null }
   >(
     `WITH q AS (
        SELECT CASE
@@ -252,6 +256,7 @@ export async function searchNodes(
        END AS tsq
      )
      SELECT id, type, title, status,
+            NULLIF(data #>> '{due}', '') AS due,
             CASE
               WHEN q.tsq IS NULL THEN title
               ELSE ts_headline(
@@ -279,11 +284,15 @@ export async function searchNodes(
        )
        AND ($6::text IS NULL OR data #>> '{origin,system}' = $6)
        AND ($7::text IS NULL OR data #>> '{origin,id}' = $7)
+       AND ($8::text IS NULL OR (data #>> '{due}') >= $8)
+       AND ($9::text IS NULL OR (data #>> '{due}') <= $9)
+       AND ($10::text IS NULL OR (data #>> '{due}') < $10)
+       AND ($11::text IS NULL OR (data #>> '{due}') = $11)
        AND (q.tsq IS NULL OR search_tsv @@ q.tsq)
      ORDER BY
        CASE WHEN q.tsq IS NULL THEN 0 ELSE ts_rank_cd(search_tsv, q.tsq) END DESC,
        updated_at DESC
-     LIMIT $8`,
+     LIMIT $12`,
     [
       query,
       input.type ?? null,
@@ -292,6 +301,10 @@ export async function searchNodes(
       input.under ?? null,
       input.originSystem ?? null,
       input.originId ?? null,
+      input.dueOnOrAfter ?? null,
+      input.dueOnOrBefore ?? null,
+      input.dueBefore ?? null,
+      input.dueExact ?? null,
       limit,
     ],
   );
@@ -301,6 +314,7 @@ export async function searchNodes(
     title: row.title,
     status: row.status,
     snippet: row.snippet ?? "",
+    ...(row.due ? { due: row.due } : {}),
   }));
 }
 

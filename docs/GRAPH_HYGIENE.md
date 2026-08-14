@@ -33,7 +33,7 @@ A first-day vault (seed types, zero user nodes) is **healthy**. Zero user nodes 
 
 ## Weekly checks (report only)
 
-Intent only — call `bootstrap` if you need the current tool surface. Prefer MCP. A read-only SQL look via `docker compose exec` on the host running Compose is allowed when MCP cannot enumerate the whole graph (there is no `list_nodes` tool). Do not add one. `search` can list by `type` / `status` / `under` without a query (limit 100); that is a sample, not a full dump.
+Intent only — call `bootstrap` if you need the current tool surface. Prefer MCP. A read-only SQL look via `docker compose exec` on the host running Compose is allowed when MCP cannot enumerate the whole graph (there is no `list_nodes` tool). Do not add one. `search` can list by `type` / `status` / `under` / `due` without a query (limit 100); that is a sample, not a full dump.
 
 ### 1. Duplicate titles
 

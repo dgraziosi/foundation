@@ -1,3 +1,4 @@
+import { DUE_DATA_JSON_SCHEMA } from "./due.js";
 import type { NodeType, RelationType } from "./types.js";
 
 /** area → project → goal → habit | task */
@@ -37,10 +38,11 @@ export const SEED_NODE_TYPES: readonly NodeType[] = [
   {
     slug: "goal",
     label: "Goal",
-    description: "An outcome a project is aiming at.",
+    description:
+      "An outcome a project is aiming at. Optional data.due is an ISO date (YYYY-MM-DD).",
     kind: "spine",
     parent_types: ["project"],
-    json_schema: null,
+    json_schema: DUE_DATA_JSON_SCHEMA,
     is_system: true,
   },
   {
@@ -56,10 +58,10 @@ export const SEED_NODE_TYPES: readonly NodeType[] = [
   {
     slug: "task",
     label: "Task",
-    description: "A discrete action under a goal.",
+    description: "A discrete action under a goal. Optional data.due is an ISO date (YYYY-MM-DD).",
     kind: "spine",
     parent_types: ["goal"],
-    json_schema: null,
+    json_schema: DUE_DATA_JSON_SCHEMA,
     is_system: true,
   },
   {

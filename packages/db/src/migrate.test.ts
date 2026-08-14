@@ -95,6 +95,24 @@ test(
          WHERE schemaname = current_schema() AND indexname = 'nodes_origin_live_uidx'`,
       );
       assert.equal(originIdx[0]?.indexname, "nodes_origin_live_uidx");
+      const { rows: dueIdx } = await pool.query<{ indexname: string }>(
+        `SELECT indexname FROM pg_indexes
+         WHERE schemaname = current_schema() AND indexname = 'nodes_due_idx'`,
+      );
+      assert.equal(dueIdx[0]?.indexname, "nodes_due_idx");
+      const { rows: dueCol } = await pool.query<{ column_name: string }>(
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_schema = current_schema() AND table_name = 'nodes' AND column_name = 'due'`,
+      );
+      assert.deepEqual(dueCol, []);
+      const taskSchema = types.find((type) => type.slug === "task")?.json_schema as {
+        properties?: { due?: unknown };
+      } | null;
+      const goalSchema = types.find((type) => type.slug === "goal")?.json_schema as {
+        properties?: { due?: unknown };
+      } | null;
+      assert.ok(taskSchema?.properties?.due);
+      assert.ok(goalSchema?.properties?.due);
       assert.ok(typeSlugs.includes("company"));
       assert.ok(typeSlugs.includes("decision"));
     } finally {
