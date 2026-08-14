@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { BLOB_BASE64_MAX_CHARS } from "./blobs.js";
+import { isIsoDate } from "./due.js";
 import {
   ActivityActionSchema,
   ActivityActorSchema,
@@ -229,8 +230,14 @@ export const ManageRelationSuccessSchema = z.object({
   activity_id: z.string().uuid(),
 });
 
+export const IsoDateSchema = z.string().refine(isIsoDate, {
+  message: "must be an ISO date YYYY-MM-DD",
+});
+
+export const SearchDueKindSchema = z.enum(["overdue", "today"]);
+
 export const SearchInputSchema = z.object({
-  /** Lexical query. Optional when type, status, under, since, or origin is set. */
+  /** Lexical query. Optional when a filter is set. */
   query: z.string().optional(),
   type: z.string().min(1).optional(),
   status: NodeStatusSchema.optional(),
@@ -240,6 +247,12 @@ export const SearchInputSchema = z.object({
   since: z.string().min(1).optional(),
   /** Unique origin ref lookup (gmail | calendar | drive | github). */
   origin: OriginRefSchema.optional(),
+  /** Due before today, or due today, in America/New_York. */
+  due: SearchDueKindSchema.optional(),
+  /** Inclusive ISO date YYYY-MM-DD on data.due. */
+  due_on_or_before: IsoDateSchema.optional(),
+  /** Inclusive ISO date YYYY-MM-DD on data.due. */
+  due_on_or_after: IsoDateSchema.optional(),
   limit: z.number().int().min(1).max(100).optional(),
 });
 export type SearchInput = z.infer<typeof SearchInputSchema>;
@@ -250,6 +263,8 @@ export const SearchHitSchema = z.object({
   title: z.string().min(1),
   status: NodeStatusSchema,
   snippet: z.string(),
+  /** data.due when present (YYYY-MM-DD). */
+  due: z.string().optional(),
 });
 export type SearchHit = z.infer<typeof SearchHitSchema>;
 
@@ -261,7 +276,31 @@ export const SEARCH_UUID_SUGGESTION =
   "This query is a node UUID. Prefer get when you already have an id.";
 
 export const SEARCH_NO_SELECTOR_SUGGESTION =
-  "Pass query for lexical recall, or type, status, under (child_of parent UUID), since, or origin to list without a word. Do not add list_nodes.";
+  "Pass query for lexical recall, or type, status, under (child_of parent UUID), since, origin, due (overdue|today), due_on_or_before, or due_on_or_after to list without a word. Do not add list_nodes.";
+
+export function searchHasSelector(input: {
+  query?: string;
+  type?: string;
+  status?: string;
+  under?: string;
+  since?: string;
+  origin?: unknown;
+  due?: string;
+  due_on_or_before?: string;
+  due_on_or_after?: string;
+}): boolean {
+  return Boolean(
+    input.query?.trim() ||
+      input.type ||
+      input.status ||
+      input.under ||
+      input.since ||
+      input.origin ||
+      input.due ||
+      input.due_on_or_before ||
+      input.due_on_or_after,
+  );
+}
 
 export const ORIGIN_MISS_SUGGESTION =
   "No live node has that origin. You may upsert with data.origin.system and data.origin.id. Foundation stores the ref only — do not fetch or mirror Gmail, Calendar, Drive, or GitHub bodies.";

@@ -7,7 +7,8 @@ import { defineTool } from "./define-tool.js";
 export function registerSearchTool(server: McpServer, pool: Pool): void {
   defineTool(server, {
     name: "search",
-    description: "Find nodes by text query and optional filters (type, status, under, since, origin). Query is optional when a filter is set. If you already have a UUID, call get.",
+    description:
+      "Find nodes by text query and optional filters (type, status, under, since, origin, due overdue|today, due_on_or_before, due_on_or_after). Query is optional when a filter is set. Hits include data.due when present. If you already have a UUID, call get.",
     input: SearchInputSchema.shape,
     output: SearchSuccessSchema,
     handler: async (input) => searchGraphNodes(pool, input),

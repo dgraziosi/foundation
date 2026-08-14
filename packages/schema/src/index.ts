@@ -76,6 +76,7 @@ export {
   SearchHitSchema,
   SearchInputSchema,
   SearchSuccessSchema,
+  searchHasSelector,
   SlugSchema,
   ToolErrorSchema,
   UndoInputSchema,
@@ -109,6 +110,21 @@ export {
   canonicalizeOriginInData,
 } from "./origin.js";
 export { validateDataAgainstJsonSchema } from "./json-schema.js";
+export {
+  DUE_DATA_JSON_SCHEMA,
+  DUE_DATE_SUGGESTION,
+  DUE_TIMEZONE,
+  ISO_DATE_PATTERN,
+  canonicalizeDueInData,
+  dueFromData,
+  dueKeyIsInvalid,
+  hasDueSearchFilter,
+  isIsoDate,
+  matchesDueFilters,
+  todayInNewYork,
+  todayInTimeZone,
+  type DueSearchFilters,
+} from "./due.js";
 export {
   LOST_UPDATE_SUGGESTION,
   MISSING_BASE_SUGGESTION,

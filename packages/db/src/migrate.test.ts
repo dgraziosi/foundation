@@ -95,6 +95,44 @@ test(
          WHERE schemaname = current_schema() AND indexname = 'nodes_origin_live_uidx'`,
       );
       assert.equal(originIdx[0]?.indexname, "nodes_origin_live_uidx");
+      const { rows: dueIdx } = await pool.query<{ indexname: string }>(
+        `SELECT indexname FROM pg_indexes
+         WHERE schemaname = current_schema() AND indexname = 'nodes_due_idx'`,
+      );
+      assert.equal(dueIdx[0]?.indexname, "nodes_due_idx");
+      const { rows: dueFn } = await pool.query<{ proname: string }>(
+        `SELECT proname FROM pg_proc
+         WHERE proname = 'foundation_iso_date' AND pronamespace = current_schema()::regnamespace`,
+      );
+      assert.equal(dueFn[0]?.proname, "foundation_iso_date");
+      const { rows: dueSafe } = await pool.query<{ d: string | null }>(
+        `SELECT foundation_iso_date($1) AS d`,
+        ["2026-13-01"],
+      );
+      assert.equal(dueSafe[0]?.d, null);
+      const { rows: dueFeb } = await pool.query<{ d: string | null }>(
+        `SELECT foundation_iso_date($1) AS d`,
+        ["2026-02-31"],
+      );
+      assert.equal(dueFeb[0]?.d, null);
+      const { rows: dueOk } = await pool.query<{ d: string | null }>(
+        `SELECT foundation_iso_date($1) AS d`,
+        ["2026-08-27"],
+      );
+      assert.equal(dueOk[0]?.d, "2026-08-27");
+      const { rows: dueCol } = await pool.query<{ column_name: string }>(
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_schema = current_schema() AND table_name = 'nodes' AND column_name = 'due'`,
+      );
+      assert.deepEqual(dueCol, []);
+      const taskSchema = types.find((type) => type.slug === "task")?.json_schema as {
+        properties?: { due?: unknown };
+      } | null;
+      const goalSchema = types.find((type) => type.slug === "goal")?.json_schema as {
+        properties?: { due?: unknown };
+      } | null;
+      assert.ok(taskSchema?.properties?.due);
+      assert.ok(goalSchema?.properties?.due);
       assert.ok(typeSlugs.includes("company"));
       assert.ok(typeSlugs.includes("decision"));
     } finally {

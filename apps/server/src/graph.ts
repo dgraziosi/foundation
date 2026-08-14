@@ -56,11 +56,18 @@ import {
   SEARCH_UUID_SUGGESTION,
   ORIGIN_HIT_SUGGESTION,
   ORIGIN_MISS_SUGGESTION,
+  DUE_DATE_SUGGESTION,
   assertIfMatch,
   isToolError,
   originConflictError,
   originFromData,
   canonicalizeOriginInData,
+  canonicalizeDueInData,
+  dueFromData,
+  dueKeyIsInvalid,
+  matchesDueFilters,
+  searchHasSelector,
+  todayInNewYork,
   validateDataAgainstJsonSchema,
   type Activity,
   type Blob,
@@ -109,6 +116,9 @@ function validateUpsertData(type: NodeType, data: Record<string, unknown>): Tool
   const origin = originFromData(data);
   if (isToolError(origin)) {
     return origin;
+  }
+  if (dueKeyIsInvalid(data)) {
+    return toolError("data.due must be an ISO date YYYY-MM-DD", DUE_DATE_SUGGESTION);
   }
   return validateDataAgainstJsonSchema(data, type.json_schema, type.slug);
 }
@@ -414,7 +424,9 @@ export async function upsertGraphNode(
         }
       }
 
-      const nextData = canonicalizeOriginInData(mergedNodeData(existing, input.data));
+      const nextData = canonicalizeDueInData(
+        canonicalizeOriginInData(mergedNodeData(existing, input.data)),
+      );
       const dataErr = validateUpsertData(type, nextData);
       if (dataErr) {
         return dataErr;
@@ -982,9 +994,20 @@ export async function searchGraphNodes(
   input: SearchInput,
 ): Promise<{ nodes: SearchHit[]; suggestion?: string } | ToolError> {
   const query = input.query?.trim() ? input.query.trim() : undefined;
-  if (!query && !input.type && !input.status && !input.under && !input.since && !input.origin) {
+  if (!searchHasSelector(input)) {
     return toolError("search requires a query or a filter", SEARCH_NO_SELECTOR_SUGGESTION);
   }
+  if (
+    input.due_on_or_after &&
+    input.due_on_or_before &&
+    input.due_on_or_after > input.due_on_or_before
+  ) {
+    return toolError(
+      "due_on_or_after is after due_on_or_before",
+      "Pass a window where due_on_or_after is on or before due_on_or_before, e.g. 2026-08-01 and 2026-08-27.",
+    );
+  }
+  const today = todayInNewYork();
   if (input.type) {
     const type = await getNodeType(pool, input.type);
     if (!type) {
@@ -1036,6 +1059,10 @@ export async function searchGraphNodes(
     if (input.under && !(await isChildOfParent(pool, node.id, input.under))) {
       return { nodes: [], suggestion: SEARCH_MISS_SUGGESTION };
     }
+    const due = dueFromData(node.data);
+    if (!matchesDueFilters(due, input, today)) {
+      return { nodes: [], suggestion: SEARCH_MISS_SUGGESTION };
+    }
     return {
       nodes: [
         {
@@ -1044,6 +1071,7 @@ export async function searchGraphNodes(
           title: node.title,
           status: node.status,
           snippet: node.title,
+          ...(due ? { due } : {}),
         },
       ],
       suggestion: SEARCH_UUID_SUGGESTION,
@@ -1057,6 +1085,10 @@ export async function searchGraphNodes(
     since,
     originSystem: input.origin?.system,
     originId: input.origin?.id,
+    dueOnOrAfter: input.due_on_or_after,
+    dueOnOrBefore: input.due_on_or_before,
+    dueBefore: input.due === "overdue" ? today : undefined,
+    dueExact: input.due === "today" ? today : undefined,
     limit: input.limit,
   });
   if (nodes.length === 0) {

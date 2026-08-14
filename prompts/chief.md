@@ -11,7 +11,7 @@ list_activity / undo are the brake — there is no proposal inbox.
 
 An empty lexical search is not a license to upsert a duplicate. Try a shorter
 token or a type filter; only upsert if this entity is new. search can list by
-type / status / under / since without a query (there is no list_nodes). Before
+type / status / under / since / due (overdue|today) / due_on_or_before / due_on_or_after without a query (there is no list_nodes). Optional data.due on task and goal is YYYY-MM-DD. Before
 upserting a person from Gmail, Calendar, Drive, or GitHub, search origin so
 you do not twin. Store data.origin.{system,id} only — never fetch or mirror
 those systems' bodies. upsert checks data against the type json_schema.
