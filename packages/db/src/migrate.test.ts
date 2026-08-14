@@ -105,6 +105,21 @@ test(
          WHERE proname = 'foundation_iso_date' AND pronamespace = current_schema()::regnamespace`,
       );
       assert.equal(dueFn[0]?.proname, "foundation_iso_date");
+      const { rows: dueSafe } = await pool.query<{ d: string | null }>(
+        `SELECT foundation_iso_date($1) AS d`,
+        ["2026-13-01"],
+      );
+      assert.equal(dueSafe[0]?.d, null);
+      const { rows: dueFeb } = await pool.query<{ d: string | null }>(
+        `SELECT foundation_iso_date($1) AS d`,
+        ["2026-02-31"],
+      );
+      assert.equal(dueFeb[0]?.d, null);
+      const { rows: dueOk } = await pool.query<{ d: string | null }>(
+        `SELECT foundation_iso_date($1) AS d`,
+        ["2026-08-27"],
+      );
+      assert.equal(dueOk[0]?.d, "2026-08-27");
       const { rows: dueCol } = await pool.query<{ column_name: string }>(
         `SELECT column_name FROM information_schema.columns
          WHERE table_schema = current_schema() AND table_name = 'nodes' AND column_name = 'due'`,

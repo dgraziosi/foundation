@@ -1,18 +1,25 @@
 -- Optional data.due (YYYY-MM-DD) on task/goal. Filter in SQL against JSONB,
 -- same shape as data.origin — not a new nodes column.
--- Only real calendar dates match (2026-02-31 is not a due).
+-- Never throw: pre-existing junk (2026-13-01, 2026-02-31) must not fail
+-- migrate or search.
 
 CREATE OR REPLACE FUNCTION foundation_iso_date(value text)
 RETURNS text
-LANGUAGE sql
+LANGUAGE plpgsql
 IMMUTABLE
 AS $$
-  SELECT CASE
-    WHEN value ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
-     AND to_char(to_date(value, 'YYYY-MM-DD'), 'YYYY-MM-DD') = value
-    THEN value
-    ELSE NULL
-  END
+BEGIN
+  IF value IS NULL OR value !~ '^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$' THEN
+    RETURN NULL;
+  END IF;
+  IF to_char(to_date(value, 'YYYY-MM-DD'), 'YYYY-MM-DD') = value THEN
+    RETURN value;
+  END IF;
+  RETURN NULL;
+EXCEPTION
+  WHEN datetime_field_overflow OR invalid_datetime_format OR invalid_text_representation THEN
+    RETURN NULL;
+END;
 $$;
 
 CREATE INDEX nodes_due_idx

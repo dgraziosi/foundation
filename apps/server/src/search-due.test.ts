@@ -237,6 +237,24 @@ test(
         }
       });
 
+      await t.test("junk data.due does not 500 search", async () => {
+        await pool.query(
+          `INSERT INTO nodes (type, title, status, payload, data)
+           VALUES (
+             'note',
+             'Throwaway junk due note',
+             'active',
+             '{"media_type":"text/plain","storage":"inline","body":""}'::jsonb,
+             '{"due":"2026-13-01"}'::jsonb
+           )`,
+        );
+        const listed = await searchGraphNodes(pool, { type: "note", due: "overdue" });
+        assert.equal(isToolError(listed), false);
+        if (!isToolError(listed)) {
+          assert.ok(listed.nodes.every((node) => node.due !== "2026-13-01"));
+        }
+      });
+
       await t.test("inverted due window is an error; due alone is a selector", async () => {
         const inverted = await searchGraphNodes(pool, {
           due_on_or_after: "2026-08-27",
