@@ -59,7 +59,7 @@ flowchart LR
 A node has **type**, **title**, **status**, a **payload**, and **data**. Identity is UUID.
 
 - **Payload** is either **inline** (`text/markdown`, `text/html`, `application/json`, `text/plain`) or a **blob** (file on the node).
-- **data** is structured JSON. If the type has `json_schema`, upsert validates the merged object. `data.origin` is an optional pointer, not a mirrored body. `data.due` is an optional ISO date (`YYYY-MM-DD`) on `task` and `goal` (enforced by those types’ `json_schema` when present; omit it and the node still writes). Stored on the JSONB `data` object, not a separate column.
+- **data** is structured JSON. If the type has `json_schema`, upsert validates the merged object. `data.origin` is an optional pointer, not a mirrored body. `data.due` is an optional ISO date (`YYYY-MM-DD`) on `task` and `goal` (enforced when present; omit it and the node still writes; `due: null` clears). Stored on the JSONB `data` object, not a separate column.
 
 ```mermaid
 flowchart TB

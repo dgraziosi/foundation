@@ -30,8 +30,13 @@ test("seed node types parse and include spine plus artifacts", () => {
   assert.equal(slugs.includes("core_value"), false);
   const task = SEED_NODE_TYPES.find((type) => type.slug === "task");
   const goal = SEED_NODE_TYPES.find((type) => type.slug === "goal");
-  const dueSchema = task?.json_schema as { properties?: { due?: { pattern?: string } } } | null;
-  assert.equal(dueSchema?.properties?.due?.pattern, "^[0-9]{4}-[0-9]{2}-[0-9]{2}$");
+  const dueSchema = task?.json_schema as {
+    properties?: { due?: { anyOf?: Array<{ pattern?: string; type?: string }> } };
+  } | null;
+  assert.ok(
+    dueSchema?.properties?.due?.anyOf?.some((item) => item.pattern === "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"),
+  );
+  assert.ok(dueSchema?.properties?.due?.anyOf?.some((item) => item.type === "null"));
   assert.deepEqual(task?.json_schema, goal?.json_schema);
   assert.equal(SEED_NODE_TYPES.find((type) => type.slug === "note")?.json_schema, null);
 });

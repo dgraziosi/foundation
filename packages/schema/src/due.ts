@@ -13,9 +13,15 @@ export const DUE_DATA_JSON_SCHEMA = {
   additionalProperties: true,
   properties: {
     due: {
-      type: "string",
-      pattern: ISO_DATE_PATTERN,
-      description: "Optional due date as YYYY-MM-DD",
+      anyOf: [
+        {
+          type: "string",
+          pattern: ISO_DATE_PATTERN,
+          description: "ISO date YYYY-MM-DD (real calendar day)",
+        },
+        { type: "null" },
+      ],
+      description: "Optional due date as YYYY-MM-DD. Pass null to clear.",
     },
   },
 } as const;
@@ -60,6 +66,24 @@ export function dueFromData(data: Record<string, unknown>): string | undefined {
     return undefined;
   }
   return raw;
+}
+
+/** Drop `due: null` so a dated node can become undated. */
+export function canonicalizeDueInData(data: Record<string, unknown>): Record<string, unknown> {
+  if (!Object.prototype.hasOwnProperty.call(data, "due")) {
+    return data;
+  }
+  if (data.due === null || data.due === undefined) {
+    const next = { ...data };
+    delete next.due;
+    return next;
+  }
+  return data;
+}
+
+/** After canonicalize: a remaining `due` key must be a real YYYY-MM-DD. */
+export function dueKeyIsInvalid(data: Record<string, unknown>): boolean {
+  return Object.prototype.hasOwnProperty.call(data, "due") && dueFromData(data) === undefined;
 }
 
 export type DueSearchFilters = {

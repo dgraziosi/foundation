@@ -56,12 +56,15 @@ import {
   SEARCH_UUID_SUGGESTION,
   ORIGIN_HIT_SUGGESTION,
   ORIGIN_MISS_SUGGESTION,
+  DUE_DATE_SUGGESTION,
   assertIfMatch,
   isToolError,
   originConflictError,
   originFromData,
   canonicalizeOriginInData,
+  canonicalizeDueInData,
   dueFromData,
+  dueKeyIsInvalid,
   matchesDueFilters,
   searchHasSelector,
   todayInNewYork,
@@ -113,6 +116,9 @@ function validateUpsertData(type: NodeType, data: Record<string, unknown>): Tool
   const origin = originFromData(data);
   if (isToolError(origin)) {
     return origin;
+  }
+  if (dueKeyIsInvalid(data)) {
+    return toolError("data.due must be an ISO date YYYY-MM-DD", DUE_DATE_SUGGESTION);
   }
   return validateDataAgainstJsonSchema(data, type.json_schema, type.slug);
 }
@@ -418,7 +424,9 @@ export async function upsertGraphNode(
         }
       }
 
-      const nextData = canonicalizeOriginInData(mergedNodeData(existing, input.data));
+      const nextData = canonicalizeDueInData(
+        canonicalizeOriginInData(mergedNodeData(existing, input.data)),
+      );
       const dataErr = validateUpsertData(type, nextData);
       if (dataErr) {
         return dataErr;

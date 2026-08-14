@@ -100,6 +100,11 @@ test(
          WHERE schemaname = current_schema() AND indexname = 'nodes_due_idx'`,
       );
       assert.equal(dueIdx[0]?.indexname, "nodes_due_idx");
+      const { rows: dueFn } = await pool.query<{ proname: string }>(
+        `SELECT proname FROM pg_proc
+         WHERE proname = 'foundation_iso_date' AND pronamespace = current_schema()::regnamespace`,
+      );
+      assert.equal(dueFn[0]?.proname, "foundation_iso_date");
       const { rows: dueCol } = await pool.query<{ column_name: string }>(
         `SELECT column_name FROM information_schema.columns
          WHERE table_schema = current_schema() AND table_name = 'nodes' AND column_name = 'due'`,

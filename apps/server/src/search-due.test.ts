@@ -53,7 +53,7 @@ test(
       });
       assert.equal(isToolError(badStamp), true);
       if (isToolError(badStamp)) {
-        assert.match(badStamp.error, /does not match json_schema for type "task"/);
+        assert.match(badStamp.error, /data.due must be an ISO date|does not match json_schema/);
       }
 
       const badWords = await upsertGraphNode(pool, {
@@ -62,6 +62,16 @@ test(
         data: { due: "August 27" },
       });
       assert.equal(isToolError(badWords), true);
+
+      const feb31 = await upsertGraphNode(pool, {
+        type: "task",
+        title: "Throwaway impossible due",
+        data: { due: "2026-02-31" },
+      });
+      assert.equal(isToolError(feb31), true);
+      if (isToolError(feb31)) {
+        assert.match(feb31.error, /data.due must be an ISO date/);
+      }
 
       const today = todayInNewYork();
       const overdue = await upsertGraphNode(pool, {
@@ -87,15 +97,23 @@ test(
         title: "Throwaway future goal",
         data: { due: "2026-12-31" },
       });
+      const toClear = await upsertGraphNode(pool, {
+        type: "task",
+        title: "Throwaway clearable due",
+        status: "active",
+        data: { due: "2020-02-02" },
+      });
       assert.equal(isToolError(overdue), false);
       assert.equal(isToolError(dueToday), false);
       assert.equal(isToolError(windowTask), false);
       assert.equal(isToolError(futureGoal), false);
+      assert.equal(isToolError(toClear), false);
       if (
         isToolError(overdue) ||
         isToolError(dueToday) ||
         isToolError(windowTask) ||
-        isToolError(futureGoal)
+        isToolError(futureGoal) ||
+        isToolError(toClear)
       ) {
         return;
       }
@@ -187,6 +205,36 @@ test(
           return;
         }
         assert.ok(goals.nodes.some((node) => node.id === futureGoal.node.id));
+      });
+
+      await t.test("due: null clears a date so overdue no longer matches", async () => {
+        const cleared = await upsertGraphNode(pool, {
+          id: toClear.node.id,
+          type: "task",
+          title: toClear.node.title,
+          data: { due: null },
+          base_updated_at: toClear.node.updated_at,
+        });
+        assert.equal(isToolError(cleared), false);
+        if (isToolError(cleared)) {
+          return;
+        }
+        assert.equal(cleared.node.data.due, undefined);
+
+        const got = await getGraphNode(pool, toClear.node.id);
+        assert.equal(isToolError(got), false);
+        if (!isToolError(got)) {
+          assert.equal(got.node.data.due, undefined);
+        }
+
+        const late = await searchGraphNodes(pool, { type: "task", due: "overdue" });
+        assert.equal(isToolError(late), false);
+        if (!isToolError(late)) {
+          assert.equal(
+            late.nodes.some((node) => node.id === toClear.node.id),
+            false,
+          );
+        }
       });
 
       await t.test("inverted due window is an error; due alone is a selector", async () => {

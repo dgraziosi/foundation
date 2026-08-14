@@ -4,7 +4,9 @@ import { validateDataAgainstJsonSchema } from "./json-schema.js";
 import {
   DUE_DATA_JSON_SCHEMA,
   DUE_TIMEZONE,
+  canonicalizeDueInData,
   dueFromData,
+  dueKeyIsInvalid,
   isIsoDate,
   matchesDueFilters,
   todayInNewYork,
@@ -65,7 +67,7 @@ test("matchesDueFilters: overdue, today, and inclusive window", () => {
   );
 });
 
-test("json_schema: due is optional; invalid due misses", () => {
+test("json_schema: due is optional; null clears; invalid due misses", () => {
   assert.equal(validateDataAgainstJsonSchema({}, DUE_DATA_JSON_SCHEMA, "task"), null);
   assert.equal(
     validateDataAgainstJsonSchema({ title_note: "undated" }, DUE_DATA_JSON_SCHEMA, "task"),
@@ -75,6 +77,7 @@ test("json_schema: due is optional; invalid due misses", () => {
     validateDataAgainstJsonSchema({ due: "2026-08-27" }, DUE_DATA_JSON_SCHEMA, "goal"),
     null,
   );
+  assert.equal(validateDataAgainstJsonSchema({ due: null }, DUE_DATA_JSON_SCHEMA, "task"), null);
   const miss = validateDataAgainstJsonSchema(
     { due: "2026-08-27T00:00:00Z" },
     DUE_DATA_JSON_SCHEMA,
@@ -82,4 +85,12 @@ test("json_schema: due is optional; invalid due misses", () => {
   );
   assert.ok(miss);
   assert.match(miss.error, /does not match json_schema for type "task"/);
+});
+
+test("canonicalizeDueInData drops null due; dueKeyIsInvalid catches Feb 31", () => {
+  assert.deepEqual(canonicalizeDueInData({ due: null, other: 1 }), { other: 1 });
+  assert.deepEqual(canonicalizeDueInData({ due: "2026-08-27" }), { due: "2026-08-27" });
+  assert.equal(dueKeyIsInvalid({ due: "2026-02-31" }), true);
+  assert.equal(dueKeyIsInvalid({ due: "2026-08-27" }), false);
+  assert.equal(dueKeyIsInvalid({}), false);
 });
