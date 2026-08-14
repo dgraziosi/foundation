@@ -14,7 +14,7 @@ v1 surface is **12 tools**. Destructive tools require `confirm: true` or they re
 | `link` | Create a typed edge after validation. Requires `from_base_updated_at` and `to_base_updated_at`. |
 | `unlink` | Remove a typed edge. Requires `confirm: true`. |
 | `inspect_ontology` | List type and relation registry rows (system + authored). |
-| `manage_type` | Create or update a node type. Applies immediately. |
+| `manage_type` | Create, update, or retire a node type. Applies immediately. Retire requires `confirm: true`. |
 | `manage_relation` | Create or update a relation type. Applies immediately. |
 | `list_activity` | Read the activity log (filter by action, target, since). |
 | `undo` | Reverse a reversible activity row by id. Requires `confirm: true`. Type-create undo with leftover deleted nodes needs `purge_deleted: true`. |
@@ -49,7 +49,7 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
   3. `blob_id` — attach an already-ingested blob (sha256 dedup may reuse an existing row).
 - Stored payload is `{ storage: "blob", blob_id, media_type }`. Over cap → `{ error, suggestion }`.
 - Omit `id` to create. Pass `id` to update, or to create with a chosen UUID.
-- **Update if-match:** when `id` already exists, `base_updated_at` is required and must match the node's current `updated_at`. Mismatch or omit → `{ error, suggestion }` (call `get` and retry). This is lost-update protection, not a write-ACL.
+- **Update if-match:** when `id` already exists, `base_updated_at` is required and must match the node's current `updated_at` at millisecond precision (the instant `get` returns). Mismatch or omit → `{ error, suggestion }` (call `get` and retry). A CAS miss is stale, never “node not found.” This is lost-update protection, not a write-ACL.
 - **`data` merges** on update (`JSONB ||`, top-level keys). A partial `data` patch does not wipe other keys. Omit `data` to leave it unchanged.
 - **`json_schema`:** if the type has `json_schema`, upsert validates the **merged** `data` object against it. Miss → `{ error, suggestion }` (inspect_ontology, fix data or the type schema). Types with `json_schema: null` skip this check. Seed `task` and `goal` schemas accept optional `data.due` (`YYYY-MM-DD`); omit it and the node still writes.
 - **`data.due`:** optional ISO date on `task` and `goal`. Stored on the JSONB `data` object. Pass `due: null` to clear. `get` returns it on `node.data`; search hits also surface `due` so briefs do not have to open every node.
@@ -84,9 +84,10 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 
 ### `manage_type`
 
-- **In:** `{ action: "create"|"update", slug, label?, description?, kind?, parent_types?, json_schema?, actor?, actor_label? }`
+- **In:** `{ action: "create"|"update"|"retire", slug, label?, description?, kind?, parent_types?, json_schema?, confirm?, purge_deleted?, actor?, actor_label? }`
 - **Out:** `{ type, activity_id }` or `{ error, suggestion? }`
-- Applies immediately. System types: description only; system slugs cannot be deleted. Custom types may set `parent_types` so `child_of` placement works.
+- Applies immediately. System types: description only; system slugs cannot be retired. Custom types may set `parent_types` so `child_of` placement works.
+- **Retire:** `action: "retire"` with `confirm: true` drops an authored type that has **zero live nodes**. System seed types refuse. Live nodes refuse with `{ error, suggestion }` (delete or retype, then retry). Soft-deleted nodes of that type stay restorable — same family as undo-of-type-create: restore those deletes first, or pass `purge_deleted: true` (with `confirm: true`) to hard-delete the tombstones and their incident edges. Never a silent vault wipe. Undo of retire restores the registry row.
 
 ### `manage_relation`
 
@@ -128,8 +129,9 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 | unlink | re-insert edge from `before` |
 | type/relation create | delete registry row if unused; else refuse |
 | type/relation update | restore `before` row |
+| type retire | restore registry row from `before` |
 
-Live nodes of a type still block type-create undo. Soft-deleted nodes stay restorable via undo-of-delete while the type row exists. If only tombstones remain, undo returns `{ error, suggestion }`: restore those nodes first, or pass `purge_deleted: true` (with `confirm: true`) to hard-delete the tombstones and their incident edges, write unlink activity, and mark those prior delete rows non-reversible. Type-create undo never silently purges.
+Live nodes of a type still block type-create undo and `manage_type` retire. Soft-deleted nodes stay restorable via undo-of-delete while the type row exists. If only tombstones remain, undo (or retire) returns `{ error, suggestion }`: restore those nodes first, or pass `purge_deleted: true` (with `confirm: true`) to hard-delete the tombstones and their incident edges, write unlink activity, and mark those prior delete rows non-reversible. Type-create undo and type retire never silently purge.
 
 Undo tokens are single-use (`undone_at`; token cleared). Expired tokens refuse. Undo of undo is the compensating row (`reversible = false`).
 

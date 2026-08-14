@@ -5,6 +5,7 @@ import { assertIfMatch, timestampsEqual } from "./cas.js";
 test("timestampsEqual compares ISO instants at millisecond precision", () => {
   assert.equal(timestampsEqual("2026-08-13T12:00:00.123Z", "2026-08-13T12:00:00.123Z"), true);
   assert.equal(timestampsEqual("2026-08-13T12:00:00.123Z", "2026-08-13T12:00:00.123000Z"), true);
+  assert.equal(timestampsEqual("2026-08-13T04:04:36.861Z", "2026-08-13T04:04:36.861528Z"), true);
   assert.equal(timestampsEqual("2026-08-13T12:00:00.123Z", "2026-08-13T12:00:00.124Z"), false);
   assert.equal(timestampsEqual("not-a-date", "2026-08-13T12:00:00.123Z"), false);
   assert.equal(timestampsEqual("August 13, 2026", "2026-08-13T12:00:00.123Z"), false);

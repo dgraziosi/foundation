@@ -58,6 +58,7 @@ import {
   ORIGIN_MISS_SUGGESTION,
   DUE_DATE_SUGGESTION,
   assertIfMatch,
+  LOST_UPDATE_SUGGESTION,
   isToolError,
   originConflictError,
   originFromData,
@@ -88,6 +89,7 @@ import {
   type UpsertPayload,
 } from "@foundation/schema";
 import { randomUUID } from "node:crypto";
+import { removeAuthoredType } from "./retire-type.js";
 import { undoGraphActivity } from "./undo.js";
 
 export { undoGraphActivity };
@@ -453,12 +455,23 @@ export async function upsertGraphNode(
             base_updated_at: input.base_updated_at,
           });
           if (!node) {
-            const current = await getNodeById(client, input.id!);
+            const current = await getNodeById(client, input.id!, { includeDeleted: true });
             if (!current) {
-              return toolError(`Node not found: ${input.id}`);
+              return toolError(
+                `Node not found: ${input.id}`,
+                "If you already have a UUID, call get. Search is for lexical recall, not a substitute for get. Deleted nodes are hidden until restored via undo.",
+              );
             }
-            return assertIfMatch("base_updated_at", input.base_updated_at, current.updated_at) ??
-              toolError(`Node not found: ${input.id}`);
+            if (current.deleted_at) {
+              return toolError(
+                `Node ${input.id} is deleted`,
+                "Restore via undo. Use a new id to create another node.",
+              );
+            }
+            return toolError(
+              "base_updated_at does not match current updated_at",
+              LOST_UPDATE_SUGGESTION,
+            );
           }
           const activity = await insertActivity(client, {
             ...writer,
@@ -761,6 +774,33 @@ export async function manageType(
       "Use action: \"create\" to add it. Call inspect_ontology for current slugs.",
     );
   }
+
+  if (input.action === "retire") {
+    const confirmErr = missingConfirm("manage_type retire", input.confirm);
+    if (confirmErr) {
+      return confirmErr;
+    }
+    return withTransaction(pool, async (client) => {
+      const removed = await removeAuthoredType(client, input.slug, {
+        purgeDeleted: input.purge_deleted === true,
+        writer,
+        purpose: "retire",
+      });
+      if ("error" in removed) {
+        return removed;
+      }
+      const activity = await insertActivity(client, {
+        ...writer,
+        action: "type_change",
+        target_kind: "type",
+        target_id: removed.type.slug,
+        before: removed.type,
+        after: null,
+      });
+      return { type: removed.type, activity_id: activity.id };
+    });
+  }
+
   const locked = assertSystemTypePatch(existing, {
     label: input.label,
     kind: input.kind,

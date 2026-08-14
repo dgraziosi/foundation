@@ -48,9 +48,10 @@ Names are locked. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md).
 
 `bootstrap`, `search`, `get`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`.
 
-- Destructive tools (`delete`, `unlink`, `undo`) require `confirm: true`
+- Destructive tools (`delete`, `unlink`, `undo`, `manage_type` retire) require `confirm: true`
 - Identity is UUID. If you already have a UUID, call `get` — do not `search`
-- Updates (`upsert` with an existing id, `link`) are if-match: pass `base_updated_at` / endpoint timestamps from `get`. Mismatch → `{ error, suggestion }` (get and retry). Not a write-ACL.
+- Updates (`upsert` with an existing id, `link`) are if-match: pass `base_updated_at` / endpoint timestamps from `get`. Compared at millisecond precision (same instant `get` returns). Mismatch → `{ error, suggestion }` (get and retry), never “node not found.” Not a write-ACL.
+- `manage_type` can retire an unused authored type (`action: "retire"`, `confirm: true`). System seed types cannot be retired. Live nodes of that type refuse; leftover soft-deleted nodes follow type-create undo (`purge_deleted: true` or restore those deletes first).
 - `upsert` **merges** `data` on update (partial patch does not wipe other keys). Create accepts `idempotency_key` so a retry does not twin a node. When a type has `json_schema`, upsert validates merged `data` and returns `{ error, suggestion }` on a miss.
 - Activity stores optional `actor` / `actor_label` (who wrote). Not a permission gate.
 - `search` is Postgres FTS (title + `data` + extracted inline payload text; Latin accents folded). `query` is optional when `type`, `status`, `under` (child_of parent), `since`, `origin`, `due` (`overdue` | `today` in America/New_York), `due_on_or_before`, or `due_on_or_after` is set, so agents can list without a word. Hits include `due` when `data.due` is set. Not embeddings. No `list_nodes`.

@@ -244,6 +244,35 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
       assert.match(blocked.error, /still use it/);
     });
 
+    await t.test("undo of type retire restores the authored type", async () => {
+      const typed = await manageType(pool, {
+        action: "create",
+        slug: "meeting_retire_undo",
+        kind: "artifact",
+        description: "restored by undo",
+      });
+      assert.equal(isToolError(typed), false);
+      if (isToolError(typed)) return;
+
+      const retired = await manageType(pool, {
+        action: "retire",
+        slug: "meeting_retire_undo",
+        confirm: true,
+      });
+      assert.equal(isToolError(retired), false);
+      if (isToolError(retired)) return;
+
+      const restored = await undoGraphActivity(pool, {
+        id: retired.activity_id,
+        confirm: true,
+      });
+      assert.equal(isToolError(restored), false);
+      const ontology = await inspectOntology(pool, "types");
+      const row = ontology.types.find((type) => type.slug === "meeting_retire_undo");
+      assert.equal(row?.description, "restored by undo");
+      assert.equal(row?.is_system, false);
+    });
+
     await t.test("undo of type create without purge keeps tombstones restorable", async () => {
       const typed = await manageType(pool, {
         action: "create",

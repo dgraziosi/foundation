@@ -7,7 +7,8 @@ import { defineTool } from "./define-tool.js";
 export function registerManageTypeTool(server: McpServer, pool: Pool): void {
   defineTool(server, {
     name: "manage_type",
-    description: "Create or update a node type. Applies immediately.",
+    description:
+      "Create, update, or retire a node type. Applies immediately. Retire requires confirm: true and refuses system types or types with live nodes. Soft-deleted nodes of that type need purge_deleted: true (same as undo of type create).",
     input: ManageTypeInputSchema.shape,
     output: ManageTypeSuccessSchema,
     handler: async (input) => manageType(pool, input),

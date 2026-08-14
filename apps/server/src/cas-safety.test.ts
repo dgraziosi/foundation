@@ -62,6 +62,7 @@ test(
         assert.equal(isToolError(stale), true);
         if (!isToolError(stale)) return;
         assert.match(stale.error, /does not match current updated_at/);
+        assert.doesNotMatch(stale.error, /not found/i);
         assert.match(stale.suggestion ?? "", /get and retry/);
 
         const got = await getGraphNode(pool, created.node.id);
@@ -70,6 +71,69 @@ test(
         assert.equal(got.node.title, "Writer A");
         assert.equal(got.node.data.a, 9);
         assert.equal(got.node.data.b, 2);
+      });
+
+      await t.test("create then get then upsert with that updated_at succeeds", async () => {
+        const created = await upsertGraphNode(pool, {
+          type: "note",
+          title: "Immediate CAS round-trip",
+        });
+        assert.equal(isToolError(created), false);
+        if (isToolError(created)) return;
+
+        const got = await getGraphNode(pool, created.node.id);
+        assert.equal(isToolError(got), false);
+        if (isToolError(got)) return;
+
+        const updated = await upsertGraphNode(pool, {
+          id: created.node.id,
+          type: "note",
+          title: "Immediate CAS round-trip renamed",
+          base_updated_at: got.node.updated_at,
+        });
+        assert.equal(isToolError(updated), false);
+        if (isToolError(updated)) return;
+        assert.equal(updated.node.title, "Immediate CAS round-trip renamed");
+      });
+
+      await t.test("never-updated node with leftover microseconds upserts from get", async () => {
+        const created = await upsertGraphNode(pool, {
+          type: "project",
+          title: "Synthetic never-updated CAS",
+        });
+        assert.equal(isToolError(created), false);
+        if (isToolError(created)) return;
+
+        await pool.query(
+          `UPDATE nodes
+           SET updated_at = date_trunc('milliseconds', now()) + interval '528 microseconds'
+           WHERE id = $1`,
+          [created.node.id],
+        );
+        const { rows } = await pool.query<{ us: string }>(
+          `SELECT (EXTRACT(MICROSECONDS FROM updated_at)::int % 1000)::text AS us
+           FROM nodes WHERE id = $1`,
+          [created.node.id],
+        );
+        assert.equal(rows[0]?.us, "528");
+
+        const got = await getGraphNode(pool, created.node.id);
+        assert.equal(isToolError(got), false);
+        if (isToolError(got)) return;
+
+        const updated = await upsertGraphNode(pool, {
+          id: created.node.id,
+          type: "project",
+          title: "Synthetic never-updated CAS renamed",
+          base_updated_at: got.node.updated_at,
+        });
+        assert.equal(isToolError(updated), false);
+        if (isToolError(updated)) {
+          assert.doesNotMatch(updated.error, /not found/i);
+          assert.fail(updated.error);
+          return;
+        }
+        assert.equal(updated.node.title, "Synthetic never-updated CAS renamed");
       });
 
       await t.test("missing base_updated_at refuses an update", async () => {

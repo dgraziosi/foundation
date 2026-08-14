@@ -193,13 +193,17 @@ export const InspectOntologySuccessSchema = z.object({
 });
 
 export const ManageTypeInputSchema = z.object({
-  action: z.enum(["create", "update"]),
+  action: z.enum(["create", "update", "retire"]),
   slug: SlugSchema,
   label: z.string().min(1).optional(),
   description: z.string().optional(),
   kind: TypeKindSchema.optional(),
   parent_types: z.array(z.string()).optional(),
   json_schema: z.unknown().nullable().optional(),
+  /** Required when action is retire. */
+  confirm: z.boolean().optional(),
+  /** Permanently drop leftover soft-deleted nodes when retiring a type. */
+  purge_deleted: z.boolean().optional(),
   actor: ActivityActorSchema.optional(),
   actor_label: z.string().trim().min(1).max(200).optional(),
 });

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { SearchInputSchema } from "./mcp-io.js";
+import { ManageTypeInputSchema, SearchInputSchema } from "./mcp-io.js";
 
 test("search query is optional when a filter is set", () => {
   const listed = SearchInputSchema.parse({ type: "task", status: "active" });
@@ -22,4 +22,17 @@ test("search query is optional when a filter is set", () => {
 test("search still accepts a lexical query", () => {
   const parsed = SearchInputSchema.parse({ query: "Liz", type: "person" });
   assert.equal(parsed.query, "Liz");
+});
+
+test("manage_type accepts retire with confirm and purge_deleted", () => {
+  const retired = ManageTypeInputSchema.parse({
+    action: "retire",
+    slug: "meeting",
+    confirm: true,
+    purge_deleted: true,
+  });
+  assert.equal(retired.action, "retire");
+  assert.equal(retired.confirm, true);
+  assert.equal(retired.purge_deleted, true);
+  assert.throws(() => ManageTypeInputSchema.parse({ action: "delete", slug: "meeting" }));
 });

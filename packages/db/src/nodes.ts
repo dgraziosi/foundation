@@ -127,8 +127,11 @@ export async function updateNode(
      WHERE id = $1 AND deleted_at IS NULL
        AND (
          $8::timestamptz IS NULL
-         OR (EXTRACT(EPOCH FROM updated_at) * 1000)::bigint
-           = (EXTRACT(EPOCH FROM $8::timestamptz) * 1000)::bigint
+         -- Same instant as timestampsEqual / Date.parse: millisecond precision.
+         -- EXTRACT(EPOCH)*1000::bigint disagrees on leftover microseconds
+         -- (now() on insert) and can float-round a millisecond timestamp.
+         OR date_trunc('milliseconds', updated_at AT TIME ZONE 'UTC')
+           = date_trunc('milliseconds', $8::timestamptz AT TIME ZONE 'UTC')
        )
      RETURNING id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at`,
     [

@@ -1,11 +1,7 @@
 import {
-  countDeletedNodesByType,
   countEdgesByRelation,
-  countNodesByType,
   countRelationsUsingSemanticParent,
-  countTypesUsingParent,
   deleteEdgeById,
-  deleteNodeType,
   deleteRelationType,
   getActivityById,
   getEdgeById,
@@ -13,9 +9,8 @@ import {
   getNodeType,
   getRelationType,
   insertActivity,
+  insertNodeType,
   markActivityUndone,
-  markNodeDeleteActivitiesIrreversible,
-  purgeDeletedNodesByType,
   restoreEdge,
   restoreNode,
   restoreNodeSnapshot,
@@ -45,6 +40,7 @@ import {
   type ToolError,
   type UndoInput,
 } from "@foundation/schema";
+import { removeAuthoredType } from "./retire-type.js";
 
 function snapshotNode(value: unknown): Node | null {
   const parsed = NodeSchema.safeParse(value);
@@ -231,63 +227,40 @@ async function invertTypeChange(
   }
 
   if (before == null && after) {
-    const slug = after.slug;
-    const nodes = await countNodesByType(client, slug);
-    if (nodes > 0) {
+    const removed = await removeAuthoredType(client, after.slug, {
+      purgeDeleted: options.purgeDeleted === true,
+      writer: { actor: row.actor, actor_label: row.actor_label },
+      purpose: "undo_create",
+    });
+    if ("error" in removed) {
+      return removed;
+    }
+    return { action: "type_change", before: removed.type, after: null };
+  }
+
+  if (before && after == null) {
+    const current = await getNodeType(client, before.slug);
+    if (current) {
       return toolError(
-        `Cannot undo type create "${slug}": ${nodes} node(s) still use it`,
-        "Delete or retype those nodes first, then retry undo.",
-      );
-    }
-    const tombstones = await countDeletedNodesByType(client, slug);
-    if (tombstones > 0 && !options.purgeDeleted) {
-      return toolError(
-        `Cannot undo type create "${slug}": ${tombstones} deleted node(s) of that type are still restorable`,
-        "Undo those deletes to restore the nodes, or retry undo with confirm: true and purge_deleted: true to permanently drop the deleted nodes and their edges.",
-      );
-    }
-    const parents = await countTypesUsingParent(client, slug);
-    if (parents > 0) {
-      return toolError(
-        `Cannot undo type create "${slug}": other types list it in parent_types`,
-        "Update those types first, then retry undo.",
-      );
-    }
-    const current = await getNodeType(client, slug);
-    if (!current) {
-      return toolError(`Cannot undo type create: "${slug}" is already gone`);
-    }
-    if (current.is_system) {
-      return toolError(`Cannot delete system type "${slug}"`);
-    }
-    if (tombstones > 0) {
-      const purged = await purgeDeletedNodesByType(client, slug);
-      for (const edge of purged.edges) {
-        await insertActivity(client, {
-          actor: row.actor,
-          actor_label: row.actor_label,
-          action: "unlink",
-          target_kind: "edge",
-          target_id: edge.id,
-          before: edge,
-          after: null,
-          reversible: false,
-          rationale: `Purge deleted nodes while undoing type create ${slug}`,
-        });
-      }
-      await markNodeDeleteActivitiesIrreversible(
-        client,
-        purged.nodes.map((node) => node.id),
+        `Cannot undo type retire: "${before.slug}" already exists`,
+        "The type was recreated. Leave it, or retire the new row first.",
       );
     }
     try {
-      const removed = await deleteNodeType(client, slug);
-      return { action: "type_change", before: current, after: removed ?? null };
+      const restored = await insertNodeType(client, {
+        slug: before.slug,
+        label: before.label,
+        description: before.description,
+        kind: before.kind,
+        parent_types: before.parent_types,
+        json_schema: before.json_schema,
+      });
+      return { action: "type_change", before: null, after: restored };
     } catch (error) {
-      if (isForeignKeyViolation(error)) {
+      if (isUniqueViolation(error)) {
         return toolError(
-          `Cannot undo type create "${slug}": deleted nodes still reference it`,
-          "Undo those deletes to restore the nodes, or retry undo with confirm: true and purge_deleted: true to permanently drop the deleted nodes and their edges.",
+          `Cannot undo type retire: "${before.slug}" already exists`,
+          "The type was recreated. Leave it, or retire the new row first.",
         );
       }
       throw error;
