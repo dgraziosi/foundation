@@ -80,7 +80,7 @@ test("blob ingest round-trip, sha256 dedup, and path constraints", { skip: !data
   if (!databaseUrl) {
     return;
   }
-  const pool = await poolForSchema("slice10_blobs");
+  const pool = await poolForSchema("blobs_fs");
   const root = await mkdtemp(join(tmpdir(), "foundation-blob-data-"));
   try {
     await t.test("writes bytes under blobs/<uuid> with sha256 and 0600 file mode", async () => {

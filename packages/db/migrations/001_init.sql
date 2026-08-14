@@ -1,5 +1,5 @@
 -- Foundation graph: UUID nodes, typed jsonb payloads, edges as source of truth.
--- pgvector is enabled for a later search slice; unused here.
+-- pgvector is enabled for later optional hybrid search; unused here.
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -88,7 +88,7 @@ CREATE TABLE activity (
 CREATE INDEX activity_created_idx ON activity (created_at DESC);
 CREATE INDEX activity_target_idx ON activity (target_id);
 
--- Slice 9/10 will use this; stub so later migrations are additive, not a rewrite.
+-- Stub blobs table so later migrations are additive, not a rewrite.
 CREATE TABLE blobs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   media_type TEXT NOT NULL,

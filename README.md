@@ -6,7 +6,7 @@ Foundation is a small, self-hostable **typed knowledge graph + MCP server** for 
 
 The name is a nod to Asimov: carry structured knowledge forward so you (and your agents) are not starting from zero every time.
 
-**Glossary (locked):** **Foundation** = the product. A **vault** = one instance (`FOUNDATION_DATA` + Postgres). The **graph** = the knowledge in that vault. A **blob** = a file on a node. An **agent** = anything that can reach the vault MCP. The **operator** = the human who runs Compose. Do not call the graph “the Vault.” Short analog: app / folder / links → Foundation / vault / graph.
+**Glossary (locked):** **Foundation** = the product. A **vault** = one instance (`FOUNDATION_DATA` + Postgres). The **graph** = the knowledge in that vault. A **blob** = a file on a node. An **agent** = anything that can reach the vault MCP. The **operator** = the human who runs Compose — only the human, not an agent. Do not call the graph “the Vault.” Short analog: app / folder / links → Foundation / vault / graph.
 
 Do not commit personal life data, documents, or secrets to this repository. Those belong in the operator’s vault, not in git.
 
@@ -15,7 +15,7 @@ Do not commit personal life data, documents, or secrets to this repository. Thos
 - [`docs/SPEC.md`](docs/SPEC.md) — product contract
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — living vault and graph
 - [`docs/MCP_TOOLS.md`](docs/MCP_TOOLS.md) — 12-tool MCP surface
-- [`docs/AGENTS.md`](docs/AGENTS.md) — optional named-agent stand-up
+- [`docs/AGENTS.md`](docs/AGENTS.md) — optional named-agent recipe (not product ontology)
 - [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md) — weekday instance checkup
 - [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md) — weekly graph report
 
@@ -50,7 +50,7 @@ Requires [Docker Compose](https://docs.docker.com/compose/) and a copy of this r
    docker compose up --build
    ```
 
-   **Optional stand-up.** After Compose is up, see [`docs/AGENTS.md`](docs/AGENTS.md) for an optional named-agent recipe and three routines. What “healthy” means: [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md). Graph report: [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md). No new MCP tools.
+   **Optional stand-up.** After Compose is up, the operator can run instance routines (vault health, graph hygiene, applying git updates) or attach named agents ([`docs/AGENTS.md`](docs/AGENTS.md)). What “healthy” means: [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md). Graph report: [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md). No new MCP tools.
 
 3. Point an MCP client at `http://127.0.0.1:8787/mcp` with:
 
@@ -164,7 +164,7 @@ Never point `FOUNDATION_DATA` at an agent profile or memory directory.
 
 1. Run Compose on a machine your agents can reach at localhost MCP
 2. Point agents at the local MCP endpoint
-3. Optionally stand up named agents and the three routines ([`docs/AGENTS.md`](docs/AGENTS.md))
+3. Optionally stand up named agents and instance routines ([`docs/AGENTS.md`](docs/AGENTS.md))
 
 ## License
 

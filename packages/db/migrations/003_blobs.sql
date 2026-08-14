@@ -1,4 +1,4 @@
--- Slice 10: blob files under $FOUNDATION_DATA/blobs/<uuid>.
+-- Blob files under $FOUNDATION_DATA/blobs/<uuid>.
 -- Unique sha256 allows content-addressed dedup. Path must be relative blobs/<uuid>.
 
 ALTER TABLE blobs

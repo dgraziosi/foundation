@@ -45,7 +45,7 @@ test(
     if (!databaseUrl) {
       return;
     }
-    const pool = await poolForSchema("slice4_graph");
+    const pool = await poolForSchema("graph_nodes");
     try {
       await resetGraph(pool);
 

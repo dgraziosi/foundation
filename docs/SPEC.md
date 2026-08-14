@@ -21,11 +21,11 @@ Short analog: app / folder / links → Foundation / vault / graph.
 - **graph** — the knowledge in that vault
 - **blob** — a file on a node
 - **agent** — anything that can reach the vault MCP
-- **operator** — the human who runs Compose
+- **operator** — the human who runs Compose. Only the human, not an agent.
 
 Do not call the graph “the Vault.”
 
-Optional named agents: see [`AGENTS.md`](./AGENTS.md).
+Optional named-agent recipe (not product ontology): [`AGENTS.md`](./AGENTS.md).
 
 ## Primary users
 
@@ -55,7 +55,7 @@ Names are locked. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md).
 - Activity stores optional `actor` / `actor_label` (who wrote). Not a permission gate.
 - `search` is Postgres FTS (title + `data` + extracted inline payload text; Latin accents folded). `query` is optional when `type`, `status`, `under` (child_of parent), `since`, or `origin` is set, so agents can list without a word. Not embeddings. No `list_nodes`.
 - Live nodes are unique on `data.origin.{system,id}` for `gmail` | `calendar` | `drive` | `github`. Look up with `search` `{ origin }` (then `get`). Store the ref only — do not fetch or mirror those systems’ bodies.
-- No `get_vault_health` / `run_maintenance` / `audit_links` tools — those jobs are operator routines ([`AGENTS.md`](./AGENTS.md), [`VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md))
+- No `get_vault_health` / `run_maintenance` / `audit_links` tools — those jobs are instance routines the operator can run ([`VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md), [`prompts/update-foundation.md`](../prompts/update-foundation.md))
 
 ## Runtime
 
@@ -80,4 +80,4 @@ Names are locked. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md).
 
 ## Contributor checklist
 
-Typecheck and tests pass. Destructive MCP tools stay behind `confirm: true`. Do not put vault contents, `FOUNDATION_DATA` files, or graph dumps in pull requests. When a slice changes the graph or vault shape, update [`ARCHITECTURE.md`](./ARCHITECTURE.md) in the same PR.
+Typecheck and tests pass. Destructive MCP tools stay behind `confirm: true`. Do not put vault contents, `FOUNDATION_DATA` files, or graph dumps in pull requests. When a change alters the graph or vault shape, update [`ARCHITECTURE.md`](./ARCHITECTURE.md) in the same PR.

@@ -1,8 +1,8 @@
-You are applying product updates on the host running Compose: git fetch/pull the product, rebuild Compose, confirm /health. In the optional named-agent recipe this is a Librarian (instance-keeper) routine — not new MCP tools.
+You are applying product updates on the host running Compose: git fetch/pull the product, rebuild Compose, confirm /health. This is an instance routine the operator can run, or attach to an instance-keeper. In the optional named-agent recipe this is a Librarian (instance-keeper) routine — not new MCP tools. Librarian is not the operator.
 
 Intent below; do not freeze JSON schemas. Call bootstrap only if you need the current tool surface after the rebuild.
 
-Foundation is the product (this GitHub clone, Docker, MCP). A vault is this running instance (FOUNDATION_DATA + Postgres). The graph lives in the vault. Do not call the graph “the Vault.” An agent that can reach the vault MCP may read/write; one that cannot does not get the API key and does not upsert.
+Foundation is the product (this GitHub clone, Docker, MCP). A vault is this running instance (FOUNDATION_DATA + Postgres). The graph lives in the vault. Do not call the graph “the Vault.” An agent that can reach the vault MCP may read/write; one that cannot does not get the API key and does not upsert. The operator is the human who runs Compose — only the human.
 
 Do not commit personal life data, documents, or secrets to this repository. Those belong in the operator’s vault, not in git. After pulling product updates, an optional agent that reads git (no vault key) scans the tree and recent diffs for secrets and personal data. Report-only; quiet if clean. Prompt: prompts/repo-leak-scan.md.
 
@@ -10,9 +10,9 @@ Do not commit personal life data, documents, or secrets to this repository. Thos
 
 Weekdays, late morning local time. If the clone is already up to date and /health is green, stay completely quiet (no ping, no email, no digest) **except** the Monday leak-scan backup. Ping the operator only when you pulled, rebuilt, failed, stopped because a pull would risk the vault, or the leak-scan agent found something.
 
-After main moves, the architect (Seldon in this recipe) may optionally let you know. That heads-up is optional — not a required protocol, and not a demand for PR numbers. This weekday routine is the regular apply path.
-
 ## Operator config (fill in)
+
+The operator (the human) sets these.
 
 - Foundation clone path: (the git checkout that docker compose uses)
 - MCP / health base: http://127.0.0.1:8787

@@ -4,13 +4,13 @@ Weekly, report-only look at the **graph** in this vault. Quiet if green. Not vau
 
 ## Glossary
 
-Same locked terms as [`VAULT_HEALTH.md`](./VAULT_HEALTH.md): Foundation = the product; vault = one instance (`FOUNDATION_DATA` + Postgres); graph = the knowledge in that vault; blob = a file on a node; agent = anything that can reach the vault MCP; operator = the human who runs Compose. Do **not** call the graph “the Vault.”
+Same locked terms as [`VAULT_HEALTH.md`](./VAULT_HEALTH.md): Foundation = the product; vault = one instance (`FOUNDATION_DATA` + Postgres); graph = the knowledge in that vault; blob = a file on a node; agent = anything that can reach the vault MCP; operator = the human who runs Compose (only the human, not an agent). Do **not** call the graph “the Vault.”
 
-Optional named agents: see [`AGENTS.md`](./AGENTS.md). Paste: [`prompts/graph-hygiene.md`](../prompts/graph-hygiene.md).
+The operator can run this report, or attach it to an instance-keeper agent ([`AGENTS.md`](./AGENTS.md)). Paste: [`prompts/graph-hygiene.md`](../prompts/graph-hygiene.md).
 
 ## What it is
 
-A **quiet operator routine** (weekly, local time). It reports:
+A **quiet instance routine** (weekly, local time). It reports:
 
 - Duplicate titles
 - Nodes with zero edges

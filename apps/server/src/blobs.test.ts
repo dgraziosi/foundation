@@ -43,8 +43,8 @@ test("blob nodes: ingest, get metadata, HTTP bytes, snapshots, delete keeps file
   if (!databaseUrl) {
     return;
   }
-  const pool = await poolForSchema("slice10_graph_blobs");
-  const dataDir = await mkdtemp(join(tmpdir(), "foundation-slice10-"));
+  const pool = await poolForSchema("graph_blobs");
+  const dataDir = await mkdtemp(join(tmpdir(), "foundation-blobs-"));
   const blobs = { dataDir };
   const apiKey = "test-foundation-key";
   const app = createApp(pool, {

@@ -117,7 +117,7 @@ test(
           title: "Liz",
           idempotency_key: "create-liz-1",
           actor: "agent",
-          actor_label: "chief",
+          actor_label: "agent-a",
         });
         assert.equal(isToolError(first), false);
         if (isToolError(first)) return;
@@ -126,7 +126,7 @@ test(
           type: "person",
           title: "Elizabeth",
           idempotency_key: "create-liz-1",
-          actor_label: "librarian",
+          actor_label: "agent-b",
         });
         assert.equal(isToolError(retry), false);
         if (isToolError(retry)) return;
@@ -145,7 +145,7 @@ test(
           type: "note",
           title: "Who wrote",
           actor: "user",
-          actor_label: "danny",
+          actor_label: "operator",
         });
         assert.equal(isToolError(created), false);
         if (isToolError(created)) return;
@@ -156,7 +156,7 @@ test(
         const row = listed.activities.find((item) => item.id === created.activity_id);
         assert.ok(row);
         assert.equal(row?.actor, "user");
-        assert.equal(row?.actor_label, "danny");
+        assert.equal(row?.actor_label, "operator");
       });
 
       await t.test("stale from_base_updated_at refuses a link", async () => {
@@ -181,7 +181,7 @@ test(
           relation_type: "child_of",
           from_base_updated_at: project.node.updated_at,
           to_base_updated_at: area.node.updated_at,
-          actor_label: "chief",
+          actor_label: "agent-a",
         });
         assert.equal(isToolError(stale), true);
         if (!isToolError(stale)) return;
@@ -194,7 +194,7 @@ test(
           from_base_updated_at: renamed.node.updated_at,
           to_base_updated_at: area.node.updated_at,
           actor: "agent",
-          actor_label: "chief",
+          actor_label: "agent-a",
         });
         assert.equal(isToolError(linked), false);
         if (isToolError(linked)) return;
@@ -204,7 +204,7 @@ test(
         if (isToolError(listed)) return;
         const row = listed.activities.find((item) => item.id === linked.activity_id);
         assert.equal(row?.actor, "agent");
-        assert.equal(row?.actor_label, "chief");
+        assert.equal(row?.actor_label, "agent-a");
       });
     } finally {
       await pool.end();

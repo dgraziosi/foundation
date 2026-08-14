@@ -6,7 +6,7 @@ When a change alters the graph or vault shape, update this file in the same PR.
 
 ## Glossary
 
-**Foundation** is the product. A **vault** is one instance (`FOUNDATION_DATA` + Postgres). The **graph** is the knowledge in that vault. A **blob** is a file on a node. An **agent** is anything that can reach the vault MCP. The **operator** is the human who runs Compose. Do not call the graph “the Vault.” A git clone is the product, not this vault — `compose up` elsewhere starts a different instance.
+**Foundation** is the product. A **vault** is one instance (`FOUNDATION_DATA` + Postgres). The **graph** is the knowledge in that vault. A **blob** is a file on a node. An **agent** is anything that can reach the vault MCP. The **operator** is the human who runs Compose — only the human, not an agent. Do not call the graph “the Vault.” A git clone is the product, not this vault — `compose up` elsewhere starts a different instance.
 
 ## Vault
 
@@ -15,22 +15,25 @@ One vault is one running instance. Postgres files and blob files both live under
 ```mermaid
 flowchart TB
   product["Foundation the product<br/>git + Docker + MCP server"]
-  product --> thisVault
-  product --> otherVault
 
-  subgraph thisVault["This vault"]
-    graph["Graph — knowledge"]
+  subgraph this_vault["This vault"]
+    knowledge["Graph — knowledge"]
     pg["Postgres"]
-    data["FOUNDATION_DATA"]
-    data --> pgfiles["postgres files"]
-    data --> blobs["blobs on disk"]
-    graph --- pg
-    pg --- pgfiles
+    data_dir["FOUNDATION_DATA"]
+    pg_files["postgres files"]
+    blob_files["blobs on disk"]
+    data_dir --> pg_files
+    data_dir --> blob_files
+    knowledge --- pg
+    pg --- pg_files
   end
 
-  subgraph otherVault["A clone"]
+  subgraph other_vault["A clone"]
     empty["Its own vault — not this one"]
   end
+
+  product --> this_vault
+  product --> other_vault
 ```
 
 Compose publishes the server at `127.0.0.1:8787` only. Do not bind 8787 beyond localhost.
@@ -41,14 +44,14 @@ The graph is the knowledge in that vault: **nodes**, **typed edges**, and **acti
 
 ```mermaid
 flowchart LR
-  subgraph graph["Graph"]
+  subgraph knowledge_graph["Graph"]
     nodes["nodes"]
-    edges["typed edges"]
-    activity["activity"]
+    typed_edges["typed edges"]
+    activity_log["activity"]
+    nodes --- typed_edges
+    nodes --- activity_log
+    typed_edges --- activity_log
   end
-  nodes --- edges
-  nodes --- activity
-  edges --- activity
 ```
 
 ### Node
@@ -60,19 +63,19 @@ A node has **type**, **title**, **status**, a **payload**, and **data**. Identit
 
 ```mermaid
 flowchart TB
-  node["Node"]
-  node --> type["type"]
-  node --> title["title"]
-  node --> status["status"]
-  node --> payload["payload"]
-  node --> dataField["data"]
+  node_box["Node"]
+  node_box --> node_type["type"]
+  node_box --> node_title["title"]
+  node_box --> node_status["status"]
+  node_box --> node_payload["payload"]
+  node_box --> node_data["data"]
 
-  payload --> inline["inline: markdown / html / json"]
-  payload --> blob["blob: file on the node"]
+  node_payload --> inline["inline: markdown / html / json"]
+  node_payload --> blob_on_node["blob: file on the node"]
 
-  dataField --> structured["structured fields"]
-  dataField --> origin["origin ref"]
-  dataField --> schema["json_schema on the type"]
+  node_data --> structured["structured fields"]
+  node_data --> origin["origin ref"]
+  node_data --> schema["json_schema on the type"]
 ```
 
 ### Spine and artifacts
@@ -101,7 +104,7 @@ flowchart TB
   hang -.-> project
   hang -.-> goal
 
-  beside["person / company / note / …"]
+  beside["person / company / note / ..."]
   beside -.-> area
 ```
 
@@ -114,17 +117,17 @@ Stored edge is `child_of` (child → parent). The picture above is the spine, no
 ```mermaid
 flowchart LR
   subgraph hierarchy["Hierarchy"]
-    childOf["child_of<br/>one parent"]
+    child_of["child_of<br/>one parent"]
   end
 
   subgraph associative["Associative"]
     relates["relates_to"]
     about["about"]
-    other["supports, inspired_by, references, …"]
+    other["supports, inspired_by, references, ..."]
   end
 
-  hierarchy -.->|"placement"| spine["spine"]
-  associative -.->|"cross-links"| anywhere["any nodes"]
+  child_of -.->|"placement"| spine["spine"]
+  relates -.->|"cross-links"| anywhere["any nodes"]
 ```
 
 ## Blob
@@ -143,7 +146,7 @@ Writes go through the graph and leave **activity**. `undo` reverses a reversible
 ```mermaid
 flowchart LR
   write["Write"] --> cas["if-match"]
-  write --> merge["data merge"]
+  write --> data_merge["data merge"]
   write --> idemp["create idempotency_key"]
   write --> activity["activity row"]
   activity --> undo["undo"]
@@ -164,9 +167,9 @@ Empty `{}` is an error (no `list_nodes` tool). Hits are lean; `get` loads payloa
 
 ```mermaid
 flowchart TB
-  search["search"]
-  search --> fts["full-text + accent-folding"]
-  search --> list["or list by type / status / under / since / origin"]
+  search_box["search"]
+  search_box --> fts["full-text + accent-folding"]
+  search_box --> list_or_filter["or list by type / status / under / since / origin"]
 ```
 
 ## Origin
@@ -176,10 +179,10 @@ Gmail, Calendar, Drive, and GitHub stay the source of truth. The graph may hold 
 ```mermaid
 flowchart LR
   sot["Gmail / Calendar / Drive / GitHub<br/>stay source of truth"]
-  ref["data.origin system + id"]
-  graphHold["Graph holds the ref only"]
-  sot -.-> ref
-  ref --> graphHold
+  origin_ref["data.origin system + id"]
+  holds_ref["Graph holds the ref only"]
+  sot -.-> origin_ref
+  origin_ref --> holds_ref
 ```
 
 ## How agents reach the vault
@@ -212,6 +215,6 @@ sequenceDiagram
   B->>MCP: upsert if-match
   MCP-->>B: ok
   A->>MCP: upsert if-match (stale)
-  MCP-->>A: refuse — node moved
+  MCP-->>A: refuse - node moved
   Note over A: get and retry
 ```

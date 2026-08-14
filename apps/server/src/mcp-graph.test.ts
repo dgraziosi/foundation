@@ -46,7 +46,7 @@ test(
     if (!databaseUrl) {
       return;
     }
-    const pool = await poolForSchema("slice4_mcp");
+    const pool = await poolForSchema("mcp_graph");
     const app = createApp(pool, {
       FOUNDATION_API_KEY: apiKey,
       DATABASE_URL: databaseUrl,
@@ -63,7 +63,7 @@ test(
     const transport = new StreamableHTTPClientTransport(new URL(url), {
       requestInit: { headers: { Authorization: `ApiKey ${apiKey}` } },
     });
-    const client = new Client({ name: "foundation-slice-test", version: "0.1.0" });
+    const client = new Client({ name: "foundation-mcp-test", version: "0.1.0" });
 
     try {
       await client.connect(transport);
@@ -74,8 +74,8 @@ test(
       assert.equal((boot.how_to_extend as { activity: string }).activity.includes("list_activity"), true);
       assert.equal((boot.how_to_extend as { search: string }).search.includes("full-text"), true);
       const howTo = boot.how_to_extend as { summary: string };
-      assert.equal(howTo.summary.includes("operator routine"), true);
-      assert.equal(howTo.summary.includes("docs/AGENTS.md"), true);
+      assert.equal(howTo.summary.includes("instance routine"), true);
+      assert.equal(howTo.summary.includes("docs/VAULT_HEALTH.md"), true);
       assert.equal(howTo.summary.includes("Vault health"), true);
       assert.equal(howTo.summary.includes("Do not add get_vault_health"), true);
 
