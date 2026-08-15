@@ -7,7 +7,7 @@ v1 surface is **12 tools**. Destructive tools require `confirm: true` or they re
 | Tool | Purpose |
 | --- | --- |
 | `bootstrap` | Return starter ontology, how to extend it, and current type/relation inventory. Call first. |
-| `search` | Find nodes by text query and/or filters (`type`, `status`, `under`, `since`, `origin`, `due`, `due_on_or_before`, `due_on_or_after`). Query is optional when a filter is set. Hits are id/type/title/snippet plus `due` when set. |
+| `search` | Find nodes by text query and/or filters (`type`, `status`, `under`, `since`, `origin`, `due`, `due_on_or_before`, `due_on_or_after`, `data_equals`). Query is optional when a filter is set. Hits are id/type/title/snippet plus `due` when set. |
 | `get` | Fetch a node by id, including payload and incident edges with neighbor titles. Blob payloads return metadata, not bytes. |
 | `upsert` | Create or update a node (title, type, payload, data, status). Updates require `base_updated_at`. Create accepts `idempotency_key`. Blob ingest via `bytes_base64` or `source_path`. |
 | `delete` | Soft-delete a node. Requires `confirm: true`. |
@@ -97,11 +97,12 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 
 ### `search`
 
-- **In:** `{ query?, type?, status?, under?, since?, origin?, due?, due_on_or_before?, due_on_or_after?, limit? }`
+- **In:** `{ query?, type?, status?, under?, since?, origin?, due?, due_on_or_before?, due_on_or_after?, data_equals?, limit? }`
 - **Out:** `{ nodes: [{ id, type, title, status, snippet, due? }], suggestion? }` or `{ error, suggestion? }`
 - Postgres FTS on `title` (weighted highest) + string values from `data` + extracted inline payload text. HTML: tag text plus `alt` / `title` / `aria-label` / `placeholder`. JSON: string values from the parsed body — **not** `JSON.stringify` of the payload wrapper (`media_type`, `storage`, …). Latin diacritics are folded (`fiancee` matches `fiancée` and vice versa). Soft-deleted nodes are excluded. Lexical recall only (no embeddings).
-- **`query` is optional** when `type`, `status`, `under`, `since`, `origin`, `due`, `due_on_or_before`, or `due_on_or_after` is set. That is how agents list without a word: all people (`type: "person"`), all open tasks (`type: "task", status: "active"`), overdue or due-today (`due: "overdue"` | `"today"`), due on or before a date (`due_on_or_before: "2026-08-27"`), children of a parent (`under: <parent uuid>` = live `child_of`), or nodes updated `since` an ISO-8601 timestamp. Empty `{}` → `{ error, suggestion }` (do not add `list_nodes`).
+- **`query` is optional** when `type`, `status`, `under`, `since`, `origin`, `due`, `due_on_or_before`, `due_on_or_after`, or `data_equals` is set. That is how agents list without a word: all people (`type: "person"`), all open tasks (`type: "task", status: "active"`), overdue or due-today (`due: "overdue"` | `"today"`), due on or before a date (`due_on_or_before: "2026-08-27"`), children of a parent (`under: <parent uuid>` = live `child_of`), nodes updated `since` an ISO-8601 timestamp, or nodes whose top-level `data` keys equal a value (`data_equals: { kind: "…", status: "…" }`). Empty `{}` → `{ error, suggestion }` (do not add `list_nodes`).
 - `due: "overdue" | "today"` uses **America/New_York** for “today.” `due_on_or_before` / `due_on_or_after` are inclusive ISO dates (`YYYY-MM-DD`) against `data.due`. Nodes without `data.due` do not match a due filter.
+- `data_equals` is JSONB containment (`data @> …`) on one or a few top-level keys (at most 8; lowercase identifiers). Not a column per key. Nodes missing those keys do not match. Combine with `type` / other filters.
 - `origin: { system, id }` looks up the unique live `data.origin` ref (`gmail` | `calendar` | `drive` | `github`).
 - Hits are lean (id/type/title/snippet, plus `due` when `data.due` is set). Call `get` to load payload and neighbor titles.
 - If `query` is a UUID, search resolves it like `get` and returns `suggestion` to prefer `get` next time.

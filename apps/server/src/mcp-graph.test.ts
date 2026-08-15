@@ -70,6 +70,8 @@ test(
 
       const boot = asObject(await client.callTool({ name: "bootstrap", arguments: {} }));
       assert.equal((boot.spine as { diagram: string }).diagram, "area → project → goal → habit | task");
+      assert.match((boot.spine as { description: string }).description, /preferred placement, not a hard gate/);
+      assert.match((boot.how_to_extend as { search: string }).search, /data_equals/);
       assert.equal((boot.how_to_extend as { nodes: string }).nodes.includes("upsert"), true);
       assert.equal((boot.how_to_extend as { activity: string }).activity.includes("list_activity"), true);
       assert.equal((boot.how_to_extend as { search: string }).search.includes("full-text"), true);

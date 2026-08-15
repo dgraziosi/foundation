@@ -140,6 +140,10 @@ test(
       } | null;
       assert.ok(taskSchema?.properties?.due);
       assert.ok(goalSchema?.properties?.due);
+      assert.deepEqual(types.find((type) => type.slug === "task")?.parent_types, [
+        "goal",
+        "project",
+      ]);
       assert.ok(typeSlugs.includes("company"));
       assert.ok(typeSlugs.includes("decision"));
     } finally {

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { BLOB_BASE64_MAX_CHARS } from "./blobs.js";
+import { DataEqualsSchema, hasDataEqualsFilter } from "./data-equals.js";
 import { isIsoDate } from "./due.js";
 import {
   ActivityActionSchema,
@@ -257,6 +258,8 @@ export const SearchInputSchema = z.object({
   due_on_or_before: IsoDateSchema.optional(),
   /** Inclusive ISO date YYYY-MM-DD on data.due. */
   due_on_or_after: IsoDateSchema.optional(),
+  /** Top-level data key equality (JSONB @>). One or a few keys, e.g. { kind, status }. */
+  data_equals: DataEqualsSchema.optional(),
   limit: z.number().int().min(1).max(100).optional(),
 });
 export type SearchInput = z.infer<typeof SearchInputSchema>;
@@ -280,7 +283,7 @@ export const SEARCH_UUID_SUGGESTION =
   "This query is a node UUID. Prefer get when you already have an id.";
 
 export const SEARCH_NO_SELECTOR_SUGGESTION =
-  "Pass query for lexical recall, or type, status, under (child_of parent UUID), since, origin, due (overdue|today), due_on_or_before, or due_on_or_after to list without a word. Do not add list_nodes.";
+  "Pass query for lexical recall, or type, status, under (child_of parent UUID), since, origin, due (overdue|today), due_on_or_before, due_on_or_after, or data_equals to list without a word. Do not add list_nodes.";
 
 export function searchHasSelector(input: {
   query?: string;
@@ -292,6 +295,7 @@ export function searchHasSelector(input: {
   due?: string;
   due_on_or_before?: string;
   due_on_or_after?: string;
+  data_equals?: Record<string, string>;
 }): boolean {
   return Boolean(
     input.query?.trim() ||
@@ -302,7 +306,8 @@ export function searchHasSelector(input: {
       input.origin ||
       input.due ||
       input.due_on_or_before ||
-      input.due_on_or_after,
+      input.due_on_or_after ||
+      hasDataEqualsFilter(input.data_equals),
   );
 }
 

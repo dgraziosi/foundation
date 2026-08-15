@@ -111,6 +111,16 @@ export {
 } from "./origin.js";
 export { validateDataAgainstJsonSchema } from "./json-schema.js";
 export {
+  DATA_EQUALS_KEY_RE,
+  DATA_EQUALS_KEY_SUGGESTION,
+  DATA_EQUALS_MAX_KEYS,
+  DataEqualsKeySchema,
+  DataEqualsSchema,
+  hasDataEqualsFilter,
+  matchesDataEquals,
+  type DataEquals,
+} from "./data-equals.js";
+export {
   DUE_DATA_JSON_SCHEMA,
   DUE_DATE_SUGGESTION,
   DUE_TIMEZONE,

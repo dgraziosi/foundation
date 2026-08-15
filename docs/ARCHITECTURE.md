@@ -83,7 +83,7 @@ flowchart TB
 
 Hierarchy verb is `child_of`. At most one `child_of` per node. Allowed parents come from the child’s type (`parent_types`).
 
-Spine: **area → project → goal → habit | task**.
+Spine: **area → project → goal → habit | task** — preferred placement, not a hard gate. `task` may `child_of` `goal` or `project` (prefer goal when there is a real outcome). `task` cannot `child_of` `area`.
 
 Artifacts hang off that spine or sit beside it. Seeds include person, company, decision, note, lesson, journal, idea, trip. `lesson` and `decision` may hang under area, project, or goal. `person`, `company`, `note`, and the other artifacts sit beside unless an agent links them.
 
@@ -99,6 +99,7 @@ flowchart TB
   project --> goal
   goal --> habit
   goal --> task
+  project -.->|"allowed"| task
 
   hang["lesson / decision"]
   hang -.-> area
@@ -165,6 +166,7 @@ flowchart LR
 - `origin` — unique live `data.origin` ref
 - `due` — `overdue` or `today` (`America/New_York`)
 - `due_on_or_before` / `due_on_or_after` — inclusive ISO date window on `data.due`
+- `data_equals` — one or a few top-level `data` keys equal a string value (JSONB `@>`, same family as `data.origin` / `data.due`; not a column per key). Example shape: `{ kind: "…", status: "…" }`.
 
 Empty `{}` is an error (no `list_nodes` tool). Hits are lean and include `due` when `data.due` is set; `get` loads payload, `data.due`, and neighbor titles.
 
@@ -172,7 +174,7 @@ Empty `{}` is an error (no `list_nodes` tool). Hits are lean and include `due` w
 flowchart TB
   search_box["search"]
   search_box --> fts["full-text + accent-folding"]
-  search_box --> list_or_filter["or list by type / status / under / since / origin / due"]
+  search_box --> list_or_filter["or list by type / status / under / since / origin / due / data_equals"]
 ```
 
 ## Origin

@@ -58,9 +58,10 @@ export const SEED_NODE_TYPES: readonly NodeType[] = [
   {
     slug: "task",
     label: "Task",
-    description: "A discrete action under a goal. Optional data.due is an ISO date (YYYY-MM-DD).",
+    description:
+      "A discrete action. Prefer child_of a goal when there is a real outcome; child_of a project is allowed. Cannot child_of an area. Optional data.due is an ISO date (YYYY-MM-DD).",
     kind: "spine",
-    parent_types: ["goal"],
+    parent_types: ["goal", "project"],
     json_schema: DUE_DATA_JSON_SCHEMA,
     is_system: true,
   },

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ManageTypeInputSchema, SearchInputSchema } from "./mcp-io.js";
+import { ManageTypeInputSchema, SearchInputSchema, searchHasSelector } from "./mcp-io.js";
 
 test("search query is optional when a filter is set", () => {
   const listed = SearchInputSchema.parse({ type: "task", status: "active" });
@@ -15,8 +15,14 @@ test("search query is optional when a filter is set", () => {
   SearchInputSchema.parse({ due: "today" });
   SearchInputSchema.parse({ due_on_or_before: "2026-08-27" });
   SearchInputSchema.parse({ due_on_or_after: "2026-08-01", due_on_or_before: "2026-08-27" });
+  SearchInputSchema.parse({ data_equals: { kind: "fixture_alpha" } });
+  SearchInputSchema.parse({ data_equals: { kind: "fixture_alpha", status: "potential" } });
   assert.throws(() => SearchInputSchema.parse({ due_on_or_before: "2026-08-27T00:00:00Z" }));
   assert.throws(() => SearchInputSchema.parse({ due: "soon" }));
+  assert.throws(() => SearchInputSchema.parse({ data_equals: { "Kind": "x" } }));
+  assert.equal(searchHasSelector({ data_equals: { kind: "fixture_alpha" } }), true);
+  assert.equal(searchHasSelector({ data_equals: {} }), false);
+  assert.equal(searchHasSelector({}), false);
 });
 
 test("search still accepts a lexical query", () => {

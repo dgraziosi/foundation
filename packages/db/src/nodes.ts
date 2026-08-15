@@ -245,6 +245,7 @@ export async function searchNodes(
     dueOnOrBefore?: string;
     dueBefore?: string;
     dueExact?: string;
+    dataEquals?: Record<string, string>;
     limit?: number;
   },
 ): Promise<SearchHit[]> {
@@ -292,11 +293,12 @@ export async function searchNodes(
        AND ($9::text IS NULL OR foundation_iso_date(data #>> '{due}') <= $9)
        AND ($10::text IS NULL OR foundation_iso_date(data #>> '{due}') < $10)
        AND ($11::text IS NULL OR foundation_iso_date(data #>> '{due}') = $11)
+       AND ($12::jsonb IS NULL OR data @> $12::jsonb)
        AND (q.tsq IS NULL OR search_tsv @@ q.tsq)
      ORDER BY
        CASE WHEN q.tsq IS NULL THEN 0 ELSE ts_rank_cd(search_tsv, q.tsq) END DESC,
        updated_at DESC
-     LIMIT $12`,
+     LIMIT $13`,
     [
       query,
       input.type ?? null,
@@ -309,6 +311,9 @@ export async function searchNodes(
       input.dueOnOrBefore ?? null,
       input.dueBefore ?? null,
       input.dueExact ?? null,
+      input.dataEquals && Object.keys(input.dataEquals).length > 0
+        ? JSON.stringify(input.dataEquals)
+        : null,
       limit,
     ],
   );

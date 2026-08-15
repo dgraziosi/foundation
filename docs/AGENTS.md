@@ -49,7 +49,7 @@ The operator dumps messy ideas. This agent decides what becomes a node (or an up
 
 Typical host: an agent on the host running Compose, with MCP pointed at the vault (`http://127.0.0.1:8787/mcp`).
 
-Call `bootstrap` first. Follow the spine (`area → project → goal → habit | task`). Identity is UUID. If you already have a UUID, call `get`. Destructive tools need `confirm: true`. Type/relation writes apply immediately; safety is `list_activity` + `undo`.
+Call `bootstrap` first. Prefer the spine (`area → project → goal → habit | task`); it is a framework, not a hard gate — `task` may `child_of` `project`. Identity is UUID. If you already have a UUID, call `get`. Destructive tools need `confirm: true`. Type/relation writes apply immediately; safety is `list_activity` + `undo`.
 
 ### Librarian (instance-keeper)
 

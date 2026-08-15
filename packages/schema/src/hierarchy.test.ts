@@ -17,7 +17,11 @@ test("getParentType(project) === area", () => {
 test("spine parent chain", () => {
   assert.equal(getParentType("goal"), "project");
   assert.equal(getParentType("habit"), "goal");
-  assert.equal(getParentType("task"), "goal");
+  assert.deepEqual(getParentTypes("task"), ["goal", "project"]);
+  assert.equal(getParentType("task"), undefined);
+  assert.equal(canChildOf("task", "goal"), true);
+  assert.equal(canChildOf("task", "project"), true);
+  assert.equal(canChildOf("task", "area"), false);
   assert.equal(getParentType("area"), undefined);
 });
 

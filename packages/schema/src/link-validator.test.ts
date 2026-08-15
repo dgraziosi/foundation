@@ -149,6 +149,39 @@ test("child_of rejects types that do not match parent_types", () => {
   assert.match(result.suggestion ?? "", /area/);
 });
 
+test("child_of task → project succeeds; task → area is refused; task → goal still works", () => {
+  const toProject = validateLink({
+    from_id: ids.a,
+    to_id: ids.b,
+    relation_type: "child_of",
+    from_type: "task",
+    to_type: "project",
+  });
+  assert.equal(toProject.ok, true);
+
+  const toGoal = validateLink({
+    from_id: ids.a,
+    to_id: ids.b,
+    relation_type: "child_of",
+    from_type: "task",
+    to_type: "goal",
+  });
+  assert.equal(toGoal.ok, true);
+
+  const toArea = validateLink({
+    from_id: ids.a,
+    to_id: ids.b,
+    relation_type: "child_of",
+    from_type: "task",
+    to_type: "area",
+  });
+  assert.equal(toArea.ok, false);
+  if (toArea.ok) return;
+  assert.match(toArea.error, /cannot be child_of/);
+  assert.match(toArea.suggestion ?? "", /goal/);
+  assert.match(toArea.suggestion ?? "", /project/);
+});
+
 test("child_of project → area succeeds", () => {
   const result = validateLink({
     from_id: ids.a,
