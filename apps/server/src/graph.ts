@@ -67,6 +67,7 @@ import {
   dueFromData,
   dueKeyIsInvalid,
   matchesDueFilters,
+  matchesDataEquals,
   searchHasSelector,
   todayInNewYork,
   validateDataAgainstJsonSchema,
@@ -1103,6 +1104,9 @@ export async function searchGraphNodes(
     if (!matchesDueFilters(due, input, today)) {
       return { nodes: [], suggestion: SEARCH_MISS_SUGGESTION };
     }
+    if (!matchesDataEquals(node.data, input.data_equals)) {
+      return { nodes: [], suggestion: SEARCH_MISS_SUGGESTION };
+    }
     return {
       nodes: [
         {
@@ -1129,6 +1133,7 @@ export async function searchGraphNodes(
     dueOnOrBefore: input.due_on_or_before,
     dueBefore: input.due === "overdue" ? today : undefined,
     dueExact: input.due === "today" ? today : undefined,
+    dataEquals: input.data_equals,
     limit: input.limit,
   });
   if (nodes.length === 0) {

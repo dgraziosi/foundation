@@ -30,6 +30,9 @@ test("seed node types parse and include spine plus artifacts", () => {
   assert.equal(slugs.includes("core_value"), false);
   const task = SEED_NODE_TYPES.find((type) => type.slug === "task");
   const goal = SEED_NODE_TYPES.find((type) => type.slug === "goal");
+  assert.deepEqual(task?.parent_types, ["goal", "project"]);
+  assert.match(task?.description ?? "", /Prefer child_of a goal/);
+  assert.match(task?.description ?? "", /child_of a project is allowed/);
   const dueSchema = task?.json_schema as {
     properties?: { due?: { anyOf?: Array<{ pattern?: string; type?: string }> } };
   } | null;
