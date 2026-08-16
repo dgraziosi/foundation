@@ -4,9 +4,9 @@ Weekly, report-only look at the **graph** in this vault. Quiet if green. Not vau
 
 ## Glossary
 
-Same locked terms as [`VAULT_HEALTH.md`](./VAULT_HEALTH.md): Foundation = the product; vault = one instance (`FOUNDATION_DATA` + Postgres); graph = the knowledge in that vault; blob = a file on a node; agent = anything that can reach the vault MCP; operator = the human who runs Compose (only the human, not an agent). Do **not** call the graph “the Vault.”
+Same locked terms as [`VAULT_HEALTH.md`](./VAULT_HEALTH.md): Foundation = the product; vault = one instance (`FOUNDATION_DATA` + Postgres); graph = the knowledge in that vault; blob = a file on a node; agent = anything that can reach the vault MCP; operator = the human who runs Compose. Do **not** call the graph “the Vault.”
 
-The operator can run this report, or attach it to an instance-keeper agent ([`AGENTS.md`](./AGENTS.md)). Paste: [`prompts/graph-hygiene.md`](../prompts/graph-hygiene.md).
+The operator can run this report, or attach it to Vault Keeper ([`AGENTS.md`](./AGENTS.md)). Paste: [`prompts/graph-hygiene.md`](../prompts/graph-hygiene.md).
 
 ## What it is
 
@@ -69,4 +69,4 @@ Report slug, kind, parent_types. Do not `manage_type` on this routine.
 
 ## Failure / findings ping
 
-List what you found (duplicates, isolates, soup) with enough ids/titles for the operator to decide. Smallest next look — not a silent rewrite. If they ask to repair in this conversation, then you may mutate with the usual confirm gates. Do not email. Do not wipe the vault.
+List what you found (duplicates, isolates, soup) with enough ids/titles for the operator to decide. Smallest next look — not a silent rewrite. If they ask to repair in this conversation, then you may mutate with the usual confirm gates. Ping in chat.

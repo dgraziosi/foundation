@@ -178,8 +178,8 @@ test(
       await t.test("retried create with the same idempotency_key does not twin a node", async () => {
         const first = await upsertGraphNode(pool, {
           type: "person",
-          title: "Liz",
-          idempotency_key: "create-liz-1",
+          title: "Ada",
+          idempotency_key: "create-ada-1",
           actor: "agent",
           actor_label: "agent-a",
         });
@@ -188,18 +188,18 @@ test(
 
         const retry = await upsertGraphNode(pool, {
           type: "person",
-          title: "Elizabeth",
-          idempotency_key: "create-liz-1",
+          title: "Jordan Lee",
+          idempotency_key: "create-ada-1",
           actor_label: "agent-b",
         });
         assert.equal(isToolError(retry), false);
         if (isToolError(retry)) return;
         assert.equal(retry.node.id, first.node.id);
         assert.equal(retry.activity_id, first.activity_id);
-        assert.equal(retry.node.title, "Liz");
+        assert.equal(retry.node.title, "Ada");
 
         const { rows } = await pool.query<{ count: string }>(
-          `SELECT count(*)::text AS count FROM nodes WHERE title IN ('Liz', 'Elizabeth')`,
+          `SELECT count(*)::text AS count FROM nodes WHERE title IN ('Ada', 'Jordan Lee')`,
         );
         assert.equal(rows[0]?.count, "1");
       });

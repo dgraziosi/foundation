@@ -26,8 +26,8 @@ test("search query is optional when a filter is set", () => {
 });
 
 test("search still accepts a lexical query", () => {
-  const parsed = SearchInputSchema.parse({ query: "Liz", type: "person" });
-  assert.equal(parsed.query, "Liz");
+  const parsed = SearchInputSchema.parse({ query: "Ada", type: "person" });
+  assert.equal(parsed.query, "Ada");
 });
 
 test("manage_type accepts retire with confirm and purge_deleted", () => {

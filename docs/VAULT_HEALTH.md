@@ -11,11 +11,11 @@ Short analog: app / folder / links → Foundation / vault / graph.
 - **graph** — the knowledge in that vault
 - **blob** — a file on a node
 - **agent** — anything that can reach the vault MCP
-- **operator** — the human who runs Compose. Only the human, not an agent.
+- **operator** — the human who runs Compose
 
 Do not call the graph “the Vault.”
 
-The operator can run this checkup, or attach it to an instance-keeper agent ([`AGENTS.md`](./AGENTS.md)). Paste: [`prompts/vault-health.md`](../prompts/vault-health.md).
+The operator can run this checkup, or attach it to Vault Keeper ([`AGENTS.md`](./AGENTS.md)). Paste: [`prompts/vault-health.md`](../prompts/vault-health.md).
 
 ## What it is
 
@@ -28,7 +28,7 @@ Graph-side report (duplicate titles, zero-edge nodes, type soup) is **not** this
 ## What it is not
 
 - **Not the graph.** `$FOUNDATION_DATA` and Postgres *are* the vault. The graph lives in them. Do not call the graph “the Vault.” Do not dual-write a markdown store or invent a backup product.
-- **Optional stand-up.** Named agents are a clone recipe, not product ontology. See [`AGENTS.md`](./AGENTS.md).
+- **Starter recipes.** Paste Vault Keeper and attach this routine. See [`AGENTS.md`](./AGENTS.md).
 - **Not email.** No SMTP, no digest. Pings stay in the operator’s chat. Ping only when a check fails.
 - **Not a write-ACL.** The API key is the gate. Do not invent default-deny.
 - **Not a mutation pass.** The quiet weekday run does not `upsert`, `delete`, `unlink`, `undo`, or `manage_type` unless the operator asked for a repair in that conversation. Report; don’t rewrite the graph unattended.
@@ -38,7 +38,7 @@ Graph-side report (duplicate titles, zero-edge nodes, type soup) is **not** this
 
 Run in order. Stop at the first hard failure and ping. Skip a check when its input is unset — a fresh clone with no well-known nodes and no backup path is allowed to be healthy.
 
-Do **not** assume a live, populated graph. Do **not** `docker compose down -v`, delete `./data`, or otherwise wipe the vault.
+A first-day empty graph is a valid vault. Keep `FOUNDATION_DATA` in place and leave Compose volumes intact.
 
 ### 1. `GET /health` — process + db
 
@@ -98,4 +98,4 @@ Auth for `/mcp`: `Authorization: ApiKey <FOUNDATION_API_KEY>` (Bearer equivalent
 
 ## Failure ping
 
-Say what failed, what you observed, and the smallest next look (restart Compose, fix `FOUNDATION_DATA`, restore from the operator’s backup). Do not email. Do not silently mutate. Do not open a PR about graph data. Do not wipe the vault.
+Say what failed, what you observed, and the smallest next look (restart Compose, fix `FOUNDATION_DATA`, restore from the operator’s backup). Ping in chat. Leave the graph and `FOUNDATION_DATA` as they are unless the operator asked for a repair in this conversation.

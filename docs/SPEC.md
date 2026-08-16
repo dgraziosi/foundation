@@ -21,11 +21,11 @@ Short analog: app / folder / links → Foundation / vault / graph.
 - **graph** — the knowledge in that vault
 - **blob** — a file on a node
 - **agent** — anything that can reach the vault MCP
-- **operator** — the human who runs Compose. Only the human, not an agent.
+- **operator** — the human who runs Compose
 
 Do not call the graph “the Vault.”
 
-Optional named-agent recipe (not product ontology): [`AGENTS.md`](./AGENTS.md).
+Starter recipes: [`AGENTS.md`](./AGENTS.md).
 
 ## Primary users
 

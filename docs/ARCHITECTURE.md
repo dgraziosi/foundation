@@ -6,7 +6,7 @@ When a change alters the graph or vault shape, update this file in the same PR.
 
 ## Glossary
 
-**Foundation** is the product. A **vault** is one instance (`FOUNDATION_DATA` + Postgres). The **graph** is the knowledge in that vault. A **blob** is a file on a node. An **agent** is anything that can reach the vault MCP. The **operator** is the human who runs Compose — only the human, not an agent. Do not call the graph “the Vault.” A git clone is the product, not this vault — `compose up` elsewhere starts a different instance.
+**Foundation** is the product. A **vault** is one instance (`FOUNDATION_DATA` + Postgres). The **graph** is the knowledge in that vault. A **blob** is a file on a node. An **agent** is anything that can reach the vault MCP. The **operator** is the human who runs Compose. Do not call the graph “the Vault.” A git clone is the product, not this vault — `compose up` elsewhere starts a different instance.
 
 ## Vault
 
@@ -196,7 +196,7 @@ Agents talk to the vault over MCP. That path is not the architecture — it is t
 
 `http://127.0.0.1:8787/mcp` with `Authorization: ApiKey <FOUNDATION_API_KEY>`. Streamable HTTP on this process. Port stays localhost.
 
-Twelve tools: `bootstrap`, `search`, `get`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`. No thirteenth tool.
+Twelve tools: `bootstrap`, `search`, `get`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`.
 
 An agent that can reach the vault MCP may read/write; one that cannot does not.
 
