@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { SEED_NODE_TYPES, SEED_RELATION_TYPES } from "@foundation/schema";
 import { createPool } from "./client.js";
 import { migrate } from "./migrate.js";
-import { listNodeTypes, listRelationTypes } from "./queries.js";
+import { insertNodeType, listNodeTypes, listRelationTypes } from "./queries.js";
 import { seedSystemOntology } from "./seed.js";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -193,6 +193,92 @@ test(
       assert.deepEqual(place?.parent_types, []);
       assert.equal(place?.description, "A location (home, office, city, venue, …).");
       assert.equal(place?.is_system, true);
+      const company = after.find((type) => type.slug === "company");
+      assert.equal(company?.is_system, true);
+    } finally {
+      await pool.end();
+    }
+  },
+);
+
+test(
+  "seed apply takes the seed row when a seed slug already exists as authored",
+  { skip: !databaseUrl },
+  async () => {
+    if (!databaseUrl) {
+      return;
+    }
+    const pool = await poolForSchema("migrate_seed_authored");
+    try {
+      await migrate(pool);
+      await insertNodeType(pool, {
+        slug: "place",
+        label: "Authored Place",
+        description: "User-created place before it was a seed.",
+        kind: "artifact",
+        parent_types: ["area"],
+        json_schema: { type: "object" },
+      });
+      await insertNodeType(pool, {
+        slug: "company",
+        label: "Authored Company",
+        description: "User-created company before it was a seed.",
+        kind: "artifact",
+        parent_types: ["area"],
+        json_schema: { type: "object" },
+      });
+      await insertNodeType(pool, {
+        slug: "meeting",
+        label: "Meeting",
+        description: "A non-seed authored type.",
+        kind: "artifact",
+        parent_types: [],
+        json_schema: null,
+      });
+      const before = await listNodeTypes(pool);
+      assert.equal(before.find((type) => type.slug === "place")?.is_system, false);
+      assert.equal(before.find((type) => type.slug === "company")?.is_system, false);
+      assert.equal(before.find((type) => type.slug === "meeting")?.is_system, false);
+
+      const { rows: nodesBefore } = await pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM nodes",
+      );
+      assert.equal(nodesBefore[0]?.count, "0");
+
+      await seedSystemOntology(pool);
+
+      const after = await listNodeTypes(pool);
+      const place = after.find((type) => type.slug === "place");
+      assert.equal(place?.is_system, true);
+      assert.equal(place?.label, "Place");
+      assert.equal(place?.description, "A location (home, office, city, venue, …).");
+      assert.equal(place?.kind, "artifact");
+      assert.deepEqual(place?.parent_types, []);
+      assert.equal(place?.json_schema, null);
+
+      const company = after.find((type) => type.slug === "company");
+      assert.equal(company?.is_system, true);
+      assert.equal(company?.label, "Company");
+      assert.equal(company?.description, "An organization (employer, vendor, school, …).");
+      assert.equal(company?.kind, "artifact");
+      assert.deepEqual(company?.parent_types, []);
+      assert.equal(company?.json_schema, null);
+
+      const meeting = after.find((type) => type.slug === "meeting");
+      assert.equal(meeting?.is_system, false);
+      assert.equal(meeting?.label, "Meeting");
+      assert.equal(meeting?.description, "A non-seed authored type.");
+      assert.equal(meeting?.kind, "artifact");
+      assert.deepEqual(meeting?.parent_types, []);
+
+      const afterSlugs = after.map((type) => type.slug).sort();
+      const expectedSlugs = [...SEED_NODE_TYPES.map((type) => type.slug), "meeting"].sort();
+      assert.deepEqual(afterSlugs, expectedSlugs);
+
+      const { rows: nodesAfter } = await pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM nodes",
+      );
+      assert.equal(nodesAfter[0]?.count, "0");
     } finally {
       await pool.end();
     }
