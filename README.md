@@ -1,10 +1,29 @@
 # Foundation
 
-A personal ontology your agents can grow.
+**Vision:** A vault of your life that your bots can act on.
 
-Foundation is a small, self-hostable **typed knowledge graph + MCP server** for AI agents (Cursor, Claude, and other MCP clients). It gives them durable structure — not just chat memory — and lets that structure evolve as your life does.
+Foundation is a life management system. It gives you a vault to record your life, a method for organizing that vault, and bots that help you take action on what is in it. It is self-hosted. It can run on your computer or any virtual machine. It is designed to work with any harness (Grok Bot, Hermes, OpenClaw, Claude Code, Codex, and others).
 
-The name is a nod to Asimov: carry structured knowledge forward so you (and your agents) are not starting from zero every time.
+## 1. Vault
+The vault is a bot-managed typed knowledge graph. It is a system of record that adapts to your life. As you add to it, connections get made and related information gets pulled together.
+
+It holds your projects, goals, tasks, people, and places, and the files that belong with them. It always stays yours.
+
+## 2. Method
+The method is a recommended way to organize your vault. Starter types to get you going, and a recommended structure. Use them, change them, or add your own.
+
+Starter types: area, project, goal, task, person, place, note, habit, journal, idea, trip, decision, lesson
+
+Recommended structure: Area → project → goal → task. The point is to break your life into smaller pieces so bots can take them on.
+
+## 3. Bots
+The bots help you take action on what is in your vault. We provide two to get started. You can add more later using your platform of choice.
+
+Chief of Staff — The bot you talk to. You think out loud, dump what is on your mind, and work through decisions together. It files what matters in the vault, keeps you current on what is open and due, and hands work to the right bot. It asks you when something needs you. It also looks for recurring work in your day and suggests another bot when one would help.
+Out of the box: morning brief; capture (what you dump lands in the vault).
+
+Vault Keeper — Keeps the vault healthy and organized. Checks that it is up. Runs the backup. Cleans obvious mess.
+Out of the box: health check; nightly backup; periodic hygiene.
 
 **Glossary (locked):** **Foundation** = the product. A **vault** = one instance (`FOUNDATION_DATA` + Postgres). The **graph** = the knowledge in that vault. A **blob** = a file on a node. An **agent** = anything that can reach the vault MCP. The **operator** = the human who runs Compose — only the human, not an agent. Do not call the graph “the Vault.” Short analog: app / folder / links → Foundation / vault / graph.
 
@@ -18,20 +37,6 @@ Do not commit personal life data, documents, or secrets to this repository. Thos
 - [`docs/AGENTS.md`](docs/AGENTS.md) — optional named-agent recipe (not product ontology)
 - [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md) — weekday instance checkup
 - [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md) — weekly graph report
-
-## What it is
-
-- **Nodes** with types (e.g. area → project → goal → habit/task, plus whatever emerges)
-- **Typed links** between them
-- **Flexible payloads** (markdown, HTML, JSON, files as blobs) so a trip itinerary can live in the graph as HTML and a PDF can live as `$FOUNDATION_DATA/blobs/<uuid>`
-- **MCP-first** API so agents read and write the graph directly
-- Agents may **create and update types and relations** as needed (activity log for undo); no approve/reject inbox required
-
-## What it is not
-
-- Not a mobile app, billing system, or hosted SaaS you must buy
-- Not a second brain you have to maintain by hand (agents are the primary users)
-- Run Compose on a machine your agents can reach at localhost MCP
 
 ## Install
 
@@ -159,12 +164,6 @@ trailer<</Root 1 0 R>>
    If Postgres fails to start on a bind-mounted data dir, Compose already runs a `db-init` step that `chown`s `$FOUNDATION_DATA/postgres` to uid 999. Never `docker compose down -v` as a casual step; that is how you destroy a vault. Never delete `FOUNDATION_DATA`.
 
 Never point `FOUNDATION_DATA` at an agent profile or memory directory.
-
-## Intended use
-
-1. Run Compose on a machine your agents can reach at localhost MCP
-2. Point agents at the local MCP endpoint
-3. Optionally stand up named agents and instance routines ([`docs/AGENTS.md`](docs/AGENTS.md))
 
 ## License
 
