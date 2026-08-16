@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ManageTypeInputSchema, SearchInputSchema, searchHasSelector } from "./mcp-io.js";
+import {
+  GetSuccessSchema,
+  ManageTypeInputSchema,
+  SearchInputSchema,
+  SuggestedLinkSchema,
+  UpsertSuccessSchema,
+  searchHasSelector,
+} from "./mcp-io.js";
 
 test("search query is optional when a filter is set", () => {
   const listed = SearchInputSchema.parse({ type: "task", status: "active" });
@@ -28,6 +35,48 @@ test("search query is optional when a filter is set", () => {
 test("search still accepts a lexical query", () => {
   const parsed = SearchInputSchema.parse({ query: "Ada", type: "person" });
   assert.equal(parsed.query, "Ada");
+});
+
+test("suggested_links are seed relations to a live target", () => {
+  const link = SuggestedLinkSchema.parse({
+    kind: "child_of",
+    target: {
+      id: "11111111-1111-4111-8111-111111111111",
+      type: "project",
+      title: "Kitchen remodel",
+    },
+    reason: "Title matches an allowed parent.",
+  });
+  assert.equal(link.kind, "child_of");
+  assert.throws(() =>
+    SuggestedLinkSchema.parse({
+      kind: "supports",
+      target: link.target,
+      reason: "invented",
+    }),
+  );
+  const empty = UpsertSuccessSchema.parse({
+    node: {
+      id: "11111111-1111-4111-8111-111111111111",
+      type: "note",
+      title: "scratch",
+      status: "active",
+      payload: { media_type: "text/plain", storage: "inline", body: "" },
+      data: {},
+      metadata: {},
+      created_at: "2026-08-16T00:00:00.000Z",
+      updated_at: "2026-08-16T00:00:00.000Z",
+      deleted_at: null,
+    },
+    activity_id: "22222222-2222-4222-8222-222222222222",
+    suggested_links: [],
+  });
+  assert.deepEqual(empty.suggested_links, []);
+  GetSuccessSchema.parse({
+    node: empty.node,
+    edges: [],
+    suggested_links: [],
+  });
 });
 
 test("manage_type accepts retire with confirm and purge_deleted", () => {

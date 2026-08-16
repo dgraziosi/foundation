@@ -212,6 +212,59 @@ export async function getNodeByOrigin(
   return rows[0] ? mapNode(rows[0]) : undefined;
 }
 
+/** Live nodes whose title FTS-matches `title`. Skips self and already-linked pairs. */
+export async function searchTitleLinkCandidates(
+  db: Queryable,
+  input: { title: string; excludeId: string; limit?: number },
+): Promise<Array<{ id: string; type: string; title: string }>> {
+  const title = input.title.trim();
+  if (!title) {
+    return [];
+  }
+  const limit = input.limit ?? 20;
+  const { rows } = await db.query<{ id: string; type: string; title: string }>(
+    `WITH q AS (
+       SELECT
+         plainto_tsquery('english', foundation_unaccent($1)) AS tsq,
+         to_tsvector('english', foundation_unaccent($1)) AS title_tsv
+     )
+     SELECT n.id, n.type, n.title
+     FROM nodes n
+     CROSS JOIN q
+     WHERE n.deleted_at IS NULL
+       AND n.id <> $2
+       AND q.tsq::text <> ''
+       AND (
+         to_tsvector('english', foundation_unaccent(n.title)) @@ q.tsq
+         OR (
+           plainto_tsquery('english', foundation_unaccent(n.title))::text <> ''
+           AND q.title_tsv @@ plainto_tsquery('english', foundation_unaccent(n.title))
+         )
+       )
+       AND NOT EXISTS (
+         SELECT 1
+         FROM edges e
+         JOIN nodes other ON other.id = CASE
+           WHEN e.from_id = $2 THEN e.to_id
+           ELSE e.from_id
+         END
+         WHERE ((e.from_id = $2 AND e.to_id = n.id) OR (e.from_id = n.id AND e.to_id = $2))
+           AND other.deleted_at IS NULL
+       )
+     ORDER BY GREATEST(
+       ts_rank_cd(to_tsvector('english', foundation_unaccent(n.title)), q.tsq),
+       CASE
+         WHEN plainto_tsquery('english', foundation_unaccent(n.title))::text = '' THEN 0
+         ELSE ts_rank_cd(q.title_tsv, plainto_tsquery('english', foundation_unaccent(n.title)))
+       END
+     ) DESC,
+     n.updated_at DESC
+     LIMIT $3`,
+    [title, input.excludeId, limit],
+  );
+  return rows;
+}
+
 export async function isChildOfParent(
   db: Queryable,
   childId: string,

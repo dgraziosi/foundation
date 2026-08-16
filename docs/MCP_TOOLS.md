@@ -8,8 +8,8 @@ v1 surface is **12 tools**. Destructive tools require `confirm: true` or they re
 | --- | --- |
 | `bootstrap` | Return starter ontology, how to extend it, and current type/relation inventory. Call first. |
 | `search` | Find nodes by text query and/or filters (`type`, `status`, `under`, `since`, `origin`, `due`, `due_on_or_before`, `due_on_or_after`, `data_equals`). Query is optional when a filter is set. Hits are id/type/title/snippet plus `due` when set. |
-| `get` | Fetch a node by id, including payload and incident edges with neighbor titles. Blob payloads return metadata, not bytes. |
-| `upsert` | Create or update a node (title, type, payload, data, status). Updates require `base_updated_at`. Create accepts `idempotency_key`. Blob ingest via `bytes_base64` or `source_path`. |
+| `get` | Fetch a node by id, including payload, incident edges with neighbor titles, and `suggested_links` from title FTS. Blob payloads return metadata, not bytes. |
+| `upsert` | Create or update a node (title, type, payload, data, status). Updates require `base_updated_at`. Create accepts `idempotency_key`. Blob ingest via `bytes_base64` or `source_path`. Returns `suggested_links` (proposals only). |
 | `delete` | Soft-delete a node. Requires `confirm: true`. |
 | `link` | Create a typed edge after validation. Requires `from_base_updated_at` and `to_base_updated_at`. |
 | `unlink` | Remove a typed edge. Requires `confirm: true`. |
@@ -32,15 +32,17 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 ### `get`
 
 - **In:** `{ id, include_body? }`
-- **Out:** `{ node, edges: [{ id, from_id, to_id, relation_type, direction, metadata, created_at, neighbor: { id, title, type } }], blob? }` or `{ error, suggestion? }`
+- **Out:** `{ node, edges: [{ id, from_id, to_id, relation_type, direction, metadata, created_at, neighbor: { id, title, type } }], blob?, suggested_links }` or `{ error, suggestion? }`
 - Each incident edge includes **neighbor title and type**, not UUID-only hops. Use those titles to `search` or `get` the other node.
+- `suggested_links` is the same title-FTS list as `upsert` (skip self and already-linked; cap 5). Useful when a later `get` still has no edges. Empty → `[]`. Never writes an edge.
 - Inline payloads still return `payload.body`. Blob payloads return `{ storage: "blob", blob_id, media_type }` plus `blob: { id, sha256, media_type, byte_size, path }`. Bytes are **not** dumped into the JSON by default.
 - `include_body: true` may add base64 `payload.body` for small blobs (256KB cap). Larger files: HTTP `GET /blobs/:id` with `Authorization: ApiKey <FOUNDATION_API_KEY>`.
 
 ### `upsert`
 
 - **In:** `{ id?, type, title, payload?, data?, status?, metadata?, base_updated_at?, idempotency_key?, actor?, actor_label? }`
-- **Out:** `{ node, activity_id }` or `{ error, suggestion? }`
+- **Out:** `{ node, activity_id, suggested_links }` or `{ error, suggestion? }`
+- **`suggested_links`:** Postgres FTS on the new title (create, and update when the title changes) — not embeddings. Each item is `{ kind, target: { id, type, title }, reason }`. `kind` is a seed relation: `child_of`, `about`, or `relates_to`. `target` is a **live** node that already exists. How they are chosen: spine types with `parent_types` → `child_of` a live allowed parent whose title matches; if the title looks like a person already in the graph → `about` that person; otherwise `relates_to` a close title match of any type. Skip self. Skip nodes already linked to this one. Cap 5. Empty graph or no match → `[]`. **Never creates an edge.** Never adds a type or relation. `link` is how an accepted suggestion becomes an edge. Show non-empty suggestions and ask before calling `link`.
 - `payload`: `{ media_type, storage: "inline"|"blob", body?, blob_id?, bytes_base64?, source_path? }`
 - Inline media types: `text/markdown`, `text/html`, `application/json`, `text/plain`.
 - **Blob ingest (no browser, no S3):** pass exactly one of:
@@ -143,4 +145,4 @@ Undo tokens are single-use (`undone_at`; token cleared). Expired tokens refuse. 
 
 ## Not in v1
 
-Restore as a separate tool (use `undo`), hierarchy tree, parent suggestion, habit logging, a dedicated blob-upload tool (ingest is on `upsert`), embeddings admin, memories, pending proposals, chat presentation, web search, skills, `get_vault_health` / `run_maintenance` / `audit_links` (instance routines instead: [vault health](./VAULT_HEALTH.md), [graph hygiene](./GRAPH_HYGIENE.md), [apply product updates](../prompts/update-foundation.md)).
+Restore as a separate tool (use `undo`), hierarchy tree, a dedicated parent-suggestion tool (title-FTS `suggested_links` already return on `upsert` / `get`; `link` writes the edge), habit logging, a dedicated blob-upload tool (ingest is on `upsert`), embeddings admin, memories, pending proposals, chat presentation, web search, skills, `get_vault_health` / `run_maintenance` / `audit_links` (instance routines instead: [vault health](./VAULT_HEALTH.md), [graph hygiene](./GRAPH_HYGIENE.md), [apply product updates](../prompts/update-foundation.md)).

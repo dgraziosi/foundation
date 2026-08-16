@@ -7,7 +7,8 @@ import { defineTool } from "./define-tool.js";
 export function registerGetTool(server: McpServer, pool: Pool, dataDir: string): void {
   defineTool(server, {
     name: "get",
-    description: "Fetch a node by id, including payload and incident edges with neighbor titles.",
+    description:
+      "Fetch a node by id, including payload, incident edges with neighbor titles, and suggested_links from title FTS when a live neighbor looks related. Suggestions never write an edge.",
     input: GetInputSchema.shape,
     output: GetSuccessSchema,
     handler: async (input) =>

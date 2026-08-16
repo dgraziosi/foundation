@@ -48,6 +48,7 @@ export {
   restoreNode,
   restoreNodeSnapshot,
   searchNodes,
+  searchTitleLinkCandidates,
   softDeleteNode,
   updateNode,
 } from "./nodes.js";

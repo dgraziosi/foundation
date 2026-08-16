@@ -78,6 +78,8 @@ export {
   SearchSuccessSchema,
   searchHasSelector,
   SlugSchema,
+  SuggestedLinkKindSchema,
+  SuggestedLinkSchema,
   ToolErrorSchema,
   UndoInputSchema,
   UnlinkInputSchema,
@@ -95,12 +97,24 @@ export {
   type NeighborRef,
   type SearchHit,
   type SearchInput,
+  type SuggestedLink,
   type ToolError,
   type UndoInput,
   type UpsertInput,
   type UpsertPayload,
   type WriterIdentity,
 } from "./mcp-io.js";
+export {
+  ABOUT_SUGGESTION_REASON,
+  CHILD_OF_SUGGESTION_REASON,
+  RELATES_TO_SUGGESTION_REASON,
+  SUGGESTED_LINKS_CAP,
+  SUGGESTED_LINK_KINDS,
+  classifySuggestedLinks,
+  type SuggestedLinkCandidate,
+  type SuggestedLinkKind,
+  type SuggestedLinkTarget,
+} from "./suggested-links.js";
 export {
   ORIGIN_INCOMPLETE_SUGGESTION,
   ORIGIN_UNKNOWN_SYSTEM_SUGGESTION,

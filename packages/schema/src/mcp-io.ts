@@ -66,10 +66,22 @@ export const IncidentEdgeSchema = EdgeSchema.extend({
 });
 export type IncidentEdge = z.infer<typeof IncidentEdgeSchema>;
 
+export const SuggestedLinkKindSchema = z.enum(["child_of", "about", "relates_to"]);
+
+export const SuggestedLinkSchema = z.object({
+  kind: SuggestedLinkKindSchema,
+  /** Live node that already exists. Suggestions never invent a type or write an edge. */
+  target: NeighborRefSchema,
+  reason: z.string().min(1),
+});
+export type SuggestedLink = z.infer<typeof SuggestedLinkSchema>;
+
 export const GetSuccessSchema = z.object({
   node: NodeSchema,
   edges: z.array(IncidentEdgeSchema),
   blob: BlobSchema.optional(),
+  /** Title-FTS proposals. Empty when none, including an empty graph. Never creates an edge. */
+  suggested_links: z.array(SuggestedLinkSchema),
 });
 
 /** Upsert ingest: inline body, existing blob_id, bytes_base64, or uploads source_path. */
@@ -140,6 +152,8 @@ export type UpsertInput = z.infer<typeof UpsertInputSchema>;
 export const UpsertSuccessSchema = z.object({
   node: NodeSchema,
   activity_id: z.string().uuid(),
+  /** Title-FTS proposals. Empty when none, including an empty graph. Never creates an edge. */
+  suggested_links: z.array(SuggestedLinkSchema),
 });
 
 export const DeleteInputSchema = z.object({
