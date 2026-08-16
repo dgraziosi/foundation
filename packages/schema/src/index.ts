@@ -111,6 +111,7 @@ export {
   SUGGESTED_LINKS_CAP,
   SUGGESTED_LINK_KINDS,
   classifySuggestedLinks,
+  type ClassifySuggestedLinksOptions,
   type SuggestedLinkCandidate,
   type SuggestedLinkKind,
   type SuggestedLinkTarget,

@@ -23,6 +23,11 @@ export type SuggestedLink = {
 
 export type SuggestedLinkCandidate = SuggestedLinkTarget;
 
+export type ClassifySuggestedLinksOptions = {
+  /** Live child_of already exists — do not propose a second parent. */
+  hasChildOf?: boolean;
+};
+
 /**
  * Ranked title matches in, seed-relation suggestions out.
  * Never invents a type or relation. Caller must not write an edge.
@@ -31,6 +36,7 @@ export function classifySuggestedLinks(
   sourceId: string,
   sourceType: NodeType,
   candidates: readonly SuggestedLinkCandidate[],
+  options: ClassifySuggestedLinksOptions = {},
 ): SuggestedLink[] {
   const usable = candidates.filter((candidate) => candidate.id !== sourceId);
   const out: SuggestedLink[] = [];
@@ -57,7 +63,11 @@ export function classifySuggestedLinks(
     }
   };
 
-  if (sourceType.kind === "spine" && sourceType.parent_types.length > 0) {
+  if (
+    !options.hasChildOf &&
+    sourceType.kind === "spine" &&
+    sourceType.parent_types.length > 0
+  ) {
     take(
       "child_of",
       usable.filter((candidate) => sourceType.parent_types.includes(candidate.type)),

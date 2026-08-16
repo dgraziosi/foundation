@@ -171,6 +171,77 @@ test(
         );
       });
 
+      await t.test("task already child_of A is not offered child_of B", async () => {
+        const projectA = await upsertGraphNode(pool, {
+          type: "project",
+          title: "Garden shed",
+        });
+        const projectB = await upsertGraphNode(pool, {
+          type: "project",
+          title: "Bathroom remodel",
+        });
+        assert.equal(isToolError(projectA), false);
+        assert.equal(isToolError(projectB), false);
+        if (isToolError(projectA) || isToolError(projectB)) {
+          return;
+        }
+
+        const task = await upsertGraphNode(pool, {
+          type: "task",
+          title: "Garden shed punch list",
+        });
+        assert.equal(isToolError(task), false);
+        if (isToolError(task)) {
+          return;
+        }
+        const linked = await linkGraphNodes(pool, {
+          from_id: task.node.id,
+          to_id: projectA.node.id,
+          relation_type: "child_of",
+          from_base_updated_at: task.node.updated_at,
+          to_base_updated_at: projectA.node.updated_at,
+        });
+        assert.equal(isToolError(linked), false);
+        if (isToolError(linked)) {
+          return;
+        }
+
+        const current = await getGraphNode(pool, task.node.id);
+        assert.equal(isToolError(current), false);
+        if (isToolError(current)) {
+          return;
+        }
+        const renamed = await upsertGraphNode(pool, {
+          id: task.node.id,
+          type: "task",
+          title: "Bathroom remodel",
+          base_updated_at: current.node.updated_at,
+        });
+        assert.equal(isToolError(renamed), false);
+        if (isToolError(renamed)) {
+          return;
+        }
+        assert.equal(
+          renamed.suggested_links.some((item) => item.kind === "child_of"),
+          false,
+        );
+        assert.equal(
+          renamed.suggested_links.some((item) => item.target.id === projectB.node.id && item.kind === "child_of"),
+          false,
+        );
+
+        const fetched = await getGraphNode(pool, task.node.id);
+        assert.equal(isToolError(fetched), false);
+        if (isToolError(fetched)) {
+          return;
+        }
+        assert.equal(
+          fetched.suggested_links.some((item) => item.kind === "child_of"),
+          false,
+        );
+        assert.ok(fetched.edges.some((edge) => edge.relation_type === "child_of"));
+      });
+
       await t.test("title that looks like a person suggests about", async () => {
         const person = await upsertGraphNode(pool, {
           type: "person",

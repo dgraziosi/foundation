@@ -38,6 +38,7 @@ export {
   getNodeById,
   getNodeByIdempotencyKey,
   getNodeByOrigin,
+  hasLiveChildOf,
   insertEdge,
   insertNode,
   isChildOfParent,

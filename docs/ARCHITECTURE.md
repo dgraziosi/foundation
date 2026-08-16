@@ -146,7 +146,7 @@ Writes go through the graph and leave **activity**. `undo` reverses a reversible
 - **data merge:** update patches `data` (`JSONB ||`). A partial patch does not wipe other keys.
 - **Create idempotency:** `idempotency_key` on create. A retry returns the same node; it does not twin.
 - Optional `actor` / `actor_label` are stored on the activity row (who wrote), not a permission gate.
-- **Suggested links:** `upsert` (and `get` when the node still has no edges) may return `suggested_links` from title FTS. These are proposals (`child_of` / `about` / `relates_to` to a live target). The vault does not invent types or write an edge; `link` is the write.
+- **Suggested links:** `upsert` (and `get` when the node still has no edges) may return `suggested_links` from title FTS. These are proposals (`child_of` / `about` / `relates_to` to a live target). A node that already has a live `child_of` is not offered a second parent. The vault does not invent types or write an edge; `link` is the write.
 
 ```mermaid
 flowchart LR

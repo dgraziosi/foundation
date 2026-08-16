@@ -265,6 +265,21 @@ export async function searchTitleLinkCandidates(
   return rows;
 }
 
+/** True when the node already has a live child_of parent (deleted parents do not count). */
+export async function hasLiveChildOf(db: Queryable, childId: string): Promise<boolean> {
+  const { rows } = await db.query<{ ok: number }>(
+    `SELECT 1 AS ok
+     FROM edges e
+     JOIN nodes parent ON parent.id = e.to_id
+     WHERE e.from_id = $1
+       AND e.relation_type = 'child_of'
+       AND parent.deleted_at IS NULL
+     LIMIT 1`,
+    [childId],
+  );
+  return rows.length > 0;
+}
+
 export async function isChildOfParent(
   db: Queryable,
   childId: string,

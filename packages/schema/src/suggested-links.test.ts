@@ -85,6 +85,25 @@ test("child_of and about can both appear; relates_to stays a fallback", () => {
   assert.equal(suggestions[1]?.target.id, person.id);
 });
 
+test("already has a live child_of: do not suggest a second parent", () => {
+  const other = {
+    id: "66666666-6666-4666-8666-666666666666",
+    type: "project",
+    title: "Bathroom remodel",
+  };
+  const suggestions = classifySuggestedLinks(self.id, seedType("task"), [other, person], {
+    hasChildOf: true,
+  });
+  assert.equal(suggestions.some((item) => item.kind === "child_of"), false);
+  assert.deepEqual(suggestions, [
+    {
+      kind: "about",
+      target: person,
+      reason: ABOUT_SUGGESTION_REASON,
+    },
+  ]);
+});
+
 test("suggestions cap at 5", () => {
   const extras = Array.from({ length: 8 }, (_, index) => ({
     id: `55555555-5555-4555-8555-${String(index).padStart(12, "0")}`,

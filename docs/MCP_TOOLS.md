@@ -34,7 +34,7 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 - **In:** `{ id, include_body? }`
 - **Out:** `{ node, edges: [{ id, from_id, to_id, relation_type, direction, metadata, created_at, neighbor: { id, title, type } }], blob?, suggested_links }` or `{ error, suggestion? }`
 - Each incident edge includes **neighbor title and type**, not UUID-only hops. Use those titles to `search` or `get` the other node.
-- `suggested_links` is the same title-FTS list as `upsert` (skip self and already-linked; cap 5). Useful when a later `get` still has no edges. Empty → `[]`. Never writes an edge.
+- `suggested_links` is the same title-FTS list as `upsert` (skip self and already-linked; no second `child_of` parent; cap 5). Useful when a later `get` still has no edges. Empty → `[]`. Never writes an edge.
 - Inline payloads still return `payload.body`. Blob payloads return `{ storage: "blob", blob_id, media_type }` plus `blob: { id, sha256, media_type, byte_size, path }`. Bytes are **not** dumped into the JSON by default.
 - `include_body: true` may add base64 `payload.body` for small blobs (256KB cap). Larger files: HTTP `GET /blobs/:id` with `Authorization: ApiKey <FOUNDATION_API_KEY>`.
 
@@ -42,7 +42,7 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 
 - **In:** `{ id?, type, title, payload?, data?, status?, metadata?, base_updated_at?, idempotency_key?, actor?, actor_label? }`
 - **Out:** `{ node, activity_id, suggested_links }` or `{ error, suggestion? }`
-- **`suggested_links`:** Postgres FTS on the new title (create, and update when the title changes) — not embeddings. Each item is `{ kind, target: { id, type, title }, reason }`. `kind` is a seed relation: `child_of`, `about`, or `relates_to`. `target` is a **live** node that already exists. How they are chosen: spine types with `parent_types` → `child_of` a live allowed parent whose title matches; if the title looks like a person already in the graph → `about` that person; otherwise `relates_to` a close title match of any type. Skip self. Skip nodes already linked to this one. Cap 5. Empty graph or no match → `[]`. **Never creates an edge.** Never adds a type or relation. `link` is how an accepted suggestion becomes an edge. Show non-empty suggestions and ask before calling `link`.
+- **`suggested_links`:** Postgres FTS on the new title (create, and update when the title changes) — not embeddings. Each item is `{ kind, target: { id, type, title }, reason }`. `kind` is a seed relation: `child_of`, `about`, or `relates_to`. `target` is a **live** node that already exists. How they are chosen: spine types with `parent_types` → `child_of` a live allowed parent whose title matches; if the title looks like a person already in the graph → `about` that person; otherwise `relates_to` a close title match of any type. Skip self. Skip nodes already linked to this one. A node with a live `child_of` is not offered a second parent (`about` / `relates_to` may still appear). Cap 5. Empty graph or no match → `[]`. **Never creates an edge.** Never adds a type or relation. `link` is how an accepted suggestion becomes an edge. Show non-empty suggestions and ask before calling `link`.
 - `payload`: `{ media_type, storage: "inline"|"blob", body?, blob_id?, bytes_base64?, source_path? }`
 - Inline media types: `text/markdown`, `text/html`, `application/json`, `text/plain`.
 - **Blob ingest (no browser, no S3):** pass exactly one of:
