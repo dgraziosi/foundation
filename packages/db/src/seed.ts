@@ -10,11 +10,15 @@ export async function seedSystemOntology(pool: pg.Pool): Promise<void> {
       ) VALUES ($1, $2, $3, $4, $5::text[], $6::jsonb, true)
       ON CONFLICT (slug) DO UPDATE SET
         label = EXCLUDED.label,
+        description = CASE
+          WHEN node_types.is_system THEN node_types.description
+          ELSE EXCLUDED.description
+        END,
         kind = EXCLUDED.kind,
         parent_types = EXCLUDED.parent_types,
         json_schema = EXCLUDED.json_schema,
+        is_system = true,
         updated_at = now()
-      WHERE node_types.is_system = true
       `,
       [
         type.slug,
