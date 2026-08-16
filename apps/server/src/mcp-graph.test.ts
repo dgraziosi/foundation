@@ -71,6 +71,9 @@ test(
       const boot = asObject(await client.callTool({ name: "bootstrap", arguments: {} }));
       assert.equal((boot.spine as { diagram: string }).diagram, "area → project → goal → habit | task");
       assert.match((boot.spine as { description: string }).description, /preferred placement, not a hard gate/);
+      const bootSlugs = (boot.types as Array<{ slug: string }>).map((type) => type.slug);
+      assert.ok(bootSlugs.includes("place"));
+      assert.ok(bootSlugs.includes("company"));
       assert.match((boot.how_to_extend as { search: string }).search, /data_equals/);
       assert.equal((boot.how_to_extend as { nodes: string }).nodes.includes("upsert"), true);
       assert.equal((boot.how_to_extend as { activity: string }).activity.includes("list_activity"), true);
@@ -166,6 +169,8 @@ test(
       const slugs = (ontology.types as Array<{ slug: string }>).map((row) => row.slug);
       assert.ok(slugs.includes("waypoint"));
       assert.ok(slugs.includes("area"));
+      assert.ok(slugs.includes("place"));
+      assert.ok(slugs.includes("company"));
 
       const listed = asObject(
         await client.callTool({

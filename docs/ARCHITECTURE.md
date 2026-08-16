@@ -85,7 +85,9 @@ Hierarchy verb is `child_of`. At most one `child_of` per node. Allowed parents c
 
 Spine: **area → project → goal → habit | task** — preferred placement, not a hard gate. `task` may `child_of` `goal` or `project` (prefer goal when there is a real outcome). `task` cannot `child_of` `area`.
 
-Artifacts hang off that spine or sit beside it. Seeds include person, company, decision, note, lesson, journal, idea, trip. `lesson` and `decision` may hang under area, project, or goal. `person`, `company`, `note`, and the other artifacts sit beside unless an agent links them.
+Recommended structure: Area → project → goal → task. A habit hangs under a goal. A task may child_of a goal or a project.
+
+Artifacts hang off that spine or sit beside it. Seeds include person, place, company, decision, note, lesson, journal, idea, trip. `lesson` and `decision` may hang under area, project, or goal. `person`, `place`, `company`, `note`, and the other artifacts sit beside unless an agent links them.
 
 ```mermaid
 flowchart TB
@@ -106,7 +108,7 @@ flowchart TB
   hang -.-> project
   hang -.-> goal
 
-  beside["person / company / note / ..."]
+  beside["person / place / company / note / ..."]
   beside -.-> area
 ```
 

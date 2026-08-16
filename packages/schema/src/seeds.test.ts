@@ -25,9 +25,19 @@ test("seed node types parse and include spine plus artifacts", () => {
   for (const slug of ARTIFACT_TYPE_SLUGS) {
     assert.ok(slugs.includes(slug), `missing artifact type ${slug}`);
   }
+  assert.ok(slugs.includes("place"));
   assert.ok(slugs.includes("company"));
   assert.ok(slugs.includes("decision"));
   assert.equal(slugs.includes("core_value"), false);
+  const place = SEED_NODE_TYPES.find((type) => type.slug === "place");
+  const company = SEED_NODE_TYPES.find((type) => type.slug === "company");
+  assert.equal(place?.kind, "artifact");
+  assert.deepEqual(place?.parent_types, []);
+  assert.equal(place?.label, "Place");
+  assert.equal(place?.description, "A location (home, office, city, venue, …).");
+  assert.equal(place?.is_system, true);
+  assert.equal(company?.kind, "artifact");
+  assert.equal(company?.is_system, true);
   const task = SEED_NODE_TYPES.find((type) => type.slug === "task");
   const goal = SEED_NODE_TYPES.find((type) => type.slug === "goal");
   assert.deepEqual(task?.parent_types, ["goal", "project"]);
