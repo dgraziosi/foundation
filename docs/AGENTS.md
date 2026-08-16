@@ -37,6 +37,10 @@ Fill in the operator config (data dir, optional well-known nodes, backup path, c
 
 Paste [`prompts/executive-assistant.md`](../prompts/executive-assistant.md). Give it mail, calendar, and the vault MCP so it can read due dates.
 
+## Another bot
+
+Chief of Staff copies [`prompts/bot-template.md`](../prompts/bot-template.md), fills the six headings, and pastes the result into the operator’s harness. The create-bot skill is [`skills/create-bot/SKILL.md`](../skills/create-bot/SKILL.md).
+
 ## Where prompts live
 
 | File | Paste into |
