@@ -17,7 +17,7 @@ fail() {
 
 # Single dated dump older than 14 days must survive prune.
 tmp_one="$(mktemp -d)"
-trap 'rm -rf -- "${tmp_one}" "${tmp_two:-}" "${tmp_fail:-}" "${tmp_blobs:-}"' EXIT
+trap 'rm -rf -- "${tmp_one}" "${tmp_two:-}" "${tmp_fail:-}" "${tmp_blobs:-}" "${tmp_abort:-}"' EXIT
 printf '%s\n' '-- fixture dump, not a vault' >"${tmp_one}/foundation-20000101.sql"
 foundation_backup_prune_sql "${tmp_one}"
 if [[ ! -f "${tmp_one}/foundation-20000101.sql" ]]; then
@@ -128,6 +128,62 @@ if ! grep -qx 'date=good' "${tmp_blobs}/backup/MANIFEST"; then
 fi
 if compgen -G "${tmp_blobs}/backup/blobs.staging.*" >/dev/null; then
   fail "failed later step left a blob staging tree"
+fi
+
+# Mid-install abort after staging is filled (set -e on rollback cp) must not
+# leave blobs.staging.*. A second attempt must not accumulate another tree.
+tmp_abort="$(mktemp -d)"
+abort_day="$(date +%Y%m%d)"
+mkdir -p "${tmp_abort}/backup/sql" "${tmp_abort}/backup/blobs" "${tmp_abort}/data/blobs"
+printf '%s\n' '-- last good dump' >"${tmp_abort}/backup/sql/foundation-${abort_day}.sql"
+printf '%s\n' 'date=good' >"${tmp_abort}/backup/MANIFEST"
+printf '%s\n' 'keep-original' >"${tmp_abort}/backup/blobs/keep-me"
+printf '%s\n' '-- new dump temp' >"${tmp_abort}/dump.tmp"
+chmod 0600 "${tmp_abort}/dump.tmp"
+
+run_abort_install() {
+  set +e
+  (
+    foundation_backup_stage_blobs() {
+      mkdir -p -- "$2"
+      printf '%s\n' 'staged' >"$2/staged"
+    }
+    cp() { return 1; }
+    foundation_backup_install \
+      "${tmp_abort}/backup" \
+      "${tmp_abort}/data" \
+      "${abort_day}" \
+      "${tmp_abort}/dump.tmp" \
+      ""
+  )
+  abort_rc=$?
+  set -e
+  if ((abort_rc == 0)); then
+    fail "install should abort when rollback cp fails after staging"
+  fi
+}
+
+run_abort_install
+# Recreate the dump temp so a retry can start the same way.
+printf '%s\n' '-- new dump temp' >"${tmp_abort}/dump.tmp"
+chmod 0600 "${tmp_abort}/dump.tmp"
+run_abort_install
+
+if compgen -G "${tmp_abort}/backup/blobs.staging.*" >/dev/null; then
+  fail "mid-install abort left a blobs.staging.* tree"
+fi
+staging_count="$(find "${tmp_abort}/backup" -maxdepth 1 -type d -name 'blobs.staging.*' | wc -l | tr -d ' ')"
+if ((staging_count != 0)); then
+  fail "retry accumulated blobs.staging.* directories (${staging_count})"
+fi
+if [[ ! -f "${tmp_abort}/backup/blobs/keep-me" ]] || ! grep -qx 'keep-original' "${tmp_abort}/backup/blobs/keep-me"; then
+  fail "mid-install abort mutated BACKUP_ROOT/blobs"
+fi
+if ! grep -qx -- '-- last good dump' "${tmp_abort}/backup/sql/foundation-${abort_day}.sql"; then
+  fail "mid-install abort replaced the same-day dump"
+fi
+if ! grep -qx 'date=good' "${tmp_abort}/backup/MANIFEST"; then
+  fail "mid-install abort replaced MANIFEST"
 fi
 
 echo "backup-vault.test: ok"

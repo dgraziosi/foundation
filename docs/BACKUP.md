@@ -18,7 +18,7 @@ Each run (Compose stays up):
 3. `$BACKUP_ROOT/MANIFEST` — date, dump size, blob count from the staging tree, product git SHA when the checkout has one, checksum of that day’s dump. No node titles, no graph payloads, no life text.
 4. After the dump and `MANIFEST` are in place, swap the staging tree into `$BACKUP_ROOT/blobs/` (one tree, not a dated copy)
 
-It skips `uploads/`. It does not copy the live `postgres/` cluster. Same-day success overwrites that day’s SQL and ends with one blob tree that matches live (including deletions). SQL files older than 14 days are pruned; the last remaining dump is never deleted. If dump, staging rsync, `MANIFEST`, or the final swap fails, temps and staging are deleted; the last good dump, `MANIFEST`, and `$BACKUP_ROOT/blobs/` stay in place.
+It skips `uploads/`. It does not copy the live `postgres/` cluster. Same-day success overwrites that day’s SQL and ends with one blob tree that matches live (including deletions). SQL files older than 14 days are pruned; the last remaining dump is never deleted. If dump, staging rsync, `MANIFEST`, or the final swap fails — or any later step aborts — temps and every `blobs.staging.*` tree are deleted; the last good dump, `MANIFEST`, and `$BACKUP_ROOT/blobs/` stay in place. A retry does not accumulate staging directories.
 
 ```bash
 # from the clone, with Compose up

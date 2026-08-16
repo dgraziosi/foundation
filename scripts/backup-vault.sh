@@ -12,8 +12,8 @@
 # moves the dump and MANIFEST into place and swaps staging into
 # $BACKUP_ROOT/blobs/. Same-day success overwrites that day's SQL and
 # ends with one blob tree that matches live (including deletions). On
-# failure, temps and staging are deleted; the last good dump, MANIFEST,
-# and blob tree stay.
+# any abort after temps or staging exist, those are deleted; the last
+# good dump, MANIFEST, and blob tree stay.
 set -euo pipefail
 
 FOUNDATION_BACKUP_SQL_GLOB='foundation-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].sql'
@@ -200,77 +200,86 @@ foundation_backup_swap_blobs() {
   rm -rf -- "${prev}" || true
 }
 
+# Restore previous dump/MANIFEST if we already moved the new ones, then drop
+# temps and every blobs.staging.* tree. Live $BACKUP_ROOT/blobs/ is not touched.
+foundation_backup_install_abort() {
+  local dump_tmp="$1"
+  local manifest_tmp="$2"
+  local staging="$3"
+  local saved_dump="$4"
+  local saved_manifest="$5"
+  local dump_path="$6"
+  local manifest="$7"
+  local backup_abs="$8"
+
+  if [[ -z "${dump_tmp}" && -n "${saved_dump}" && -f "${saved_dump}" ]]; then
+    mv -- "${saved_dump}" "${dump_path}" || true
+    saved_dump=""
+  fi
+  if [[ -z "${manifest_tmp}" && -n "${saved_manifest}" && -f "${saved_manifest}" ]]; then
+    mv -- "${saved_manifest}" "${manifest}" || true
+    saved_manifest=""
+  fi
+  foundation_backup_discard "${dump_tmp}" "${manifest_tmp}" "${staging}" "${saved_dump}" "${saved_manifest}"
+  if [[ -n "${backup_abs}" && -d "${backup_abs}" ]]; then
+    find "${backup_abs}" -maxdepth 1 -type d -name 'blobs.staging.*' -exec rm -rf {} +
+  fi
+}
+
 # After a dump sits in dump_tmp: stage blobs, write MANIFEST from that temp dump
 # and staging tree, commit dump + MANIFEST, then swap staging into blobs/.
-# On any failure, delete temps and staging; leave the previous dump, MANIFEST,
-# and blob tree untouched.
+# A subshell EXIT trap discards temps and staging on any abort (including set -e
+# after mktemp/cp). Previous dump, MANIFEST, and blob tree stay put.
 foundation_backup_install() {
   local backup_abs="$1"
   local data_abs="$2"
   local day="$3"
   local dump_tmp="$4"
   local git_sha="$5"
-  local dump_path manifest manifest_tmp="" staging="" saved_dump="" saved_manifest=""
 
-  dump_path="${backup_abs}/sql/foundation-${day}.sql"
-  manifest="${backup_abs}/MANIFEST"
+  (
+    set -euo pipefail
+    local dump_path manifest
+    local manifest_tmp="" staging="" saved_dump="" saved_manifest=""
 
-  if ! staging="$(mktemp -d "${backup_abs}/blobs.staging.XXXXXX")"; then
-    foundation_backup_discard "${dump_tmp}"
-    echo "backup-vault: cannot stage blobs; last good dump, MANIFEST, and blobs left in place" >&2
-    return 1
-  fi
+    dump_path="${backup_abs}/sql/foundation-${day}.sql"
+    manifest="${backup_abs}/MANIFEST"
 
-  if ! manifest_tmp="$(mktemp "${manifest}.tmp.XXXXXX")"; then
-    foundation_backup_discard "${dump_tmp}" "${staging}"
-    echo "backup-vault: cannot stage MANIFEST; last good dump, MANIFEST, and blobs left in place" >&2
-    return 1
-  fi
+    trap 'foundation_backup_install_abort \
+      "${dump_tmp}" "${manifest_tmp}" "${staging}" \
+      "${saved_dump}" "${saved_manifest}" \
+      "${dump_path}" "${manifest}" "${backup_abs}"' EXIT
 
-  if ! foundation_backup_stage_blobs "${data_abs}" "${staging}"; then
-    foundation_backup_discard "${dump_tmp}" "${manifest_tmp}" "${staging}"
-    echo "backup-vault: rsync failed; last good dump, MANIFEST, and blobs left in place" >&2
-    return 1
-  fi
+    staging="$(mktemp -d "${backup_abs}/blobs.staging.XXXXXX")"
+    manifest_tmp="$(mktemp "${manifest}.tmp.XXXXXX")"
+    foundation_backup_stage_blobs "${data_abs}" "${staging}" \
+      || { echo "backup-vault: rsync failed; last good dump, MANIFEST, and blobs left in place" >&2; exit 1; }
+    foundation_backup_write_manifest_tmp "${manifest_tmp}" "${day}" "${dump_tmp}" "${git_sha}" "${staging}" \
+      || { echo "backup-vault: MANIFEST write failed; last good dump, MANIFEST, and blobs left in place" >&2; exit 1; }
 
-  if ! foundation_backup_write_manifest_tmp "${manifest_tmp}" "${day}" "${dump_tmp}" "${git_sha}" "${staging}"; then
-    foundation_backup_discard "${dump_tmp}" "${manifest_tmp}" "${staging}"
-    echo "backup-vault: MANIFEST write failed; last good dump, MANIFEST, and blobs left in place" >&2
-    return 1
-  fi
-
-  if [[ -f "${dump_path}" ]]; then
-    saved_dump="$(mktemp "${dump_path}.prev.XXXXXX")"
-    cp -p -- "${dump_path}" "${saved_dump}"
-  fi
-  if [[ -f "${manifest}" ]]; then
-    saved_manifest="$(mktemp "${manifest}.prev.XXXXXX")"
-    cp -p -- "${manifest}" "${saved_manifest}"
-  fi
-
-  mv -- "${dump_tmp}" "${dump_path}"
-  dump_tmp=""
-  chmod 0600 -- "${dump_path}"
-  mv -- "${manifest_tmp}" "${manifest}"
-  manifest_tmp=""
-
-  if ! foundation_backup_swap_blobs "${backup_abs}" "${staging}"; then
-    if [[ -n "${saved_dump}" ]]; then
-      mv -- "${saved_dump}" "${dump_path}"
-    else
-      rm -f -- "${dump_path}"
+    if [[ -f "${dump_path}" ]]; then
+      saved_dump="$(mktemp "${dump_path}.prev.XXXXXX")"
+      cp -p -- "${dump_path}" "${saved_dump}"
     fi
-    if [[ -n "${saved_manifest}" ]]; then
-      mv -- "${saved_manifest}" "${manifest}"
-    else
-      rm -f -- "${manifest}"
+    if [[ -f "${manifest}" ]]; then
+      saved_manifest="$(mktemp "${manifest}.prev.XXXXXX")"
+      cp -p -- "${manifest}" "${saved_manifest}"
     fi
-    foundation_backup_discard "${staging}"
-    echo "backup-vault: blob swap failed; last good dump, MANIFEST, and blobs left in place" >&2
-    return 1
-  fi
-  staging=""
-  foundation_backup_discard "${saved_dump}" "${saved_manifest}"
+
+    mv -- "${dump_tmp}" "${dump_path}"
+    dump_tmp=""
+    chmod 0600 -- "${dump_path}"
+    mv -- "${manifest_tmp}" "${manifest}"
+    manifest_tmp=""
+
+    foundation_backup_swap_blobs "${backup_abs}" "${staging}" \
+      || { echo "backup-vault: blob swap failed; last good dump, MANIFEST, and blobs left in place" >&2; exit 1; }
+    staging=""
+    foundation_backup_discard "${saved_dump}" "${saved_manifest}"
+    saved_dump=""
+    saved_manifest=""
+    trap - EXIT
+  )
 }
 
 foundation_backup_compose_exec() {
@@ -319,6 +328,7 @@ foundation_backup_main() {
   dump_path="${backup_abs}/sql/foundation-${day}.sql"
   dump_tmp="$(mktemp "${dump_path}.tmp.XXXXXX")"
   chmod 0600 -- "${dump_tmp}"
+  trap 'foundation_backup_discard "${dump_tmp}"' EXIT
 
   # Online dump. Compose stays up. Dump, MANIFEST, and the live blob tree stay
   # put until staging rsync, MANIFEST, and the final blob swap all succeed.
@@ -337,6 +347,8 @@ foundation_backup_main() {
   if ! foundation_backup_install "${backup_abs}" "${data_abs}" "${day}" "${dump_tmp}" "${git_sha}"; then
     return 1
   fi
+  dump_tmp=""
+  trap - EXIT
   foundation_backup_prune_sql "${backup_abs}/sql"
 }
 
