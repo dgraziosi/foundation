@@ -27,11 +27,11 @@ Paste [`prompts/chief.md`](../prompts/chief.md). This is the bot you talk to. It
 
 Paste [`prompts/vault-keeper.md`](../prompts/vault-keeper.md). Same machine, same vault MCP. Then attach:
 
-1. Vault health — [`prompts/vault-health.md`](../prompts/vault-health.md). Read [`VAULT_HEALTH.md`](./VAULT_HEALTH.md). Backup is a path you name. Health checks that path; it does not create a dump.
+1. Vault health — [`prompts/vault-health.md`](../prompts/vault-health.md). Read [`VAULT_HEALTH.md`](./VAULT_HEALTH.md). Nightly backup is `scripts/backup-vault.sh`. Health checks `BACKUP_ROOT`; it does not create a dump.
 2. Graph hygiene — [`prompts/graph-hygiene.md`](../prompts/graph-hygiene.md). Read [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md).
 3. Product updates — [`prompts/update-foundation.md`](../prompts/update-foundation.md). On the machine that runs Compose: `git fetch` / `git pull --ff-only` on main, `docker compose up --build -d`, wait for `/health`.
 
-Fill in the operator config (data dir, optional well-known nodes, backup path, clone path). Vault Keeper keeps `FOUNDATION_DATA` in place and leaves Compose volumes intact.
+Fill in the operator config (data dir, optional well-known nodes, `BACKUP_ROOT`, clone path). Vault Keeper keeps `FOUNDATION_DATA` in place and leaves Compose volumes intact.
 
 ## Executive Assistant
 

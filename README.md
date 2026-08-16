@@ -22,8 +22,8 @@ The bots help you take action on what is in your vault. Three starter recipes sh
 Chief of Staff — The bot you talk to. You think out loud, dump what is on your mind, and work through decisions together. It files what matters in the vault, keeps you current on what is open and due, and hands work to the right bot. It asks you when something needs you. It also looks for recurring work in your day and suggests another bot when one would help.
 Out of the box: morning brief; capture (what you dump lands in the vault). When you want another seat, it uses the create-bot skill and the blank template.
 
-Vault Keeper — Keeps the vault healthy and organized. Checks that it is up. Checks the backup path you named. Reports obvious mess; cleans it only when you ask. Applies product updates on the machine that runs Compose. Keeps `FOUNDATION_DATA` in place and leaves Compose volumes intact.
-Out of the box: health check; backup freshness; periodic hygiene; product updates.
+Vault Keeper — Keeps the vault healthy and organized. Checks that it is up. Runs the backup (`scripts/backup-vault.sh`). Reports obvious mess; cleans it only when you ask. Applies product updates on the machine that runs Compose. Keeps `FOUNDATION_DATA` in place and leaves Compose volumes intact.
+Out of the box: health check; nightly backup; backup freshness; periodic hygiene; product updates.
 
 Executive Assistant — Inbox and calendar for due dates in the vault. Drafts email; sends when you approve that specific message. Puts vault due dates on the calendar.
 
@@ -38,6 +38,7 @@ Do not commit personal life data, documents, or secrets to this repository. Thos
 - [`docs/MCP_TOOLS.md`](docs/MCP_TOOLS.md) — 12-tool MCP surface
 - [`docs/AGENTS.md`](docs/AGENTS.md) — starter recipes (Chief of Staff, Vault Keeper, Executive Assistant)
 - [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md) — weekday instance checkup
+- [`docs/BACKUP.md`](docs/BACKUP.md) — nightly backup script and throwaway restore
 - [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md) — weekly graph report
 
 ## Install

@@ -1,6 +1,9 @@
 node_modules
 dist
 data
+foundation-backups
+*.sql
+!packages/db/migrations/*.sql
 .env
 *.log
 .DS_Store
