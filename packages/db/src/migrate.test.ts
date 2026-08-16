@@ -144,8 +144,55 @@ test(
         "goal",
         "project",
       ]);
+      assert.ok(typeSlugs.includes("place"));
       assert.ok(typeSlugs.includes("company"));
       assert.ok(typeSlugs.includes("decision"));
+      const place = types.find((type) => type.slug === "place");
+      assert.equal(place?.kind, "artifact");
+      assert.deepEqual(place?.parent_types, []);
+      assert.equal(place?.is_system, true);
+    } finally {
+      await pool.end();
+    }
+  },
+);
+
+test(
+  "seed apply on a vault that already has types adds place",
+  { skip: !databaseUrl },
+  async () => {
+    if (!databaseUrl) {
+      return;
+    }
+    const pool = await poolForSchema("migrate_seed_place");
+    try {
+      await migrate(pool);
+      await pool.query(
+        `
+        INSERT INTO node_types (
+          slug, label, description, kind, parent_types, json_schema, is_system
+        ) VALUES
+          ('area', 'Area', 'Existing area', 'spine', '{}', NULL, true),
+          ('company', 'Company', 'Existing company', 'artifact', '{}', NULL, true)
+        `,
+      );
+      const before = await listNodeTypes(pool);
+      const beforeSlugs = before.map((type) => type.slug);
+      assert.ok(beforeSlugs.includes("company"));
+      assert.equal(beforeSlugs.includes("place"), false);
+
+      await seedSystemOntology(pool);
+
+      const after = await listNodeTypes(pool);
+      const afterSlugs = after.map((type) => type.slug);
+      assert.ok(afterSlugs.includes("place"));
+      assert.ok(afterSlugs.includes("company"));
+      const place = after.find((type) => type.slug === "place");
+      assert.equal(place?.label, "Place");
+      assert.equal(place?.kind, "artifact");
+      assert.deepEqual(place?.parent_types, []);
+      assert.equal(place?.description, "A location (home, office, city, venue, …).");
+      assert.equal(place?.is_system, true);
     } finally {
       await pool.end();
     }

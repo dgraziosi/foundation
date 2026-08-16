@@ -12,9 +12,9 @@ It holds your projects, goals, tasks, people, and places, and the files that bel
 ## 2. Method
 The method is a recommended way to organize your vault. Starter types to get you going, and a recommended structure. Use them, change them, or add your own.
 
-Starter types: area, project, goal, task, person, place, note, habit, journal, idea, trip, decision, lesson
+Starter types: area, project, goal, task, person, place, company, note, habit, journal, idea, trip, decision, lesson
 
-Recommended structure: Area → project → goal → task. The point is to break your life into smaller pieces so bots can take them on.
+Recommended structure: Area → project → goal → task. The point is to break your life into smaller pieces so bots can take them on. A habit hangs under a goal. A task may child_of a goal or a project.
 
 ## 3. Bots
 The bots help you take action on what is in your vault. Three starter recipes ship with the repo. You can add more later using your platform of choice. Paste them from [`docs/AGENTS.md`](docs/AGENTS.md).

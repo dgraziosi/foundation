@@ -38,7 +38,9 @@ Starter recipes: [`AGENTS.md`](./AGENTS.md).
 area → project → goal → habit | task
 ```
 
-**Area** is the spine root (life domain + what you value). The spine is preferred placement, not a hard gate: `task` may `child_of` `project` (skip a dummy goal). Prefer goal when there is a real outcome. `task` still cannot `child_of` `area`. Seed artifacts include person, company, journal, idea, lesson, note, trip, decision. Hierarchy verb is `child_of`. Associative seeds: relates_to, supports, inspired_by, references, about.
+Recommended structure: Area → project → goal → task. A habit hangs under a goal. A task may child_of a goal or a project.
+
+**Area** is the spine root (life domain + what you value). The spine is preferred placement, not a hard gate: `task` may `child_of` `project` (skip a dummy goal). Prefer goal when there is a real outcome. `task` still cannot `child_of` `area`. Seed artifacts include person, place, company, journal, idea, lesson, note, trip, decision. Hierarchy verb is `child_of`. Associative seeds: relates_to, supports, inspired_by, references, about.
 
 Agents can add types and relations over time. No approval inbox.
 

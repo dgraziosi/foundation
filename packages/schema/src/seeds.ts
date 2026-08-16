@@ -8,6 +8,7 @@ export const SPINE_TYPE_SLUGS = ["area", "project", "goal", "habit", "task"] as 
 export const ARTIFACT_TYPE_SLUGS = [
   "lesson",
   "person",
+  "place",
   "company",
   "journal",
   "idea",
@@ -78,6 +79,15 @@ export const SEED_NODE_TYPES: readonly NodeType[] = [
     slug: "person",
     label: "Person",
     description: "A person. Typical target of the about relation.",
+    kind: "artifact",
+    parent_types: [],
+    json_schema: null,
+    is_system: true,
+  },
+  {
+    slug: "place",
+    label: "Place",
+    description: "A location (home, office, city, venue, …).",
     kind: "artifact",
     parent_types: [],
     json_schema: null,

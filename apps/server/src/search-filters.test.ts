@@ -41,8 +41,10 @@ test(
     try {
       const ontology = await inspectOntology(pool, "types");
       const slugs = ontology.types.map((type) => type.slug);
+      assert.ok(slugs.includes("place"));
       assert.ok(slugs.includes("company"));
       assert.ok(slugs.includes("decision"));
+      assert.equal(ontology.types.find((type) => type.slug === "place")?.is_system, true);
       assert.equal(ontology.types.find((type) => type.slug === "company")?.is_system, true);
       assert.equal(ontology.types.find((type) => type.slug === "decision")?.is_system, true);
 
