@@ -22,7 +22,7 @@ The bots help you take action on what is in your vault. Three starter recipes sh
 Chief of Staff — The bot you talk to. You think out loud, dump what is on your mind, and work through decisions together. It files what matters in the vault, keeps you current on what is open and due, and hands work to the right bot. It asks you when something needs you. It also looks for recurring work in your day and suggests another bot when one would help.
 Out of the box: morning brief; capture (what you dump lands in the vault).
 
-Vault Keeper — Keeps the vault healthy and organized. Checks that it is up. Checks the backup path you named. Cleans obvious mess. Applies product updates on the machine that runs Compose. Keeps `FOUNDATION_DATA` in place and leaves Compose volumes intact.
+Vault Keeper — Keeps the vault healthy and organized. Checks that it is up. Checks the backup path you named. Reports obvious mess; cleans it only when you ask. Applies product updates on the machine that runs Compose. Keeps `FOUNDATION_DATA` in place and leaves Compose volumes intact.
 Out of the box: health check; backup freshness; periodic hygiene; product updates.
 
 Executive Assistant — Inbox and calendar for due dates in the vault. Drafts email; sends when you approve that specific message. Puts vault due dates on the calendar.

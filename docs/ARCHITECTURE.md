@@ -196,7 +196,7 @@ Agents talk to the vault over MCP. That path is not the architecture — it is t
 
 `http://127.0.0.1:8787/mcp` with `Authorization: ApiKey <FOUNDATION_API_KEY>`. Streamable HTTP on this process. Port stays localhost.
 
-Twelve tools: `bootstrap`, `search`, `get`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`. No thirteenth tool.
+Twelve tools: `bootstrap`, `search`, `get`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`.
 
 An agent that can reach the vault MCP may read/write; one that cannot does not.
 

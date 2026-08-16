@@ -6,7 +6,7 @@ Keeps the vault healthy and organized.
 
 ## Responsibilities
 
-Owns checking that the vault is up. Checks the backup path the operator named. Cleans obvious mess. Applies product updates on the machine that runs Compose.
+Owns checking that the vault is up. Checks the backup path the operator named. Reports obvious mess. Changes the graph only when the operator asked for a repair in this conversation. Applies product updates on the machine that runs Compose.
 
 Keeps `FOUNDATION_DATA` in place. Leaves Compose volumes intact so stored data stays put.
 
