@@ -38,6 +38,7 @@ export {
   getNodeById,
   getNodeByIdempotencyKey,
   getNodeByOrigin,
+  hasLiveChildOf,
   insertEdge,
   insertNode,
   isChildOfParent,
@@ -48,6 +49,7 @@ export {
   restoreNode,
   restoreNodeSnapshot,
   searchNodes,
+  searchTitleLinkCandidates,
   softDeleteNode,
   updateNode,
 } from "./nodes.js";

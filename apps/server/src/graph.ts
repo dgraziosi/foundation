@@ -85,12 +85,14 @@ import {
   type RelationType,
   type SearchHit,
   type SearchInput,
+  type SuggestedLink,
   type ToolError,
   type UpsertInput,
   type UpsertPayload,
 } from "@foundation/schema";
 import { randomUUID } from "node:crypto";
 import { removeAuthoredType } from "./retire-type.js";
+import { suggestLinksForNode } from "./suggested-links.js";
 import { undoGraphActivity } from "./undo.js";
 
 export { undoGraphActivity };
@@ -353,7 +355,9 @@ export async function getGraphNode(
   pool: Pool,
   id: string,
   options: { include_body?: boolean; blobs?: BlobRuntime } = {},
-): Promise<{ node: Node; edges: IncidentEdge[]; blob?: Blob } | ToolError> {
+): Promise<
+  { node: Node; edges: IncidentEdge[]; blob?: Blob; suggested_links: SuggestedLink[] } | ToolError
+> {
   const node = await getNodeById(pool, id);
   if (!node) {
     return toolError(
@@ -362,8 +366,9 @@ export async function getGraphNode(
     );
   }
   const edges = await listIncidentEdges(pool, id);
+  const suggested_links = await suggestLinksForNode(pool, node);
   if (node.payload.storage !== "blob" || !node.payload.blob_id) {
-    return { node, edges };
+    return { node, edges, suggested_links };
   }
   const blob = await getBlobById(pool, node.payload.blob_id);
   const presented = await presentBlobNode(node, blob, options);
@@ -373,6 +378,7 @@ export async function getGraphNode(
   return {
     node: presented,
     edges,
+    suggested_links,
     ...(blob ? { blob } : {}),
   };
 }
@@ -381,7 +387,7 @@ export async function upsertGraphNode(
   pool: Pool,
   input: UpsertInput,
   blobs?: BlobRuntime,
-): Promise<{ node: Node; activity_id: string } | ToolError> {
+): Promise<{ node: Node; activity_id: string; suggested_links: SuggestedLink[] } | ToolError> {
   const type = await getNodeType(pool, input.type);
   if (!type) {
     return toolError(
@@ -554,7 +560,13 @@ export async function upsertGraphNode(
     if (pendingUploadUnlink) {
       await unlinkQuiet(pendingUploadUnlink);
     }
-    return result;
+    if (isToolError(result)) {
+      return result;
+    }
+    return {
+      ...result,
+      suggested_links: await suggestLinksForNode(pool, result.node),
+    };
   } catch (error) {
     if (createdBlobAbs) {
       await unlinkQuiet(createdBlobAbs);
