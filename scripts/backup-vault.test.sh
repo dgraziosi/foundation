@@ -17,7 +17,7 @@ fail() {
 
 # Single dated dump older than 14 days must survive prune.
 tmp_one="$(mktemp -d)"
-trap 'rm -rf -- "${tmp_one}" "${tmp_two:-}"' EXIT
+trap 'rm -rf -- "${tmp_one}" "${tmp_two:-}" "${tmp_fail:-}"' EXIT
 printf '%s\n' '-- fixture dump, not a vault' >"${tmp_one}/foundation-20000101.sql"
 foundation_backup_prune_sql "${tmp_one}"
 if [[ ! -f "${tmp_one}/foundation-20000101.sql" ]]; then
@@ -34,6 +34,44 @@ if [[ -f "${tmp_two}/foundation-20000101.sql" ]]; then
 fi
 if [[ ! -f "${tmp_two}/foundation-20000102.sql" ]]; then
   fail "prune deleted the last remaining dump among two old files"
+fi
+
+# Failed later step (rsync) must not replace an existing same-day dump or MANIFEST.
+tmp_fail="$(mktemp -d)"
+fail_day="$(date +%Y%m%d)"
+mkdir -p "${tmp_fail}/backup/sql" "${tmp_fail}/backup/blobs" "${tmp_fail}/data/blobs"
+printf '%s\n' '-- last good dump' >"${tmp_fail}/backup/sql/foundation-${fail_day}.sql"
+printf '%s\n' 'date=good' >"${tmp_fail}/backup/MANIFEST"
+printf '%s\n' '-- fixture blob' >"${tmp_fail}/data/blobs/fixture"
+printf '%s\n' '-- new dump temp' >"${tmp_fail}/dump.tmp"
+chmod 0600 "${tmp_fail}/dump.tmp"
+
+set +e
+(
+  foundation_backup_sync_blobs() { return 1; }
+  foundation_backup_install \
+    "${tmp_fail}/backup" \
+    "${tmp_fail}/data" \
+    "${fail_day}" \
+    "${tmp_fail}/dump.tmp" \
+    ""
+)
+fail_rc=$?
+set -e
+if ((fail_rc == 0)); then
+  fail "install should fail when a later step fails"
+fi
+if ! grep -qx -- '-- last good dump' "${tmp_fail}/backup/sql/foundation-${fail_day}.sql"; then
+  fail "failed later step replaced the same-day dump"
+fi
+if ! grep -qx 'date=good' "${tmp_fail}/backup/MANIFEST"; then
+  fail "failed later step replaced MANIFEST"
+fi
+if [[ -e "${tmp_fail}/dump.tmp" ]]; then
+  fail "failed later step left the temp dump"
+fi
+if compgen -G "${tmp_fail}/backup/MANIFEST.tmp.*" >/dev/null; then
+  fail "failed later step left a MANIFEST temp"
 fi
 
 echo "backup-vault.test: ok"

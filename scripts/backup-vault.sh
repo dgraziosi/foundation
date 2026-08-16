@@ -8,8 +8,10 @@
 #
 # Writes $BACKUP_ROOT/sql/foundation-YYYYMMDD.sql (mode 0600),
 # rsyncs $FOUNDATION_DATA/blobs/ → $BACKUP_ROOT/blobs/,
-# and rewrites $BACKUP_ROOT/MANIFEST. Same-day rerun overwrites that day's
-# dump. On failure, the last good dump and MANIFEST stay in place.
+# and rewrites $BACKUP_ROOT/MANIFEST. The day's dump and MANIFEST stay in
+# temps until rsync and the MANIFEST write succeed; only then are they
+# moved into place. Same-day success overwrites that day's SQL. On
+# failure, temps are deleted and the last good dump and MANIFEST stay.
 set -euo pipefail
 
 FOUNDATION_BACKUP_SQL_GLOB='foundation-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].sql'
@@ -127,15 +129,15 @@ foundation_backup_blob_count() {
   find "${blobs_dir}" -type f | wc -l | tr -d ' '
 }
 
-foundation_backup_write_manifest() {
-  local backup_root="$1"
-  local day="$2"
-  local dump_path="$3"
-  local git_sha="$4"
-  local manifest tmp size checksum blobs
+# Write MANIFEST content to dest_tmp from dump_path (the temp dump). Does not replace MANIFEST.
+foundation_backup_write_manifest_tmp() {
+  local dest_tmp="$1"
+  local backup_root="$2"
+  local day="$3"
+  local dump_path="$4"
+  local git_sha="$5"
+  local size checksum blobs
 
-  manifest="${backup_root}/MANIFEST"
-  tmp="$(mktemp "${manifest}.tmp.XXXXXX")"
   size="$(wc -c < "${dump_path}" | tr -d ' ')"
   checksum="$(foundation_backup_sha256 "${dump_path}")"
   blobs="$(foundation_backup_blob_count "${backup_root}/blobs")"
@@ -149,8 +151,52 @@ foundation_backup_write_manifest() {
       printf 'git_sha=%s\n' "${git_sha}"
     fi
     printf 'dump_checksum=sha256:%s\n' "${checksum}"
-  } >"${tmp}"
-  mv -- "${tmp}" "${manifest}"
+  } >"${dest_tmp}"
+}
+
+foundation_backup_sync_blobs() {
+  local data_abs="$1"
+  local backup_abs="$2"
+  if [[ -d "${data_abs}/blobs" ]]; then
+    rsync -a --delete -- "${data_abs}/blobs/" "${backup_abs}/blobs/"
+  fi
+}
+
+# After a dump sits in dump_tmp: rsync blobs, write MANIFEST from that temp dump,
+# then replace the day's SQL and MANIFEST. On any failure, delete temps and leave
+# the previous dump and MANIFEST untouched.
+foundation_backup_install() {
+  local backup_abs="$1"
+  local data_abs="$2"
+  local day="$3"
+  local dump_tmp="$4"
+  local git_sha="$5"
+  local dump_path manifest manifest_tmp=""
+
+  dump_path="${backup_abs}/sql/foundation-${day}.sql"
+  manifest="${backup_abs}/MANIFEST"
+
+  if ! manifest_tmp="$(mktemp "${manifest}.tmp.XXXXXX")"; then
+    rm -f -- "${dump_tmp}"
+    echo "backup-vault: cannot stage MANIFEST; last good dump and MANIFEST left in place" >&2
+    return 1
+  fi
+
+  if ! foundation_backup_sync_blobs "${data_abs}" "${backup_abs}"; then
+    rm -f -- "${dump_tmp}" "${manifest_tmp}"
+    echo "backup-vault: rsync failed; last good dump and MANIFEST left in place" >&2
+    return 1
+  fi
+
+  if ! foundation_backup_write_manifest_tmp "${manifest_tmp}" "${backup_abs}" "${day}" "${dump_tmp}" "${git_sha}"; then
+    rm -f -- "${dump_tmp}" "${manifest_tmp}"
+    echo "backup-vault: MANIFEST write failed; last good dump and MANIFEST left in place" >&2
+    return 1
+  fi
+
+  mv -- "${dump_tmp}" "${dump_path}"
+  chmod 0600 -- "${dump_path}"
+  mv -- "${manifest_tmp}" "${manifest}"
 }
 
 foundation_backup_compose_exec() {
@@ -200,7 +246,8 @@ foundation_backup_main() {
   dump_tmp="$(mktemp "${dump_path}.tmp.XXXXXX")"
   chmod 0600 -- "${dump_tmp}"
 
-  # Online dump. Compose stays up. Temp file so a failed dump cannot replace the last good copy.
+  # Online dump. Compose stays up. Dump stays in the temp file until rsync and
+  # MANIFEST succeed, so a failed later step cannot replace the last good copy.
   if ! foundation_backup_compose_exec "${repo_root}" db pg_dump -U foundation -d foundation >"${dump_tmp}"; then
     rm -f -- "${dump_tmp}"
     echo "backup-vault: pg_dump failed; last good dump and MANIFEST left in place" >&2
@@ -211,16 +258,11 @@ foundation_backup_main() {
     echo "backup-vault: pg_dump wrote an empty file; last good dump and MANIFEST left in place" >&2
     return 1
   fi
-  mv -- "${dump_tmp}" "${dump_path}"
-  chmod 0600 -- "${dump_path}"
-
-  # One blob tree, not a dated copy. Skip uploads/ and the live postgres/ cluster.
-  if [[ -d "${data_abs}/blobs" ]]; then
-    rsync -a --delete -- "${data_abs}/blobs/" "${backup_abs}/blobs/"
-  fi
 
   git_sha="$(foundation_backup_git_sha "${repo_root}" || true)"
-  foundation_backup_write_manifest "${backup_abs}" "${day}" "${dump_path}" "${git_sha}"
+  if ! foundation_backup_install "${backup_abs}" "${data_abs}" "${day}" "${dump_tmp}" "${git_sha}"; then
+    return 1
+  fi
   foundation_backup_prune_sql "${backup_abs}/sql"
 }
 

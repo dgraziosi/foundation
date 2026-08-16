@@ -17,7 +17,7 @@ Each run (Compose stays up):
 2. `rsync -a --delete` `$FOUNDATION_DATA/blobs/` → `$BACKUP_ROOT/blobs/` (one tree, not a dated copy)
 3. `$BACKUP_ROOT/MANIFEST` — date, dump size, blob count, product git SHA when the checkout has one, checksum of that day’s dump. No node titles, no graph payloads, no life text.
 
-It skips `uploads/`. It does not copy the live `postgres/` cluster. Same-day rerun overwrites that day’s SQL, rsyncs blobs, and rewrites `MANIFEST`. SQL files older than 14 days are pruned; the last remaining dump is never deleted. On failure, the last good dump and `MANIFEST` stay in place.
+It skips `uploads/`. It does not copy the live `postgres/` cluster. The day’s dump stays in a temp file until blobs are rsynced and `MANIFEST` is written from that temp dump; only then are the dump and `MANIFEST` moved into place. Same-day success overwrites that day’s SQL. SQL files older than 14 days are pruned; the last remaining dump is never deleted. If dump, rsync, or `MANIFEST` fails, temps are deleted and the last good dump and `MANIFEST` stay in place.
 
 ```bash
 # from the clone, with Compose up
