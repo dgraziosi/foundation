@@ -13,11 +13,12 @@ Driven only by env:
 
 Each run (Compose stays up):
 
-1. Online `pg_dump` of the Compose `db` service (user `foundation`, database `foundation`) to `$BACKUP_ROOT/sql/foundation-YYYYMMDD.sql` (mode `0600`)
-2. `rsync -a --delete` `$FOUNDATION_DATA/blobs/` → `$BACKUP_ROOT/blobs/` (one tree, not a dated copy)
-3. `$BACKUP_ROOT/MANIFEST` — date, dump size, blob count, product git SHA when the checkout has one, checksum of that day’s dump. No node titles, no graph payloads, no life text.
+1. Online `pg_dump` of the Compose `db` service (user `foundation`, database `foundation`) to a temp file, then `$BACKUP_ROOT/sql/foundation-YYYYMMDD.sql` (mode `0600`) only after the rest of the run succeeds
+2. `rsync -a --delete` `$FOUNDATION_DATA/blobs/` into a staging tree (not into `$BACKUP_ROOT/blobs/`)
+3. `$BACKUP_ROOT/MANIFEST` — date, dump size, blob count from the staging tree, product git SHA when the checkout has one, checksum of that day’s dump. No node titles, no graph payloads, no life text.
+4. After the dump and `MANIFEST` are in place, swap the staging tree into `$BACKUP_ROOT/blobs/` (one tree, not a dated copy)
 
-It skips `uploads/`. It does not copy the live `postgres/` cluster. The day’s dump stays in a temp file until blobs are rsynced and `MANIFEST` is written from that temp dump; only then are the dump and `MANIFEST` moved into place. Same-day success overwrites that day’s SQL. SQL files older than 14 days are pruned; the last remaining dump is never deleted. If dump, rsync, or `MANIFEST` fails, temps are deleted and the last good dump and `MANIFEST` stay in place.
+It skips `uploads/`. It does not copy the live `postgres/` cluster. Same-day success overwrites that day’s SQL and ends with one blob tree that matches live (including deletions). SQL files older than 14 days are pruned; the last remaining dump is never deleted. If dump, staging rsync, `MANIFEST`, or the final swap fails, temps and staging are deleted; the last good dump, `MANIFEST`, and `$BACKUP_ROOT/blobs/` stay in place.
 
 ```bash
 # from the clone, with Compose up
