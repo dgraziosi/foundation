@@ -195,6 +195,42 @@ test(
       assert.equal(place?.is_system, true);
       const company = after.find((type) => type.slug === "company");
       assert.equal(company?.is_system, true);
+      assert.equal(company?.description, "Existing company");
+    } finally {
+      await pool.end();
+    }
+  },
+);
+
+test(
+  "seed apply keeps a custom description on an already-system place",
+  { skip: !databaseUrl },
+  async () => {
+    if (!databaseUrl) {
+      return;
+    }
+    const pool = await poolForSchema("migrate_seed_system_desc");
+    try {
+      await migrate(pool);
+      await pool.query(
+        `
+        INSERT INTO node_types (
+          slug, label, description, kind, parent_types, json_schema, is_system
+        ) VALUES (
+          'place', 'Place', 'Office, home, and the places we actually go.',
+          'artifact', '{}', NULL, true
+        )
+        `,
+      );
+
+      await seedSystemOntology(pool);
+
+      const place = (await listNodeTypes(pool)).find((type) => type.slug === "place");
+      assert.equal(place?.is_system, true);
+      assert.equal(place?.description, "Office, home, and the places we actually go.");
+      assert.equal(place?.label, "Place");
+      assert.equal(place?.kind, "artifact");
+      assert.deepEqual(place?.parent_types, []);
     } finally {
       await pool.end();
     }
