@@ -17,15 +17,17 @@ Starter types: area, project, goal, task, person, place, note, habit, journal, i
 Recommended structure: Area → project → goal → task. The point is to break your life into smaller pieces so bots can take them on.
 
 ## 3. Bots
-The bots help you take action on what is in your vault. We provide two to get started. You can add more later using your platform of choice.
+The bots help you take action on what is in your vault. Three starter recipes ship with the repo. You can add more later using your platform of choice. Paste them from [`docs/AGENTS.md`](docs/AGENTS.md).
 
 Chief of Staff — The bot you talk to. You think out loud, dump what is on your mind, and work through decisions together. It files what matters in the vault, keeps you current on what is open and due, and hands work to the right bot. It asks you when something needs you. It also looks for recurring work in your day and suggests another bot when one would help.
 Out of the box: morning brief; capture (what you dump lands in the vault).
 
-Vault Keeper — Keeps the vault healthy and organized. Checks that it is up. Runs the backup. Cleans obvious mess.
-Out of the box: health check; nightly backup; periodic hygiene.
+Vault Keeper — Keeps the vault healthy and organized. Checks that it is up. Checks the backup path you named. Cleans obvious mess. Applies product updates on the machine that runs Compose. Keeps `FOUNDATION_DATA` in place and leaves Compose volumes intact.
+Out of the box: health check; backup freshness; periodic hygiene; product updates.
 
-**Glossary (locked):** **Foundation** = the product. A **vault** = one instance (`FOUNDATION_DATA` + Postgres). The **graph** = the knowledge in that vault. A **blob** = a file on a node. An **agent** = anything that can reach the vault MCP. The **operator** = the human who runs Compose — only the human, not an agent. Do not call the graph “the Vault.” Short analog: app / folder / links → Foundation / vault / graph.
+Executive Assistant — Inbox and calendar for due dates in the vault. Drafts email; sends when you approve that specific message. Puts vault due dates on the calendar.
+
+**Glossary (locked):** **Foundation** = the product. A **vault** = one instance (`FOUNDATION_DATA` + Postgres). The **graph** = the knowledge in that vault. A **blob** = a file on a node. An **agent** = anything that can reach the vault MCP. The **operator** = the human who runs Compose. Do not call the graph “the Vault.” Short analog: app / folder / links → Foundation / vault / graph.
 
 Do not commit personal life data, documents, or secrets to this repository. Those belong in the operator’s vault, not in git.
 
@@ -34,7 +36,7 @@ Do not commit personal life data, documents, or secrets to this repository. Thos
 - [`docs/SPEC.md`](docs/SPEC.md) — product contract
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — living vault and graph
 - [`docs/MCP_TOOLS.md`](docs/MCP_TOOLS.md) — 12-tool MCP surface
-- [`docs/AGENTS.md`](docs/AGENTS.md) — optional named-agent recipe (not product ontology)
+- [`docs/AGENTS.md`](docs/AGENTS.md) — starter recipes (Chief of Staff, Vault Keeper, Executive Assistant)
 - [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md) — weekday instance checkup
 - [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md) — weekly graph report
 
@@ -55,7 +57,7 @@ Requires [Docker Compose](https://docs.docker.com/compose/) and a copy of this r
    docker compose up --build
    ```
 
-   **Optional stand-up.** After Compose is up, the operator can run instance routines (vault health, graph hygiene, applying git updates) or attach named agents ([`docs/AGENTS.md`](docs/AGENTS.md)). What “healthy” means: [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md). Graph report: [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md). No new MCP tools.
+   After Compose is up, paste the starter recipes in [`docs/AGENTS.md`](docs/AGENTS.md). What “healthy” means: [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md). Graph report: [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md).
 
 3. Point an MCP client at `http://127.0.0.1:8787/mcp` with:
 
@@ -161,10 +163,10 @@ trailer<</Root 1 0 R>>
 
    Operator drop-box (no base64): copy a file into `$FOUNDATION_DATA/uploads/` then `upsert` with `payload.source_path` set to the filename. The server moves it to `blobs/<uuid>`. Compose `db-init` creates `uploads/` mode 1777 (sticky) so the host user can write on a bind mount; `blobs/` stays 0700.
 
-   If Postgres fails to start on a bind-mounted data dir, Compose already runs a `db-init` step that `chown`s `$FOUNDATION_DATA/postgres` to uid 999. Never `docker compose down -v` as a casual step; that is how you destroy a vault. Never delete `FOUNDATION_DATA`.
+   If Postgres fails to start on a bind-mounted data dir, Compose already runs a `db-init` step that `chown`s `$FOUNDATION_DATA/postgres` to uid 999. `FOUNDATION_DATA` is the vault; keep that directory and leave Compose volumes intact.
 
 Never point `FOUNDATION_DATA` at an agent profile or memory directory.
 
 ## License
 
-[MIT](LICENSE) © 2026 Danny Graziosi
+[MIT](LICENSE) © 2026 Foundation contributors

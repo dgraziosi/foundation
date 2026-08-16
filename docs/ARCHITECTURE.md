@@ -6,7 +6,7 @@ When a change alters the graph or vault shape, update this file in the same PR.
 
 ## Glossary
 
-**Foundation** is the product. A **vault** is one instance (`FOUNDATION_DATA` + Postgres). The **graph** is the knowledge in that vault. A **blob** is a file on a node. An **agent** is anything that can reach the vault MCP. The **operator** is the human who runs Compose — only the human, not an agent. Do not call the graph “the Vault.” A git clone is the product, not this vault — `compose up` elsewhere starts a different instance.
+**Foundation** is the product. A **vault** is one instance (`FOUNDATION_DATA` + Postgres). The **graph** is the knowledge in that vault. A **blob** is a file on a node. An **agent** is anything that can reach the vault MCP. The **operator** is the human who runs Compose. Do not call the graph “the Vault.” A git clone is the product, not this vault — `compose up` elsewhere starts a different instance.
 
 ## Vault
 

@@ -39,13 +39,13 @@ test(
     try {
       const person = await upsertGraphNode(pool, {
         type: "person",
-        title: "Elizabeth Chen",
+        title: "Jordan Lee",
         payload: {
           media_type: "text/html",
           storage: "inline",
-          body: '<p>Weekend note.</p><img alt="fiancée at the lake cabin" src="photo.jpg">',
+          body: '<p>Weekend note.</p><img alt="café terrace in the park" src="photo.jpg">',
         },
-        data: { nickname: "Liz", relation: "fiancée" },
+        data: { nickname: "Ada", note: "café" },
       });
       assert.equal(isToolError(person), false);
       if (isToolError(person)) {
@@ -98,8 +98,8 @@ test(
         return;
       }
 
-      await t.test("paraphrase Liz hits data, not an echoed full title", async () => {
-        const hits = await searchGraphNodes(pool, { query: "Liz", type: "person" });
+      await t.test("paraphrase Ada hits data, not an echoed full title", async () => {
+        const hits = await searchGraphNodes(pool, { query: "Ada", type: "person" });
         assert.equal(isToolError(hits), false);
         if (isToolError(hits)) {
           return;
@@ -107,13 +107,13 @@ test(
         assert.ok(hits.nodes.some((node) => node.id === person.node.id));
         assert.ok(hits.nodes.every((node) => node.type === "person"));
         assert.equal(
-          hits.nodes.some((node) => node.title === "Liz"),
+          hits.nodes.some((node) => node.title === "Ada"),
           false,
         );
       });
 
-      await t.test("fiancée hits data and HTML alt text", async () => {
-        const hits = await searchGraphNodes(pool, { query: "fiancée" });
+      await t.test("café hits data and HTML alt text", async () => {
+        const hits = await searchGraphNodes(pool, { query: "café" });
         assert.equal(isToolError(hits), false);
         if (isToolError(hits)) {
           return;
@@ -138,7 +138,7 @@ test(
         if (isToolError(gotProject)) {
           return;
         }
-        assert.equal(gotProject.edges[0]?.neighbor.title, "Elizabeth Chen");
+        assert.equal(gotProject.edges[0]?.neighbor.title, "Jordan Lee");
         assert.equal(gotProject.edges[0]?.neighbor.type, "person");
       });
 

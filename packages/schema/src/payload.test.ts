@@ -88,11 +88,11 @@ test("extractPayloadText strips HTML tags and keeps attribute values", () => {
   const text = extractPayloadText({
     media_type: "text/html",
     storage: "inline",
-    body: '<html><body><h1>Kyoto</h1><img alt="fiancée at the lake" src="x.jpg"><ol><li>Fushimi Inari</li></ol></body></html>',
+    body: '<html><body><h1>Kyoto</h1><img alt="café terrace in the park" src="x.jpg"><ol><li>Fushimi Inari</li></ol></body></html>',
   });
   assert.match(text, /Kyoto/);
   assert.match(text, /Fushimi Inari/);
-  assert.match(text, /fiancée at the lake/);
+  assert.match(text, /café terrace in the park/);
   assert.equal(text.includes("<"), false);
 });
 
@@ -120,10 +120,10 @@ test("extractPayloadText pulls JSON string values, not the payload wrapper", () 
 });
 
 test("extractDataText walks nested string values", () => {
-  const text = extractDataText({ nickname: "Liz", relation: "fiancée", extra: { note: "lake" } });
-  assert.match(text, /Liz/);
-  assert.match(text, /fiancée/);
-  assert.match(text, /lake/);
+  const text = extractDataText({ nickname: "Ada", role: "colleague", extra: { note: "café" } });
+  assert.match(text, /Ada/);
+  assert.match(text, /colleague/);
+  assert.match(text, /café/);
 });
 
 test("extractPayloadText ignores blob payloads", () => {
