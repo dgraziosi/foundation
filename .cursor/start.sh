@@ -34,16 +34,20 @@ if ! command -v docker >/dev/null 2>&1; then
   log "ERROR: docker is not installed in this base image"
   exit 1
 fi
+DOCKERD_LOG=/var/log/foundation-dockerd.log
 if ! sudo docker info >/dev/null 2>&1; then
-  log "starting dockerd"
-  sudo bash -c 'nohup dockerd >/tmp/dockerd.log 2>&1 &'
+  log "starting dockerd (log: $DOCKERD_LOG)"
+  # Write the daemon log to a root-owned path, not sticky world-writable /tmp:
+  # with fs.protected_regular=2 a stale, other-user-owned /tmp file blocks even
+  # root's ">" redirect, which would silently prevent dockerd from starting.
+  sudo bash -c "rm -f '$DOCKERD_LOG'; nohup dockerd >'$DOCKERD_LOG' 2>&1 &"
   for _ in $(seq 1 30); do
     sudo docker info >/dev/null 2>&1 && break
     sleep 1
   done
   if ! sudo docker info >/dev/null 2>&1; then
     log "ERROR: dockerd did not become ready"
-    tail -n 20 /tmp/dockerd.log 2>/dev/null || true
+    sudo tail -n 20 "$DOCKERD_LOG" 2>/dev/null || true
     exit 1
   fi
 fi
