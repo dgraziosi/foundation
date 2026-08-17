@@ -53,7 +53,10 @@ EOF
 
 start_dockerd_temporarily() {
   if sudo docker info >/dev/null 2>&1; then
-    return 0
+    if [ "$(sudo docker info --format '{{.Driver}}' 2>/dev/null || true)" = "fuse-overlayfs" ]; then
+      return 0
+    fi
+    sudo service docker stop >/dev/null 2>&1 || true
   fi
   sudo service docker start >/dev/null 2>&1 || true
   if sudo docker info >/dev/null 2>&1; then
