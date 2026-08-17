@@ -2,20 +2,7 @@
 
 After Compose is up, paste these three bots into your harness. They use the vault MCP and the twelve tools already on the server.
 
-`GET http://127.0.0.1:8787/health` should return `{ "ok": true, "service": "foundation", "db": "up" }`. Point MCP at the vault:
-
-```json
-{
-  "mcpServers": {
-    "foundation": {
-      "url": "http://127.0.0.1:8787/mcp",
-      "headers": {
-        "Authorization": "ApiKey YOUR_KEY"
-      }
-    }
-  }
-}
-```
+`GET http://127.0.0.1:8787/health` should return `{ "ok": true, "service": "foundation", "db": "up" }`. How to attach MCP (URL, API key, confirm with `bootstrap` or a simple `search`): [`HARNESS.md`](./HARNESS.md).
 
 Each recipe uses the same locked headings: Job, Responsibilities, Standards, Routines, Skills, Handoffs.
 

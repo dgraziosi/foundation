@@ -199,7 +199,7 @@ flowchart LR
 
 Agents talk to the vault over MCP. That path is not the architecture — it is the door.
 
-`http://127.0.0.1:8787/mcp` with `Authorization: ApiKey <FOUNDATION_API_KEY>`. Streamable HTTP on this process. Port stays localhost.
+`http://127.0.0.1:8787/mcp` with `Authorization: ApiKey <FOUNDATION_API_KEY>`. Streamable HTTP on this process. Port stays localhost. Named harnesses attach with that same URL and key: [`HARNESS.md`](./HARNESS.md).
 
 Twelve tools: `bootstrap`, `search`, `get`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`.
 
