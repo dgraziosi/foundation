@@ -33,7 +33,17 @@ Put this JSON in the MCP config (`mcpServers` with `url` + `headers`). Same URL 
 
 ## Grok Bot
 
-Add a remote HTTP MCP server named `foundation` on the computer that runs Compose. Set the URL to `http://127.0.0.1:8787/mcp`. Pass the API key as `Authorization: ApiKey YOUR_KEY`. Then call `bootstrap` or a simple `search`.
+Add a remote HTTP MCP connector named `foundation` on the machine that runs Compose. Put this in the connector config. Then call `bootstrap` or a simple `search`.
+
+```json
+{
+  "name": "foundation",
+  "url": "http://127.0.0.1:8787/mcp",
+  "headers": {
+    "Authorization": "ApiKey YOUR_KEY"
+  }
+}
+```
 
 ## Hermes
 
