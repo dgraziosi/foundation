@@ -3,12 +3,49 @@ import type { NextFunction, Request, Response } from "express";
 /**
  * Authorization: ApiKey <FOUNDATION_API_KEY>
  * Bearer <FOUNDATION_API_KEY> is accepted as a documented equivalent.
+ * Cookie `foundation_key` is accepted so a browser can unlock the read-only window.
  */
+export const API_KEY_COOKIE = "foundation_key";
+
+export function cookieValue(cookieHeader: string, name: string): string | undefined {
+  for (const part of cookieHeader.split(";")) {
+    const trimmed = part.trim();
+    const eq = trimmed.indexOf("=");
+    if (eq <= 0) {
+      continue;
+    }
+    if (trimmed.slice(0, eq).trim() !== name) {
+      continue;
+    }
+    let value = trimmed.slice(eq + 1).trim();
+    if (value.startsWith('"') && value.endsWith('"') && value.length >= 2) {
+      value = value.slice(1, -1);
+    }
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+export function providedApiKey(req: Request): string | undefined {
+  const header = req.header("authorization") ?? "";
+  const match = header.match(/^(ApiKey|Bearer)\s+(\S+)$/i);
+  if (match?.[2]) {
+    return match[2];
+  }
+  return cookieValue(req.header("cookie") ?? "", API_KEY_COOKIE);
+}
+
+export function apiKeyCookieHeader(key: string): string {
+  return `${API_KEY_COOKIE}=${encodeURIComponent(key)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000`;
+}
+
 export function requireApiKey(expected: string) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const header = req.header("authorization") ?? "";
-    const match = header.match(/^(ApiKey|Bearer)\s+(\S+)$/i);
-    const provided = match?.[2];
+    const provided = providedApiKey(req);
     if (!provided || provided !== expected) {
       res.setHeader("WWW-Authenticate", 'ApiKey realm="foundation"');
       const mcp = req.baseUrl === "/mcp" || req.originalUrl.startsWith("/mcp");

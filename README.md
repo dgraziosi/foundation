@@ -101,6 +101,8 @@ Requires [Docker Compose](https://docs.docker.com/compose/) and a copy of this r
 
    **Health** (no auth): `GET http://127.0.0.1:8787/health` — `{ ok, service, db }`.
 
+   **Window:** read-only graph at `http://127.0.0.1:8787/view` (same API key as MCP).
+
    **Blobs:** large files are `$FOUNDATION_DATA/blobs/<uuid>` (not git, not agent-data). Ingest with `upsert` (`payload.storage = "blob"` plus `bytes_base64`, or drop a file in `$FOUNDATION_DATA/uploads` and pass `source_path`). Cap 20MB. Fetch bytes: `GET /blobs/:id` with the API key. `get` returns blob metadata, not the file body.
 
    **Bootstrap:**

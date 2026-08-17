@@ -5,6 +5,7 @@ import { requireApiKey } from "./auth.js";
 import { sendBlob } from "./blobs-http.js";
 import type { AppConfig } from "./config.js";
 import { handleMcpRequest } from "./mcp.js";
+import { registerViewRoutes } from "./view.js";
 
 /** 20MB blob cap as base64 plus JSON-RPC envelope. */
 const JSON_BODY_LIMIT = "32mb";
@@ -12,6 +13,7 @@ const JSON_BODY_LIMIT = "32mb";
 export function createApp(pool: Pool, config: AppConfig): Express {
   const app = express();
   app.use(express.json({ limit: JSON_BODY_LIMIT }));
+  app.use(express.urlencoded({ extended: false }));
   app.use(hostHeaderValidation(["localhost", "127.0.0.1", "[::1]"]));
 
   app.get("/health", async (_req, res) => {
@@ -22,6 +24,8 @@ export function createApp(pool: Pool, config: AppConfig): Express {
       db: db ? "up" : "down",
     });
   });
+
+  registerViewRoutes(app, pool, config);
 
   app.get("/blobs/:id", requireApiKey(config.FOUNDATION_API_KEY), async (req, res) => {
     try {

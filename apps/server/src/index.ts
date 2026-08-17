@@ -17,6 +17,7 @@ const app = createApp(pool, config);
 const server = app.listen(config.PORT, config.HOST, () => {
   console.log(`Foundation MCP listening on http://${config.HOST}:${config.PORT}/mcp`);
   console.log(`Health: http://${config.HOST}:${config.PORT}/health`);
+  console.log(`View:   http://${config.HOST}:${config.PORT}/view`);
   console.log(`Blobs:  http://${config.HOST}:${config.PORT}/blobs/:id`);
 });
 

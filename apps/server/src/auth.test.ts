@@ -45,3 +45,28 @@ test("ApiKey header is accepted; missing or wrong key is 401", async () => {
     server.close();
   }
 });
+
+test("cookie foundation_key is accepted when Authorization is absent", async () => {
+  const app = express();
+  app.get("/blobs/:id", requireApiKey("secret-key"), (_req, res) => {
+    res.json({ ok: true });
+  });
+
+  const server = app.listen(0);
+  await new Promise<void>((resolve) => server.on("listening", () => resolve()));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const url = `http://127.0.0.1:${address.port}/blobs/11111111-1111-4111-8111-111111111111`;
+
+  try {
+    const denied = await fetch(url);
+    assert.equal(denied.status, 401);
+
+    const ok = await fetch(url, {
+      headers: { cookie: "foundation_key=secret-key" },
+    });
+    assert.equal(ok.status, 200);
+  } finally {
+    server.close();
+  }
+});
