@@ -19,7 +19,7 @@ The operator can run this checkup, or attach it to Vault Keeper ([`AGENTS.md`](.
 
 ## What it is
 
-A **quiet instance routine** (weekdays, morning local). Instance ops: process + db, the data dir is the real vault, optional canaries, optional backup freshness. It uses HTTP, the host filesystem, and existing MCP tools the same way a careful operator would. When everything is fine, it stays silent. It pings the operator **only on failure**.
+A **quiet instance routine** (weekdays, morning local). Instance ops: process + db, the data dir is the real vault, optional canaries, backup freshness. It uses HTTP, the host filesystem, and existing MCP tools the same way a careful operator would. When everything is fine, it stays silent. It pings the operator **only on failure**.
 
 Do not add `get_vault_health`, `run_maintenance`, `propose_reorganize`, `audit_links`, or `cleanup_dangling_links`. Those jobs are this routine and [graph hygiene](./GRAPH_HYGIENE.md), not MCP tools.
 
@@ -27,7 +27,7 @@ Graph-side report (duplicate titles, zero-edge nodes, type soup) is **not** this
 
 ## What it is not
 
-- **Not the graph.** `$FOUNDATION_DATA` and Postgres *are* the vault. The graph lives in them. Do not call the graph “the Vault.” Do not dual-write a markdown store or invent a backup product.
+- **Not the graph.** `$FOUNDATION_DATA` and Postgres *are* the vault. The graph lives in them. Do not call the graph “the Vault.” Do not dual-write a markdown store.
 - **Starter recipes.** Paste Vault Keeper and attach this routine. See [`AGENTS.md`](./AGENTS.md).
 - **Not email.** No SMTP, no digest. Pings stay in the operator’s chat. Ping only when a check fails.
 - **Not a write-ACL.** The API key is the gate. Do not invent default-deny.
@@ -36,7 +36,7 @@ Graph-side report (duplicate titles, zero-edge nodes, type soup) is **not** this
 
 ## Quiet weekday checks
 
-Run in order. Stop at the first hard failure and ping. Skip a check when its input is unset — a fresh clone with no well-known nodes and no backup path is allowed to be healthy.
+Run in order. Stop at the first hard failure and ping. Skip a check when its input is unset — a fresh clone with no well-known nodes is allowed to be healthy. Backup freshness uses `BACKUP_ROOT`; skip that check only if the operator unset it.
 
 A first-day empty graph is a valid vault. Keep `FOUNDATION_DATA` in place and leave Compose volumes intact.
 
@@ -72,14 +72,13 @@ If the operator listed a couple of node UUIDs or stable titles in the routine pr
 
 If the list is empty, **skip**. Do not invent nodes. Do not fail a fresh graph for lacking them.
 
-### 4. Backup not missing/stale (if a backup path exists)
+### 4. Backup not missing/stale
 
-Foundation does not ship a backup tool. If the operator named a backup path (for example `$FOUNDATION_DATA/backups`, a `pg_dump` file, or a restic snapshot directory they already use), check:
+The product ships `scripts/backup-vault.sh`. Default backup path is `BACKUP_ROOT` (sibling of the data dir). Health checks that the path exists and the newest artifact is newer than 48 hours. Health does not dump.
 
-- The path exists and is readable
-- The newest artifact is newer than the operator’s stale threshold (default: 48 hours)
+If the operator unset `BACKUP_ROOT`, **skip**. Do not nag.
 
-If no backup path is configured, **skip**. Do not nag. Do not dump the database from the quiet routine.
+How to take a dump and how to restore into a throwaway instance: [`BACKUP.md`](./BACKUP.md).
 
 ## How to check (existing surface)
 
@@ -92,7 +91,7 @@ Intent only — tool JSON schemas change; call `bootstrap` and use what the serv
 | Canary nodes | `get` / `search` |
 | Recent writes (optional context, not a fail) | `list_activity` with a `since` window |
 | Data dir (the vault) | Host filesystem + `.env` `FOUNDATION_DATA` |
-| Backup | Host filesystem, only if a path was configured |
+| Backup | Host filesystem at `BACKUP_ROOT` (skip only if the operator unset it) |
 
 Auth for `/mcp`: `Authorization: ApiKey <FOUNDATION_API_KEY>` (Bearer equivalent). `/health` needs no key.
 
