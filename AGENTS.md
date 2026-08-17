@@ -10,14 +10,17 @@ Product/setup docs live in `README.md` and `docs/`. Standard scripts are in root
 
 ## Cursor Cloud specific instructions
 
-The base VM snapshot already has: pnpm deps installed, Docker installed/configured for this VM (fuse-overlayfs storage driver, containerd-snapshotter disabled, iptables set to legacy), and the `pgvector/pgvector:pg16` image pulled. The startup update script only refreshes pnpm deps — the services below are NOT auto-started, so start them yourself when you need them.
+The base VM snapshot already has: Docker installed/configured for this nested VM (fuse-overlayfs storage driver, containerd-snapshotter disabled, iptables set to legacy) and the `pgvector/pgvector:pg16` image pulled. The environment scripts are:
 
-Services and how to run them:
+- `install`: `pnpm install --frozen-lockfile` — refreshes workspace deps after checkout.
+- `start`: `bash .cursor/start.sh` — per-boot startup that creates `.env` if missing, starts the Docker daemon, brings up Postgres (pgvector) via `docker compose up -d db`, then runs the Foundation server with `pnpm dev` (hot reload, stays attached). Its output goes to the start logs.
 
-- Postgres (pgvector) — the only runtime dependency. It provides the `vector`, `unaccent`, and `pgcrypto` extensions the migrations require, so a plain Postgres will not work. Start the Docker daemon if it is not running (`sudo dockerd &`, or check `sudo docker info`), then bring up just the DB with `sudo docker compose up -d db` (it publishes `127.0.0.1:5432`, user/pass/db all `foundation`). `docker compose` needs `sudo` here because the daemon runs as root in this VM.
-- Foundation server — for development run it on the host with hot reload: `set -a && source .env && set +a && pnpm dev`. It auto-runs migrations + seed on boot and listens on `:8787` (`/health` no-auth, `/mcp` and `/view` require the API key). Full production-style stack is `sudo docker compose up --build` (runs `pnpm start`, not dev).
+So on a normally-booted agent the DB and server are already running; `/health` at `:8787` should return `{"ok":true,...}`. If you need to run things manually (e.g. the start script is not active):
 
-Required config: a gitignored `.env` at the repo root (copy from `.env.example`). It must set `FOUNDATION_API_KEY` (any long string) and, for host/dev runs, `DATABASE_URL=postgres://foundation:foundation@localhost:5432/foundation`. The server loads `.env` automatically, but the tests read `process.env.DATABASE_URL` directly, so `source .env` (export it) before running tests.
+- Postgres (pgvector) is the only runtime dependency and supplies the `vector`, `unaccent`, and `pgcrypto` extensions the migrations require, so a plain Postgres will not work. Ensure dockerd is up (`sudo docker info`, else `sudo dockerd &`), then `sudo -E docker compose up -d db` (publishes `127.0.0.1:5432`, user/pass/db all `foundation`). `docker compose` needs `sudo` because the daemon runs as root here.
+- Foundation server (dev): `set -a && source .env && set +a && pnpm dev` — auto-runs migrations + seed, listens on `:8787` (`/health` no-auth, `/mcp` and `/view` require the API key). Full production-style stack: `sudo docker compose up --build`.
+
+Config: `.cursor/start.sh` writes a gitignored `.env` (from the `.env.example` shape) with `FOUNDATION_API_KEY` and `DATABASE_URL=postgres://foundation:foundation@localhost:5432/foundation`. The server loads `.env` automatically, but the tests read `process.env.DATABASE_URL` directly, so `source .env` (export it) before running tests.
 
 Testing caveats:
 
