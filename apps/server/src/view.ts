@@ -11,6 +11,7 @@ import {
 } from "@foundation/schema";
 import type { Express, NextFunction, Request, Response } from "express";
 import { apiKeyCookieHeader, providedApiKey } from "./auth.js";
+import { sendBlob } from "./blobs-http.js";
 import type { AppConfig } from "./config.js";
 import { getGraphNode, inspectOntology, searchGraphNodes } from "./graph.js";
 
@@ -170,7 +171,7 @@ function nodePage(got: {
       : `<p class="notice">Blob metadata unavailable.</p>`;
     const fetch =
       blobId !== ""
-        ? `<p><a href="/blobs/${encodeURIComponent(blobId)}" download>Fetch bytes</a> via <code>/blobs/:id</code></p>`
+        ? `<p><a href="${VIEW_PATH}/blobs/${encodeURIComponent(blobId)}" download>Fetch bytes</a></p>`
         : "";
     payloadBlock = `${meta}${fetch}`;
   } else {
@@ -270,6 +271,17 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppConfig):
     } catch (error) {
       console.error("View search failed", error);
       res.status(500).type("html").send(page("Vault", "<p>Internal server error</p>"));
+    }
+  });
+
+  app.get(`${VIEW_PATH}/blobs/:id`, gate, async (req, res) => {
+    try {
+      await sendBlob(pool, config, req, res);
+    } catch (error) {
+      console.error("View blob fetch failed", error);
+      if (!res.headersSent) {
+        res.status(500).type("html").send(page("Vault", "<p>Internal server error</p>"));
+      }
     }
   });
 

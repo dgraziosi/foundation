@@ -40,6 +40,20 @@ function mcpUpsertBody(title: string): string {
   });
 }
 
+async function unlockCookie(origin: string): Promise<string> {
+  const unlock = await fetch(`${origin}/view/unlock`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: `api_key=${encodeURIComponent(apiKey)}`,
+    redirect: "manual",
+  });
+  assert.equal(unlock.status, 303);
+  const setCookie = unlock.headers.get("set-cookie") ?? "";
+  const cookie = setCookie.split(";")[0];
+  assert.ok(cookie);
+  return cookie;
+}
+
 test("read-only window: auth, search, node page, no writes", { skip: !databaseUrl }, async (t) => {
   if (!databaseUrl) {
     return;
@@ -67,6 +81,9 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
 
       const node = await fetch(`${origin}/view/nodes/11111111-1111-4111-8111-111111111111`);
       assert.equal(node.status, 401);
+
+      const blob = await fetch(`${origin}/view/blobs/11111111-1111-4111-8111-111111111111`);
+      assert.equal(blob.status, 401);
     });
 
     await t.test("succeeds with the API key; empty graph is an empty list", async () => {
@@ -254,7 +271,7 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       return;
     }
 
-    await t.test("blob node shows metadata and the existing /blobs path", async () => {
+    await t.test("blob node shows metadata and a window download link", async () => {
       const got = await getGraphNode(pool, blobNote.node.id, { blobs: { dataDir } });
       assert.equal(isToolError(got), false);
       if (isToolError(got)) {
@@ -268,7 +285,43 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       assert.match(html, new RegExp(got.blob.id));
       assert.match(html, new RegExp(got.blob.sha256));
       assert.match(html, /application\/pdf/);
-      assert.match(html, new RegExp(`/blobs/${got.blob.id}`));
+      assert.match(html, new RegExp(`/view/blobs/${got.blob.id}`));
+    });
+
+    await t.test("form unlock can download blob bytes without an Authorization header", async () => {
+      const got = await getGraphNode(pool, blobNote.node.id, { blobs: { dataDir } });
+      assert.equal(isToolError(got), false);
+      if (isToolError(got) || !got.blob) {
+        return;
+      }
+      const cookie = await unlockCookie(origin);
+      const deniedAgentPath = await fetch(`${origin}/blobs/${got.blob.id}`, { headers: { cookie } });
+      assert.equal(deniedAgentPath.status, 401);
+
+      const download = await fetch(`${origin}/view/blobs/${got.blob.id}`, { headers: { cookie } });
+      assert.equal(download.status, 200);
+      assert.equal(download.headers.get("content-type"), "application/pdf");
+      assert.match(download.headers.get("content-disposition") ?? "", /attachment/i);
+      const body = Buffer.from(await download.arrayBuffer());
+      assert.deepEqual(body, pdf);
+
+      const { rows: countBefore } = await pool.query<{ n: string }>(
+        "SELECT COUNT(*)::text AS n FROM nodes WHERE deleted_at IS NULL",
+      );
+      const mcp = await fetch(`${origin}/mcp`, {
+        method: "POST",
+        headers: {
+          cookie,
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+        },
+        body: mcpUpsertBody("Cookie must not write after blob download"),
+      });
+      assert.equal(mcp.status, 401);
+      const { rows: countAfter } = await pool.query<{ n: string }>(
+        "SELECT COUNT(*)::text AS n FROM nodes WHERE deleted_at IS NULL",
+      );
+      assert.equal(countAfter[0]?.n, countBefore[0]?.n);
     });
 
     await t.test("text/html blob from the node page is not a navigable document", async () => {
@@ -282,20 +335,23 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       });
       assert.equal(page.status, 200);
       const pageHtml = await page.text();
-      assert.match(pageHtml, new RegExp(`/blobs/${got.blob.id}`));
+      assert.match(pageHtml, new RegExp(`/view/blobs/${got.blob.id}`));
 
-      const cookieOnly = await fetch(`${origin}/blobs/${got.blob.id}`, {
-        headers: { cookie: "foundation_key=test-foundation-key" },
-      });
-      assert.equal(cookieOnly.status, 401);
+      const cookie = await unlockCookie(origin);
+      const cookieAgentPath = await fetch(`${origin}/blobs/${got.blob.id}`, { headers: { cookie } });
+      assert.equal(cookieAgentPath.status, 401);
 
-      const bytes = await fetch(`${origin}/blobs/${got.blob.id}`, { headers: authHeader() });
-      assert.equal(bytes.status, 200);
-      assert.equal(bytes.headers.get("content-type"), "application/octet-stream");
-      assert.match(bytes.headers.get("content-disposition") ?? "", /attachment/i);
-      assert.equal(bytes.headers.get("x-content-type-options"), "nosniff");
-      assert.notEqual(bytes.headers.get("content-type"), "text/html");
-      const body = Buffer.from(await bytes.arrayBuffer());
+      const headerAgentPath = await fetch(`${origin}/blobs/${got.blob.id}`, { headers: authHeader() });
+      assert.equal(headerAgentPath.status, 200);
+      assert.equal(headerAgentPath.headers.get("content-type"), "application/octet-stream");
+
+      const windowBytes = await fetch(`${origin}/view/blobs/${got.blob.id}`, { headers: { cookie } });
+      assert.equal(windowBytes.status, 200);
+      assert.equal(windowBytes.headers.get("content-type"), "application/octet-stream");
+      assert.match(windowBytes.headers.get("content-disposition") ?? "", /attachment/i);
+      assert.equal(windowBytes.headers.get("x-content-type-options"), "nosniff");
+      assert.notEqual(windowBytes.headers.get("content-type"), "text/html");
+      const body = Buffer.from(await windowBytes.arrayBuffer());
       assert.deepEqual(body, htmlBytes);
     });
 
