@@ -36,6 +36,7 @@ Do not commit personal life data, documents, or secrets to this repository. Thos
 - [`docs/SPEC.md`](docs/SPEC.md) — product contract
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — living vault and graph
 - [`docs/MCP_TOOLS.md`](docs/MCP_TOOLS.md) — 12-tool MCP surface
+- [`docs/HARNESS.md`](docs/HARNESS.md) — attach the vault MCP from a named harness
 - [`docs/AGENTS.md`](docs/AGENTS.md) — starter recipes (Chief of Staff, Vault Keeper, Executive Assistant)
 - [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md) — weekday instance checkup
 - [`docs/BACKUP.md`](docs/BACKUP.md) — nightly backup script and throwaway restore
@@ -68,7 +69,7 @@ Requires [Docker Compose](https://docs.docker.com/compose/) and a copy of this r
 
    `Authorization: Bearer <FOUNDATION_API_KEY>` is accepted as an equivalent.
 
-   Cursor / Claude-style MCP config:
+   After Compose is up, attach from Grok Bot, Hermes, OpenClaw, Claude Code, or Codex on this same machine. Commands and file snippets: [`docs/HARNESS.md`](docs/HARNESS.md). The generic JSON shape (`url` + `headers`) is:
 
    ```json
    {
