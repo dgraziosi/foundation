@@ -71,6 +71,11 @@ start_dockerd_temporarily() {
   return 1
 }
 
+stop_temporary_dockerd() {
+  sudo service docker stop >/dev/null 2>&1 || true
+  sudo pkill -x dockerd >/dev/null 2>&1 || true
+}
+
 ensure_env_file() {
   if [ -f .env ]; then
     return 0
@@ -105,6 +110,7 @@ corepack prepare pnpm@10.33.3 --activate
 pnpm install --frozen-lockfile
 ensure_env_file
 source_env_on_login
+trap 'stop_temporary_dockerd' EXIT
 start_dockerd_temporarily
 sudo docker pull pgvector/pgvector:pg16
 echo "install complete"
