@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createPool, explainLookupNodeCandidates, explainLookupTitleAccess, migrate, seedSystemOntology, type Pool } from "@foundation/db";
+import {
+  createPool,
+  explainLookupNodeCandidates,
+  explainLookupTitleAccess,
+  explainLookupTitleTrgmGin,
+  migrate,
+  seedSystemOntology,
+  type Pool,
+} from "@foundation/db";
 import { isToolError } from "@foundation/schema";
 import { lookupGraphNodes, upsertGraphNode } from "./graph.js";
 
@@ -122,11 +130,9 @@ test(
       await pool.query("ANALYZE nodes");
 
       const titlePlans = await explainLookupTitleAccess(pool, "priya shah");
-      assert.match(titlePlans.exact, /title_norm/);
-      assert.match(titlePlans.fuzzy, /title_norm/);
-      // Exact/fuzzy title access should be index-backed, not a raw sequential filter of all titles.
-      assert.match(titlePlans.exact, /Index|Bitmap/i);
-      assert.match(titlePlans.fuzzy, /Index|Bitmap/i);
+      assert.match(titlePlans.exact, /nodes_title_norm_idx/);
+      const trgmGinPlan = await explainLookupTitleTrgmGin(pool, "priya shah");
+      assert.match(trgmGinPlan, /nodes_title_norm_trgm_idx/);
 
       const inputs = [
         { id: "1", name: "Priya Shah", type: "person" },
@@ -185,6 +191,7 @@ test(
               warm_cache_ms: Math.round(elapsedMs * 10) / 10,
               title_exact_plan: titlePlans.exact,
               title_fuzzy_plan: titlePlans.fuzzy,
+              title_trgm_gin_plan: trgmGinPlan,
               batch_plan: batchPlan,
             },
           },

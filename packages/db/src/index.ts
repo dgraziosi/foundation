@@ -50,6 +50,7 @@ export {
   restoreNodeSnapshot,
   explainLookupNodeCandidates,
   explainLookupTitleAccess,
+  explainLookupTitleTrgmGin,
   lookupNodeCandidates,
   searchNodes,
   searchTitleLinkCandidates,

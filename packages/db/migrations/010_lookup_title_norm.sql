@@ -43,12 +43,12 @@ CREATE INDEX nodes_title_compact_idx
   ON nodes (title_compact)
   WHERE deleted_at IS NULL;
 
+-- Full GIN (not partial): a WHERE deleted_at IS NULL predicate made `%`
+-- plans ignore the trigram index and bitmap-scan other live-row indexes.
 CREATE INDEX nodes_title_norm_trgm_idx
   ON nodes
-  USING GIN (title_norm public.gin_trgm_ops)
-  WHERE deleted_at IS NULL;
+  USING GIN (title_norm public.gin_trgm_ops);
 
 CREATE INDEX nodes_title_compact_trgm_idx
   ON nodes
-  USING GIN (title_compact public.gin_trgm_ops)
-  WHERE deleted_at IS NULL;
+  USING GIN (title_compact public.gin_trgm_ops);

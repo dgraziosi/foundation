@@ -12,6 +12,7 @@ import {
 } from "@foundation/schema";
 import type { Queryable } from "./tx.js";
 import { iso } from "./tx.js";
+import type pg from "pg";
 
 type NodeRow = {
   id: string;
@@ -551,10 +552,20 @@ combined AS (
   SELECT * FROM title_fuzzy
   UNION ALL
   SELECT * FROM alias_fuzzy
+),
+ranked AS (
+  SELECT *,
+         row_number() OVER (
+           PARTITION BY idx, match
+           ORDER BY score DESC, title ASC, id ASC
+         ) AS rn
+  FROM combined
+  WHERE score >= $6 OR match IN ('title_exact', 'alias_exact', 'title_token')
 )
 SELECT idx, id, type, title, status, score, match, matched_value
-FROM combined
-WHERE score >= $6 OR match IN ('title_exact', 'alias_exact', 'title_token')
+FROM ranked
+WHERE match IN ('title_exact', 'alias_exact')
+   OR rn <= 20
 `;
 
 export function lookupCandidateValues(inputs: LookupQueryInput[]): unknown[] {
@@ -619,6 +630,46 @@ export async function explainLookupTitleAccess(
     exact: exact.rows.map((row) => row["QUERY PLAN"]).join("\n"),
     fuzzy: fuzzy.rows.map((row) => row["QUERY PLAN"]).join("\n"),
   };
+}
+
+/** Force bitmap-only planning so the title_norm trigram GIN must be considered. */
+export async function explainLookupTitleTrgmGin(
+  db: Queryable,
+  sampleNorm: string,
+): Promise<string> {
+  const run = async (client: Queryable): Promise<string> => {
+    await client.query("SET LOCAL enable_seqscan = off");
+    const { rows } = await client.query<{ "QUERY PLAN": string }>(
+      `EXPLAIN (FORMAT TEXT)
+       SELECT id FROM nodes
+       WHERE title_norm % $1`,
+      [sampleNorm],
+    );
+    return rows.map((row) => row["QUERY PLAN"]).join("\n");
+  };
+  if ("connect" in db && typeof (db as pg.Pool).connect === "function") {
+    const client = await (db as pg.Pool).connect();
+    try {
+      await client.query("BEGIN");
+      const plan = await run(client);
+      await client.query("ROLLBACK");
+      return plan;
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+  await db.query("BEGIN");
+  try {
+    const plan = await run(db);
+    await db.query("ROLLBACK");
+    return plan;
+  } catch (error) {
+    await db.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  }
 }
 
 type EdgeRow = {
