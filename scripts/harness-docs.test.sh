@@ -25,4 +25,12 @@ if ! grep -Fq -- "http://127.0.0.1:8787/mcp" "${doc}"; then
   fail "docs/HARNESS.md does not name the localhost MCP URL"
 fi
 
+if ! grep -Fq -- "Authorization: ApiKey YOUR_KEY" "${doc}"; then
+  fail "docs/HARNESS.md does not say how to pass the API key"
+fi
+
+if ! grep -Fq -- "bootstrap" "${doc}" || ! grep -Fq -- "search" "${doc}"; then
+  fail "docs/HARNESS.md does not say how to confirm with bootstrap or search"
+fi
+
 echo "harness-docs.test: ok"

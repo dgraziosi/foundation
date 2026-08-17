@@ -1,19 +1,22 @@
 # Attach the vault MCP
 
-After Compose is up, the operator (the human who runs Compose) points a harness at the vault. Same localhost URL and API key on every named harness. The harness runs on the same machine as Compose.
+A stranger follows the README: clone, Compose up, then this page to connect a named harness. The operator (the human who runs Compose) does this on the same machine as Compose.
 
-- URL: `http://127.0.0.1:8787/mcp`
-- Header: `Authorization: ApiKey YOUR_KEY` (`Bearer` is accepted)
-- Health: `GET http://127.0.0.1:8787/health`
-- Window: `http://127.0.0.1:8787/view`
+## Shared pattern
 
-Replace `YOUR_KEY` with `FOUNDATION_API_KEY` from `.env`. Do not commit the key.
+1. **MCP URL:** `http://127.0.0.1:8787/mcp`
+2. **API key:** send `Authorization: ApiKey YOUR_KEY`. Replace `YOUR_KEY` with `FOUNDATION_API_KEY` from `.env`. `Authorization: Bearer YOUR_KEY` is accepted. Do not commit the key.
+3. **Confirm it works:** in the harness, call `bootstrap`, or a simple `search` (for example `{ "type": "area" }`). `bootstrap` returns the starter spine. A connected harness can reach the twelve tools already on the server.
 
-The twelve tools stay on the server. This page is how to attach, not a new tool. Starter recipes still paste from [`AGENTS.md`](./AGENTS.md).
+Health: `GET http://127.0.0.1:8787/health`. Window: `http://127.0.0.1:8787/view`.
+
+Put the URL and header in the harness config file (or the command that writes that file). Snippets below are only where the file shape differs. No marketplace. No new MCP tool.
+
+Starter recipes still paste from [`AGENTS.md`](./AGENTS.md).
 
 ## Cursor
 
-Generic JSON (`mcpServers` with `url` + `headers`):
+Write the generic JSON (`mcpServers` with `url` + `headers`). Same URL and key as the shared pattern. Confirm with `bootstrap` or a simple `search`.
 
 ```json
 {
@@ -30,11 +33,11 @@ Generic JSON (`mcpServers` with `url` + `headers`):
 
 ## Grok Bot
 
-Add a remote HTTP MCP server named `foundation` on the computer that runs Compose. Use that URL and the Authorization header.
+Add a remote HTTP MCP server named `foundation` on the computer that runs Compose. URL: `http://127.0.0.1:8787/mcp`. Pass the API key as `Authorization: ApiKey YOUR_KEY`. Confirm with `bootstrap` or a simple `search`.
 
 ## Hermes
 
-`~/.hermes/config.yaml`:
+Open `~/.hermes/config.yaml` and add a `foundation` server. URL and `headers.Authorization` follow the shared pattern. Confirm with `bootstrap` or a simple `search`.
 
 ```yaml
 mcp_servers:
@@ -46,7 +49,7 @@ mcp_servers:
 
 ## OpenClaw
 
-`mcp.servers` entry with `url`, `transport: "streamable-http"`, and `headers.Authorization`:
+Add an `mcp.servers` entry named `foundation` with `url`, `transport: "streamable-http"`, and `headers.Authorization`. Same URL and key as the shared pattern. Confirm with `bootstrap` or a simple `search`.
 
 ```json
 {
@@ -68,11 +71,13 @@ Control UI: Settings → MCP → Add server (Streamable HTTP).
 
 ## Claude Code
 
+Run the command, or write `.mcp.json` (`type: "http"`, `url`, `headers`). Same URL and key as the shared pattern. Confirm with `bootstrap` or a simple `search`.
+
 ```bash
 claude mcp add --transport http foundation http://127.0.0.1:8787/mcp --header "Authorization: ApiKey YOUR_KEY"
 ```
 
-`.mcp.json` / `claude mcp add-json` uses `type: "http"`, `url`, and `headers`:
+`.mcp.json` / `claude mcp add-json`:
 
 ```json
 {
@@ -90,7 +95,7 @@ claude mcp add --transport http foundation http://127.0.0.1:8787/mcp --header "A
 
 ## Codex
 
-`~/.codex/config.toml` (or project `.codex/config.toml`):
+Open `~/.codex/config.toml` (or project `.codex/config.toml`) and add `mcp_servers.foundation`. URL and `http_headers.Authorization` follow the shared pattern. Confirm with `bootstrap` or a simple `search`.
 
 ```toml
 [mcp_servers.foundation]

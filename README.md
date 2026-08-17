@@ -69,7 +69,7 @@ Requires [Docker Compose](https://docs.docker.com/compose/) and a copy of this r
 
    `Authorization: Bearer <FOUNDATION_API_KEY>` is accepted as an equivalent.
 
-   After Compose is up, attach from Grok Bot, Hermes, OpenClaw, Claude Code, or Codex on this same machine. Commands and file snippets: [`docs/HARNESS.md`](docs/HARNESS.md). The generic JSON shape (`url` + `headers`) is:
+   After Compose is up, attach from Grok Bot, Hermes, OpenClaw, Claude Code, or Codex on this same machine. Put the URL and API key in that harness. Confirm it works: call `bootstrap` (step 4) or a simple `search`. What the operator does, plus the file snippet where the config differs: [`docs/HARNESS.md`](docs/HARNESS.md). The generic JSON shape (`url` + `headers`) is:
 
    ```json
    {
