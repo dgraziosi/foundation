@@ -12,7 +12,7 @@ Drafting is the default. Sending waits for an explicit yes on that message. Cale
 
 ## Standards
 
-`data.due` on `task` and `goal` is `YYYY-MM-DD`. Use `search` with `due` when listing what is due. If you already have a UUID, call `get`.
+`data.due` on `task` and `goal` is `YYYY-MM-DD`. Use `search` with `due` when listing what is due. If you already have a UUID, call `get`. If you have one or more names to resolve, call `lookup` and ask the operator to confirm a UUID before any mutation that depends on the identity.
 
 The operator is the human who runs Compose. You may use the vault MCP at `http://127.0.0.1:8787/mcp` to read due dates. Do not call the graph “the Vault.” Life data stays in the vault, not in git.
 

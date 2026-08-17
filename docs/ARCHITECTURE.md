@@ -59,7 +59,7 @@ flowchart LR
 A node has **type**, **title**, **status**, a **payload**, and **data**. Identity is UUID.
 
 - **Payload** is either **inline** (`text/markdown`, `text/html`, `application/json`, `text/plain`) or a **blob** (file on the node).
-- **data** is structured JSON. If the type has `json_schema`, upsert validates the merged object. `data.origin` is an optional pointer, not a mirrored body. `data.due` is an optional ISO date (`YYYY-MM-DD`) on `task` and `goal` (enforced when present; omit it and the node still writes; `due: null` clears). Stored on the JSONB `data` object, not a separate column.
+- **data** is structured JSON. If the type has `json_schema`, upsert validates the merged object. `data.origin` is an optional pointer, not a mirrored body. `data.due` is an optional ISO date (`YYYY-MM-DD`) on `task` and `goal` (enforced when present; omit it and the node still writes; `due: null` clears). `data.aliases` is an optional string array of operator-authored alternate names (any type; used by `lookup`). Stored on the JSONB `data` object, not a separate column.
 
 ```mermaid
 flowchart TB
@@ -76,6 +76,7 @@ flowchart TB
   node_data --> structured["structured fields"]
   node_data --> origin["origin ref"]
   node_data --> due["data.due on task / goal"]
+  node_data --> aliases["data.aliases"]
   node_data --> schema["json_schema on the type"]
 ```
 
@@ -175,11 +176,17 @@ flowchart LR
 
 Empty `{}` is an error (no `list_nodes` tool). Hits are lean and include `due` when `data.due` is set; `get` loads payload, `data.due`, and neighbor titles.
 
+`lookup` is a separate read-only tool: batch name resolution with a result per input. Unique folded title, unique operator alias, or UUID may bind. Token and fuzzy matches are candidates that need operator confirmation before a write. `score` ranks; it is not a probability. Title folding uses generated `title_norm` / `title_compact` and trigram indexes. Aliases stay on `data.aliases` (JSONB unnest). Not embeddings.
+
 ```mermaid
 flowchart TB
   search_box["search"]
   search_box --> fts["full-text + accent-folding"]
   search_box --> list_or_filter["or list by type / status / under / since / origin / due / data_equals"]
+  lookup_box["lookup"]
+  lookup_box --> names["batch names → per-input outcome"]
+  lookup_box --> title_idx["title_norm / trigram"]
+  lookup_box --> aliases["data.aliases unnest"]
 ```
 
 ## Origin
@@ -201,7 +208,7 @@ Agents talk to the vault over MCP. That path is not the architecture — it is t
 
 `http://127.0.0.1:8787/mcp` with `Authorization: ApiKey <FOUNDATION_API_KEY>`. Streamable HTTP on this process. Port stays localhost. Named harnesses attach with that same URL and key: [`HARNESS.md`](./HARNESS.md).
 
-Twelve tools: `bootstrap`, `search`, `get`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`.
+Thirteen tools: `bootstrap`, `search`, `lookup`, `get`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`.
 
 An agent that can reach the vault MCP may read/write; one that cannot does not.
 
@@ -211,7 +218,7 @@ The operator opens a read-only HTTP window on the same localhost process: `http:
 
 ```mermaid
 flowchart LR
-  agents["Agents"] -->|"MCP on localhost — 12 tools, ApiKey"| vault["Vault"]
+  agents["Agents"] -->|"MCP on localhost — 13 tools, ApiKey"| vault["Vault"]
 ```
 
 Two agents may write the same node through that one MCP. Update and `link` are if-match. If the node moved, the vault **refuses**. The caller’s next move is get and retry.

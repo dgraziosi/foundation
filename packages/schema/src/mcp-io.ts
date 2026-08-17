@@ -336,6 +336,72 @@ export const SearchSuccessSchema = z.object({
   suggestion: z.string().optional(),
 });
 
+export const LOOKUP_BATCH_MAX = 20;
+export const LOOKUP_NAME_MAX = 200;
+export const LOOKUP_CANDIDATE_MAX = 10;
+
+export const LOOKUP_NO_SELECTOR_SUGGESTION =
+  "Pass one or more inputs with name (max 20). Optional type narrows people, places, companies, or other types. Do not use lookup for listing, origin refs, or payload search — those stay on search.";
+
+export const LookupMatchSchema = z.enum([
+  "title_exact",
+  "alias_exact",
+  "title_fuzzy",
+  "alias_fuzzy",
+  "title_token",
+  "uuid",
+]);
+export type LookupMatch = z.infer<typeof LookupMatchSchema>;
+
+export const LookupOutcomeSchema = z.enum([
+  "exact",
+  "alias",
+  "candidate",
+  "ambiguous",
+  "no_match",
+]);
+export type LookupOutcome = z.infer<typeof LookupOutcomeSchema>;
+
+export const LookupInputItemSchema = z.object({
+  name: z.string().trim().min(1).max(LOOKUP_NAME_MAX),
+  type: z.string().min(1).optional(),
+  id: z.string().trim().min(1).max(80).optional(),
+});
+export type LookupInputItem = z.infer<typeof LookupInputItemSchema>;
+
+export const LookupInputSchema = z.object({
+  inputs: z.array(LookupInputItemSchema).min(1).max(LOOKUP_BATCH_MAX),
+  type: z.string().min(1).optional(),
+  limit: z.number().int().min(1).max(LOOKUP_CANDIDATE_MAX).optional(),
+});
+export type LookupInput = z.infer<typeof LookupInputSchema>;
+
+export const LookupCandidateSchema = z.object({
+  id: z.string().uuid(),
+  type: z.string().min(1),
+  title: z.string().min(1),
+  status: NodeStatusSchema,
+  /** Algorithmic ranking score in [0, 1]. Not a probability or authority. */
+  score: z.number().min(0).max(1),
+  match: LookupMatchSchema,
+  matched_value: z.string().min(1),
+  explanation: z.string().min(1),
+});
+export type LookupCandidate = z.infer<typeof LookupCandidateSchema>;
+
+export const LookupResultSchema = z.object({
+  input: LookupInputItemSchema,
+  outcome: LookupOutcomeSchema,
+  candidates: z.array(LookupCandidateSchema),
+  suggestion: z.string().optional(),
+});
+export type LookupResult = z.infer<typeof LookupResultSchema>;
+
+export const LookupSuccessSchema = z.object({
+  results: z.array(LookupResultSchema),
+});
+export type LookupSuccess = z.infer<typeof LookupSuccessSchema>;
+
 export const ListActivityInputSchema = z.object({
   action: ActivityActionSchema.optional(),
   target: z.string().min(1).optional(),

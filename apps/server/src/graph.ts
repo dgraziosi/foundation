@@ -24,6 +24,7 @@ import {
   listRelationTypes,
   readBlobBytes,
   resolveBlobFilePath,
+  lookupNodeCandidates,
   searchNodes,
   softDeleteNode,
   unlinkQuiet,
@@ -54,6 +55,10 @@ import {
   SEARCH_MISS_SUGGESTION,
   SEARCH_NO_SELECTOR_SUGGESTION,
   SEARCH_UUID_SUGGESTION,
+  LOOKUP_NO_SELECTOR_SUGGESTION,
+  LOOKUP_CANDIDATE_DEFAULT,
+  applyAliasesFromPatch,
+  classifyLookupResult,
   ORIGIN_HIT_SUGGESTION,
   ORIGIN_MISS_SUGGESTION,
   DUE_DATE_SUGGESTION,
@@ -83,6 +88,8 @@ import {
   type NodeType,
   type Payload,
   type RelationType,
+  type LookupInput,
+  type LookupSuccess,
   type SearchHit,
   type SearchInput,
   type SuggestedLink,
@@ -433,9 +440,13 @@ export async function upsertGraphNode(
         }
       }
 
-      const nextData = canonicalizeDueInData(
+      const merged = canonicalizeDueInData(
         canonicalizeOriginInData(mergedNodeData(existing, input.data)),
       );
+      const nextData = applyAliasesFromPatch(merged, input.data);
+      if (isToolError(nextData)) {
+        return nextData;
+      }
       const dataErr = validateUpsertData(type, nextData);
       if (dataErr) {
         return dataErr;
@@ -1161,4 +1172,99 @@ export async function searchGraphNodes(
     return { nodes, suggestion: ORIGIN_HIT_SUGGESTION };
   }
   return { nodes };
+}
+
+export async function lookupGraphNodes(
+  pool: Pool,
+  input: LookupInput,
+): Promise<LookupSuccess | ToolError> {
+  if (!input.inputs?.length) {
+    return toolError("lookup requires one or more inputs", LOOKUP_NO_SELECTOR_SUGGESTION);
+  }
+  const limit = input.limit ?? LOOKUP_CANDIDATE_DEFAULT;
+  const resolved = input.inputs.map((item) => ({
+    name: item.name.trim(),
+    type: item.type ?? input.type,
+    id: item.id,
+  }));
+  if (resolved.some((item) => !item.name)) {
+    return toolError("lookup requires a non-empty name on each input", LOOKUP_NO_SELECTOR_SUGGESTION);
+  }
+
+  const typeSlugs = new Set<string>();
+  if (input.type) {
+    typeSlugs.add(input.type);
+  }
+  for (const item of resolved) {
+    if (item.type) {
+      typeSlugs.add(item.type);
+    }
+  }
+  for (const slug of typeSlugs) {
+    const type = await getNodeType(pool, slug);
+    if (!type) {
+      return toolError(
+        `Unknown type "${slug}"`,
+        `Call inspect_ontology. Known types: ${await knownTypeSlugs(pool)}`,
+      );
+    }
+  }
+
+  const nameInputs: Array<{ idx: number; name: string; type?: string }> = [];
+  const uuidHits = new Map<number, LookupSuccess["results"][number]>();
+
+  for (const [idx, item] of resolved.entries()) {
+    if (!isUuid(item.name)) {
+      nameInputs.push({ idx, name: item.name, type: item.type });
+      continue;
+    }
+    const node = await getNodeById(pool, item.name);
+    if (!node || (item.type && node.type !== item.type)) {
+      uuidHits.set(
+        idx,
+        classifyLookupResult({ name: item.name, type: item.type, id: item.id }, [], limit),
+      );
+      continue;
+    }
+    uuidHits.set(
+      idx,
+      classifyLookupResult(
+        { name: item.name, type: item.type, id: item.id },
+        [
+          {
+            id: node.id,
+            type: node.type,
+            title: node.title,
+            status: node.status,
+            score: 1,
+            match: "uuid",
+            matched_value: node.title,
+          },
+        ],
+        limit,
+      ),
+    );
+  }
+
+  const raw = await lookupNodeCandidates(pool, nameInputs);
+  const byIdx = new Map<number, typeof raw>();
+  for (const row of raw) {
+    const list = byIdx.get(row.idx) ?? [];
+    list.push(row);
+    byIdx.set(row.idx, list);
+  }
+
+  const results = resolved.map((item, idx) => {
+    const uuid = uuidHits.get(idx);
+    if (uuid) {
+      return uuid;
+    }
+    return classifyLookupResult(
+      { name: item.name, type: item.type, id: item.id },
+      byIdx.get(idx) ?? [],
+      limit,
+    );
+  });
+
+  return { results };
 }

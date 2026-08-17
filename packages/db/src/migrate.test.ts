@@ -127,6 +127,44 @@ test(
         ["2026-08-27"],
       );
       assert.equal(dueOk[0]?.d, "2026-08-27");
+      const { rows: trgmExt } = await pool.query<{ extname: string }>(
+        `SELECT extname FROM pg_extension WHERE extname = 'pg_trgm'`,
+      );
+      assert.equal(trgmExt[0]?.extname, "pg_trgm");
+      const { rows: titleCols } = await pool.query<{ column_name: string }>(
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_schema = current_schema() AND table_name = 'nodes'
+           AND column_name IN ('title_norm', 'title_compact')
+         ORDER BY column_name`,
+      );
+      assert.deepEqual(
+        titleCols.map((row) => row.column_name),
+        ["title_compact", "title_norm"],
+      );
+      const { rows: titleIdx } = await pool.query<{ indexname: string }>(
+        `SELECT indexname FROM pg_indexes
+         WHERE schemaname = current_schema()
+           AND indexname IN (
+             'nodes_title_norm_idx',
+             'nodes_title_compact_idx',
+             'nodes_title_norm_trgm_idx',
+             'nodes_title_compact_trgm_idx'
+           )
+         ORDER BY indexname`,
+      );
+      assert.equal(titleIdx.length, 4);
+      const { rows: nameNorm } = await pool.query<{ n: string; c: string }>(
+        `SELECT foundation_name_norm($1) AS n, foundation_name_compact($1) AS c`,
+        ["Café Luna"],
+      );
+      assert.equal(nameNorm[0]?.n, "cafe luna");
+      assert.equal(nameNorm[0]?.c, "cafeluna");
+      const { rows: oBrien } = await pool.query<{ n: string; c: string }>(
+        `SELECT foundation_name_norm($1) AS n, foundation_name_compact($1) AS c`,
+        ["O'Brien"],
+      );
+      assert.equal(oBrien[0]?.n, "o brien");
+      assert.equal(oBrien[0]?.c, "obrien");
       const { rows: dueCol } = await pool.query<{ column_name: string }>(
         `SELECT column_name FROM information_schema.columns
          WHERE table_schema = current_schema() AND table_name = 'nodes' AND column_name = 'due'`,

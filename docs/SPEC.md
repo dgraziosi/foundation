@@ -44,11 +44,11 @@ Recommended structure: Area → project → goal → task. A habit hangs under a
 
 Agents can add types and relations over time. No approval inbox.
 
-## Agent API (12 tools)
+## Agent API (13 tools)
 
 Names are locked. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md).
 
-`bootstrap`, `search`, `get`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`.
+`bootstrap`, `search`, `lookup`, `get`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`.
 
 - Destructive tools (`delete`, `unlink`, `undo`, `manage_type` retire) require `confirm: true`
 - Identity is UUID. If you already have a UUID, call `get` — do not `search`
@@ -58,6 +58,8 @@ Names are locked. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md).
 - `upsert` (create, and update when the title changes) returns `suggested_links` from Postgres FTS on the new title — not embeddings. Each item is `{ kind, target: { id, type, title }, reason }` where `kind` is a seed relation (`child_of`, `about`, or `relates_to`) and `target` is a live node that already exists. Spine types with `parent_types` get `child_of` an allowed parent whose title matches; a title that looks like a person already in the graph gets `about`; otherwise `relates_to` a close title match. Skip self and already-linked pairs. A node with a live `child_of` is not offered a second parent (`about` / `relates_to` may still appear). Cap 5. Empty graph or no match → `[]`. **Never creates an edge** and never adds a type or relation. `link` is how an accepted suggestion becomes an edge. `get` may return the same list for a node that still has no edges.
 - Activity stores optional `actor` / `actor_label` (who wrote). Not a permission gate.
 - `search` is Postgres FTS (title + `data` + extracted inline payload text; Latin accents folded). `query` is optional when `type`, `status`, `under` (child_of parent), `since`, `origin`, `due` (`overdue` | `today` in America/New_York), `due_on_or_before`, `due_on_or_after`, or `data_equals` is set, so agents can list without a word. `data_equals` is JSONB equality on one or a few top-level `data` keys (not a column per key). Hits include `due` when `data.due` is set. Not embeddings. No `list_nodes`.
+- `lookup` resolves one or more names in one request and returns a result per input (`exact`, `alias`, `candidate`, `ambiguous`, `no_match`). Unique UUID, unique folded title (`name_norm`: case, accent, punctuation, whitespace), or unique operator-authored `data.aliases` entry may bind a UUID. Token and fuzzy matches are always `candidate`. Duplicate exact titles and alias/title collisions are `ambiguous`. `score` ranks candidates; it is not a probability and does not authorize a write. For `candidate` or `ambiguous`, ask the operator to confirm a UUID before any mutation that depends on the identity; `get` is safe for inspection. `lookup` never writes. Compact/no-space equality is candidate-only. Not embeddings. No hidden nickname list.
+- `data.aliases` is an optional string array on any node. `upsert` validates it only when the incoming `data` patch includes `aliases` (`[]` clears; malformed patch refuses). Unrelated updates leave legacy values alone. `lookup` ignores malformed legacy aliases.
 - `task` and `goal` accept optional `data.due` (`YYYY-MM-DD`). Seed `json_schema` enforces the date when present; nodes without due still upsert. `due: null` clears.
 - Live nodes are unique on `data.origin.{system,id}` for `gmail` | `calendar` | `drive` | `github`. Look up with `search` `{ origin }` (then `get`). Store the ref only — do not fetch or mirror those systems’ bodies.
 - No `get_vault_health` / `run_maintenance` / `audit_links` tools — those jobs are instance routines the operator can run ([`VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md), [`prompts/update-foundation.md`](../prompts/update-foundation.md))
@@ -72,7 +74,7 @@ Names are locked. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md).
 
 ## Locked (do not reopen)
 
-- **12 tools** — names above. New tools need a SPEC amendment
+- **13 tools** — names above. New tools need a SPEC amendment
 - **FTS now** — embeddings/hybrid search is later optional work, not current search
 
 ## Non-goals (v1)

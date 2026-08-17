@@ -48,8 +48,12 @@ export {
   restoreEdge,
   restoreNode,
   restoreNodeSnapshot,
+  explainLookupNodeCandidates,
+  explainLookupTitleAccess,
+  lookupNodeCandidates,
   searchNodes,
   searchTitleLinkCandidates,
+  LOOKUP_CANDIDATE_SQL,
   softDeleteNode,
   updateNode,
 } from "./nodes.js";
