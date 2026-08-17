@@ -51,14 +51,19 @@ fi
 # 3. Postgres (pgvector). Idempotent: compose reconciles the running container.
 log "bringing up Postgres (pgvector)"
 sudo -E docker compose up -d db
-DBID="$(sudo docker compose ps -q db)"
 for _ in $(seq 1 60); do
+  DBID="$(sudo docker compose ps -q db)"
   if [ -n "$DBID" ] && sudo docker exec "$DBID" pg_isready -U foundation -d foundation >/dev/null 2>&1; then
     log "Postgres is ready"
     break
   fi
   sleep 1
 done
+DBID="$(sudo docker compose ps -q db)"
+if [ -z "$DBID" ] || ! sudo docker exec "$DBID" pg_isready -U foundation -d foundation >/dev/null 2>&1; then
+  log "ERROR: Postgres did not become ready"
+  exit 1
+fi
 
 # 4. Foundation MCP server (dev mode, hot reload). Runs migrations + seed on boot,
 #    then stays attached so its logs are visible to the agent.
