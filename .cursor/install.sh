@@ -3,6 +3,11 @@
 # Must be idempotent, non-interactive, and terminate. Do not leave services running.
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
+APT_INSTALL=(
+  apt-get install -y
+  -o Dpkg::Options::=--force-confdef
+  -o Dpkg::Options::=--force-confold
+)
 
 cd "$(git rev-parse --show-toplevel 2>/dev/null || echo /workspace)"
 
@@ -13,7 +18,7 @@ install_docker() {
   fi
 
   sudo apt-get update -y
-  sudo apt-get install -y ca-certificates curl gnupg fuse-overlayfs iptables
+  sudo DEBIAN_FRONTEND=noninteractive "${APT_INSTALL[@]}" ca-certificates curl gnupg fuse-overlayfs iptables
   sudo install -m 0755 -d /etc/apt/keyrings
   if [ ! -f /etc/apt/keyrings/docker.gpg ]; then
     curl --retry 3 --retry-delay 5 -fsSL https://download.docker.com/linux/ubuntu/gpg \
@@ -25,7 +30,7 @@ install_docker() {
       | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
   fi
   sudo apt-get update -y
-  sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  sudo DEBIAN_FRONTEND=noninteractive "${APT_INSTALL[@]}" docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 }
 
 configure_nested_docker() {
