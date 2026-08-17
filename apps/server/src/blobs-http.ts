@@ -10,6 +10,26 @@ import type { AppConfig } from "./config.js";
 const MEDIA_TYPE_RE =
   /^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/i;
 
+/** Types a browser may execute as a same-origin document if served inline. */
+const SCRIPTABLE_MEDIA_TYPES = new Set([
+  "text/html",
+  "application/xhtml+xml",
+  "image/svg+xml",
+  "text/xml",
+  "application/xml",
+  "text/javascript",
+  "application/javascript",
+  "text/ecmascript",
+]);
+
+function safeBlobMediaType(stored: string): string {
+  const raw = stored.split(";", 1)[0]?.trim().toLowerCase() ?? "";
+  if (!MEDIA_TYPE_RE.test(raw) || SCRIPTABLE_MEDIA_TYPES.has(raw)) {
+    return "application/octet-stream";
+  }
+  return raw;
+}
+
 export async function sendBlob(
   pool: Pool,
   config: AppConfig,
@@ -31,10 +51,9 @@ export async function sendBlob(
     res.status(404).json({ error: bytes.error });
     return;
   }
-  const mediaType = MEDIA_TYPE_RE.test(blob.media_type)
-    ? blob.media_type
-    : "application/octet-stream";
+  const mediaType = safeBlobMediaType(blob.media_type);
   res.setHeader("Content-Type", mediaType);
+  res.setHeader("Content-Disposition", `attachment; filename="${id}"`);
   res.setHeader("Content-Length", String(bytes.byteLength));
   res.setHeader("ETag", `"${blob.sha256}"`);
   res.setHeader("X-Content-Type-Options", "nosniff");

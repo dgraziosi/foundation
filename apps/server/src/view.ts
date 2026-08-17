@@ -170,7 +170,7 @@ function nodePage(got: {
       : `<p class="notice">Blob metadata unavailable.</p>`;
     const fetch =
       blobId !== ""
-        ? `<p><a href="/blobs/${encodeURIComponent(blobId)}">Fetch bytes</a> via <code>/blobs/:id</code></p>`
+        ? `<p><a href="/blobs/${encodeURIComponent(blobId)}" download>Fetch bytes</a> via <code>/blobs/:id</code></p>`
         : "";
     payloadBlock = `${meta}${fetch}`;
   } else {
