@@ -43,7 +43,11 @@ test(
       });
       const jordan = await upsertGraphNode(pool, { type: "person", title: "Jordan Hale" });
       const alexA = await upsertGraphNode(pool, { type: "person", title: "Alex Rivera" });
-      const alexB = await upsertGraphNode(pool, { type: "person", title: "Alex Rivera" });
+      const alexB = await upsertGraphNode(pool, {
+        type: "person",
+        title: "Alex Rivera",
+        allow_duplicate: true,
+      });
       const samOrtega = await upsertGraphNode(pool, { type: "person", title: "Sam Ortega" });
       const samOakley = await upsertGraphNode(pool, { type: "person", title: "Sam Oakley" });
       const cafe = await upsertGraphNode(pool, { type: "place", title: "Café Luna" });
@@ -105,7 +109,7 @@ test(
         assert.equal(found.results[2]?.candidates[0]?.id, jordan.node.id);
         assert.equal(found.results[2]?.candidates[0]?.match, "title_fuzzy");
         assert.equal(found.results[2]?.suggestion, LOOKUP_CANDIDATE_SUGGESTION);
-        assert.match(found.results[2]?.candidates[0]?.explanation ?? "", /ranking score, not a probability/);
+        assert.match(found.results[2]?.candidates[0]?.explanation ?? "", /ranking field, not a probability/);
         assert.equal(found.results[3]?.outcome, "ambiguous");
         assert.equal(found.results[3]?.candidates.length, 2);
         assert.equal(found.results[3]?.suggestion, LOOKUP_AMBIGUOUS_SUGGESTION);
@@ -122,11 +126,12 @@ test(
             assert.ok(candidate.type);
             assert.ok(candidate.title);
             assert.ok(candidate.status);
-            assert.equal(typeof candidate.score, "number");
+            assert.ok(candidate.updated_at);
+            assert.equal(typeof candidate.confidence, "number");
             assert.ok(candidate.match);
             assert.ok(candidate.matched_value);
             assert.ok(candidate.explanation);
-            assert.equal(/confidence|likelihood|% likely/i.test(candidate.explanation), false);
+            assert.equal(/likelihood|% likely/i.test(candidate.explanation), false);
           }
         }
       });
@@ -337,6 +342,99 @@ test(
         });
         assert.equal(isToolError(unknown), true);
       });
+    } finally {
+      await pool.end();
+    }
+  },
+);
+
+test(
+  "create-time duplicate preflight uses the lookup matcher",
+  { skip: !databaseUrl },
+  async () => {
+    if (!databaseUrl) {
+      return;
+    }
+    const pool = await poolForSchema("lookup_create_preflight");
+    try {
+      const priya = await upsertGraphNode(pool, {
+        type: "person",
+        title: "Priya Shah",
+        data: { aliases: ["Pree-uh"] },
+      });
+      const jordan = await upsertGraphNode(pool, { type: "person", title: "Jordan Hale" });
+      assert.equal(isToolError(priya), false);
+      assert.equal(isToolError(jordan), false);
+      if (isToolError(priya) || isToolError(jordan)) {
+        return;
+      }
+
+      const blockedExact = await upsertGraphNode(pool, { type: "person", title: "Priya Shah" });
+      assert.equal(isToolError(blockedExact), true);
+      if (isToolError(blockedExact)) {
+        assert.equal(blockedExact.error, "duplicate_candidates");
+        assert.equal(blockedExact.outcome, "exact");
+        assert.equal(blockedExact.candidates?.[0]?.id, priya.node.id);
+        assert.equal(blockedExact.candidates?.[0]?.title, "Priya Shah");
+        assert.ok(blockedExact.candidates?.[0]?.updated_at);
+        assert.equal(typeof blockedExact.candidates?.[0]?.confidence, "number");
+        assert.equal(blockedExact.candidates?.[0]?.match, "title_exact");
+      }
+      const afterBlock = await lookupGraphNodes(pool, {
+        inputs: [{ name: "Priya Shah", type: "person" }],
+      });
+      assert.equal(isToolError(afterBlock), false);
+      if (!isToolError(afterBlock)) {
+        assert.equal(afterBlock.results[0]?.outcome, "exact");
+        assert.equal(afterBlock.results[0]?.candidates.length, 1);
+      }
+
+      const blockedAlias = await upsertGraphNode(pool, { type: "person", title: "Pree-uh" });
+      assert.equal(isToolError(blockedAlias), true);
+      if (isToolError(blockedAlias)) {
+        assert.equal(blockedAlias.error, "duplicate_candidates");
+        assert.equal(blockedAlias.outcome, "alias");
+        assert.equal(blockedAlias.candidates?.[0]?.id, priya.node.id);
+      }
+
+      const twin = await upsertGraphNode(pool, {
+        type: "person",
+        title: "Priya Shah",
+        allow_duplicate: true,
+      });
+      assert.equal(isToolError(twin), false);
+      if (isToolError(twin)) {
+        return;
+      }
+      assert.equal(twin.node.title, "Priya Shah");
+      assert.notEqual(twin.node.id, priya.node.id);
+
+      const fuzzyCreate = await upsertGraphNode(pool, { type: "person", title: "Jorden Hale" });
+      assert.equal(isToolError(fuzzyCreate), false);
+      if (!isToolError(fuzzyCreate)) {
+        assert.equal(fuzzyCreate.node.title, "Jorden Hale");
+        assert.equal(fuzzyCreate.duplicate_warnings?.outcome, "candidate");
+        assert.equal(fuzzyCreate.duplicate_warnings?.candidates[0]?.id, jordan.node.id);
+        assert.match(fuzzyCreate.duplicate_warnings?.suggestion ?? "", /not blocked/);
+      }
+
+      const otherType = await upsertGraphNode(pool, { type: "place", title: "Priya Shah" });
+      assert.equal(isToolError(otherType), false);
+      if (!isToolError(otherType)) {
+        assert.equal(otherType.node.type, "place");
+      }
+
+      const renamed = await upsertGraphNode(pool, {
+        id: jordan.node.id,
+        type: "person",
+        title: "Jordan Hale",
+        base_updated_at: jordan.node.updated_at,
+      });
+      assert.equal(isToolError(renamed), false);
+      if (!isToolError(renamed)) {
+        assert.equal(renamed.node.id, jordan.node.id);
+        assert.equal(renamed.duplicate_warnings, undefined);
+      }
     } finally {
       await pool.end();
     }

@@ -68,6 +68,9 @@ export {
   ManageTypeInputSchema,
   ManageTypeSuccessSchema,
   MutationOkSchema,
+  DUPLICATE_CANDIDATES_ERROR,
+  DuplicatePreflightErrorSchema,
+  DuplicateWarningSchema,
   LOOKUP_BATCH_MAX,
   LOOKUP_CANDIDATE_MAX,
   LOOKUP_NAME_MAX,
@@ -103,6 +106,8 @@ export {
   type IncidentEdge,
   type LinkInput,
   type ListActivityInput,
+  type DuplicatePreflightError,
+  type DuplicateWarning,
   type LookupCandidate,
   type LookupInput,
   type LookupInputItem,
@@ -120,6 +125,7 @@ export {
   type UndoInput,
   type UpsertInput,
   type UpsertPayload,
+  type UpsertSuccess,
   type WriterIdentity,
 } from "./mcp-io.js";
 export {
@@ -154,6 +160,9 @@ export {
 } from "./aliases.js";
 export { nameCompact, nameNorm } from "./name-norm.js";
 export {
+  CREATE_AMBIGUOUS_SUGGESTION,
+  CREATE_DUPLICATE_SUGGESTION,
+  CREATE_SIMILAR_WARNING,
   LOOKUP_AMBIGUOUS_SUGGESTION,
   LOOKUP_CANDIDATE_DEFAULT,
   LOOKUP_CANDIDATE_SUGGESTION,
@@ -163,6 +172,8 @@ export {
   LOOKUP_TOKEN_MIN_COMPACT_LEN,
   LOOKUP_UUID_SUGGESTION,
   classifyLookupResult,
+  createPreflightFromLookup,
+  type CreatePreflightDecision,
   type LookupRawCandidate,
 } from "./lookup-classify.js";
 export {

@@ -7,6 +7,7 @@ import {
   ManageTypeInputSchema,
   SearchInputSchema,
   SuggestedLinkSchema,
+  UpsertInputSchema,
   UpsertSuccessSchema,
   searchHasSelector,
 } from "./mcp-io.js";
@@ -60,7 +61,8 @@ test("lookup accepts a batch of names and rejects an empty list", () => {
             type: "person",
             title: "Priya Shah",
             status: "active",
-            score: 1,
+            updated_at: "2026-08-17T00:00:00.000Z",
+            confidence: 1,
             match: "title_exact",
             matched_value: "Priya Shah",
             explanation: "Title match after case, accent, punctuation, and whitespace folding.",
@@ -111,6 +113,15 @@ test("suggested_links are seed relations to a live target", () => {
     edges: [],
     suggested_links: [],
   });
+});
+
+test("upsert create accepts allow_duplicate", () => {
+  const parsed = UpsertInputSchema.parse({
+    type: "person",
+    title: "Priya Shah",
+    allow_duplicate: true,
+  });
+  assert.equal(parsed.allow_duplicate, true);
 });
 
 test("manage_type accepts retire with confirm and purge_deleted", () => {

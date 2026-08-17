@@ -105,7 +105,11 @@ test(
       });
       const jordan = await upsertGraphNode(pool, { type: "person", title: "Jordan Hale" });
       const alexA = await upsertGraphNode(pool, { type: "person", title: "Alex Rivera" });
-      const alexB = await upsertGraphNode(pool, { type: "person", title: "Alex Rivera" });
+      const alexB = await upsertGraphNode(pool, {
+        type: "person",
+        title: "Alex Rivera",
+        allow_duplicate: true,
+      });
       const cafe = await upsertGraphNode(pool, { type: "place", title: "Café Luna" });
       assert.equal(isToolError(priya), false);
       assert.equal(isToolError(jordan), false);

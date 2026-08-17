@@ -419,7 +419,8 @@ type LookupRow = {
   type: string;
   title: string;
   status: Node["status"];
-  score: string | number;
+  updated_at: Date | string;
+  confidence: string | number;
   match: LookupMatch;
   matched_value: string;
 };
@@ -440,8 +441,8 @@ WITH inputs AS (
   FROM unnest($1::int[], $2::text[], $3::text[]) AS i(idx, name, type)
 ),
 title_exact AS (
-  SELECT n.idx, nodes.id, nodes.type, nodes.title, nodes.status,
-         1::float8 AS score,
+  SELECT n.idx, nodes.id, nodes.type, nodes.title, nodes.status, nodes.updated_at,
+         1::float8 AS confidence,
          'title_exact'::text AS match,
          nodes.title AS matched_value
   FROM inputs n
@@ -451,8 +452,8 @@ title_exact AS (
   WHERE n.q_norm <> ''
 ),
 alias_exact AS (
-  SELECT n.idx, nodes.id, nodes.type, nodes.title, nodes.status,
-         0.99::float8 AS score,
+  SELECT n.idx, nodes.id, nodes.type, nodes.title, nodes.status, nodes.updated_at,
+         0.99::float8 AS confidence,
          'alias_exact'::text AS match,
          aliases.alias_text AS matched_value
   FROM inputs n
@@ -473,8 +474,8 @@ alias_exact AS (
     AND foundation_name_norm(aliases.alias_text) = n.q_norm
 ),
 title_token AS (
-  SELECT n.idx, nodes.id, nodes.type, nodes.title, nodes.status,
-         LEAST(0.8, 0.6 + 0.2 * (char_length(n.q_norm)::float8 / GREATEST(char_length(nodes.title_norm), 1))) AS score,
+  SELECT n.idx, nodes.id, nodes.type, nodes.title, nodes.status, nodes.updated_at,
+         LEAST(0.8, 0.6 + 0.2 * (char_length(n.q_norm)::float8 / GREATEST(char_length(nodes.title_norm), 1))) AS confidence,
          'title_token'::text AS match,
          nodes.title AS matched_value
   FROM inputs n
@@ -486,7 +487,7 @@ title_token AS (
     AND n.q_norm <> ''
 ),
 title_fuzzy AS (
-  SELECT n.idx, nodes.id, nodes.type, nodes.title, nodes.status,
+  SELECT n.idx, nodes.id, nodes.type, nodes.title, nodes.status, nodes.updated_at,
          LEAST(
            0.98,
            GREATEST(
@@ -494,7 +495,7 @@ title_fuzzy AS (
              word_similarity(n.q_norm, nodes.title_norm),
              similarity(nodes.title_compact, n.q_compact)
            )
-         ) AS score,
+         ) AS confidence,
          'title_fuzzy'::text AS match,
          nodes.title AS matched_value
   FROM inputs n
@@ -509,7 +510,7 @@ title_fuzzy AS (
     AND n.q_norm <> ''
 ),
 alias_fuzzy AS (
-  SELECT n.idx, nodes.id, nodes.type, nodes.title, nodes.status,
+  SELECT n.idx, nodes.id, nodes.type, nodes.title, nodes.status, nodes.updated_at,
          LEAST(
            0.98,
            GREATEST(
@@ -517,7 +518,7 @@ alias_fuzzy AS (
              word_similarity(n.q_norm, foundation_name_norm(aliases.alias_text)),
              similarity(foundation_name_compact(aliases.alias_text), n.q_compact)
            )
-         ) AS score,
+         ) AS confidence,
          'alias_fuzzy'::text AS match,
          aliases.alias_text AS matched_value
   FROM inputs n
@@ -557,12 +558,12 @@ ranked AS (
   SELECT *,
          row_number() OVER (
            PARTITION BY idx, match
-           ORDER BY score DESC, title ASC, id ASC
+           ORDER BY confidence DESC, title ASC, id ASC
          ) AS rn
   FROM combined
-  WHERE score >= $6 OR match IN ('title_exact', 'alias_exact', 'title_token')
+  WHERE confidence >= $6 OR match IN ('title_exact', 'alias_exact', 'title_token')
 )
-SELECT idx, id, type, title, status, score, match, matched_value
+SELECT idx, id, type, title, status, updated_at, confidence, match, matched_value
 FROM ranked
 WHERE match IN ('title_exact', 'alias_exact')
    OR rn <= 20
@@ -593,7 +594,8 @@ export async function lookupNodeCandidates(
     type: row.type,
     title: row.title,
     status: row.status,
-    score: typeof row.score === "number" ? row.score : Number(row.score),
+    updated_at: iso(row.updated_at),
+    confidence: typeof row.confidence === "number" ? row.confidence : Number(row.confidence),
     match: row.match,
     matched_value: row.matched_value,
   }));

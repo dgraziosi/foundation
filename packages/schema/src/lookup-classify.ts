@@ -1,5 +1,14 @@
 import { nameCompact, nameNorm } from "./name-norm.js";
-import type { LookupCandidate, LookupInputItem, LookupMatch, LookupOutcome, LookupResult } from "./mcp-io.js";
+import type {
+  DuplicatePreflightError,
+  DuplicateWarning,
+  LookupCandidate,
+  LookupInputItem,
+  LookupMatch,
+  LookupOutcome,
+  LookupResult,
+} from "./mcp-io.js";
+import { DUPLICATE_CANDIDATES_ERROR } from "./mcp-io.js";
 
 export const LOOKUP_SIM_FLOOR = 0.3;
 export const LOOKUP_TOKEN_MIN_COMPACT_LEN = 3;
@@ -18,12 +27,22 @@ export const LOOKUP_NO_MATCH_SUGGESTION =
 export const LOOKUP_UUID_SUGGESTION =
   "This input is a node UUID. Prefer get when you already have an id.";
 
+export const CREATE_DUPLICATE_SUGGESTION =
+  "Exact title or unique exact alias already exists. Do not write a twin. Use a candidate id to get or update, or pass allow_duplicate: true if the operator confirms this is a distinct same-name entity.";
+
+export const CREATE_AMBIGUOUS_SUGGESTION =
+  "Several live nodes match this title exactly. Ask the operator to confirm which UUID to use, or pass allow_duplicate: true if this is a distinct same-name entity. get is safe for inspection. Do not merge.";
+
+export const CREATE_SIMILAR_WARNING =
+  "Similar live nodes exist (token, fuzzy, or space-compacted). This write was not blocked. Confirm you are not twinning an existing entity.";
+
 export type LookupRawCandidate = {
   id: string;
   type: string;
   title: string;
   status: LookupCandidate["status"];
-  score: number;
+  updated_at: string;
+  confidence: number;
   match: LookupMatch;
   matched_value: string;
 };
@@ -48,19 +67,19 @@ function explanationFor(row: LookupRawCandidate, query: string): string {
     return "Operator-authored alias match after case, accent, punctuation, and whitespace folding.";
   }
   if (row.match === "title_token") {
-    return "Token match against a longer title (ranking score, not a probability). Not an exact match.";
+    return "Token match against a longer title (ranking field, not a probability). Not an exact match.";
   }
   const qNorm = nameNorm(query);
   const qCompact = nameCompact(query);
   const valueNorm = nameNorm(row.matched_value);
   const valueCompact = nameCompact(row.matched_value);
   if (qNorm !== valueNorm && qCompact !== "" && qCompact === valueCompact) {
-    return "Names match only after removing spaces (ranking score, not a probability). Not an exact match.";
+    return "Names match only after removing spaces (ranking field, not a probability). Not an exact match.";
   }
   if (row.match === "alias_fuzzy") {
-    return "Close alias match via trigram similarity (ranking score, not a probability).";
+    return "Close alias match via trigram similarity (ranking field, not a probability).";
   }
-  return "Close title match via trigram similarity (ranking score, not a probability).";
+  return "Close title match via trigram similarity (ranking field, not a probability).";
 }
 
 function toCandidate(row: LookupRawCandidate, query: string): LookupCandidate {
@@ -69,7 +88,8 @@ function toCandidate(row: LookupRawCandidate, query: string): LookupCandidate {
     type: row.type,
     title: row.title,
     status: row.status,
-    score: row.score,
+    updated_at: row.updated_at,
+    confidence: row.confidence,
     match: row.match,
     matched_value: row.matched_value,
     explanation: explanationFor(row, query),
@@ -78,8 +98,8 @@ function toCandidate(row: LookupRawCandidate, query: string): LookupCandidate {
 
 function sortCandidates(rows: LookupCandidate[]): LookupCandidate[] {
   return [...rows].sort((a, b) => {
-    if (b.score !== a.score) {
-      return b.score - a.score;
+    if (b.confidence !== a.confidence) {
+      return b.confidence - a.confidence;
     }
     const titleCmp = a.title.localeCompare(b.title);
     if (titleCmp !== 0) {
@@ -105,7 +125,10 @@ function pickBestPerNode(rows: LookupRawCandidate[]): LookupRawCandidate[] {
       best.set(row.id, row);
       continue;
     }
-    if (MATCH_RANK[row.match] === MATCH_RANK[current.match] && row.score > current.score) {
+    if (
+      MATCH_RANK[row.match] === MATCH_RANK[current.match] &&
+      row.confidence > current.confidence
+    ) {
       best.set(row.id, row);
     }
   }
@@ -130,7 +153,13 @@ export function classifyLookupResult(
 
   if (exactTierIds.size > 1) {
     const candidates = sortCandidates(
-      best.filter((row) => exactTierIds.has(row.id) && (row.match === "title_exact" || row.match === "alias_exact" || row.match === "uuid")).map((row) => toCandidate(row, input.name)),
+      best
+        .filter(
+          (row) =>
+            exactTierIds.has(row.id) &&
+            (row.match === "title_exact" || row.match === "alias_exact" || row.match === "uuid"),
+        )
+        .map((row) => toCandidate(row, input.name)),
     ).slice(0, limit);
     return {
       input: echo,
@@ -175,4 +204,36 @@ export function classifyLookupResult(
     candidates: [],
     suggestion: LOOKUP_NO_MATCH_SUGGESTION,
   };
+}
+
+export type CreatePreflightDecision =
+  | { action: "block"; error: DuplicatePreflightError }
+  | { action: "warn"; warning: DuplicateWarning }
+  | { action: "ok" };
+
+/** Exact/alias-tier matches block create. Token/fuzzy/compact warn. Never auto-picks. */
+export function createPreflightFromLookup(result: LookupResult): CreatePreflightDecision {
+  if (result.outcome === "exact" || result.outcome === "alias" || result.outcome === "ambiguous") {
+    return {
+      action: "block",
+      error: {
+        error: DUPLICATE_CANDIDATES_ERROR,
+        suggestion:
+          result.outcome === "ambiguous" ? CREATE_AMBIGUOUS_SUGGESTION : CREATE_DUPLICATE_SUGGESTION,
+        outcome: result.outcome,
+        candidates: result.candidates,
+      },
+    };
+  }
+  if (result.outcome === "candidate") {
+    return {
+      action: "warn",
+      warning: {
+        outcome: "candidate",
+        candidates: result.candidates,
+        suggestion: CREATE_SIMILAR_WARNING,
+      },
+    };
+  }
+  return { action: "ok" };
 }

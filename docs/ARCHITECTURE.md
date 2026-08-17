@@ -176,7 +176,7 @@ flowchart LR
 
 Empty `{}` is an error (no `list_nodes` tool). Hits are lean and include `due` when `data.due` is set; `get` loads payload, `data.due`, and neighbor titles.
 
-`lookup` is a separate read-only tool: batch name resolution with a result per input. Unique folded title, unique operator alias, or UUID may bind. Token and fuzzy matches are candidates that need operator confirmation before a write. `score` ranks; it is not a probability. Title folding uses generated `title_norm` / `title_compact` and trigram indexes. Aliases stay on `data.aliases` (JSONB unnest). Not embeddings.
+`lookup` is a separate read-only tool: batch name resolution with a result per input. Unique folded title, unique operator alias, or UUID may bind. Token and fuzzy matches are candidates that need operator confirmation before a write. Each useful candidate includes `id`, `type`, canonical `title`, `updated_at`, `match`, and `confidence` plus the surrounding `candidates` list. `confidence` ranks; it is not a probability and does not authorize a write. Title folding uses generated `title_norm` / `title_compact` and trigram indexes. Aliases stay on `data.aliases` (JSONB unnest). Create-time `upsert` (no `id`) uses the same matcher: exact/alias hits refuse unless `allow_duplicate` is set; fuzzy hits warn. Not embeddings.
 
 ```mermaid
 flowchart TB

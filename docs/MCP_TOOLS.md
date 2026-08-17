@@ -10,7 +10,7 @@ v1 surface is **13 tools**. Destructive tools require `confirm: true` or they re
 | `search` | Find nodes by text query and/or filters (`type`, `status`, `under`, `since`, `origin`, `due`, `due_on_or_before`, `due_on_or_after`, `data_equals`). Query is optional when a filter is set. Hits are id/type/title/snippet plus `due` when set. |
 | `lookup` | Resolve one or more names to live nodes. One result per input (`exact` / `alias` / `candidate` / `ambiguous` / `no_match`). Read-only. |
 | `get` | Fetch a node by id, including payload, incident edges with neighbor titles, and `suggested_links` from title FTS. Blob payloads return metadata, not bytes. |
-| `upsert` | Create or update a node (title, type, payload, data, status). Updates require `base_updated_at`. Create accepts `idempotency_key`. Blob ingest via `bytes_base64` or `source_path`. Returns `suggested_links` (proposals only). |
+| `upsert` | Create or update a node (title, type, payload, data, status). Updates require `base_updated_at`. Create accepts `idempotency_key`. Create (no id) preflights duplicates via `lookup`. Blob ingest via `bytes_base64` or `source_path`. Returns `suggested_links` (proposals only). |
 | `delete` | Soft-delete a node. Requires `confirm: true`. |
 | `link` | Create a typed edge after validation. Requires `from_base_updated_at` and `to_base_updated_at`. |
 | `unlink` | Remove a typed edge. Requires `confirm: true`. |
@@ -41,8 +41,8 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 
 ### `upsert`
 
-- **In:** `{ id?, type, title, payload?, data?, status?, metadata?, base_updated_at?, idempotency_key?, actor?, actor_label? }`
-- **Out:** `{ node, activity_id, suggested_links }` or `{ error, suggestion? }`
+- **In:** `{ id?, type, title, payload?, data?, status?, metadata?, base_updated_at?, idempotency_key?, allow_duplicate?, actor?, actor_label? }`
+- **Out:** `{ node, activity_id, suggested_links, duplicate_warnings? }` or `{ error, suggestion?, outcome?, candidates? }`
 - **`suggested_links`:** Postgres FTS on the new title (create, and update when the title changes) — not embeddings. Each item is `{ kind, target: { id, type, title }, reason }`. `kind` is a seed relation: `child_of`, `about`, or `relates_to`. `target` is a **live** node that already exists. How they are chosen: spine types with `parent_types` → `child_of` a live allowed parent whose title matches; if the title looks like a person already in the graph → `about` that person; otherwise `relates_to` a close title match of any type. Skip self. Skip nodes already linked to this one. A node with a live `child_of` is not offered a second parent (`about` / `relates_to` may still appear). Cap 5. Empty graph or no match → `[]`. **Never creates an edge.** Never adds a type or relation. `link` is how an accepted suggestion becomes an edge. Show non-empty suggestions and ask before calling `link`.
 - `payload`: `{ media_type, storage: "inline"|"blob", body?, blob_id?, bytes_base64?, source_path? }`
 - Inline media types: `text/markdown`, `text/html`, `application/json`, `text/plain`.
@@ -58,6 +58,7 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 - **`data.due`:** optional ISO date on `task` and `goal`. Stored on the JSONB `data` object. Pass `due: null` to clear. `get` returns it on `node.data`; search hits also surface `due` so briefs do not have to open every node.
 - **`data.origin`:** optional `{ system, id }` for `gmail` | `calendar` | `drive` | `github`. Unique on **live** nodes. Look up with `search` `{ origin }` (or `get` once you have the UUID) so agents do not twin people. Foundation stores the ref only — **never fetch or mirror** those systems' bodies.
 - **`data.aliases`:** optional string array of operator-authored alternate names (any type). Validated only when the incoming `data` patch includes `aliases`. `aliases: []` clears. Explicit malformed values refuse. Omit the key to leave aliases unchanged (including legacy malformed values). `lookup` ignores malformed stored aliases.
+- **Create duplicate preflight:** when `id` is omitted, `upsert` runs the same matcher as `lookup` on `{ name: title, type }`. Exact title or unique exact alias (or an exact-tier collision) returns `{ error: "duplicate_candidates", suggestion, outcome, candidates }` and does not write. Pass `allow_duplicate: true` to write a same-name entity anyway. Token, fuzzy, and space-compacted matches set `duplicate_warnings` and still write. `confidence` on those candidates ranks only — it does not authorize the write. Updates (`id` present) and CAS are unchanged.
 - **Create idempotency:** `idempotency_key` on create. A retry with the same key returns the existing node and original `activity_id` — it does not twin. A key already used by a deleted node refuses (undo, or a new key).
 - **`actor` / `actor_label`:** optional who-wrote fields stored on the activity row (`actor` is `agent` | `user` | `system`; default `agent`). Not a permission gate.
 
@@ -121,12 +122,12 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 - `outcome` is `exact` | `alias` | `candidate` | `ambiguous` | `no_match`.
   - `exact` — unique live UUID, or unique title after `name_norm` (case, accent, punctuation, whitespace).
   - `alias` — unique exact operator-authored `data.aliases` entry; title did not exact-match.
-  - `candidate` — token or fuzzy (including compact/no-space) matches. Never authoritative, even with a high `score`.
+  - `candidate` — token or fuzzy (including compact/no-space) matches. Never authoritative, even with a high `confidence`.
   - `ambiguous` — duplicate exact titles, or title exact and alias exact on different nodes.
   - `no_match` — nothing above the floor.
-- Candidates are `{ id, type, title, status, score, match, matched_value, explanation }`. `score` is algorithmic rank, not a probability. `match` is `title_exact` | `alias_exact` | `title_fuzzy` | `alias_fuzzy` | `title_token` | `uuid`.
+- Candidates are `{ id, type, title, status, updated_at, confidence, match, matched_value, explanation }`. `title` is the canonical node title. `updated_at` is for a later if-match upsert or link. `confidence` is algorithmic rank, not a calibrated probability, and does not authorize a write. `match` is `title_exact` | `alias_exact` | `title_fuzzy` | `alias_fuzzy` | `title_token` | `uuid`. The surrounding list is `candidates` on that result.
 - Soft-deleted nodes are excluded. Title matching uses generated `title_norm` / `title_compact` plus trigram indexes. Aliases are unnested from JSONB (well-formed string arrays only).
-- Read-only. Never writes, merges, or appends aliases. For `candidate` or `ambiguous`, ask the operator to confirm a UUID before any mutation that depends on the identity. `get` is safe for inspection.
+- Read-only. Never writes, merges, creates, or picks an ambiguous candidate. For `candidate` or `ambiguous`, ask the operator to confirm a UUID before any mutation that depends on the identity. `get` is safe for inspection.
 - If you already have a UUID, call `get`. Listing, origin refs, due filters, and payload search stay on `search`. Lexical recall only, not embeddings. No hidden nickname list.
 
 ### `list_activity`
