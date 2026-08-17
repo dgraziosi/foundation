@@ -17,7 +17,7 @@ fail() {
 
 # Single dated dump older than 14 days must survive prune.
 tmp_one="$(mktemp -d)"
-trap 'rm -rf -- "${tmp_one}" "${tmp_two:-}" "${tmp_fail:-}" "${tmp_blobs:-}" "${tmp_abort:-}"' EXIT
+trap 'rm -rf -- "${tmp_one}" "${tmp_two:-}" "${tmp_fail:-}" "${tmp_blobs:-}" "${tmp_abort:-}" "${tmp_swap:-}"' EXIT
 printf '%s\n' '-- fixture dump, not a vault' >"${tmp_one}/foundation-20000101.sql"
 foundation_backup_prune_sql "${tmp_one}"
 if [[ ! -f "${tmp_one}/foundation-20000101.sql" ]]; then
@@ -184,6 +184,55 @@ if ! grep -qx -- '-- last good dump' "${tmp_abort}/backup/sql/foundation-${abort
 fi
 if ! grep -qx 'date=good' "${tmp_abort}/backup/MANIFEST"; then
   fail "mid-install abort replaced MANIFEST"
+fi
+
+# First-of-day: dump and MANIFEST are committed, then swap fails. Remove the
+# new dump and MANIFEST so the backup root matches the start of this run.
+# Blobs stay untouched.
+tmp_swap="$(mktemp -d)"
+swap_day="$(date +%Y%m%d)"
+mkdir -p "${tmp_swap}/backup/sql" "${tmp_swap}/backup/blobs" "${tmp_swap}/data/blobs"
+printf '%s\n' '-- yesterday dump' >"${tmp_swap}/backup/sql/foundation-20000101.sql"
+printf '%s\n' 'keep-original' >"${tmp_swap}/backup/blobs/keep-me"
+printf '%s\n' '-- new dump temp' >"${tmp_swap}/dump.tmp"
+chmod 0600 "${tmp_swap}/dump.tmp"
+
+set +e
+(
+  foundation_backup_stage_blobs() {
+    mkdir -p -- "$2"
+    printf '%s\n' 'staged' >"$2/staged"
+  }
+  foundation_backup_swap_blobs() { return 1; }
+  foundation_backup_install \
+    "${tmp_swap}/backup" \
+    "${tmp_swap}/data" \
+    "${swap_day}" \
+    "${tmp_swap}/dump.tmp" \
+    ""
+)
+swap_rc=$?
+set -e
+if ((swap_rc == 0)); then
+  fail "install should fail when blob swap fails after dump/MANIFEST commit"
+fi
+if [[ -e "${tmp_swap}/backup/sql/foundation-${swap_day}.sql" ]]; then
+  fail "first-of-day swap failure left a new dump"
+fi
+if [[ -e "${tmp_swap}/backup/MANIFEST" ]]; then
+  fail "first-of-day swap failure left a new MANIFEST"
+fi
+if [[ ! -f "${tmp_swap}/backup/sql/foundation-20000101.sql" ]]; then
+  fail "first-of-day swap failure removed a prior day's dump"
+fi
+if [[ ! -f "${tmp_swap}/backup/blobs/keep-me" ]] || ! grep -qx 'keep-original' "${tmp_swap}/backup/blobs/keep-me"; then
+  fail "first-of-day swap failure mutated BACKUP_ROOT/blobs"
+fi
+if [[ -e "${tmp_swap}/backup/blobs/staged" ]]; then
+  fail "first-of-day swap failure swapped staging into blobs"
+fi
+if compgen -G "${tmp_swap}/backup/blobs.staging.*" >/dev/null; then
+  fail "first-of-day swap failure left a blobs.staging.* tree"
 fi
 
 echo "backup-vault.test: ok"

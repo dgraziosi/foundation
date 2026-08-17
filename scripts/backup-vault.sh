@@ -12,8 +12,9 @@
 # moves the dump and MANIFEST into place and swaps staging into
 # $BACKUP_ROOT/blobs/. Same-day success overwrites that day's SQL and
 # ends with one blob tree that matches live (including deletions). On
-# any abort after temps or staging exist, those are deleted; the last
-# good dump, MANIFEST, and blob tree stay.
+# any abort after temps or staging exist, those are deleted. If dump and
+# MANIFEST had already been moved, previous same-day copies are restored
+# or the new first-of-day files are removed. The blob tree stays.
 set -euo pipefail
 
 FOUNDATION_BACKUP_SQL_GLOB='foundation-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].sql'
@@ -200,8 +201,10 @@ foundation_backup_swap_blobs() {
   rm -rf -- "${prev}" || true
 }
 
-# Restore previous dump/MANIFEST if we already moved the new ones, then drop
-# temps and every blobs.staging.* tree. Live $BACKUP_ROOT/blobs/ is not touched.
+# All-or-nothing: if dump/MANIFEST were already moved, restore the previous
+# same-day copies when they exist; otherwise remove the newly written files so
+# the backup root matches the start of this run. Then drop temps and every
+# blobs.staging.* tree. Live $BACKUP_ROOT/blobs/ is not touched.
 foundation_backup_install_abort() {
   local dump_tmp="$1"
   local manifest_tmp="$2"
@@ -212,13 +215,21 @@ foundation_backup_install_abort() {
   local manifest="$7"
   local backup_abs="$8"
 
-  if [[ -z "${dump_tmp}" && -n "${saved_dump}" && -f "${saved_dump}" ]]; then
-    mv -- "${saved_dump}" "${dump_path}" || true
-    saved_dump=""
+  if [[ -z "${dump_tmp}" ]]; then
+    if [[ -n "${saved_dump}" && -f "${saved_dump}" ]]; then
+      mv -- "${saved_dump}" "${dump_path}" || true
+      saved_dump=""
+    elif [[ -n "${dump_path}" ]]; then
+      rm -f -- "${dump_path}"
+    fi
   fi
-  if [[ -z "${manifest_tmp}" && -n "${saved_manifest}" && -f "${saved_manifest}" ]]; then
-    mv -- "${saved_manifest}" "${manifest}" || true
-    saved_manifest=""
+  if [[ -z "${manifest_tmp}" ]]; then
+    if [[ -n "${saved_manifest}" && -f "${saved_manifest}" ]]; then
+      mv -- "${saved_manifest}" "${manifest}" || true
+      saved_manifest=""
+    elif [[ -n "${manifest}" ]]; then
+      rm -f -- "${manifest}"
+    fi
   fi
   foundation_backup_discard "${dump_tmp}" "${manifest_tmp}" "${staging}" "${saved_dump}" "${saved_manifest}"
   if [[ -n "${backup_abs}" && -d "${backup_abs}" ]]; then
@@ -328,26 +339,34 @@ foundation_backup_main() {
   dump_path="${backup_abs}/sql/foundation-${day}.sql"
   dump_tmp="$(mktemp "${dump_path}.tmp.XXXXXX")"
   chmod 0600 -- "${dump_tmp}"
-  trap 'foundation_backup_discard "${dump_tmp}"' EXIT
+  # Global so the EXIT trap can still see the path after this function returns.
+  FOUNDATION_BACKUP_MAIN_DUMP_TMP="${dump_tmp}"
+  trap 'foundation_backup_discard "${FOUNDATION_BACKUP_MAIN_DUMP_TMP:-}"' EXIT
 
   # Online dump. Compose stays up. Dump, MANIFEST, and the live blob tree stay
   # put until staging rsync, MANIFEST, and the final blob swap all succeed.
   if ! foundation_backup_compose_exec "${repo_root}" db pg_dump -U foundation -d foundation >"${dump_tmp}"; then
-    rm -f -- "${dump_tmp}"
+    foundation_backup_discard "${dump_tmp}"
+    FOUNDATION_BACKUP_MAIN_DUMP_TMP=""
+    trap - EXIT
     echo "backup-vault: pg_dump failed; last good dump and MANIFEST left in place" >&2
     return 1
   fi
   if [[ ! -s "${dump_tmp}" ]]; then
-    rm -f -- "${dump_tmp}"
+    foundation_backup_discard "${dump_tmp}"
+    FOUNDATION_BACKUP_MAIN_DUMP_TMP=""
+    trap - EXIT
     echo "backup-vault: pg_dump wrote an empty file; last good dump and MANIFEST left in place" >&2
     return 1
   fi
 
   git_sha="$(foundation_backup_git_sha "${repo_root}" || true)"
   if ! foundation_backup_install "${backup_abs}" "${data_abs}" "${day}" "${dump_tmp}" "${git_sha}"; then
+    FOUNDATION_BACKUP_MAIN_DUMP_TMP=""
+    trap - EXIT
     return 1
   fi
-  dump_tmp=""
+  FOUNDATION_BACKUP_MAIN_DUMP_TMP=""
   trap - EXIT
   foundation_backup_prune_sql "${backup_abs}/sql"
 }
