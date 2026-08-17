@@ -205,6 +205,10 @@ Twelve tools: `bootstrap`, `search`, `get`, `upsert`, `delete`, `link`, `unlink`
 
 An agent that can reach the vault MCP may read/write; one that cannot does not.
 
+## How the operator looks at the vault
+
+The operator opens a read-only HTTP window on the same localhost process: `http://127.0.0.1:8787/view`. Same API key as MCP. HTML pages on this server — not a second app and not a second graph. Search and open nodes; the window does not write. Blob bytes from a node page are `GET /view/blobs/:id` (unlock cookie or Authorization header). Agents still fetch `GET /blobs/:id` with the header.
+
 ```mermaid
 flowchart LR
   agents["Agents"] -->|"MCP on localhost — 12 tools, ApiKey"| vault["Vault"]

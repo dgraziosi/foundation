@@ -184,6 +184,7 @@ test("blob nodes: ingest, get metadata, HTTP bytes, snapshots, delete keeps file
       });
       assert.equal(ok.status, 200);
       assert.equal(ok.headers.get("content-type"), "application/pdf");
+      assert.match(ok.headers.get("content-disposition") ?? "", /attachment/i);
       const body = Buffer.from(await ok.arrayBuffer());
       assert.deepEqual(body, pdf);
     });

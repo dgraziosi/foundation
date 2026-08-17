@@ -30,7 +30,7 @@ Starter recipes: [`AGENTS.md`](./AGENTS.md).
 ## Primary users
 
 1. **Agents** via MCP — default interface (Cursor, Claude, and other MCP clients)
-2. **Operators** via conversation with those agents; optional thin viewer later (Mac/web)
+2. **Operators** via this read-only window on the same API. The window is not a second store.
 
 ## Starter spine
 
@@ -67,13 +67,13 @@ Names are locked. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md).
 - Docker Compose: Postgres 16 + Foundation server
 - Durable files under `FOUNDATION_DATA`
 - Localhost MCP at `http://127.0.0.1:8787/mcp` with `Authorization: ApiKey <FOUNDATION_API_KEY>`
+- Read-only window at `http://127.0.0.1:8787/view` (same API key; not a second store)
 - Blobs: `$FOUNDATION_DATA/blobs/<uuid>`; ingest on `upsert`; bytes via `GET /blobs/:id`
 
 ## Locked (do not reopen)
 
 - **12 tools** — names above. New tools need a SPEC amendment
 - **FTS now** — embeddings/hybrid search is later optional work, not current search
-- **Viewer deferred** — optional thin Mac/web viewer against the same API, not v1
 
 ## Non-goals (v1)
 

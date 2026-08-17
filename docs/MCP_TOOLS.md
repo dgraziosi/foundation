@@ -140,7 +140,8 @@ Undo tokens are single-use (`undone_at`; token cleared). Expired tokens refuse. 
 
 ## HTTP (not an MCP tool)
 
-- `GET /blobs/:id` — raw bytes. Requires `Authorization: ApiKey <FOUNDATION_API_KEY>` (Bearer accepted). `Content-Type` is the blob `media_type`. This is how agents fetch large files without inlining them in MCP JSON.
+- `GET /blobs/:id` — raw bytes. Requires `Authorization: ApiKey <FOUNDATION_API_KEY>` (Bearer accepted). The unlock cookie is not a credential here. `Content-Type` is the blob `media_type`, except HTML/SVG and other scriptable types which are `application/octet-stream`. Always `Content-Disposition: attachment` so a browser does not run the file as a page on this origin. This is how agents fetch large files without inlining them in MCP JSON.
+- `GET /view/blobs/:id` — same bytes, same store, for the read-only window. Unlock cookie or Authorization header. Same attachment / scriptable-type rules. The cookie still does not unlock `/mcp` or `/blobs/:id`.
 - Files live at `$FOUNDATION_DATA/blobs/<uuid>` (directory mode 0700). `FOUNDATION_DATA` must not be an agent profile/memory directory.
 
 ## Not in v1
