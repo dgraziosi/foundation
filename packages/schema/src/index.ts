@@ -158,7 +158,7 @@ export {
   patchHasAliases,
   wellFormedAliasStrings,
 } from "./aliases.js";
-export { nameCompact, nameNorm } from "./name-norm.js";
+export { NAME_NORM_ALIGNMENT_FIXTURES, foundationUnaccent, nameCompact, nameNorm } from "./name-norm.js";
 export {
   CREATE_AMBIGUOUS_SUGGESTION,
   CREATE_DUPLICATE_SUGGESTION,

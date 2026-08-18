@@ -6,6 +6,7 @@
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
 
+-- Must stay aligned with packages/schema nameNorm (unaccent map + Unicode alnum).
 CREATE OR REPLACE FUNCTION foundation_name_norm(txt text)
 RETURNS text
 LANGUAGE sql

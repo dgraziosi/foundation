@@ -19,6 +19,19 @@ test("nameNorm folds case, accents, punctuation, and whitespace", () => {
   assert.notEqual(nameNorm("O Brien"), nameNorm("Obrien"));
 });
 
+test("nameNorm matches SQL unaccent folds that [a-z0-9] used to drop", () => {
+  assert.equal(nameNorm("ßtrasse"), "sstrasse");
+  assert.equal(nameNorm("Straße"), "strasse");
+  assert.equal(nameNorm("øl"), "ol");
+  assert.equal(nameNorm("Łódź"), "lodz");
+  assert.equal(nameNorm("þing"), "thing");
+  assert.equal(nameNorm("Æsir"), "aesir");
+  assert.equal(nameNorm("中"), "中");
+  assert.equal(nameNorm("я"), "я");
+  assert.equal(nameNorm("---"), "");
+  assert.equal(nameNorm("…"), "");
+});
+
 test("canonicalizeAliasesPatch accepts [] and dedups by name_norm", () => {
   assert.deepEqual(canonicalizeAliasesPatch([]), []);
   const kept = canonicalizeAliasesPatch(["Pri", "pri", "  Pree-uh  "]);
@@ -26,10 +39,24 @@ test("canonicalizeAliasesPatch accepts [] and dedups by name_norm", () => {
 });
 
 test("canonicalizeAliasesPatch refuses malformed values", () => {
-  for (const bad of ["Pri", [""], [1], [null], { 0: "x" }]) {
+  for (const bad of ["Pri", [""], [1], [null], { 0: "x" }, ["---"], ["…"], ["***"], ["  ---  "]]) {
     const result = canonicalizeAliasesPatch(bad);
     assert.equal(isToolError(result), true);
   }
+});
+
+test("canonicalizeAliasesPatch refuses empty-fold values and only [] clears", () => {
+  const punct = canonicalizeAliasesPatch(["Pri", "---"]);
+  assert.equal(isToolError(punct), true);
+  const onlyPunct = canonicalizeAliasesPatch(["---"]);
+  assert.equal(isToolError(onlyPunct), true);
+  assert.deepEqual(canonicalizeAliasesPatch([]), []);
+  const kept = canonicalizeAliasesPatch(["Straße", "strasse"]);
+  assert.deepEqual(kept, ["Straße"]);
+  const applied = applyAliasesFromPatch({ aliases: ["Pri"] }, { aliases: ["---"] });
+  assert.equal(isToolError(applied), true);
+  const cleared = applyAliasesFromPatch({ aliases: ["Pri"] }, { aliases: [] });
+  assert.deepEqual(cleared, { aliases: [] });
 });
 
 test("applyAliasesFromPatch is patch-gated", () => {

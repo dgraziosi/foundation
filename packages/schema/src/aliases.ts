@@ -5,7 +5,7 @@ export const ALIASES_MAX = 20;
 export const ALIAS_MAX_LEN = 120;
 
 export const ALIASES_SUGGESTION =
-  "data.aliases must be an array of strings (max 20). Each entry is 1–120 characters after trim. Pass aliases: [] to clear. Omit the key to leave aliases unchanged.";
+  "data.aliases must be an array of strings (max 20). Each entry is 1–120 characters after trim and must still have letters or digits after name folding. Punctuation-only or whitespace-only-after-fold values refuse. Pass aliases: [] to clear. Omit the key to leave aliases unchanged.";
 
 export function patchHasAliases(data: Record<string, unknown> | undefined): boolean {
   return Boolean(data && Object.prototype.hasOwnProperty.call(data, "aliases"));
@@ -13,7 +13,9 @@ export function patchHasAliases(data: Record<string, unknown> | undefined): bool
 
 /**
  * Validate and canonicalize an explicit aliases patch.
- * Empty array is valid and clears. Non-arrays and non-strings refuse.
+ * Empty array is valid and clears. Non-arrays, non-strings, and values that
+ * fold empty (punctuation-only) refuse. Only `[]` clears stored aliases.
+ * A non-empty patch that succeeds always returns a non-empty well-formed array.
  */
 export function canonicalizeAliasesPatch(aliases: unknown): string[] | ToolError {
   if (!Array.isArray(aliases)) {
@@ -24,6 +26,9 @@ export function canonicalizeAliasesPatch(aliases: unknown): string[] | ToolError
       `data.aliases accepts at most ${ALIASES_MAX} entries`,
       ALIASES_SUGGESTION,
     );
+  }
+  if (aliases.length === 0) {
+    return [];
   }
   const out: string[] = [];
   const seen = new Set<string>();
@@ -42,11 +47,23 @@ export function canonicalizeAliasesPatch(aliases: unknown): string[] | ToolError
       );
     }
     const norm = nameNorm(trimmed);
-    if (!norm || seen.has(norm)) {
+    if (!norm) {
+      return toolError(
+        "data.aliases entries must remain non-empty after name folding",
+        ALIASES_SUGGESTION,
+      );
+    }
+    if (seen.has(norm)) {
       continue;
     }
     seen.add(norm);
     out.push(trimmed);
+  }
+  if (out.length === 0) {
+    return toolError(
+      "data.aliases must leave a well-formed non-empty array unless you pass []",
+      ALIASES_SUGGESTION,
+    );
   }
   return out;
 }

@@ -440,3 +440,71 @@ test(
     }
   },
 );
+
+test(
+  "aliases refuse empty-fold patches; Latin folds match lookup SQL",
+  { skip: !databaseUrl },
+  async () => {
+    if (!databaseUrl) {
+      return;
+    }
+    const pool = await poolForSchema("lookup_alias_fold");
+    try {
+      const created = await upsertGraphNode(pool, {
+        type: "person",
+        title: "Nia Straße",
+        data: { aliases: ["Helga Voss"] },
+      });
+      assert.equal(isToolError(created), false);
+      if (isToolError(created)) {
+        return;
+      }
+      assert.deepEqual(created.node.data.aliases, ["Helga Voss"]);
+
+      const refused = await upsertGraphNode(pool, {
+        id: created.node.id,
+        type: "person",
+        title: "Nia Straße",
+        data: { aliases: ["---"] },
+        base_updated_at: created.node.updated_at,
+      });
+      assert.equal(isToolError(refused), true);
+      const still = await lookupGraphNodes(pool, {
+        inputs: [{ name: "Helga Voss", type: "person" }],
+      });
+      assert.equal(isToolError(still), false);
+      if (!isToolError(still)) {
+        assert.equal(still.results[0]?.outcome, "alias");
+        assert.equal(still.results[0]?.candidates[0]?.id, created.node.id);
+      }
+
+      const folded = await lookupGraphNodes(pool, {
+        inputs: [
+          { name: "Nia Strasse", type: "person" },
+          { name: "ßtrasse", type: "person" },
+        ],
+      });
+      assert.equal(isToolError(folded), false);
+      if (!isToolError(folded)) {
+        assert.equal(folded.results[0]?.outcome, "exact");
+        assert.equal(folded.results[0]?.candidates[0]?.id, created.node.id);
+        assert.equal(folded.results[1]?.outcome, "candidate");
+      }
+
+      const aliasWrite = await upsertGraphNode(pool, {
+        id: created.node.id,
+        type: "person",
+        title: "Nia Straße",
+        data: { aliases: ["ßtrasse"] },
+        base_updated_at: created.node.updated_at,
+      });
+      assert.equal(isToolError(aliasWrite), false);
+      if (!isToolError(aliasWrite)) {
+        assert.deepEqual(aliasWrite.node.data.aliases, ["ßtrasse"]);
+        assert.ok((aliasWrite.node.data.aliases as string[]).length > 0);
+      }
+    } finally {
+      await pool.end();
+    }
+  },
+);

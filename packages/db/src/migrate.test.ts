@@ -165,6 +165,12 @@ test(
       );
       assert.equal(oBrien[0]?.n, "o brien");
       assert.equal(oBrien[0]?.c, "obrien");
+      const { rows: eszett } = await pool.query<{ n: string; c: string }>(
+        `SELECT foundation_name_norm($1) AS n, foundation_name_compact($1) AS c`,
+        ["ßtrasse"],
+      );
+      assert.equal(eszett[0]?.n, "sstrasse");
+      assert.equal(eszett[0]?.c, "sstrasse");
       const { rows: dueCol } = await pool.query<{ column_name: string }>(
         `SELECT column_name FROM information_schema.columns
          WHERE table_schema = current_schema() AND table_name = 'nodes' AND column_name = 'due'`,
