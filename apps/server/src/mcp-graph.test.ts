@@ -78,6 +78,9 @@ test(
       assert.equal((boot.how_to_extend as { nodes: string }).nodes.includes("upsert"), true);
       assert.equal((boot.how_to_extend as { activity: string }).activity.includes("list_activity"), true);
       assert.equal((boot.how_to_extend as { search: string }).search.includes("full-text"), true);
+      assert.match((boot.how_to_extend as { lookup: string }).lookup, /lookup resolves/);
+      assert.match((boot.how_to_extend as { lookup: string }).lookup, /not a probability/);
+      assert.match((boot.how_to_extend as { search: string }).search, /call lookup/);
       const howTo = boot.how_to_extend as { summary: string };
       assert.equal(howTo.summary.includes("instance routine"), true);
       assert.equal(howTo.summary.includes("docs/VAULT_HEALTH.md"), true);
@@ -191,6 +194,32 @@ test(
       );
       const nodes = found.nodes as Array<{ id: string; type: string }>;
       assert.ok(nodes.some((node) => node.id === tripId && node.type === "trip"));
+
+      const person = asObject(
+        await client.callTool({
+          name: "upsert",
+          arguments: { type: "person", title: "Priya Shah", data: { aliases: ["Pree-uh"] } },
+        }),
+      );
+      assert.equal(person.error, undefined);
+      const looked = asObject(
+        await client.callTool({
+          name: "lookup",
+          arguments: {
+            type: "person",
+            inputs: [
+              { id: "a", name: "Priya Shah" },
+              { id: "b", name: "Pree-uh" },
+              { id: "c", name: "No such person xyz" },
+            ],
+          },
+        }),
+      );
+      const results = looked.results as Array<{ input: { id?: string }; outcome: string }>;
+      assert.equal(results.length, 3);
+      assert.equal(results[0]?.outcome, "exact");
+      assert.equal(results[1]?.outcome, "alias");
+      assert.equal(results[2]?.outcome, "no_match");
 
       const undone = asObject(
         await client.callTool({

@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   GetSuccessSchema,
+  LookupInputSchema,
+  LookupSuccessSchema,
   ManageTypeInputSchema,
   SearchInputSchema,
   SuggestedLinkSchema,
+  UpsertInputSchema,
   UpsertSuccessSchema,
   searchHasSelector,
 } from "./mcp-io.js";
@@ -35,6 +38,39 @@ test("search query is optional when a filter is set", () => {
 test("search still accepts a lexical query", () => {
   const parsed = SearchInputSchema.parse({ query: "Ada", type: "person" });
   assert.equal(parsed.query, "Ada");
+});
+
+test("lookup accepts a batch of names and rejects an empty list", () => {
+  const parsed = LookupInputSchema.parse({
+    type: "person",
+    inputs: [
+      { id: "a", name: "Priya Shah" },
+      { id: "b", name: "Jorden Hale" },
+    ],
+  });
+  assert.equal(parsed.inputs.length, 2);
+  assert.throws(() => LookupInputSchema.parse({ inputs: [] }));
+  LookupSuccessSchema.parse({
+    results: [
+      {
+        input: { name: "Priya Shah", type: "person", id: "a" },
+        outcome: "exact",
+        candidates: [
+          {
+            id: "11111111-1111-4111-8111-111111111111",
+            type: "person",
+            title: "Priya Shah",
+            status: "active",
+            updated_at: "2026-08-17T00:00:00.000Z",
+            confidence: 1,
+            match: "title_exact",
+            matched_value: "Priya Shah",
+            explanation: "Title match after case, accent, punctuation, and whitespace folding.",
+          },
+        ],
+      },
+    ],
+  });
 });
 
 test("suggested_links are seed relations to a live target", () => {
@@ -77,6 +113,15 @@ test("suggested_links are seed relations to a live target", () => {
     edges: [],
     suggested_links: [],
   });
+});
+
+test("upsert create accepts allow_duplicate", () => {
+  const parsed = UpsertInputSchema.parse({
+    type: "person",
+    title: "Priya Shah",
+    allow_duplicate: true,
+  });
+  assert.equal(parsed.allow_duplicate, true);
 });
 
 test("manage_type accepts retire with confirm and purge_deleted", () => {

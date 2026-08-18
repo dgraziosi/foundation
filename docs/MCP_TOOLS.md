@@ -2,14 +2,15 @@
 
 Product contract: [`docs/SPEC.md`](./SPEC.md).
 
-v1 surface is **12 tools**. Destructive tools require `confirm: true` or they return `{ error, suggestion }`. Identity is UUID. If you already have a UUID, call `get` — do not `search`. Ontology mutations apply immediately (activity log + `undo`; no proposal inbox).
+v1 surface is **13 tools**. Destructive tools require `confirm: true` or they return `{ error, suggestion }`. Identity is UUID. If you already have a UUID, call `get` — do not `search`. To resolve one or more entity names, call `lookup` — do not serial-search. Ontology mutations apply immediately (activity log + `undo`; no proposal inbox).
 
 | Tool | Purpose |
 | --- | --- |
 | `bootstrap` | Return starter ontology, how to extend it, and current type/relation inventory. Call first. |
 | `search` | Find nodes by text query and/or filters (`type`, `status`, `under`, `since`, `origin`, `due`, `due_on_or_before`, `due_on_or_after`, `data_equals`). Query is optional when a filter is set. Hits are id/type/title/snippet plus `due` when set. |
+| `lookup` | Resolve one or more names to live nodes. One result per input (`exact` / `alias` / `candidate` / `ambiguous` / `no_match`). Read-only. |
 | `get` | Fetch a node by id, including payload, incident edges with neighbor titles, and `suggested_links` from title FTS. Blob payloads return metadata, not bytes. |
-| `upsert` | Create or update a node (title, type, payload, data, status). Updates require `base_updated_at`. Create accepts `idempotency_key`. Blob ingest via `bytes_base64` or `source_path`. Returns `suggested_links` (proposals only). |
+| `upsert` | Create or update a node (title, type, payload, data, status). Updates require `base_updated_at`. Create accepts `idempotency_key`. Create (no id) preflights duplicates via `lookup`. Blob ingest via `bytes_base64` or `source_path`. Returns `suggested_links` (proposals only). |
 | `delete` | Soft-delete a node. Requires `confirm: true`. |
 | `link` | Create a typed edge after validation. Requires `from_base_updated_at` and `to_base_updated_at`. |
 | `unlink` | Remove a typed edge. Requires `confirm: true`. |
@@ -27,7 +28,7 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 
 - **In:** none
 - **Out:** `{ spine, types, relations, rules, how_to_extend }`
-- `how_to_extend` includes `manage_type`, `manage_relation`, `nodes`, `links`, `activity`, and `search`. Summary notes that vault health, graph hygiene, and applying git updates are instance routines, not tools ([`docs/VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`docs/GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md), [`prompts/update-foundation.md`](../prompts/update-foundation.md)). No `get_vault_health` tool.
+- `how_to_extend` includes `manage_type`, `manage_relation`, `nodes`, `links`, `activity`, `search`, and `lookup`. Summary notes that vault health, graph hygiene, and applying git updates are instance routines, not tools ([`docs/VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`docs/GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md), [`prompts/update-foundation.md`](../prompts/update-foundation.md)). No `get_vault_health` tool.
 
 ### `get`
 
@@ -40,8 +41,8 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 
 ### `upsert`
 
-- **In:** `{ id?, type, title, payload?, data?, status?, metadata?, base_updated_at?, idempotency_key?, actor?, actor_label? }`
-- **Out:** `{ node, activity_id, suggested_links }` or `{ error, suggestion? }`
+- **In:** `{ id?, type, title, payload?, data?, status?, metadata?, base_updated_at?, idempotency_key?, allow_duplicate?, actor?, actor_label? }`
+- **Out:** `{ node, activity_id, suggested_links, duplicate_warnings? }` or `{ error, suggestion?, outcome?, candidates? }`
 - **`suggested_links`:** Postgres FTS on the new title (create, and update when the title changes) — not embeddings. Each item is `{ kind, target: { id, type, title }, reason }`. `kind` is a seed relation: `child_of`, `about`, or `relates_to`. `target` is a **live** node that already exists. How they are chosen: spine types with `parent_types` → `child_of` a live allowed parent whose title matches; if the title looks like a person already in the graph → `about` that person; otherwise `relates_to` a close title match of any type. Skip self. Skip nodes already linked to this one. A node with a live `child_of` is not offered a second parent (`about` / `relates_to` may still appear). Cap 5. Empty graph or no match → `[]`. **Never creates an edge.** Never adds a type or relation. `link` is how an accepted suggestion becomes an edge. Show non-empty suggestions and ask before calling `link`.
 - `payload`: `{ media_type, storage: "inline"|"blob", body?, blob_id?, bytes_base64?, source_path? }`
 - Inline media types: `text/markdown`, `text/html`, `application/json`, `text/plain`.
@@ -56,6 +57,8 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 - **`json_schema`:** if the type has `json_schema`, upsert validates the **merged** `data` object against it. Miss → `{ error, suggestion }` (inspect_ontology, fix data or the type schema). Types with `json_schema: null` skip this check. Seed `task` and `goal` schemas accept optional `data.due` (`YYYY-MM-DD`); omit it and the node still writes.
 - **`data.due`:** optional ISO date on `task` and `goal`. Stored on the JSONB `data` object. Pass `due: null` to clear. `get` returns it on `node.data`; search hits also surface `due` so briefs do not have to open every node.
 - **`data.origin`:** optional `{ system, id }` for `gmail` | `calendar` | `drive` | `github`. Unique on **live** nodes. Look up with `search` `{ origin }` (or `get` once you have the UUID) so agents do not twin people. Foundation stores the ref only — **never fetch or mirror** those systems' bodies.
+- **`data.aliases`:** optional string array of operator-authored alternate names (any type). Validated only when the incoming `data` patch includes `aliases`. `aliases: []` clears. Explicit malformed values refuse, including values that fold empty after `name_norm` (punctuation-only). A successful aliases patch leaves a well-formed non-empty array, or is `[]`. Omit the key to leave aliases unchanged (including legacy malformed values). `lookup` ignores malformed stored aliases. Alias dedupe uses the same fold as SQL `foundation_name_norm`.
+- **Create duplicate preflight:** when `id` is omitted, `upsert` runs the same matcher as `lookup` on `{ name: title, type }`. Exact title or unique exact alias (or an exact-tier collision) returns `{ error: "duplicate_candidates", suggestion, outcome, candidates }` and does not write. Pass `allow_duplicate: true` to write a same-name entity anyway. Token, fuzzy, and space-compacted matches set `duplicate_warnings` and still write. `confidence` on those candidates ranks only — it does not authorize the write. Updates (`id` present) and CAS are unchanged.
 - **Create idempotency:** `idempotency_key` on create. A retry with the same key returns the existing node and original `activity_id` — it does not twin. A key already used by a deleted node refuses (undo, or a new key).
 - **`actor` / `actor_label`:** optional who-wrote fields stored on the activity row (`actor` is `agent` | `user` | `system`; default `agent`). Not a permission gate.
 
@@ -108,7 +111,24 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 - `origin: { system, id }` looks up the unique live `data.origin` ref (`gmail` | `calendar` | `drive` | `github`).
 - Hits are lean (id/type/title/snippet, plus `due` when `data.due` is set). Call `get` to load payload and neighbor titles.
 - If `query` is a UUID, search resolves it like `get` and returns `suggestion` to prefer `get` next time.
-- **An empty lexical result is not a license to upsert a duplicate.** The `suggestion` says so. Try a shorter token or a type filter; only upsert if the entity is new. If you already have a UUID, call `get`. An origin miss means you may upsert with that `data.origin` (ref only).
+- **An empty lexical result is not a license to upsert a duplicate.** The `suggestion` says so. Try a shorter token or a type filter; only upsert if the entity is new. If you already have a UUID, call `get`. An origin miss means you may upsert with that `data.origin` (ref only). To resolve one or more entity names to UUIDs, call `lookup`.
+
+### `lookup`
+
+- **In:** `{ inputs: [{ name, type?, id? }], type?, limit? }`
+- **Out:** `{ results: [{ input, outcome, candidates, suggestion? }] }` or `{ error, suggestion? }`
+- `inputs` is required (1–20). Each `name` is 1–200 characters. Optional `id` is echoed for correlation. Top-level `type` applies when an input omits `type`. `limit` is candidates per input (default 5, max 10).
+- One result per input, same order, even when some names miss.
+- `outcome` is `exact` | `alias` | `candidate` | `ambiguous` | `no_match`.
+  - `exact` — unique live UUID, or unique title after `name_norm` (case, accent, punctuation, whitespace).
+  - `alias` — unique exact operator-authored `data.aliases` entry; title did not exact-match.
+  - `candidate` — token or fuzzy (including compact/no-space) matches. Never authoritative, even with a high `confidence`.
+  - `ambiguous` — duplicate exact titles, or title exact and alias exact on different nodes.
+  - `no_match` — nothing above the floor.
+- Candidates are `{ id, type, title, status, updated_at, confidence, match, matched_value, explanation }`. `title` is the canonical node title. `updated_at` is for a later if-match upsert or link. `confidence` is algorithmic rank, not a calibrated probability, and does not authorize a write. `match` is `title_exact` | `alias_exact` | `title_fuzzy` | `alias_fuzzy` | `title_token` | `uuid`. The surrounding list is `candidates` on that result.
+- Soft-deleted nodes are excluded. Title matching uses generated `title_norm` / `title_compact` plus trigram indexes. Aliases are unnested from JSONB (well-formed string arrays only).
+- Read-only. Never writes, merges, creates, or picks an ambiguous candidate. For `candidate` or `ambiguous`, ask the operator to confirm a UUID before any mutation that depends on the identity. `get` is safe for inspection.
+- If you already have a UUID, call `get`. Listing, origin refs, due filters, and payload search stay on `search`. Lexical recall only, not embeddings. No hidden nickname list.
 
 ### `list_activity`
 

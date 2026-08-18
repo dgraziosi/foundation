@@ -24,6 +24,7 @@ import {
   listRelationTypes,
   readBlobBytes,
   resolveBlobFilePath,
+  lookupNodeCandidates,
   searchNodes,
   softDeleteNode,
   unlinkQuiet,
@@ -54,6 +55,11 @@ import {
   SEARCH_MISS_SUGGESTION,
   SEARCH_NO_SELECTOR_SUGGESTION,
   SEARCH_UUID_SUGGESTION,
+  LOOKUP_NO_SELECTOR_SUGGESTION,
+  LOOKUP_CANDIDATE_DEFAULT,
+  applyAliasesFromPatch,
+  classifyLookupResult,
+  createPreflightFromLookup,
   ORIGIN_HIT_SUGGESTION,
   ORIGIN_MISS_SUGGESTION,
   DUE_DATE_SUGGESTION,
@@ -83,10 +89,13 @@ import {
   type NodeType,
   type Payload,
   type RelationType,
+  type LookupInput,
+  type LookupSuccess,
   type SearchHit,
   type SearchInput,
   type SuggestedLink,
   type ToolError,
+  type DuplicateWarning,
   type UpsertInput,
   type UpsertPayload,
 } from "@foundation/schema";
@@ -142,6 +151,38 @@ async function originUniqueError(
     return originConflictError(existing.id, origin);
   }
   return null;
+}
+
+async function createDuplicatePreflight(
+  db: Queryable,
+  input: { title: string; type: string; allow_duplicate?: boolean },
+): Promise<{ block?: ToolError; warning?: DuplicateWarning }> {
+  const raw = await lookupNodeCandidates(db, [{ idx: 0, name: input.title, type: input.type }]);
+  const classified = classifyLookupResult(
+    { name: input.title, type: input.type },
+    raw.map((row) => ({
+      id: row.id,
+      type: row.type,
+      title: row.title,
+      status: row.status,
+      updated_at: row.updated_at,
+      confidence: row.confidence,
+      match: row.match,
+      matched_value: row.matched_value,
+    })),
+    LOOKUP_CANDIDATE_DEFAULT,
+  );
+  const decision = createPreflightFromLookup(classified);
+  if (decision.action === "block") {
+    if (input.allow_duplicate) {
+      return {};
+    }
+    return { block: decision.error };
+  }
+  if (decision.action === "warn") {
+    return { warning: decision.warning };
+  }
+  return {};
 }
 
 async function replayIdempotentCreate(
@@ -387,7 +428,15 @@ export async function upsertGraphNode(
   pool: Pool,
   input: UpsertInput,
   blobs?: BlobRuntime,
-): Promise<{ node: Node; activity_id: string; suggested_links: SuggestedLink[] } | ToolError> {
+): Promise<
+  | {
+      node: Node;
+      activity_id: string;
+      suggested_links: SuggestedLink[];
+      duplicate_warnings?: DuplicateWarning;
+    }
+  | ToolError
+> {
   const type = await getNodeType(pool, input.type);
   if (!type) {
     return toolError(
@@ -433,9 +482,13 @@ export async function upsertGraphNode(
         }
       }
 
-      const nextData = canonicalizeDueInData(
+      const merged = canonicalizeDueInData(
         canonicalizeOriginInData(mergedNodeData(existing, input.data)),
       );
+      const nextData = applyAliasesFromPatch(merged, input.data);
+      if (isToolError(nextData)) {
+        return nextData;
+      }
       const dataErr = validateUpsertData(type, nextData);
       if (dataErr) {
         return dataErr;
@@ -500,6 +553,19 @@ export async function upsertGraphNode(
         }
       }
 
+      let duplicate_warnings: DuplicateWarning | undefined;
+      if (!input.id) {
+        const preflight = await createDuplicatePreflight(client, {
+          title: input.title,
+          type: input.type,
+          allow_duplicate: input.allow_duplicate,
+        });
+        if (preflight.block) {
+          return preflight.block;
+        }
+        duplicate_warnings = preflight.warning;
+      }
+
       await client.query("SAVEPOINT upsert_insert");
       try {
         const resolved = await resolveStoredPayload(client, input.payload, blobs);
@@ -526,7 +592,11 @@ export async function upsertGraphNode(
           before: null,
           after: await snapshotNodeForActivity(client, node, resolved.blob),
         });
-        return { node, activity_id: activity.id };
+        return {
+          node,
+          activity_id: activity.id,
+          ...(duplicate_warnings ? { duplicate_warnings } : {}),
+        };
       } catch (error) {
         if (isUniqueViolation(error)) {
           await client.query("ROLLBACK TO SAVEPOINT upsert_insert");
@@ -1161,4 +1231,100 @@ export async function searchGraphNodes(
     return { nodes, suggestion: ORIGIN_HIT_SUGGESTION };
   }
   return { nodes };
+}
+
+export async function lookupGraphNodes(
+  pool: Pool,
+  input: LookupInput,
+): Promise<LookupSuccess | ToolError> {
+  if (!input.inputs?.length) {
+    return toolError("lookup requires one or more inputs", LOOKUP_NO_SELECTOR_SUGGESTION);
+  }
+  const limit = input.limit ?? LOOKUP_CANDIDATE_DEFAULT;
+  const resolved = input.inputs.map((item) => ({
+    name: item.name.trim(),
+    type: item.type ?? input.type,
+    id: item.id,
+  }));
+  if (resolved.some((item) => !item.name)) {
+    return toolError("lookup requires a non-empty name on each input", LOOKUP_NO_SELECTOR_SUGGESTION);
+  }
+
+  const typeSlugs = new Set<string>();
+  if (input.type) {
+    typeSlugs.add(input.type);
+  }
+  for (const item of resolved) {
+    if (item.type) {
+      typeSlugs.add(item.type);
+    }
+  }
+  for (const slug of typeSlugs) {
+    const type = await getNodeType(pool, slug);
+    if (!type) {
+      return toolError(
+        `Unknown type "${slug}"`,
+        `Call inspect_ontology. Known types: ${await knownTypeSlugs(pool)}`,
+      );
+    }
+  }
+
+  const nameInputs: Array<{ idx: number; name: string; type?: string }> = [];
+  const uuidHits = new Map<number, LookupSuccess["results"][number]>();
+
+  for (const [idx, item] of resolved.entries()) {
+    if (!isUuid(item.name)) {
+      nameInputs.push({ idx, name: item.name, type: item.type });
+      continue;
+    }
+    const node = await getNodeById(pool, item.name);
+    if (!node || (item.type && node.type !== item.type)) {
+      uuidHits.set(
+        idx,
+        classifyLookupResult({ name: item.name, type: item.type, id: item.id }, [], limit),
+      );
+      continue;
+    }
+    uuidHits.set(
+      idx,
+      classifyLookupResult(
+        { name: item.name, type: item.type, id: item.id },
+        [
+          {
+            id: node.id,
+            type: node.type,
+            title: node.title,
+            status: node.status,
+            updated_at: node.updated_at,
+            confidence: 1,
+            match: "uuid",
+            matched_value: node.title,
+          },
+        ],
+        limit,
+      ),
+    );
+  }
+
+  const raw = await lookupNodeCandidates(pool, nameInputs);
+  const byIdx = new Map<number, typeof raw>();
+  for (const row of raw) {
+    const list = byIdx.get(row.idx) ?? [];
+    list.push(row);
+    byIdx.set(row.idx, list);
+  }
+
+  const results = resolved.map((item, idx) => {
+    const uuid = uuidHits.get(idx);
+    if (uuid) {
+      return uuid;
+    }
+    return classifyLookupResult(
+      { name: item.name, type: item.type, id: item.id },
+      byIdx.get(idx) ?? [],
+      limit,
+    );
+  });
+
+  return { results };
 }

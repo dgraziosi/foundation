@@ -8,6 +8,7 @@ import { registerLinkTool } from "./link.js";
 import { registerListActivityTool } from "./list-activity.js";
 import { registerManageRelationTool } from "./manage-relation.js";
 import { registerManageTypeTool } from "./manage-type.js";
+import { registerLookupTool } from "./lookup.js";
 import { registerSearchTool } from "./search.js";
 import { registerUndoTool } from "./undo.js";
 import { registerUnlinkTool } from "./unlink.js";
@@ -16,6 +17,7 @@ import { registerUpsertTool } from "./upsert.js";
 export function registerTools(server: McpServer, pool: Pool, dataDir: string): void {
   registerBootstrapTool(server, pool);
   registerSearchTool(server, pool);
+  registerLookupTool(server, pool);
   registerGetTool(server, pool, dataDir);
   registerUpsertTool(server, pool, dataDir);
   registerDeleteTool(server, pool);

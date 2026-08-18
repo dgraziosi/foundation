@@ -6,7 +6,7 @@ After Compose is up, the operator (the human who runs Compose) attaches a named 
 
 1. **MCP URL:** `http://127.0.0.1:8787/mcp`
 2. **API key:** send `Authorization: ApiKey YOUR_KEY`. Replace `YOUR_KEY` with `FOUNDATION_API_KEY` from `.env`. `Authorization: Bearer YOUR_KEY` is accepted. Do not commit the key.
-3. **Confirm it works:** in the harness, call `bootstrap`, or a simple `search` (for example `{ "type": "area" }`). `bootstrap` returns the starter spine. A connected harness can reach the twelve tools already on the server.
+3. **Confirm it works:** in the harness, call `bootstrap`, or a simple `search` (for example `{ "type": "area" }`). `bootstrap` returns the starter spine. A connected harness can reach the thirteen tools already on the server.
 
 Health: `GET http://127.0.0.1:8787/health`. Window: `http://127.0.0.1:8787/view`.
 

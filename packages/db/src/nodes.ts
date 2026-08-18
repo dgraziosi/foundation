@@ -1,6 +1,18 @@
-import { isIsoDate, type IncidentEdge, type Node, type Payload, type SearchHit } from "@foundation/schema";
+import {
+  LOOKUP_FUZZY_MIN_COMPACT_LEN,
+  LOOKUP_SIM_FLOOR,
+  LOOKUP_TOKEN_MIN_COMPACT_LEN,
+  isIsoDate,
+  type IncidentEdge,
+  type LookupMatch,
+  type LookupRawCandidate,
+  type Node,
+  type Payload,
+  type SearchHit,
+} from "@foundation/schema";
 import type { Queryable } from "./tx.js";
 import { iso } from "./tx.js";
+import type pg from "pg";
 
 type NodeRow = {
   id: string;
@@ -393,6 +405,273 @@ export async function searchNodes(
     snippet: row.snippet ?? "",
     ...(row.due && isIsoDate(row.due) ? { due: row.due } : {}),
   }));
+}
+
+export type LookupQueryInput = {
+  idx: number;
+  name: string;
+  type?: string;
+};
+
+type LookupRow = {
+  idx: number;
+  id: string;
+  type: string;
+  title: string;
+  status: Node["status"];
+  updated_at: Date | string;
+  confidence: string | number;
+  match: LookupMatch;
+  matched_value: string;
+};
+
+/**
+ * Batch title + well-formed-alias candidate gather.
+ * Title exact/token/trigram use title_norm / title_compact indexes.
+ * Aliases are unnested from JSONB; that path is not trigram-indexed.
+ */
+export const LOOKUP_CANDIDATE_SQL = `
+WITH inputs AS (
+  SELECT
+    i.idx,
+    i.name,
+    NULLIF(i.type, '') AS type,
+    foundation_name_norm(i.name) AS q_norm,
+    foundation_name_compact(i.name) AS q_compact
+  FROM unnest($1::int[], $2::text[], $3::text[]) AS i(idx, name, type)
+),
+title_exact AS (
+  SELECT n.idx, nodes.id, nodes.type, nodes.title, nodes.status, nodes.updated_at,
+         1::float8 AS confidence,
+         'title_exact'::text AS match,
+         nodes.title AS matched_value
+  FROM inputs n
+  JOIN nodes ON nodes.deleted_at IS NULL
+    AND nodes.title_norm = n.q_norm
+    AND (n.type IS NULL OR nodes.type = n.type)
+  WHERE n.q_norm <> ''
+),
+alias_exact AS (
+  SELECT n.idx, nodes.id, nodes.type, nodes.title, nodes.status, nodes.updated_at,
+         0.99::float8 AS confidence,
+         'alias_exact'::text AS match,
+         aliases.alias_text AS matched_value
+  FROM inputs n
+  JOIN nodes ON nodes.deleted_at IS NULL
+    AND (n.type IS NULL OR nodes.type = n.type)
+  CROSS JOIN LATERAL (
+    SELECT trim(both ' ' FROM value #>> '{}') AS alias_text
+    FROM jsonb_array_elements(
+      CASE
+        WHEN jsonb_typeof(nodes.data->'aliases') = 'array' THEN nodes.data->'aliases'
+        ELSE '[]'::jsonb
+      END
+    ) AS value
+    WHERE jsonb_typeof(value) = 'string'
+  ) aliases
+  WHERE n.q_norm <> ''
+    AND aliases.alias_text <> ''
+    AND foundation_name_norm(aliases.alias_text) = n.q_norm
+),
+title_token AS (
+  SELECT n.idx, nodes.id, nodes.type, nodes.title, nodes.status, nodes.updated_at,
+         LEAST(0.8, 0.6 + 0.2 * (char_length(n.q_norm)::float8 / GREATEST(char_length(nodes.title_norm), 1))) AS confidence,
+         'title_token'::text AS match,
+         nodes.title AS matched_value
+  FROM inputs n
+  JOIN nodes ON nodes.deleted_at IS NULL
+    AND (n.type IS NULL OR nodes.type = n.type)
+    AND nodes.title_norm <> n.q_norm
+    AND (' ' || nodes.title_norm || ' ') LIKE ('% ' || n.q_norm || ' %')
+  WHERE char_length(n.q_compact) >= $4
+    AND n.q_norm <> ''
+),
+title_fuzzy AS (
+  SELECT n.idx, nodes.id, nodes.type, nodes.title, nodes.status, nodes.updated_at,
+         LEAST(
+           0.98,
+           GREATEST(
+             similarity(nodes.title_norm, n.q_norm),
+             word_similarity(n.q_norm, nodes.title_norm),
+             similarity(nodes.title_compact, n.q_compact)
+           )
+         ) AS confidence,
+         'title_fuzzy'::text AS match,
+         nodes.title AS matched_value
+  FROM inputs n
+  JOIN nodes ON nodes.deleted_at IS NULL
+    AND (n.type IS NULL OR nodes.type = n.type)
+    AND nodes.title_norm <> n.q_norm
+    AND (
+      nodes.title_norm % n.q_norm
+      OR nodes.title_compact % n.q_compact
+    )
+  WHERE char_length(n.q_compact) >= $5
+    AND n.q_norm <> ''
+),
+alias_fuzzy AS (
+  SELECT n.idx, nodes.id, nodes.type, nodes.title, nodes.status, nodes.updated_at,
+         LEAST(
+           0.98,
+           GREATEST(
+             similarity(foundation_name_norm(aliases.alias_text), n.q_norm),
+             word_similarity(n.q_norm, foundation_name_norm(aliases.alias_text)),
+             similarity(foundation_name_compact(aliases.alias_text), n.q_compact)
+           )
+         ) AS confidence,
+         'alias_fuzzy'::text AS match,
+         aliases.alias_text AS matched_value
+  FROM inputs n
+  JOIN nodes ON nodes.deleted_at IS NULL
+    AND (n.type IS NULL OR nodes.type = n.type)
+  CROSS JOIN LATERAL (
+    SELECT trim(both ' ' FROM value #>> '{}') AS alias_text
+    FROM jsonb_array_elements(
+      CASE
+        WHEN jsonb_typeof(nodes.data->'aliases') = 'array' THEN nodes.data->'aliases'
+        ELSE '[]'::jsonb
+      END
+    ) AS value
+    WHERE jsonb_typeof(value) = 'string'
+  ) aliases
+  WHERE char_length(n.q_compact) >= $5
+    AND n.q_norm <> ''
+    AND aliases.alias_text <> ''
+    AND foundation_name_norm(aliases.alias_text) <> n.q_norm
+    AND (
+      foundation_name_norm(aliases.alias_text) % n.q_norm
+      OR foundation_name_compact(aliases.alias_text) % n.q_compact
+    )
+),
+combined AS (
+  SELECT * FROM title_exact
+  UNION ALL
+  SELECT * FROM alias_exact
+  UNION ALL
+  SELECT * FROM title_token
+  UNION ALL
+  SELECT * FROM title_fuzzy
+  UNION ALL
+  SELECT * FROM alias_fuzzy
+),
+ranked AS (
+  SELECT *,
+         row_number() OVER (
+           PARTITION BY idx, match
+           ORDER BY confidence DESC, title ASC, id ASC
+         ) AS rn
+  FROM combined
+  WHERE confidence >= $6 OR match IN ('title_exact', 'alias_exact', 'title_token')
+)
+SELECT idx, id, type, title, status, updated_at, confidence, match, matched_value
+FROM ranked
+WHERE match IN ('title_exact', 'alias_exact')
+   OR rn <= 20
+`;
+
+export function lookupCandidateValues(inputs: LookupQueryInput[]): unknown[] {
+  return [
+    inputs.map((item) => item.idx),
+    inputs.map((item) => item.name),
+    inputs.map((item) => item.type ?? ""),
+    LOOKUP_TOKEN_MIN_COMPACT_LEN,
+    LOOKUP_FUZZY_MIN_COMPACT_LEN,
+    LOOKUP_SIM_FLOOR,
+  ];
+}
+
+export async function lookupNodeCandidates(
+  db: Queryable,
+  inputs: LookupQueryInput[],
+): Promise<Array<LookupRawCandidate & { idx: number }>> {
+  if (inputs.length === 0) {
+    return [];
+  }
+  const { rows } = await db.query<LookupRow>(LOOKUP_CANDIDATE_SQL, lookupCandidateValues(inputs));
+  return rows.map((row) => ({
+    idx: Number(row.idx),
+    id: row.id,
+    type: row.type,
+    title: row.title,
+    status: row.status,
+    updated_at: iso(row.updated_at),
+    confidence: typeof row.confidence === "number" ? row.confidence : Number(row.confidence),
+    match: row.match,
+    matched_value: row.matched_value,
+  }));
+}
+
+export async function explainLookupNodeCandidates(
+  db: Queryable,
+  inputs: LookupQueryInput[],
+): Promise<string> {
+  const { rows } = await db.query<{ "QUERY PLAN": string }>(
+    `EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT) ${LOOKUP_CANDIDATE_SQL}`,
+    lookupCandidateValues(inputs),
+  );
+  return rows.map((row) => row["QUERY PLAN"]).join("\n");
+}
+
+export async function explainLookupTitleAccess(
+  db: Queryable,
+  sampleNorm: string,
+): Promise<{ exact: string; fuzzy: string }> {
+  const exact = await db.query<{ "QUERY PLAN": string }>(
+    `EXPLAIN (FORMAT TEXT)
+     SELECT id FROM nodes
+     WHERE deleted_at IS NULL AND title_norm = $1`,
+    [sampleNorm],
+  );
+  const fuzzy = await db.query<{ "QUERY PLAN": string }>(
+    `EXPLAIN (FORMAT TEXT)
+     SELECT id FROM nodes
+     WHERE deleted_at IS NULL AND title_norm % $1`,
+    [sampleNorm],
+  );
+  return {
+    exact: exact.rows.map((row) => row["QUERY PLAN"]).join("\n"),
+    fuzzy: fuzzy.rows.map((row) => row["QUERY PLAN"]).join("\n"),
+  };
+}
+
+/** Force bitmap-only planning so the title_norm trigram GIN must be considered. */
+export async function explainLookupTitleTrgmGin(
+  db: Queryable,
+  sampleNorm: string,
+): Promise<string> {
+  const run = async (client: Queryable): Promise<string> => {
+    await client.query("SET LOCAL enable_seqscan = off");
+    const { rows } = await client.query<{ "QUERY PLAN": string }>(
+      `EXPLAIN (FORMAT TEXT)
+       SELECT id FROM nodes
+       WHERE title_norm % $1`,
+      [sampleNorm],
+    );
+    return rows.map((row) => row["QUERY PLAN"]).join("\n");
+  };
+  if ("connect" in db && typeof (db as pg.Pool).connect === "function") {
+    const client = await (db as pg.Pool).connect();
+    try {
+      await client.query("BEGIN");
+      const plan = await run(client);
+      await client.query("ROLLBACK");
+      return plan;
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+  await db.query("BEGIN");
+  try {
+    const plan = await run(db);
+    await db.query("ROLLBACK");
+    return plan;
+  } catch (error) {
+    await db.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  }
 }
 
 type EdgeRow = {

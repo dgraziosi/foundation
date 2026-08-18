@@ -22,8 +22,16 @@ import {
 export const ToolErrorSchema = z.object({
   error: z.string(),
   suggestion: z.string().optional(),
+  /** Present on create-time duplicate preflight refusals. */
+  outcome: z.enum(["exact", "alias", "ambiguous"]).optional(),
+  candidates: z.array(z.unknown()).optional(),
 });
-export type ToolError = z.infer<typeof ToolErrorSchema>;
+export type ToolError = {
+  error: string;
+  suggestion?: string;
+  outcome?: "exact" | "alias" | "ambiguous";
+  candidates?: LookupCandidate[];
+};
 
 export function toolError(error: string, suggestion?: string): ToolError {
   return suggestion === undefined ? { error } : { error, suggestion };
@@ -36,7 +44,9 @@ export function isToolError(value: unknown): value is ToolError {
   if (!("error" in value) || typeof (value as { error: unknown }).error !== "string") {
     return false;
   }
-  return Object.keys(value).every((key) => key === "error" || key === "suggestion");
+  return Object.keys(value).every(
+    (key) => key === "error" || key === "suggestion" || key === "outcome" || key === "candidates",
+  );
 }
 
 export const SlugSchema = z
@@ -144,17 +154,15 @@ export const UpsertInputSchema = z.object({
   base_updated_at: z.string().min(1).optional(),
   /** Create only: same key returns the existing node instead of a twin. */
   idempotency_key: z.string().trim().min(1).max(200).optional(),
+  /**
+   * Create only: write even when lookup finds an exact title or unique exact alias.
+   * Same-name entities stay allowed with this flag. Ignored on update.
+   */
+  allow_duplicate: z.boolean().optional(),
   actor: ActivityActorSchema.optional(),
   actor_label: z.string().trim().min(1).max(200).optional(),
 });
 export type UpsertInput = z.infer<typeof UpsertInputSchema>;
-
-export const UpsertSuccessSchema = z.object({
-  node: NodeSchema,
-  activity_id: z.string().uuid(),
-  /** Title-FTS proposals. Empty when none, including an empty graph. Never creates an edge. */
-  suggested_links: z.array(SuggestedLinkSchema),
-});
 
 export const DeleteInputSchema = z.object({
   id: z.string().uuid(),
@@ -335,6 +343,105 @@ export const SearchSuccessSchema = z.object({
   nodes: z.array(SearchHitSchema),
   suggestion: z.string().optional(),
 });
+
+export const LOOKUP_BATCH_MAX = 20;
+export const LOOKUP_NAME_MAX = 200;
+export const LOOKUP_CANDIDATE_MAX = 10;
+
+export const LOOKUP_NO_SELECTOR_SUGGESTION =
+  "Pass one or more inputs with name (max 20). Optional type narrows people, places, companies, or other types. Do not use lookup for listing, origin refs, or payload search — those stay on search.";
+
+export const LookupMatchSchema = z.enum([
+  "title_exact",
+  "alias_exact",
+  "title_fuzzy",
+  "alias_fuzzy",
+  "title_token",
+  "uuid",
+]);
+export type LookupMatch = z.infer<typeof LookupMatchSchema>;
+
+export const LookupOutcomeSchema = z.enum([
+  "exact",
+  "alias",
+  "candidate",
+  "ambiguous",
+  "no_match",
+]);
+export type LookupOutcome = z.infer<typeof LookupOutcomeSchema>;
+
+export const LookupInputItemSchema = z.object({
+  name: z.string().trim().min(1).max(LOOKUP_NAME_MAX),
+  type: z.string().min(1).optional(),
+  id: z.string().trim().min(1).max(80).optional(),
+});
+export type LookupInputItem = z.infer<typeof LookupInputItemSchema>;
+
+export const LookupInputSchema = z.object({
+  inputs: z.array(LookupInputItemSchema).min(1).max(LOOKUP_BATCH_MAX),
+  type: z.string().min(1).optional(),
+  limit: z.number().int().min(1).max(LOOKUP_CANDIDATE_MAX).optional(),
+});
+export type LookupInput = z.infer<typeof LookupInputSchema>;
+
+export const LookupCandidateSchema = z.object({
+  id: z.string().uuid(),
+  type: z.string().min(1),
+  /** Canonical node title (not the matched alias). */
+  title: z.string().min(1),
+  status: NodeStatusSchema,
+  /** Current node timestamp for a later if-match upsert or link. */
+  updated_at: z.string().min(1),
+  /**
+   * Algorithmic ranking in [0, 1]. Persist or show it. Not a calibrated
+   * probability and it does not authorize a write.
+   */
+  confidence: z.number().min(0).max(1),
+  match: LookupMatchSchema,
+  matched_value: z.string().min(1),
+  explanation: z.string().min(1),
+});
+export type LookupCandidate = z.infer<typeof LookupCandidateSchema>;
+
+export const DUPLICATE_CANDIDATES_ERROR = "duplicate_candidates";
+
+export const DuplicatePreflightErrorSchema = z.object({
+  error: z.literal(DUPLICATE_CANDIDATES_ERROR),
+  suggestion: z.string().min(1),
+  outcome: z.enum(["exact", "alias", "ambiguous"]),
+  candidates: z.array(LookupCandidateSchema),
+});
+export type DuplicatePreflightError = z.infer<typeof DuplicatePreflightErrorSchema>;
+
+export const DuplicateWarningSchema = z.object({
+  outcome: z.literal("candidate"),
+  candidates: z.array(LookupCandidateSchema),
+  suggestion: z.string().min(1),
+});
+export type DuplicateWarning = z.infer<typeof DuplicateWarningSchema>;
+
+export const UpsertSuccessSchema = z.object({
+  node: NodeSchema,
+  activity_id: z.string().uuid(),
+  /** Title-FTS proposals. Empty when none, including an empty graph. Never creates an edge. */
+  suggested_links: z.array(SuggestedLinkSchema),
+  /** Token/fuzzy/compact hits on create. The write still happened. */
+  duplicate_warnings: DuplicateWarningSchema.optional(),
+});
+export type UpsertSuccess = z.infer<typeof UpsertSuccessSchema>;
+
+export const LookupResultSchema = z.object({
+  input: LookupInputItemSchema,
+  outcome: LookupOutcomeSchema,
+  candidates: z.array(LookupCandidateSchema),
+  suggestion: z.string().optional(),
+});
+export type LookupResult = z.infer<typeof LookupResultSchema>;
+
+export const LookupSuccessSchema = z.object({
+  results: z.array(LookupResultSchema),
+});
+export type LookupSuccess = z.infer<typeof LookupSuccessSchema>;
 
 export const ListActivityInputSchema = z.object({
   action: ActivityActionSchema.optional(),
