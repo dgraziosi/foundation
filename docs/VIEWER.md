@@ -16,7 +16,7 @@ An implementer should be able to build the UI from this file without inventing l
 
 The window does not write. No upsert, link, unlink, delete, undo, or ontology controls.
 
-Off-box access is in scope. The operator may open `/view` from another machine on this vault at `http://<this-host>:8788/view`. Unlock, cookie, and every surface must work on that origin. Do not ship localhost-only chrome or a localhost-only unlock. MCP stays on `http://127.0.0.1:8787/mcp`.
+Off-box access is in scope. The operator may open `/view` from another machine on this vault. Unlock, cookie, and every surface must work on that origin. Do not ship localhost-only chrome or a localhost-only unlock.
 
 ## Starting point (keep)
 
@@ -296,10 +296,12 @@ React. Boring, well-known quantities that coding agents already write well.
 - **Vite + React + TypeScript** — one app, served at `/view`
 - **React Router** — Graph, Search, Recents, Tasks, `/view/nodes/:id`
 - **TanStack Query** — reads
-- **CSS variables** for the tokens above. Plain CSS or CSS modules. Not a design-system package. Not Tailwind-as-identity
-- **One well-known 2D graph library** (react-force-graph-2d or equivalent). Do not write a WebGL engine
+- **shadcn/ui + Tailwind** — chrome, not a second design system. Map shadcn theme tokens to the paper and dark hex values in this file (paper `#f7f7f4` / `#26251e` / `#f54e00`, dark `#14120b` / `#edecec` / cards `#1b1913`, accent `#f54e00`)
+- **Real primitives** for buttons, inputs, selects, badges, separators, cards, and the theme toggle. Do not hand-roll raw inputs, square 1px boxes, or homemade pills
+- Density numbers stay (rows ~36–40px, body ~13px). Default shadcn radius and focus rings are allowed so the window is not a 1px student form
+- **One well-known 2D graph library** (react-force-graph-2d or equivalent) for the canvas only. Chrome around the canvas is shadcn. Do not write a WebGL engine
 - **No drag library in v1** — the board does not write
-- **No Next.js, no custom framework, no second backend**
+- **No design-system package besides shadcn.** No Next.js, no custom framework, no second backend. Still no writes
 
 The HTML string pages in the first window go away. Unlock, cookie, and blob routes stay on this process.
 
@@ -310,7 +312,8 @@ Review against paper (default first paint) on a wide window first, then medium, 
 ### Layout
 
 - [ ] Wide: three columns — rail, middle, inspector. Inspector ~320–380px, not a modal
-- [ ] Graph’s middle is a canvas with visible nodes **and** edges
+- [ ] Graph’s middle is a canvas with visible nodes **and** edges. A list standing in for a graph fails
+- [ ] Controls are shadcn primitives (buttons, inputs, selects, badges, separators, cards, theme toggle). Homemade unstyled controls fail, same as Graph-as-a-list
 - [ ] Search / Recents are title + rows, not cards in a masonry
 - [ ] Tasks is three columns, not a type-filtered list labeled “board”
 - [ ] Medium: inspector is a drawer; Graph is still a canvas
@@ -320,6 +323,7 @@ Review against paper (default first paint) on a wide window first, then medium, 
 ### Density and type
 
 - [ ] Rows ~36–40px. Body ~13px. Meta ~12px. Titles are page titles, not hero type
+- [ ] Default shadcn radius and focus rings are present. Square 1px boxes and raw unstyled inputs fail
 - [ ] Inter or Geist + one OFL mono. No display serif in the chrome
 - [ ] Type tags are quiet pills, not a rainbow
 - [ ] Inspector reads as an article: title, tags, labeled rows, wrapped payload. UUID and sha256 are mono, not the headline
@@ -330,7 +334,7 @@ Review against paper (default first paint) on a wide window first, then medium, 
 - [ ] Dark lane: background `#14120b`, ink `#edecec`, cards / surface lift `#1b1913`, accent `#f54e00`
 - [ ] Dark is a real theme on Unlock, Graph, Search, Recents, Tasks, and Inspector — not a single inverted screen
 - [ ] Accent appears on the selected rail item, Unlock, overdue, and selection — not on every border
-- [ ] Hairlines, no shadows, no gradients
+- [ ] Hairlines, no decorative shadows or gradients. Default shadcn focus rings are allowed
 
 ### States
 
