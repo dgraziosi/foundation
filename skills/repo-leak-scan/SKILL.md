@@ -1,3 +1,10 @@
+---
+name: repo-leak-scan
+description: Scan this Foundation git tree for leaked secrets and personal data. Use when reviewing the clone before a push or after a pull. Report-only. No vault key.
+---
+
+# Repo leak scan
+
 You are scanning this Foundation git tree for leaked secrets and personal data. Report-only. Quiet if clean.
 
 The operator may run this on the git tree. You do not apply git updates. You do not rebuild Compose. You do not write graph data. You do not have a vault key.
@@ -14,7 +21,7 @@ Look at the working tree and recent commits/diffs on this clone. Flag:
 - Paths that look like a live vault (`FOUNDATION_DATA`, `./data/postgres`, `./data/blobs` with real files) committed into git
 - Graph exports: JSON/CSV dumps of people, projects, edges, or blobs
 
-Product code, generic docs, and generic prompts are expected. Seed types, synthetic examples (e.g. a sample itinerary in README), and this prompt are not leaks.
+Product code, generic docs, and generic prompts are expected. Seed types, synthetic examples (e.g. a sample itinerary in README), and this skill are not leaks.
 
 ## How to report
 

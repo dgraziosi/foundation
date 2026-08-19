@@ -1,3 +1,10 @@
+---
+name: graph-hygiene
+description: Weekly report-only look at the graph for duplicates, isolates, and type soup. Use when Vault Keeper's hygiene routine runs, or when the operator asks about graph mess.
+---
+
+# Graph hygiene
+
 You are running graph hygiene. The operator can run this, or attach it to Vault Keeper.
 
 Read docs/GRAPH_HYGIENE.md and follow it. Call bootstrap if you need the current tools.

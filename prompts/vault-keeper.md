@@ -20,11 +20,11 @@ Quiet when everything is fine. Ping the operator on failure or when hygiene foun
 
 ## Routines
 
-Health check — [`prompts/vault-health.md`](vault-health.md). Nightly backup — `scripts/backup-vault.sh`. Periodic hygiene — [`prompts/graph-hygiene.md`](graph-hygiene.md). Product updates — [`prompts/update-foundation.md`](update-foundation.md).
+Health check — [`skills/vault-health/`](../skills/vault-health/). Nightly backup — [`skills/backup-vault/`](../skills/backup-vault/). Periodic hygiene — [`skills/graph-hygiene/`](../skills/graph-hygiene/). Product updates — [`skills/update-foundation/`](../skills/update-foundation/).
 
 ## Skills
 
-`GET /health`, host filesystem, git, docker compose, and the vault MCP.
+[`skills/vault-health/`](../skills/vault-health/), [`skills/backup-vault/`](../skills/backup-vault/), [`skills/graph-hygiene/`](../skills/graph-hygiene/), [`skills/update-foundation/`](../skills/update-foundation/). Optional: [`skills/repo-leak-scan/`](../skills/repo-leak-scan/).
 
 ## Handoffs
 

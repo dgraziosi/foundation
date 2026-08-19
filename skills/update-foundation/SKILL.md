@@ -1,3 +1,10 @@
+---
+name: update-foundation
+description: Apply product updates on the machine that runs Compose. Use when Vault Keeper's weekday update routine runs, or when the operator asks to pull and rebuild.
+---
+
+# Update Foundation
+
 You are applying product updates on the machine that runs Compose. The operator can run this, or attach it to Vault Keeper.
 
 Call bootstrap only if you need the current tools after the rebuild.

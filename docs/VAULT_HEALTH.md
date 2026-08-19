@@ -15,7 +15,7 @@ Short analog: app / folder / links → Foundation / vault / graph.
 
 Do not call the graph “the Vault.”
 
-The operator can run this checkup, or attach it to Vault Keeper ([`AGENTS.md`](./AGENTS.md)). Paste: [`prompts/vault-health.md`](../prompts/vault-health.md).
+The operator can run this checkup, or attach it to Vault Keeper ([`AGENTS.md`](./AGENTS.md)). Skill: [`skills/vault-health/`](../skills/vault-health/).
 
 ## What it is
 
@@ -23,12 +23,12 @@ A **quiet instance routine** (weekdays, morning local). Instance ops: process + 
 
 Do not add `get_vault_health`, `run_maintenance`, `propose_reorganize`, `audit_links`, or `cleanup_dangling_links`. Those jobs are this routine and [graph hygiene](./GRAPH_HYGIENE.md), not MCP tools.
 
-Graph-side report (duplicate titles, zero-edge nodes, type soup) is **not** this routine. That is weekly [graph hygiene](./GRAPH_HYGIENE.md). Git pull, compose rebuild, and the post-pull git-tree leak scan are **not** this routine. Those are [`prompts/update-foundation.md`](../prompts/update-foundation.md) and [`prompts/repo-leak-scan.md`](../prompts/repo-leak-scan.md).
+Graph-side report (duplicate titles, zero-edge nodes, type soup) is **not** this routine. That is weekly [graph hygiene](./GRAPH_HYGIENE.md). Git pull, compose rebuild, and the post-pull git-tree leak scan are **not** this routine. Those are [`skills/update-foundation/`](../skills/update-foundation/) and [`skills/repo-leak-scan/`](../skills/repo-leak-scan/).
 
 ## What it is not
 
 - **Not the graph.** `$FOUNDATION_DATA` and Postgres *are* the vault. The graph lives in them. Do not call the graph “the Vault.” Do not dual-write a markdown store.
-- **Starter recipes.** Paste Vault Keeper and attach this routine. See [`AGENTS.md`](./AGENTS.md).
+- **Starter recipes.** Paste Vault Keeper; its health routine is this skill. See [`AGENTS.md`](./AGENTS.md).
 - **Not email.** No SMTP, no digest. Pings stay in the operator’s chat. Ping only when a check fails.
 - **Not a write-ACL.** The API key is the gate. Do not invent default-deny.
 - **Not a mutation pass.** The quiet weekday run does not `upsert`, `delete`, `unlink`, `undo`, or `manage_type` unless the operator asked for a repair in that conversation. Report; don’t rewrite the graph unattended.

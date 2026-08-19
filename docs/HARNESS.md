@@ -12,7 +12,7 @@ Health: `GET http://127.0.0.1:8787/health`. Window: `http://127.0.0.1:8787/view`
 
 Put the URL and header in the harness config file (or the command that writes that file). Snippets below are only where the file shape differs.
 
-Starter recipes still paste from [`AGENTS.md`](./AGENTS.md).
+Starter recipes still paste from [`AGENTS.md`](./AGENTS.md). Named skill folders live in [`skills/`](../skills/).
 
 ## Cursor
 

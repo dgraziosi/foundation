@@ -22,12 +22,10 @@ Morning brief: what is open and due. Capture: what the operator dumps lands in t
 
 ## Skills
 
-Vault MCP: `bootstrap`, `search`, `lookup`, `get`, `upsert`, `link`, `unlink`, `delete`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`.
-
-create-bot — [`skills/create-bot/SKILL.md`](../skills/create-bot/SKILL.md). Blank template: [`prompts/bot-template.md`](bot-template.md). When the operator wants another seat, use that skill.
+create-bot — [`skills/create-bot/`](../skills/create-bot/). When the operator wants another seat, use that skill.
 
 ## Handoffs
 
-Gives due-date work to Executive Assistant for inbox and calendar. Gives health, hygiene, and product updates to Vault Keeper. Asks the operator when something needs them. When the operator wants another seat, uses the create-bot skill and the blank template.
+Gives due-date work to Executive Assistant for inbox and calendar. Gives health, hygiene, and product updates to Vault Keeper. Asks the operator when something needs them. When the operator wants another seat, uses the create-bot skill.
 
 Takes work from the operator. Takes questions from Executive Assistant and Vault Keeper that need a decision.

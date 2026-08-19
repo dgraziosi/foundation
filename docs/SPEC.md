@@ -62,7 +62,7 @@ Names are locked. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md).
 - `data.aliases` is an optional string array on any node. `upsert` validates it only when the incoming `data` patch includes `aliases` (`[]` clears; malformed patch refuses, including values that fold empty after `name_norm`). A successful aliases write leaves a well-formed non-empty array, or `[]`. Unrelated updates leave legacy values alone. `lookup` ignores malformed legacy aliases. Alias dedupe uses the same `name_norm` as SQL lookup.
 - `task` and `goal` accept optional `data.due` (`YYYY-MM-DD`). Seed `json_schema` enforces the date when present; nodes without due still upsert. `due: null` clears.
 - Live nodes are unique on `data.origin.{system,id}` for `gmail` | `calendar` | `drive` | `github`. Look up with `search` `{ origin }` (then `get`). Store the ref only — do not fetch or mirror those systems’ bodies.
-- No `get_vault_health` / `run_maintenance` / `audit_links` tools — those jobs are instance routines the operator can run ([`VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md), [`prompts/update-foundation.md`](../prompts/update-foundation.md))
+- No `get_vault_health` / `run_maintenance` / `audit_links` tools — those jobs are instance routines the operator can run ([`VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md), [`skills/update-foundation/`](../skills/update-foundation/))
 
 ## Runtime
 
