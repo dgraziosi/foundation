@@ -71,7 +71,7 @@ Landing page after unlock. Middle pane: widgets, then folders.
 
 **Widgets** (read-only, operator-useful)
 
-Wide: three cards in a row, gap 13, radius 13.
+Wide: three cards in a row, gap 13, radius 13. Medium and narrow: widgets stack.
 
 1. **Recents** — last few activity rows (same summary rhythm as Recents). Click a row: select that node, fill the inspector.
 2. **Open tasks** — `task` nodes with status active. Title, due chip when set. Click: select the task, fill the inspector. A control on the widget header opens that type in the view engine (Board).
