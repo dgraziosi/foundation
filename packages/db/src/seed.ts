@@ -6,8 +6,8 @@ export async function seedSystemOntology(pool: pg.Pool): Promise<void> {
     await pool.query(
       `
       INSERT INTO node_types (
-        slug, label, description, kind, parent_types, json_schema, is_system
-      ) VALUES ($1, $2, $3, $4, $5::text[], $6::jsonb, true)
+        slug, label, description, kind, parent_types, json_schema, views, default_view, is_system
+      ) VALUES ($1, $2, $3, $4, $5::text[], $6::jsonb, $7::text[], $8, true)
       ON CONFLICT (slug) DO UPDATE SET
         label = EXCLUDED.label,
         description = CASE
@@ -17,6 +17,8 @@ export async function seedSystemOntology(pool: pg.Pool): Promise<void> {
         kind = EXCLUDED.kind,
         parent_types = EXCLUDED.parent_types,
         json_schema = EXCLUDED.json_schema,
+        views = EXCLUDED.views,
+        default_view = EXCLUDED.default_view,
         is_system = true,
         updated_at = now()
       `,
@@ -27,6 +29,8 @@ export async function seedSystemOntology(pool: pg.Pool): Promise<void> {
         type.kind,
         type.parent_types,
         type.json_schema === null ? null : JSON.stringify(type.json_schema),
+        type.views,
+        type.default_view ?? null,
       ],
     );
   }

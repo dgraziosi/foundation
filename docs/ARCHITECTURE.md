@@ -40,7 +40,7 @@ The server listens on this process. MCP attach from a named harness is documente
 
 ## Graph
 
-The graph is the live network in that vault: **nodes**, **typed edges**, and **activity**. Edges are the only source of truth for links. The ontology (types and relations) is the vocabulary in the same vault and can grow; seeds are the day-one words.
+The graph is the live network in that vault: **nodes**, **typed edges**, and **activity**. Edges are the only source of truth for links. The ontology (types and relations) is the vocabulary in the same vault and can grow; seeds are the day-one words. A type may declare `views` and `default_view` — the Viewer reads that declaration and does not invent a view.
 
 ```mermaid
 flowchart LR
@@ -217,7 +217,7 @@ An agent that can reach the vault MCP may read/write; one that cannot does not.
 
 ## How the operator looks at the vault
 
-The operator opens a read-only window on the view publish: `/view` (`http://127.0.0.1:8788/view`; from another machine, `http://<this-host>:8788/view`). Same API key as MCP. Same graph — not a second store. Vite + React on this process. Surfaces: Unlock, Graph (nodes and edges on a canvas), Search, Recents, a read-only Tasks board, and an Inspector pane. Paper is first paint; dark is a second theme on every surface. Off-box unlock and session use the same key and `Path=/view` cookie. The window does not write. Blob bytes from the inspector are `GET /view/blobs/:id` (unlock cookie or Authorization header). Agents still fetch `GET /blobs/:id` with the header. Contract: [`VIEWER.md`](./VIEWER.md).
+The operator opens a read-only window on the view publish: `/view` (`http://127.0.0.1:8788/view`; from another machine, `http://<this-host>:8788/view`). Same API key as MCP. Same graph — not a second store. Vite + React on this process. Surfaces: Unlock, then Home (Recents, Open tasks, a small Graph, and a folder per live ontology type), rail Graph, Search, Recents, a view engine for a type’s declared views, and an Inspector pane. Dark is first paint; Light and System are full themes. A stored `paper` choice reads as Light. Off-box unlock and session use the same key and `Path=/view` cookie. The window does not write. Blob bytes from the inspector are `GET /view/blobs/:id` (unlock cookie or Authorization header). Agents still fetch `GET /blobs/:id` with the header. Contract: [`VIEWER.md`](./VIEWER.md).
 
 ```mermaid
 flowchart LR

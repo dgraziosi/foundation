@@ -1,5 +1,15 @@
 import { DUE_DATA_JSON_SCHEMA } from "./due.js";
 import type { NodeType, RelationType } from "./types.js";
+import { SEED_TYPE_VIEWS } from "./views.js";
+
+function withSeedViews(type: Omit<NodeType, "views" | "default_view">): NodeType {
+  const declared = SEED_TYPE_VIEWS[type.slug];
+  return {
+    ...type,
+    views: declared ? [...declared.views] : [],
+    ...(declared ? { default_view: declared.default_view } : {}),
+  };
+}
 
 /** area → project → goal → habit | task */
 export const SPINE_DIAGRAM = "area → project → goal → habit | task";
@@ -17,7 +27,7 @@ export const ARTIFACT_TYPE_SLUGS = [
   "decision",
 ] as const;
 
-export const SEED_NODE_TYPES: readonly NodeType[] = [
+const SEED_NODE_TYPE_DEFS: readonly Omit<NodeType, "views" | "default_view">[] = [
   {
     slug: "area",
     label: "Area",
@@ -149,6 +159,8 @@ export const SEED_NODE_TYPES: readonly NodeType[] = [
     is_system: true,
   },
 ];
+
+export const SEED_NODE_TYPES: readonly NodeType[] = SEED_NODE_TYPE_DEFS.map(withSeedViews);
 
 export const SEED_RELATION_TYPES: readonly RelationType[] = [
   {

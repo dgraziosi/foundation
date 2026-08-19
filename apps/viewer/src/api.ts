@@ -26,7 +26,45 @@ async function viewFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return body;
 }
 
-export type OntologyType = { slug: string; label: string };
+export type ViewEngineId =
+  | "list"
+  | "card"
+  | "table"
+  | "board"
+  | "calendar"
+  | "timeline"
+  | "outline"
+  | "graph";
+
+export type OntologyType = {
+  slug: string;
+  label: string;
+  views: ViewEngineId[];
+  default_view?: ViewEngineId;
+  count: number;
+};
+
+export type TypeViewNode = {
+  id: string;
+  title: string;
+  type: string;
+  status: "active" | "completed" | "archived";
+  due?: string;
+  due_tone?: "overdue" | "today" | "future";
+  parent_id?: string;
+  parent_title?: string;
+};
+
+export type TypeView = {
+  type: {
+    slug: string;
+    label: string;
+    views: ViewEngineId[];
+    default_view?: ViewEngineId;
+  };
+  nodes: TypeViewNode[];
+  children: TypeViewNode[];
+};
 export type SearchHit = {
   id: string;
   type: string;
@@ -149,6 +187,10 @@ export function fetchRecents() {
 
 export function fetchTasks() {
   return viewFetch<{ tasks: TaskCard[] }>("/view/api/tasks");
+}
+
+export function fetchType(slug: string) {
+  return viewFetch<TypeView>(`/view/api/types/${encodeURIComponent(slug)}`);
 }
 
 export function fetchNode(id: string) {

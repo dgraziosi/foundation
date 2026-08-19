@@ -280,6 +280,7 @@ const meeting: NodeType = {
   kind: "artifact",
   parent_types: ["project"],
   json_schema: null,
+  views: [],
   is_system: false,
 };
 

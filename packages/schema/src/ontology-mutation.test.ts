@@ -23,13 +23,16 @@ test("system types may update description (no locked-field changes)", () => {
   assert.equal(assertSystemTypePatch(area, { kind: "spine", label: "Area" }), null);
 });
 
-test("system types refuse kind/label/parent_types/json_schema edits", () => {
+test("system types refuse kind/label/parent_types/json_schema/views edits", () => {
   const err = assertSystemTypePatch(area, { kind: "artifact", parent_types: ["project"] });
   assert.ok(err);
   assert.match(err.error, /Cannot change system type "area"/);
   assert.match(err.error, /kind/);
   assert.match(err.error, /parent_types/);
   assert.match(err.suggestion ?? "", /description/);
+  const viewsErr = assertSystemTypePatch(area, { views: ["card"], default_view: "card" });
+  assert.ok(viewsErr);
+  assert.match(viewsErr.error, /views/);
 });
 
 test("non-system types are not locked", () => {

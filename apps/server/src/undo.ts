@@ -254,6 +254,8 @@ async function invertTypeChange(
         kind: before.kind,
         parent_types: before.parent_types,
         json_schema: before.json_schema,
+        views: before.views ?? [],
+        default_view: before.default_view,
       });
       return { action: "type_change", before: null, after: restored };
     } catch (error) {
@@ -280,6 +282,8 @@ async function invertTypeChange(
           kind: before.kind,
           parent_types: before.parent_types,
           json_schema: before.json_schema,
+          views: before.views ?? [],
+          default_view: before.default_view,
         });
     if (!restored) {
       return toolError(`Cannot undo type update: "${before.slug}" not found`);

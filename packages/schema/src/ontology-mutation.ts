@@ -1,5 +1,6 @@
 import type { NodeType, RelationType } from "./types.js";
 import { toolError, type ToolError } from "./mcp-io.js";
+import { mergeTypeViewsPatch, parseTypeViewsInput, type ViewEngineId } from "./views.js";
 
 function sameJson(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
@@ -20,6 +21,8 @@ export function assertSystemTypePatch(
     kind?: NodeType["kind"];
     parent_types?: string[];
     json_schema?: unknown;
+    views?: ViewEngineId[];
+    default_view?: ViewEngineId;
   },
 ): ToolError | null {
   if (!existing.is_system) {
@@ -37,6 +40,12 @@ export function assertSystemTypePatch(
   }
   if (patch.json_schema !== undefined && !sameJson(patch.json_schema, existing.json_schema)) {
     changed.push("json_schema");
+  }
+  if (patch.views !== undefined && !sameJson(patch.views, existing.views)) {
+    changed.push("views");
+  }
+  if (patch.default_view !== undefined && patch.default_view !== existing.default_view) {
+    changed.push("default_view");
   }
   if (changed.length === 0) {
     return null;
@@ -90,6 +99,28 @@ export function assertSystemRelationPatch(
     `Cannot change system relation "${existing.slug}" fields: ${changed.join(", ")}`,
     "System relations may only have their description updated. Add a new relation with manage_relation action create instead.",
   );
+}
+
+export function typeViewsFromInput(input: {
+  views?: unknown;
+  default_view?: unknown;
+}): { views: ViewEngineId[]; default_view?: ViewEngineId } | ToolError {
+  const parsed = parseTypeViewsInput(input);
+  if (!parsed.ok) {
+    return toolError(parsed.error, parsed.suggestion);
+  }
+  return { views: parsed.views, ...(parsed.default_view ? { default_view: parsed.default_view } : {}) };
+}
+
+export function typeViewsFromUpdate(
+  existing: { views?: readonly string[] | null; default_view?: string | null },
+  patch: { views?: unknown; default_view?: unknown },
+): { views: ViewEngineId[]; default_view?: ViewEngineId } | ToolError {
+  const parsed = mergeTypeViewsPatch(existing, patch);
+  if (!parsed.ok) {
+    return toolError(parsed.error, parsed.suggestion);
+  }
+  return { views: parsed.views, ...(parsed.default_view ? { default_view: parsed.default_view } : {}) };
 }
 
 export function missingConfirm(tool: string, confirm: boolean | undefined): ToolError | null {
