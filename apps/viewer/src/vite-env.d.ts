@@ -14,10 +14,12 @@ declare module "react-force-graph-2d" {
     linkWidth?: number | ((link: Record<string, unknown>) => number);
     linkLineDash?: number[] | ((link: Record<string, unknown>) => number[] | undefined);
     linkDirectionalArrowLength?: number;
+    linkDirectionalArrowRelPos?: number;
     backgroundColor?: string;
     cooldownTicks?: number;
     enableNodeDrag?: boolean;
     onNodeClick?: (node: Record<string, unknown>) => void;
+    onNodeRightClick?: (node: Record<string, unknown>, event: MouseEvent) => void;
     nodeCanvasObject?: (
       node: Record<string, unknown> & { x?: number; y?: number },
       ctx: CanvasRenderingContext2D,

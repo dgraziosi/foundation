@@ -1,5 +1,5 @@
-import { Clock, House, Network, PanelLeft, Search } from "lucide-react";
-import { NavLink, useLocation } from "react-router-dom";
+import { House, PanelLeft, Search } from "lucide-react";
+import { NavLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -7,29 +7,11 @@ import { cn } from "@/lib/utils";
 import { useTheme, type ThemeChoice } from "../theme";
 import { useShell } from "./context";
 
-const items = [
-  { to: "/", label: "Home", match: "home", icon: House },
-  { to: "/graph", label: "Graph", match: "graph", icon: Network },
-  { to: "/search", label: "Search", match: "search", icon: Search },
-  { to: "/recents", label: "Recents", match: "recents", icon: Clock },
-] as const;
-
 const themes: ThemeChoice[] = ["light", "dark", "system"];
-
-function isActive(match: string, pathname: string): boolean {
-  if (match === "home") {
-    return pathname === "/";
-  }
-  if (match === "graph") {
-    return pathname === "/graph" || pathname.startsWith("/graph/");
-  }
-  return pathname === `/${match}` || pathname.startsWith(`/${match}/`);
-}
 
 export function Rail() {
   const { choice, setChoice } = useTheme();
-  const { railOpen, setRailOpen, railCollapsed, setRailCollapsed } = useShell();
-  const location = useLocation();
+  const { railOpen, setRailOpen, railCollapsed, setRailCollapsed, openSearch } = useShell();
   const collapsed = railCollapsed;
 
   return (
@@ -51,9 +33,13 @@ export function Rail() {
         )}
       >
         <div className={cn("flex items-center gap-xs px-sm py-md", collapsed && "md:justify-center")}>
-          {collapsed ? null : (
-            <div className="flex-1 text-meta text-muted-foreground">Foundation</div>
-          )}
+          <div
+            className="grid h-6 w-6 place-items-center rounded-md bg-active text-label"
+            aria-label="Foundation"
+          >
+            F
+          </div>
+          {collapsed ? null : <div className="flex-1 text-meta text-muted-foreground">Foundation</div>}
           <Button
             type="button"
             variant="ghost"
@@ -66,34 +52,49 @@ export function Rail() {
           </Button>
         </div>
         <nav className="flex flex-1 flex-col gap-0.5 px-sm">
-          {items.map((item) => {
-            const active = isActive(item.match, location.pathname);
-            const Icon = item.icon;
-            const link = (
+          <Button
+            asChild
+            variant="ghost"
+            className={cn("h-9 justify-start rounded-md px-2", collapsed && "md:justify-center md:px-0")}
+          >
+            <NavLink
+              to="/"
+              onClick={() => setRailOpen(false)}
+              className={({ isActive }) => cn(isActive && "bg-active text-foreground")}
+            >
+              <House size={16} strokeWidth={2} />
+              <span className={cn(collapsed && "md:sr-only")}>Home</span>
+            </NavLink>
+          </Button>
+          {collapsed ? (
+            <Tooltip label="Search">
               <Button
-                key={item.to}
-                asChild
+                type="button"
                 variant="ghost"
-                className={cn(
-                  "h-9 justify-start rounded-md px-2",
-                  collapsed && "md:justify-center md:px-0",
-                  active && "bg-active text-foreground",
-                )}
+                className="h-9 justify-center rounded-md px-0"
+                aria-label="Search"
+                onClick={() => {
+                  openSearch();
+                  setRailOpen(false);
+                }}
               >
-                <NavLink to={item.to} onClick={() => setRailOpen(false)}>
-                  <Icon size={16} strokeWidth={2} />
-                  <span className={cn(collapsed && "md:sr-only")}>{item.label}</span>
-                </NavLink>
+                <Search size={16} strokeWidth={2} />
               </Button>
-            );
-            return collapsed ? (
-              <Tooltip key={item.to} label={item.label}>
-                {link}
-              </Tooltip>
-            ) : (
-              link
-            );
-          })}
+            </Tooltip>
+          ) : (
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-9 justify-start rounded-md px-2"
+              onClick={() => {
+                openSearch();
+                setRailOpen(false);
+              }}
+            >
+              <Search size={16} strokeWidth={2} />
+              <span>Search</span>
+            </Button>
+          )}
         </nav>
         <div className="mt-auto p-sm">
           <ToggleGroup

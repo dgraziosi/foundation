@@ -19,8 +19,9 @@ export function labelFromSlug(slug: string): string {
 }
 
 /**
- * System types: description, fields, and filter/sort/group on already-declared
- * views. The ordered view id list stays locked. Slug identity stays locked.
+ * System types: description, fields, hue, glyph, and filter/sort/group on
+ * already-declared views. The ordered view id list stays locked. Slug identity
+ * stays locked.
  */
 export function assertSystemTypePatch(
   existing: NodeType,
@@ -68,7 +69,7 @@ export function assertSystemTypePatch(
   }
   return toolError(
     `Cannot change system type "${existing.slug}" fields: ${changed.join(", ")}`,
-    "System types may edit description, fields, and filter/sort/group on views they already declare. The ordered view id list, slug, kind, parent_types, and label stay locked. default_view stays a member of those ids.",
+    "System types may edit description, fields, hue, glyph, and filter/sort/group on views they already declare. The ordered view id list, slug, kind, parent_types, and label stay locked. default_view stays a member of those ids.",
   );
 }
 

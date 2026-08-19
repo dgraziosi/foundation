@@ -280,6 +280,20 @@ export {
   timestampsEqual,
 } from "./cas.js";
 export {
+  mergeMissingTypeIdentity,
+  parseTypeIdentity,
+  SEED_TYPE_IDENTITY,
+  TYPE_HUES,
+  TYPE_HUE_SET,
+  TYPE_IDENTITY_SUGGESTION,
+  TypeGlyphSchema,
+  TypeHueSchema,
+  isTypeHueName,
+  type ParsedTypeIdentity,
+  type TypeHueName,
+  type TypeIdentity,
+} from "./type-identity.js";
+export {
   ActivityActionSchema,
   ActivityActorSchema,
   ActivitySchema,

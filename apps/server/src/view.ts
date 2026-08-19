@@ -179,10 +179,13 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings
 
   app.get(`${VIEW_PATH}/api/graph`, gate, async (req, res) => {
     try {
+      const depthRaw = queryString(req, "depth");
+      const depth = depthRaw ? Number(depthRaw) : undefined;
       res.json(
         await viewGraph(pool, {
           focus: queryString(req, "focus") || undefined,
           type: queryString(req, "type") || undefined,
+          depth: Number.isFinite(depth) ? depth : undefined,
         }),
       );
     } catch (error) {
@@ -191,9 +194,11 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings
     }
   });
 
-  app.get(`${VIEW_PATH}/api/recents`, gate, async (_req, res) => {
+  app.get(`${VIEW_PATH}/api/recents`, gate, async (req, res) => {
     try {
-      res.json(await viewRecents(pool));
+      const limitRaw = queryString(req, "limit");
+      const limit = limitRaw ? Number(limitRaw) : undefined;
+      res.json(await viewRecents(pool, { limit: Number.isFinite(limit) ? limit : undefined }));
     } catch (error) {
       console.error("View recents failed", error);
       res.status(500).json({ error: "Could not load." });

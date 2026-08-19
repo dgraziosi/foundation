@@ -2,17 +2,24 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { dueTone, type DueTone } from "../format";
 import { useThemeLane } from "../theme";
-import { typeColors, typeIcon } from "../type-meta";
+import { identityFor, typeColors, typeIcon, type TypeIdentity } from "../type-meta";
 
-export function TypeTag({ type, knownSlugs }: { type: string; knownSlugs?: string[] }) {
+export function TypeTag({
+  type,
+  types,
+}: {
+  type: string;
+  types?: Array<TypeIdentity & { slug: string }>;
+}) {
   const lane = useThemeLane();
-  const Icon = typeIcon(type);
-  const colors = typeColors(type, lane, knownSlugs);
+  const identity = identityFor(type, types);
+  const Icon = typeIcon(identity);
+  const colors = typeColors(identity, lane);
   return (
     <Badge
       variant="outline"
       className="gap-1 border-transparent"
-      style={{ background: colors.tint, color: colors.ink }}
+      style={{ background: colors.tint === "transparent" ? undefined : colors.tint, color: colors.ink }}
     >
       <Icon size={12} strokeWidth={2} />
       {type}
@@ -21,7 +28,7 @@ export function TypeTag({ type, knownSlugs }: { type: string; knownSlugs?: strin
 }
 
 export function StatusTag({ status }: { status: string }) {
-  return <Badge variant="outline">{status}</Badge>;
+  return <Badge variant="outline">{status}</Badge>
 }
 
 export function DueChip({ due, tone }: { due: string; tone?: DueTone }) {
@@ -31,7 +38,7 @@ export function DueChip({ due, tone }: { due: string; tone?: DueTone }) {
       variant={resolved === "overdue" ? "overdue" : "outline"}
       className={cn(resolved === "future" && "text-muted-foreground")}
     >
-      due {due}
+      {due}
     </Badge>
   );
 }

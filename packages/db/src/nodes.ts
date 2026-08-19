@@ -746,20 +746,21 @@ export async function listEdgesTouching(
 
 const NODE_COLUMNS = `id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at`;
 
-/** Newest live nodes. Empty graph returns []. Used by the read-only window working set. */
+/** Newest live nodes. Empty graph returns []. Pass limit: null for every live node. */
 export async function listRecentLiveNodes(
   db: Queryable,
-  options: { limit?: number; type?: string } = {},
+  options: { limit?: number | null; type?: string; excludeType?: string } = {},
 ): Promise<Node[]> {
-  const limit = options.limit ?? 48;
+  const limit = options.limit === undefined ? 48 : options.limit;
   const { rows } = await db.query<NodeRow>(
     `SELECT ${NODE_COLUMNS}
      FROM nodes
      WHERE deleted_at IS NULL
        AND ($1::text IS NULL OR type = $1)
+       AND ($2::text IS NULL OR type <> $2)
      ORDER BY updated_at DESC
-     LIMIT $2`,
-    [options.type ?? null, limit],
+     LIMIT $3`,
+    [options.type ?? null, options.excludeType ?? null, limit],
   );
   return rows.map(mapNode);
 }

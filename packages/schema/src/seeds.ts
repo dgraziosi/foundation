@@ -1,4 +1,5 @@
 import { compileJsonSchemaFromFields, type TypeField } from "./fields.js";
+import { SEED_TYPE_IDENTITY } from "./type-identity.js";
 import type { NodeType, RelationType } from "./types.js";
 import { SEED_TYPE_VIEWS } from "./views.js";
 
@@ -21,11 +22,12 @@ const PERSON_FIELDS: TypeField[] = [
 ];
 
 function withSeedContract(
-  type: Omit<NodeType, "views" | "default_view" | "fields" | "json_schema"> & {
+  type: Omit<NodeType, "views" | "default_view" | "fields" | "json_schema" | "hue" | "glyph"> & {
     fields?: TypeField[];
   },
 ): NodeType {
   const declared = SEED_TYPE_VIEWS[type.slug];
+  const identity = SEED_TYPE_IDENTITY[type.slug];
   const fields = type.fields ?? [];
   return {
     ...type,
@@ -33,6 +35,7 @@ function withSeedContract(
     json_schema: compileJsonSchemaFromFields(fields),
     views: declared ? declared.views.map((view) => ({ ...view })) : [],
     ...(declared ? { default_view: declared.default_view } : {}),
+    ...(identity ? { hue: identity.hue, glyph: identity.glyph } : {}),
   };
 }
 

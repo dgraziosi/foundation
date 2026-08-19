@@ -40,7 +40,7 @@ The server listens on this process. MCP attach from a named harness is documente
 
 ## Graph
 
-The graph is the live network in that vault: **nodes**, **typed edges**, and **activity**. Edges are the only source of truth for links. The ontology (types and relations) is the vocabulary in the same vault and can grow; seeds are the day-one words. A type owns `fields` and view declarations (`id` plus optional `filter` / `sort` / `group`) with `default_view`. `json_schema` is compiled from `fields`. The Viewer reads that contract and does not invent a view.
+The graph is the live network in that vault: **nodes**, **typed edges**, and **activity**. Edges are the only source of truth for links. The ontology (types and relations) is the vocabulary in the same vault and can grow; seeds are the day-one words. A type owns `fields`, view declarations (`id` plus optional `filter` / `sort` / `group`) with `default_view`, and identity (`hue`, `glyph`). `json_schema` is compiled from `fields`. The Viewer reads that contract and does not invent a view or a type catalog. Seed apply fills missing seed hue/glyph only; it does not overwrite an operator edit.
 
 ```mermaid
 flowchart LR
@@ -217,7 +217,7 @@ An agent that can reach the vault MCP may read/write; one that cannot does not.
 
 ## How the operator looks at the vault
 
-The operator opens a read-only window on the view publish: `/view` (`http://127.0.0.1:8788/view`; from another machine, `http://<this-host>:8788/view`). Same API key as MCP. Same graph — not a second store. Vite + React on this process. Surfaces: Unlock, then Home (Recents, Open tasks from the `task` default-view filter, a small Graph, and a folder per live ontology type), rail Graph, Search, Recents, a view engine that applies each type’s view query and field roles, and an Inspector pane (template fields, then extra `data` keys, then payload, then neighbors). Session Show completed is window chrome, not a vault write. Dark is first paint; Light and System are full themes. A stored `paper` choice reads as Light. Off-box unlock and session use the same key and `Path=/view` cookie. The window does not write. Blob bytes from the inspector are `GET /view/blobs/:id` (unlock cookie or Authorization header). Agents still fetch `GET /blobs/:id` with the header. Contract: [`VIEWER.md`](./VIEWER.md).
+The operator opens a read-only window on the view publish: `/view` (`http://127.0.0.1:8788/view`; from another machine, `http://<this-host>:8788/view`). Same API key as MCP. Same graph — not a second store. Vite + React on this process. One chrome, a content host, three surfaces: Home (graph filling the leftover viewport, Recents, open tasks, type folders), Collection (the type’s declared views), Detail (a page — not a docked inspector). Search is a rail overlay. The rail is Home and Search. Types carry hue and glyph; Viewer reads them, with a quiet fallback when missing. Off-box unlock and session use the same key and `Path=/view` cookie. The window does not write. Blob bytes from the window are `GET /view/blobs/:id` (unlock cookie or Authorization header). Agents still fetch `GET /blobs/:id` with the header. Contract: [`VIEWER.md`](./VIEWER.md).
 
 ```mermaid
 flowchart LR

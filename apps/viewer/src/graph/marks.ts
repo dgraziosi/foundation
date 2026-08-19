@@ -1,15 +1,12 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { LucideIcon } from "lucide-react";
-import { truncate } from "../format";
-import { typeColors, typeIcon } from "../type-meta";
+import { identityFor, typeIcon, typeColors, type TypeIdentity } from "../type-meta";
 
 /** Type-mark glyph. Contract: Lucide 16, stroke 2. */
 export const GRAPH_GLYPH_PX = 16;
-/** Meta size. Do not drop type text below 12px. */
-export const GRAPH_TYPE_PX = 12;
-/** Label size. Title on the mark; the only size allowed under 12px. */
-export const GRAPH_TITLE_PX = 11;
+/** Node diameter in screen px. Fill is the type color; glyph sits inside. */
+export const GRAPH_NODE_PX = 28;
 
 export function typeMarkLabel(
   slug: string,
@@ -107,32 +104,15 @@ export function drawLucideGlyph(
 export function measureGraphMark(
   ctx: CanvasRenderingContext2D,
   node: Record<string, unknown> & { x?: number; y?: number },
-  opts: { scale: number; types?: ReadonlyArray<{ slug: string; label: string }> },
-): { width: number; height: number; glyph: number; pad: number; gap: number; radius: number; typePx: number; titlePx: number } {
+  opts: { scale: number },
+): { width: number; height: number; radius: number; glyph: number } {
   const scale = Math.max(opts.scale, 0.01);
-  const glyph = graphScreenFont(GRAPH_GLYPH_PX, scale);
-  const typePx = graphScreenFont(GRAPH_TYPE_PX, scale);
-  const titlePx = graphScreenFont(GRAPH_TITLE_PX, scale);
-  const pad = graphScreenFont(5, scale);
-  const gap = graphScreenFont(5, scale);
-  const radius = graphScreenFont(8, scale);
-  const slug = String(node.type ?? "");
-  const tag = typeMarkLabel(slug, opts.types);
-  const title = truncate(String(node.title ?? ""), 22);
-  ctx.font = `400 ${typePx}px Inter, ui-sans-serif, system-ui, sans-serif`;
-  const tagW = ctx.measureText(tag).width;
-  ctx.font = `500 ${titlePx}px Inter, ui-sans-serif, system-ui, sans-serif`;
-  const titleW = ctx.measureText(title).width;
-  const innerW = Math.max(glyph + gap + tagW, titleW);
+  const diameter = graphScreenFont(GRAPH_NODE_PX, scale);
   return {
-    width: pad * 2 + innerW,
-    height: pad * 2 + glyph + gap + titlePx,
-    glyph,
-    pad,
-    gap,
-    radius,
-    typePx,
-    titlePx,
+    width: diameter,
+    height: diameter,
+    radius: diameter / 2,
+    glyph: graphScreenFont(GRAPH_GLYPH_PX, scale),
   };
 }
 
@@ -145,40 +125,34 @@ export function paintGraphMark(
     match: boolean;
     ink: string;
     lane: "light" | "dark";
-    slugs: string[];
-    types?: ReadonlyArray<{ slug: string; label: string }>;
+    types?: ReadonlyArray<TypeIdentity & { slug: string; label?: string }>;
   },
 ): { width: number; height: number } {
   const box = measureGraphMark(ctx, node, opts);
-  const { width, height, glyph, pad, gap, radius, typePx, titlePx } = box;
   const slug = String(node.type ?? "");
-  const colors = typeColors(slug, opts.lane, opts.slugs);
-  const tag = typeMarkLabel(slug, opts.types);
-  const title = truncate(String(node.title ?? ""), 22);
+  const identity = identityFor(slug, opts.types);
+  const colors = typeColors(identity, opts.lane);
+  const fill = colors.tint === "transparent" ? (opts.lane === "light" ? "#e5e5e5" : "#262626") : colors.tint;
+  const x = node.x ?? 0;
+  const y = node.y ?? 0;
   const scale = Math.max(opts.scale, 0.01);
-  const x = (node.x ?? 0) - width / 2;
-  const y = (node.y ?? 0) - height / 2;
 
   ctx.beginPath();
-  ctx.roundRect(x, y, width, height, radius);
-  ctx.fillStyle = colors.tint;
+  ctx.arc(x, y, box.radius, 0, Math.PI * 2);
+  ctx.fillStyle = fill;
   ctx.fill();
   ctx.lineWidth = (opts.selected || opts.match ? 2 : 1) / scale;
   ctx.strokeStyle = opts.selected || opts.match ? opts.ink : colors.ink;
   ctx.stroke();
 
-  drawLucideGlyph(ctx, typeIcon(slug), colors.ink, x + pad, y + pad, glyph);
+  drawLucideGlyph(
+    ctx,
+    typeIcon(identity),
+    colors.ink,
+    x - box.glyph / 2,
+    y - box.glyph / 2,
+    box.glyph,
+  );
 
-  ctx.fillStyle = colors.ink;
-  ctx.font = `400 ${typePx}px Inter, ui-sans-serif, system-ui, sans-serif`;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-  ctx.fillText(tag, x + pad + glyph + gap, y + pad + glyph / 2);
-
-  ctx.fillStyle = opts.ink;
-  ctx.font = `500 ${titlePx}px Inter, ui-sans-serif, system-ui, sans-serif`;
-  ctx.textBaseline = "top";
-  ctx.fillText(title, x + pad, y + pad + glyph + gap);
-
-  return { width, height };
+  return { width: box.width, height: box.height };
 }

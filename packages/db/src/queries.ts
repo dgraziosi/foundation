@@ -1,5 +1,6 @@
 import {
   asViewDeclarations,
+  isTypeHueName,
   resolveTypeViews,
   type NodeType,
   type RelationType,
@@ -11,7 +12,7 @@ import type pg from "pg";
 import { iso, type Queryable } from "./tx.js";
 
 const TYPE_COLUMNS = `slug, label, description, kind, parent_types, json_schema, views, default_view,
-           fields, is_system, created_at, updated_at`;
+           fields, hue, glyph, is_system, created_at, updated_at`;
 
 type NodeTypeRow = {
   slug: string;
@@ -23,6 +24,8 @@ type NodeTypeRow = {
   views: unknown;
   default_view: string | null;
   fields: unknown;
+  hue: string | null;
+  glyph: string | null;
   is_system: boolean;
   created_at: Date;
   updated_at: Date;
@@ -44,6 +47,8 @@ function mapNodeType(row: NodeTypeRow): NodeType {
     views: resolved.declarations,
     fields,
     ...(resolved.defaultView ? { default_view: resolved.defaultView } : {}),
+    ...(row.hue && isTypeHueName(row.hue) ? { hue: row.hue } : {}),
+    ...(row.glyph ? { glyph: row.glyph } : {}),
     is_system: row.is_system,
     created_at: iso(row.created_at),
     updated_at: iso(row.updated_at),
@@ -112,6 +117,8 @@ export async function insertNodeType(
     views?: ViewDeclaration[];
     default_view?: ViewEngineId;
     fields?: TypeField[];
+    hue?: NodeType["hue"];
+    glyph?: string;
     is_system?: boolean;
   },
 ): Promise<NodeType> {
@@ -119,8 +126,8 @@ export async function insertNodeType(
   const defaultView = views.length === 0 ? null : (type.default_view ?? null);
   const { rows } = await db.query<NodeTypeRow>(
     `INSERT INTO node_types (
-       slug, label, description, kind, parent_types, json_schema, views, default_view, fields, is_system
-     ) VALUES ($1, $2, $3, $4, $5::text[], $6::jsonb, $7::jsonb, $8, $9::jsonb, $10)
+       slug, label, description, kind, parent_types, json_schema, views, default_view, fields, hue, glyph, is_system
+     ) VALUES ($1, $2, $3, $4, $5::text[], $6::jsonb, $7::jsonb, $8, $9::jsonb, $10, $11, $12)
      RETURNING ${TYPE_COLUMNS}`,
     [
       type.slug,
@@ -134,6 +141,8 @@ export async function insertNodeType(
       JSON.stringify(views),
       defaultView,
       JSON.stringify(type.fields ?? []),
+      type.hue ?? null,
+      type.glyph ?? null,
       type.is_system === true,
     ],
   );
@@ -152,6 +161,8 @@ export async function updateNodeType(
     views: ViewDeclaration[];
     default_view?: ViewEngineId;
     fields: TypeField[];
+    hue?: NodeType["hue"];
+    glyph?: string;
   },
 ): Promise<NodeType | undefined> {
   const views = asViewDeclarations(patch.views);
@@ -166,6 +177,8 @@ export async function updateNodeType(
        views = $7::jsonb,
        default_view = $8,
        fields = $9::jsonb,
+       hue = $10,
+       glyph = $11,
        updated_at = now()
      WHERE slug = $1
      RETURNING ${TYPE_COLUMNS}`,
@@ -181,6 +194,8 @@ export async function updateNodeType(
       JSON.stringify(views),
       defaultView,
       JSON.stringify(patch.fields),
+      patch.hue ?? null,
+      patch.glyph ?? null,
     ],
   );
   return rows[0] ? mapNodeType(rows[0]) : undefined;

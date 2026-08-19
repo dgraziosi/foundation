@@ -7,12 +7,15 @@ import {
   FileText,
   Folder,
   GraduationCap,
+  Hash,
   Lightbulb,
   MapPin,
   NotebookPen,
   Plane,
   Repeat,
   Split,
+  Star,
+  Tag,
   Target,
   User,
 } from "lucide-react";
@@ -31,6 +34,7 @@ export type HueName =
   | "blue"
   | "indigo"
   | "violet"
+  | "purple"
   | "fuchsia"
   | "pink"
   | "rose";
@@ -57,95 +61,68 @@ export const HUE_LIBRARY: Record<HueName, TypeHue> = {
   blue: { name: "blue", lightTint: "#dbeafe", lightInk: "#155dfc", darkTint: "#162456", darkInk: "#51a2ff" },
   indigo: { name: "indigo", lightTint: "#e0e7ff", lightInk: "#4f39f6", darkTint: "#1e1a4d", darkInk: "#7c86ff" },
   violet: { name: "violet", lightTint: "#ede9fe", lightInk: "#7f22fe", darkTint: "#2f0d68", darkInk: "#a684ff" },
+  purple: { name: "purple", lightTint: "#f3e8ff", lightInk: "#9810fa", darkTint: "#3c0366", darkInk: "#c27aff" },
   fuchsia: { name: "fuchsia", lightTint: "#fae8ff", lightInk: "#c800de", darkTint: "#4b004f", darkInk: "#ed6aff" },
   pink: { name: "pink", lightTint: "#fce7f3", lightInk: "#e60076", darkTint: "#510424", darkInk: "#fb64b6" },
   rose: { name: "rose", lightTint: "#ffe4e6", lightInk: "#ec003f", darkTint: "#4d0218", darkInk: "#ff637e" },
 };
 
-const AUTHORED_HUES: HueName[] = [
-  "red",
-  "orange",
-  "amber",
-  "yellow",
-  "lime",
-  "green",
-  "emerald",
-  "teal",
-  "cyan",
-  "sky",
-  "blue",
-  "indigo",
-  "violet",
-  "fuchsia",
-  "pink",
-  "rose",
-];
-
-export const SEED_TYPE_META: Record<string, { hue: HueName; icon: LucideIcon }> = {
-  area: { hue: "red", icon: Compass },
-  project: { hue: "blue", icon: Folder },
-  goal: { hue: "amber", icon: Target },
-  habit: { hue: "violet", icon: Repeat },
-  task: { hue: "green", icon: CircleCheck },
-  lesson: { hue: "cyan", icon: GraduationCap },
-  person: { hue: "rose", icon: User },
-  place: { hue: "amber", icon: MapPin },
-  company: { hue: "emerald", icon: Building2 },
-  journal: { hue: "orange", icon: NotebookPen },
-  idea: { hue: "fuchsia", icon: Lightbulb },
-  note: { hue: "sky", icon: FileText },
-  trip: { hue: "orange", icon: Plane },
-  decision: { hue: "indigo", icon: Split },
+const GLYPHS: Record<string, LucideIcon> = {
+  Building2,
+  Circle,
+  CircleCheck,
+  Compass,
+  FileText,
+  Folder,
+  GraduationCap,
+  Hash,
+  Lightbulb,
+  MapPin,
+  NotebookPen,
+  Plane,
+  Repeat,
+  Split,
+  Star,
+  Tag,
+  Target,
+  User,
 };
 
-export function typeHueName(slug: string, knownSlugs: string[] = []): HueName {
-  const seed = SEED_TYPE_META[slug];
-  if (seed) {
-    return seed.hue;
-  }
-  const used = new Map<HueName, number>();
-  for (const name of AUTHORED_HUES) {
-    used.set(name, 0);
-  }
-  for (const other of knownSlugs) {
-    if (other === slug) {
-      continue;
-    }
-    const hue = SEED_TYPE_META[other]?.hue ?? authoredHue(other, []);
-    used.set(hue, (used.get(hue) ?? 0) + 1);
-  }
-  let least = AUTHORED_HUES[0];
-  let count = Number.POSITIVE_INFINITY;
-  for (const name of AUTHORED_HUES) {
-    const n = used.get(name) ?? 0;
-    if (n < count) {
-      least = name;
-      count = n;
-    }
-  }
-  return least;
-}
+export const NEUTRAL_INK = "#737373";
+export const GENERIC_MARK = Circle;
 
-function authoredHue(slug: string, knownSlugs: string[]): HueName {
-  let hash = 0;
-  for (const char of slug) {
-    hash = (hash + char.charCodeAt(0)) % AUTHORED_HUES.length;
-  }
-  if (knownSlugs.length === 0) {
-    return AUTHORED_HUES[hash] ?? "sky";
-  }
-  return typeHueName(slug, knownSlugs);
-}
+export type TypeIdentity = {
+  slug?: string;
+  hue?: string;
+  glyph?: string;
+};
 
-export function typeIcon(slug: string): LucideIcon {
-  return SEED_TYPE_META[slug]?.icon ?? Circle;
+function isHueName(value: string | undefined): value is HueName {
+  return Boolean(value && value in HUE_LIBRARY);
 }
 
 export function typeColors(
-  slug: string,
+  identity: TypeIdentity | undefined,
   lane: "light" | "dark",
-  knownSlugs: string[] = [],
 ): { tint: string; ink: string } {
-  const hue = HUE_LIBRARY[typeHueName(slug, knownSlugs)];
+  if (!identity?.hue || !isHueName(identity.hue)) {
+    return { tint: "transparent", ink: NEUTRAL_INK };
+  }
+  const hue = HUE_LIBRARY[identity.hue];
   return lane === "light" ? { tint: hue.lightTint, ink: hue.lightInk } : { tint: hue.darkTint, ink: hue.darkInk };
+}
+
+export function typeIcon(identity: TypeIdentity | undefined): LucideIcon {
+  const name = identity?.glyph?.trim();
+  if (name && GLYPHS[name]) {
+    return GLYPHS[name]!;
+  }
+  return GENERIC_MARK;
+}
+
+export function identityFor(
+  slug: string,
+  types?: ReadonlyArray<TypeIdentity & { slug: string }>,
+): TypeIdentity {
+  return types?.find((type) => type.slug === slug) ?? { slug };
 }

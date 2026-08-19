@@ -1,8 +1,8 @@
 import {
   countLiveNodesGroupedByType,
   getNodeType,
-  listActivity,
   listEdgesAmong,
+  listEdgesTouching,
   listLiveNodesByIds,
   listOutlineChildren,
   listRecentLiveNodes,
@@ -24,7 +24,6 @@ import {
   isUuid,
   resolveTypeViews,
   todayInNewYork,
-  type Activity,
   type SearchHit,
   type TypeField,
   type ViewDeclaration,
@@ -32,8 +31,7 @@ import {
 } from "@foundation/schema";
 import { getGraphNode, inspectOntology, searchGraphNodes } from "./graph.js";
 
-const GRAPH_SEED_LIMIT = 48;
-const RECENTS_LIMIT = 40;
+const RECENTS_PAGE_LIMIT = 500;
 const HIERARCHY_RELATION = "child_of";
 
 export type ViewGraphNode = {
@@ -53,13 +51,56 @@ export type ViewGraphEdge = {
 
 export type ViewRecentRow = {
   id: string;
-  action: string;
-  summary: string;
-  title?: string;
-  type?: string;
-  node_id?: string;
-  created_at: string;
+  title: string;
+  type: string;
+  updated_at: string;
 };
+
+export type RecencyGroup = "Today" | "Yesterday" | "Earlier this week" | "Earlier";
+
+function shiftIsoDate(iso: string, days: number): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  const date = new Date(Date.UTC(year, (month ?? 1) - 1, (day ?? 1) + days));
+  return date.toISOString().slice(0, 10);
+}
+
+function mondayOfWeek(iso: string): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  const date = new Date(Date.UTC(year, (month ?? 1) - 1, day ?? 1));
+  const weekday = (date.getUTCDay() + 6) % 7;
+  return shiftIsoDate(iso, -weekday);
+}
+
+export function recencyGroup(iso: string, now = new Date()): RecencyGroup {
+  const today = todayInNewYork(now);
+  const day = todayInNewYork(new Date(iso));
+  if (day === today) {
+    return "Today";
+  }
+  if (day === shiftIsoDate(today, -1)) {
+    return "Yesterday";
+  }
+  const monday = mondayOfWeek(today);
+  if (day >= monday && day < today) {
+    return "Earlier this week";
+  }
+  return "Earlier";
+}
+
+export type TaskDueGroup = "Overdue" | "Today" | "Upcoming" | "No date";
+
+export function taskDueGroup(due: string | undefined, today = todayInNewYork()): TaskDueGroup {
+  if (!due) {
+    return "No date";
+  }
+  if (due < today) {
+    return "Overdue";
+  }
+  if (due === today) {
+    return "Today";
+  }
+  return "Upcoming";
+}
 
 export type DueTone = "overdue" | "today" | "future";
 
@@ -71,18 +112,6 @@ export type ViewTaskCard = {
   due_tone?: DueTone;
   parent_title?: string;
 };
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-    return value as Record<string, unknown>;
-  }
-  return null;
-}
-
-function stringField(record: Record<string, unknown> | null, key: string): string | undefined {
-  const value = record?.[key];
-  return typeof value === "string" && value.trim() ? value : undefined;
-}
 
 export function dueTone(due: string, today = todayInNewYork()): DueTone {
   if (due < today) {
@@ -100,6 +129,8 @@ export type ViewOntologyType = {
   views: ViewEngineId[];
   default_view?: ViewEngineId;
   count: number;
+  hue?: string;
+  glyph?: string;
 };
 
 export async function viewOntology(pool: Pool): Promise<{ types: ViewOntologyType[] }> {
@@ -114,6 +145,8 @@ export async function viewOntology(pool: Pool): Promise<{ types: ViewOntologyTyp
         views: resolved.views,
         ...(resolved.defaultView ? { default_view: resolved.defaultView } : {}),
         count: counts.get(type.slug) ?? 0,
+        ...(type.hue ? { hue: type.hue } : {}),
+        ...(type.glyph ? { glyph: type.glyph } : {}),
       };
     }),
   };
@@ -194,6 +227,9 @@ export async function viewType(
         views: ViewDeclaration[];
         default_view?: ViewEngineId;
         fields: TypeField[];
+        hue?: string;
+        glyph?: string;
+        parent_types: string[];
       };
       nodes: ViewTypeNode[];
       children: ViewTypeNode[];
@@ -222,7 +258,10 @@ export async function viewType(
       label: type.label,
       views: declarations,
       fields,
+      parent_types: type.parent_types,
       ...(type.default_view ? { default_view: type.default_view } : {}),
+      ...(type.hue ? { hue: type.hue } : {}),
+      ...(type.glyph ? { glyph: type.glyph } : {}),
     },
     nodes,
     children,
@@ -254,19 +293,42 @@ export async function viewSearch(
 
 export async function viewGraph(
   pool: Pool,
-  input: { focus?: string; type?: string },
+  input: { focus?: string; type?: string; depth?: number },
 ): Promise<{ nodes: ViewGraphNode[]; edges: ViewGraphEdge[] }> {
   const type = input.type?.trim() || undefined;
   const focus = input.focus && isUuid(input.focus) ? input.focus : undefined;
-  const seed = await listRecentLiveNodes(pool, { limit: GRAPH_SEED_LIMIT, type });
-  const ids = new Set(seed.map((node) => node.id));
+  const depthRaw = input.depth;
+  const depth =
+    focus && Number.isFinite(depthRaw) ? Math.min(4, Math.max(1, Math.floor(depthRaw as number))) : undefined;
 
-  if (focus) {
-    const got = await getGraphNode(pool, focus);
-    if (!isToolError(got)) {
-      ids.add(got.node.id);
-      for (const edge of got.edges) {
-        ids.add(edge.neighbor.id);
+  let ids = new Set<string>();
+  if (focus && depth) {
+    ids.add(focus);
+    let frontier = [focus];
+    for (let hop = 0; hop < depth; hop += 1) {
+      const touching = await listEdgesTouching(pool, frontier);
+      const next: string[] = [];
+      for (const edge of touching) {
+        for (const id of [edge.from_id, edge.to_id]) {
+          if (!ids.has(id)) {
+            ids.add(id);
+            next.push(id);
+          }
+        }
+      }
+      if (next.length === 0) {
+        break;
+      }
+      frontier = next;
+    }
+  } else {
+    const seed = await listRecentLiveNodes(pool, { limit: null, type });
+    ids = new Set(seed.map((node) => node.id));
+    if (type) {
+      const touching = await listEdgesTouching(pool, [...ids]);
+      for (const edge of touching) {
+        ids.add(edge.from_id);
+        ids.add(edge.to_id);
       }
     }
   }
@@ -316,6 +378,41 @@ export async function viewNode(pool: Pool, id: string, dataDir: string) {
       resolved_refs[field.name] = { id: target.id, title: target.title, type: target.type };
     }
   }
+  const ancestors: Array<{ id: string; title: string; type: string }> = [];
+  let walk: string | undefined = got.edges.find(
+    (edge) => edge.relation_type === HIERARCHY_RELATION && edge.direction === "out",
+  )?.neighbor.id;
+  const seen = new Set<string>([got.node.id]);
+  while (walk && !seen.has(walk)) {
+    seen.add(walk);
+    const parent = await getGraphNode(pool, walk);
+    if (isToolError(parent)) {
+      break;
+    }
+    ancestors.push({ id: parent.node.id, title: parent.node.title, type: parent.node.type });
+    walk = parent.edges.find(
+      (edge) => edge.relation_type === HIERARCHY_RELATION && edge.direction === "out",
+    )?.neighbor.id;
+  }
+  const childRows = await listOutlineChildren(pool, [got.node.id]);
+  const children = childRows
+    .filter((row) => row.parent_id === got.node.id)
+    .map((row) => ({
+      id: row.id,
+      title: row.title,
+      type: row.type,
+      status: row.status,
+      parent_id: row.parent_id,
+    }));
+  const related: Array<{
+    relation_type: string;
+    direction: "in" | "out";
+    neighbor: { id: string; title: string; type: string };
+  }> = got.edges.map((edge) => ({
+    relation_type: edge.relation_type,
+    direction: edge.direction,
+    neighbor: edge.neighbor,
+  }));
   return {
     node: got.node,
     type: type
@@ -323,9 +420,15 @@ export async function viewNode(pool: Pool, id: string, dataDir: string) {
           slug: type.slug,
           label: type.label,
           fields,
+          parent_types: type.parent_types,
+          ...(type.hue ? { hue: type.hue } : {}),
+          ...(type.glyph ? { glyph: type.glyph } : {}),
         }
       : null,
     edges: got.edges,
+    related,
+    ancestors,
+    children,
     blob: got.blob,
     suggested_links: got.suggested_links,
     resolved_refs,
@@ -334,82 +437,20 @@ export async function viewNode(pool: Pool, id: string, dataDir: string) {
   };
 }
 
-function collectTitleIds(activity: Activity): string[] {
-  const ids: string[] = [];
-  if (activity.target_kind === "node" && activity.target_id) {
-    ids.push(activity.target_id);
-  }
-  for (const side of [activity.after, activity.before]) {
-    const record = asRecord(side);
-    const fromId = stringField(record, "from_id");
-    const toId = stringField(record, "to_id");
-    if (fromId && isUuid(fromId)) {
-      ids.push(fromId);
-    }
-    if (toId && isUuid(toId)) {
-      ids.push(toId);
-    }
-  }
-  return ids;
-}
-
-export function presentRecentRow(
-  activity: Activity,
-  titles: Map<string, { title: string; type: string }>,
-): ViewRecentRow {
-  const after = asRecord(activity.after);
-  const before = asRecord(activity.before);
-  const nodeMeta = activity.target_id ? titles.get(activity.target_id) : undefined;
-  const title =
-    stringField(after, "title") ?? stringField(before, "title") ?? nodeMeta?.title;
-  const type = stringField(after, "type") ?? stringField(before, "type") ?? nodeMeta?.type;
-
-  if (activity.action === "link" || activity.action === "unlink") {
-    const record = after ?? before;
-    const fromId = stringField(record, "from_id");
-    const toId = stringField(record, "to_id");
-    const fromTitle = fromId ? titles.get(fromId)?.title : undefined;
-    const toTitle = toId ? titles.get(toId)?.title : undefined;
-    const verb = activity.action === "link" ? "Linked" : "Unlinked";
-    const summary =
-      fromTitle && toTitle ? `${verb} ${fromTitle} → ${toTitle}` : `${verb} an edge`;
-    return {
-      id: activity.id,
-      action: activity.action,
-      summary,
-      title: fromTitle,
-      type,
-      node_id: fromId && isUuid(fromId) ? fromId : undefined,
-      created_at: activity.created_at,
-    };
-  }
-
+export async function viewRecents(
+  pool: Pool,
+  input: { limit?: number } = {},
+): Promise<{ rows: ViewRecentRow[] }> {
+  const limit = input.limit === undefined ? RECENTS_PAGE_LIMIT : Math.min(Math.max(input.limit, 1), RECENTS_PAGE_LIMIT);
+  const nodes = await listRecentLiveNodes(pool, { limit, excludeType: "task" });
   return {
-    id: activity.id,
-    action: activity.action,
-    summary: title ?? activity.action,
-    ...(title ? { title } : {}),
-    ...(type ? { type } : {}),
-    ...(activity.target_kind === "node" && activity.target_id ? { node_id: activity.target_id } : {}),
-    created_at: activity.created_at,
+    rows: nodes.map((node) => ({
+      id: node.id,
+      title: node.title,
+      type: node.type,
+      updated_at: node.updated_at,
+    })),
   };
-}
-
-export async function viewRecents(pool: Pool): Promise<{ rows: ViewRecentRow[] }> {
-  const activities = await listActivity(pool, { limit: RECENTS_LIMIT });
-  const ids = [...new Set(activities.flatMap(collectTitleIds))];
-  const nodes = await listLiveNodesByIds(pool, ids);
-  const titles = new Map(nodes.map((node) => [node.id, { title: node.title, type: node.type }]));
-  for (const activity of activities) {
-    const after = asRecord(activity.after);
-    const before = asRecord(activity.before);
-    const title = stringField(after, "title") ?? stringField(before, "title");
-    const type = stringField(after, "type") ?? stringField(before, "type");
-    if (activity.target_kind === "node" && activity.target_id && title && !titles.has(activity.target_id)) {
-      titles.set(activity.target_id, { title, type: type ?? "node" });
-    }
-  }
-  return { rows: activities.map((activity) => presentRecentRow(activity, titles)) };
 }
 
 export async function viewTasks(pool: Pool): Promise<{ tasks: ViewTaskCard[] }> {

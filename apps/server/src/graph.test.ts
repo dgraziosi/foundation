@@ -323,11 +323,15 @@ test(
           description: "A scheduled conversation",
           kind: "artifact",
           parent_types: ["project"],
+          hue: "sky",
+          glyph: "Tag",
         });
         assert.equal(isToolError(created), false);
         if (isToolError(created)) return;
         assert.equal(created.type.slug, "meeting");
         assert.equal(created.type.is_system, false);
+        assert.equal(created.type.hue, "sky");
+        assert.equal(created.type.glyph, "Tag");
         assert.deepEqual(created.type.parent_types, ["project"]);
         assert.deepEqual(viewIds(created.type.views), []);
         assert.equal(created.type.default_view, undefined);
@@ -348,6 +352,9 @@ test(
         const brief = ontology.types.find((type) => type.slug === "brief");
         assert.deepEqual(viewIds(brief?.views), ["card", "list"]);
         assert.equal(brief?.default_view, "card");
+        const meeting = ontology.types.find((type) => type.slug === "meeting");
+        assert.equal(meeting?.hue, "sky");
+        assert.equal(meeting?.glyph, "Tag");
         const task = ontology.types.find((type) => type.slug === "task");
         assert.deepEqual(viewIds(task?.views), ["board", "list", "calendar", "timeline", "outline"]);
         assert.equal(task?.default_view, "board");
@@ -671,6 +678,24 @@ test(
       }
       assert.equal(described.type.slug, "task");
       assert.deepEqual(viewIds(described.type.views), ["board", "list", "calendar", "timeline", "outline"]);
+
+      const colored = await manageType(pool, {
+        action: "update",
+        slug: "task",
+        hue: "rose",
+        glyph: "Star",
+      });
+      assert.equal(isToolError(colored), false);
+      if (isToolError(colored)) {
+        return;
+      }
+      assert.equal(colored.type.hue, "rose");
+      assert.equal(colored.type.glyph, "Star");
+      assert.equal(colored.type.slug, "task");
+      assert.deepEqual(viewIds(colored.type.views), ["board", "list", "calendar", "timeline", "outline"]);
+
+      const slugBlocked = await manageType(pool, { action: "update", slug: "task", label: "Jobs" });
+      assert.equal(isToolError(slugBlocked), true);
     } finally {
       await pool.end();
     }
@@ -719,6 +744,15 @@ test(
         clauses: [{ bind: "status", op: "in", value: ["active", "completed"] }],
       });
       assert.deepEqual(viewIds(seeded?.views), ["board", "list", "calendar", "timeline", "outline"]);
+      assert.equal(seeded?.hue, "green");
+      assert.equal(seeded?.glyph, "CircleCheck");
+
+      const recolored = await manageType(pool, { action: "update", slug: "task", hue: "pink", glyph: "Hash" });
+      assert.equal(isToolError(recolored), false);
+      await seedSystemOntology(pool);
+      const kept = (await inspectOntology(pool, "types")).types.find((type) => type.slug === "task");
+      assert.equal(kept?.hue, "pink");
+      assert.equal(kept?.glyph, "Hash");
     } finally {
       await pool.end();
     }

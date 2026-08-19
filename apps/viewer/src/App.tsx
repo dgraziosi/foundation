@@ -2,11 +2,9 @@ import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-quer
 import { useMemo } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { AuthError, session } from "./api";
-import { GraphPage } from "./pages/GraphPage";
+import { DetailPage } from "./pages/DetailPage";
 import { HomePage } from "./pages/HomePage";
-import { NodeDeepLinkPage } from "./pages/TypeViewPage";
 import { RecentsPage } from "./pages/RecentsPage";
-import { SearchPage } from "./pages/SearchPage";
 import { TypeViewPage } from "./pages/TypeViewPage";
 import { UnlockPage } from "./pages/UnlockPage";
 import { Shell } from "./shell/Shell";
@@ -38,11 +36,9 @@ function Gate() {
     <Routes location={location}>
       <Route element={<Shell />}>
         <Route path="/" element={<HomePage />} />
-        <Route path="/graph" element={<GraphPage />} />
-        <Route path="/search" element={<SearchPage />} />
         <Route path="/recents" element={<RecentsPage />} />
         <Route path="/types/:slug" element={<TypeViewRoute />} />
-        <Route path="/nodes/:id" element={<NodeDeepLinkPage />} />
+        <Route path="/nodes/:id" element={<DetailPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
