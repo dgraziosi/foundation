@@ -41,6 +41,7 @@ Do not commit personal life data, documents, or secrets to this repository. Thos
 - [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md) — weekday instance checkup
 - [`docs/BACKUP.md`](docs/BACKUP.md) — nightly backup script and throwaway restore
 - [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md) — weekly graph report
+- [`docs/VIEWER.md`](docs/VIEWER.md) — operator window: surfaces, shell, v1 vs later
 
 ## Install
 
