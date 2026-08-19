@@ -133,21 +133,11 @@ Overlay from the rail. Query the vault. Results are objects. Click: detail page.
 
 ## Type identity
 
-Hue and glyph live on the type. The window reads them. Types carry this identity:
+The window does not hardcode a type's hue or glyph. Folders, graph nodes, collection rows, and the detail page show whatever types the ontology has.
 
-| Type | Hue | Icon |
-| --- | --- | --- |
-| Task | Green | Circle (open) |
-| Project | Neutral | Folder |
-| Person | Neutral | Person |
-| Note | Neutral | File |
-| Resource | Neutral | Bookmark |
-| Event | Neutral | Calendar |
-| Decision | Neutral | Git-fork |
-| Fact | Neutral | Database |
-| Question | Neutral | Help-circle |
+Seed and authored types carry hue and glyph on the type, same as they carry `views` and `default_view`. The window reads them.
 
-Purple is held off the type wheel. The window's own chrome may use it. Types do not.
+If a type has no hue or glyph yet, the window uses a quiet fallback: neutral ink, a generic mark. It does not invent a special page.
 
 ---
 
