@@ -2,7 +2,7 @@
 
 Product contract: [`docs/SPEC.md`](./SPEC.md).
 
-v1 surface is **13 tools**. Destructive tools require `confirm: true` or they return `{ error, suggestion }`. Identity is UUID. If you already have a UUID, call `get` — do not `search`. To resolve one or more entity names, call `lookup` — do not serial-search. Ontology mutations apply immediately (activity log + `undo`; no proposal inbox).
+v1 surface is **14 tools**. Destructive tools require `confirm: true` or they return `{ error, suggestion }`. Identity is UUID. If you already have a UUID and need the node (payload, edges, if-match), call `get`. If you already have a UUID and need the open work around it, call `working_set`. To resolve one or more entity names, call `lookup`, then `working_set` with that id. Ontology mutations apply immediately (activity log + `undo`; no proposal inbox).
 
 | Tool | Purpose |
 | --- | --- |
@@ -10,6 +10,7 @@ v1 surface is **13 tools**. Destructive tools require `confirm: true` or they re
 | `search` | Find nodes by text query and/or filters (`type`, `status`, `under`, `since`, `origin`, `due`, `due_on_or_before`, `due_on_or_after`, `data_equals`). Query is optional when a filter is set. Hits are id/type/title/snippet plus `due` when set. |
 | `lookup` | Resolve one or more names to live nodes. One result per input (`exact` / `alias` / `candidate` / `ambiguous` / `no_match`). Read-only. |
 | `get` | Fetch a node by id, including payload, incident edges with neighbor titles, and `suggested_links` from title FTS. Blob payloads return metadata, not bytes. |
+| `working_set` | Return the actionable working set around one live node: open work, dues, and the parent chain when the root hangs under something. |
 | `upsert` | Create or update a node (title, type, payload, data, status). Updates require `base_updated_at`. Create accepts `idempotency_key`. Create (no id) preflights duplicates via `lookup`. Blob ingest via `bytes_base64` or `source_path`. Returns `suggested_links` (proposals only). |
 | `delete` | Soft-delete a node. Requires `confirm: true`. |
 | `link` | Create typed edges after validation. One edge or `edges[]` (1–20). Whole batch validates; one transaction writes all or none. Requires endpoint if-match. |
@@ -28,16 +29,73 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 
 - **In:** none
 - **Out:** `{ spine, types, relations, rules, how_to_extend }`
-- `how_to_extend` includes `manage_type`, `manage_relation`, `nodes`, `links`, `activity`, `search`, and `lookup`. Summary notes that vault health, graph hygiene, and applying git updates are instance routines, not tools ([`docs/VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`docs/GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md), [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/)). No `get_vault_health` tool.
+- `how_to_extend` includes `manage_type`, `manage_relation`, `nodes`, `links`, `activity`, `search`, `lookup`, and `working_set`. After `lookup` binds a UUID, `working_set` is the one call for open work around that node. Summary notes that vault health, graph hygiene, and applying git updates are instance routines, not tools ([`docs/VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`docs/GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md), [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/)). No `get_vault_health` tool.
 
 ### `get`
 
 - **In:** `{ id, include_body? }`
 - **Out:** `{ node, edges: [{ id, from_id, to_id, relation_type, direction, metadata, created_at, neighbor: { id, title, type } }], blob?, suggested_links }` or `{ error, suggestion? }`
-- Each incident edge includes **neighbor title and type**, not UUID-only hops. Use those titles to `search` or `get` the other node.
+- Each incident edge includes **neighbor title and type**, not UUID-only hops. Use those titles to `search` or `get` the other node. For the open work around this id (children, dues, parent chain), call `working_set` — `get` stays one node plus flags (`include_body`).
 - `suggested_links` is the same title-FTS list as `upsert` (skip self and already-linked; no second `child_of` parent; cap 5). Useful when a later `get` still has no edges. Empty → `[]`. Never writes an edge.
 - Inline payloads still return `payload.body`. Blob payloads return `{ storage: "blob", blob_id, media_type }` plus `blob: { id, sha256, media_type, byte_size, path }`. Bytes are **not** dumped into the JSON by default.
 - `include_body: true` may add base64 `payload.body` for small blobs (256KB cap). Larger files: HTTP `GET /blobs/:id` with `Authorization: ApiKey <FOUNDATION_API_KEY>`.
+
+### `working_set`
+
+Read-only agenda around one live node. New tool — not a `get` flag.
+
+**Why a new tool.** `get` is identity: one node, payload, incident edges, `suggested_links`, `updated_at` for if-match. A working set is a different payload: many lean rows, filtered to open work, sorted by due, walked from the ontology. A flag on `get` would either ship that agenda on every fetch or turn `get` into two tools behind a switch. `search` already lists vault-wide (`under`, `due`, `status`). This call is rooted: given one id, return the actionable set around it.
+
+**Why `working_set`.** The return is the set of nodes an agent needs to act on around that root. `context` already means prompt stuffing and MCP session state; an agent would expect bodies and history. `agenda` reads as calendar-only and misses the parent chain on a task root.
+
+- **In:** `{ id, include_completed?, depth?, limit?, due_within_days? }`
+- **Out:** `{ root: { id, type, title, status, due? }, items: [{ id, type, title, status, due?, start?, end?, role, via, parent? }], walk, truncated }` or `{ error, suggestion? }`
+- `id` is a live node UUID. Unknown or deleted id → `{ error, suggestion }` in the same family as `get` (`Node not found: <id>`; deleted nodes stay hidden until undo).
+- `include_completed` default `false`. Open work is `status: "active"`. Completed and archived work rows stay out unless this is `true`. Ancestor rows (`role: "parent"`) always include the live chain so a completed goal still explains a task.
+- `depth` default `1`, max `2`. Applies to the work walk (children or associative neighbors, then their children at 2). The ancestor chain is the full live hierarchy walk to a node with no parent — typically two or three spine hops, not bounded by `depth`.
+- `limit` default **40**, max **40**. Hard cap on `items`. Caller may pass a smaller limit. When the walk finds more work rows than fit, the response keeps the sort order, sets `truncated: true`, and fills remaining slots after the ancestor rows.
+- `due_within_days` default **14**, max **90**. Used when the root is a **spine root** (spine `kind`, empty `parent_types` — seed `area`). Work rows stay if they are overdue, due on or before today + that many days, or undated **and** depth 1 (the root’s direct children). Timezone for “today” / overdue is **America/New_York**, same as `search` `due`. Other roots skip this window; the cap still applies.
+- Honest empty: a live root with nothing open returns `{ root, items: [], walk, truncated: false }`. That is success.
+
+**Item shape (lean).** Titles, types, status, due, ids, parent titles. No payload body, no blob bytes, no `data` bag, no `suggested_links`.
+
+| Field | Meaning |
+| --- | --- |
+| `role` | `"work"` (open item around the root) or `"parent"` (ancestor that explains why the root exists) |
+| `due` | Value of the type’s field with role `date` when set (seed `data.due` on `task` / `goal`) |
+| `start` / `end` | Values of fields with those roles when set (seed `trip`) |
+| `via` | `{ relation, direction, hops }` — the edge that reached this row from the root. `direction` is `incoming` (neighbor points at the root: a `child_of` child, an `about` source) or `outgoing` (root points at the neighbor: a `child_of` parent). `hops` is 1 or 2 for work; ancestor hops follow the chain. |
+| `parent` | Immediate live hierarchy parent `{ id, title, type }` when the item itself hangs under something |
+
+**Sort.** `role: "parent"` first, nearest parent then further ancestors. Then `role: "work"`: overdue first, then upcoming by the sort date, then undated (title as tie-break). Sort date is `due` when set, else `start`. Overdue is sort date before today in America/New_York.
+
+**Walk (ontology, not a closed type catalog).** The handler reads the live type and relation registry (`bootstrap` / `inspect_ontology`). Seed examples below are illustrations.
+
+1. **Hierarchy down** (`walk.work: "children"`) — the root type appears in some type’s `parent_types`, or a `kind: hierarchy` relation can target it. Walk live hierarchy edges where the root is the parent (`child_of` target). Equivalent spine children: other `kind: hierarchy` relations, and relations whose `semantic_parent_slug` is a hierarchy relation. Seed: `goal`, `project`, `area` (and any authored type that lists this type in `parent_types`).
+2. **About a person** (`walk.work: "about"`) — the root type is listed in an associative relation’s non-empty `target_types` (seed `about` → `person`) and is not a hierarchy parent. Walk those targeted relations (incoming `about`) and `relates_to` either direction, plus relations whose `semantic_parent_slug` is `about` or `relates_to`. A person has empty `parent_types`; this walk does not invent `child_of` on them.
+3. **Event-like** (`walk.work: "event"`) — the type has `start` and `end` field roles and is not a hierarchy parent (seed `trip`). Walk hierarchy children when any exist, and associative `relates_to` / `supports` (and their semantic children) as the work around the event — seed `task` cannot `child_of` `trip`.
+4. **Parent chain** (`walk.ancestors: true`) — the root type has `parent_types`. Walk live hierarchy edges upward and emit `role: "parent"` rows. Seed: `task` → goal or project, then that parent’s parent. `habit`, `lesson`, `decision`, and a `goal` under a project use the same rule.
+
+A type can take more than one of these (a `goal` is children + ancestors). `walk` echoes what ran:
+
+`{ work: "children"|"about"|"event"|"none", ancestors: boolean, relations: string[], depth, due_window: { days, timezone } | null }`
+
+`walk.work: "none"` with `ancestors: true` is a leaf whose working set is the parent chain. `walk.work: "none"` and `ancestors: false` with `items: []` is a live isolate — still success.
+
+**Read-only.** Live edges only. The tool does not write, link, or turn `suggested_links` into edges. Call `get` when you need payload or if-match; call `link` when the operator accepts a suggestion.
+
+**How this sits next to `get` and `search`.**
+
+| Need | Call |
+| --- | --- |
+| One node’s payload, edges, `suggested_links`, `updated_at` | `get` |
+| Vault-wide list or lexical recall (`under`, `due`, `status`, text) | `search` |
+| Name → UUID | `lookup` |
+| Open work around one UUID | `working_set` |
+
+`search` `{ under }` still lists live `child_of` children of a parent. `working_set` adds due sort, open-only default, person/event walks, parent chain, and the area bound. It does not replace `search`.
+
+**Name then act.** `lookup` `{ inputs: [{ name, type }] }` → take an `exact` or `alias` UUID (ask the operator on `candidate` / `ambiguous`) → `working_set` `{ id }`. That is one resolve and one agenda.
 
 ### `upsert`
 
@@ -115,9 +173,9 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 - `due: "overdue" | "today"` uses **America/New_York** for “today.” `due_on_or_before` / `due_on_or_after` are inclusive ISO dates (`YYYY-MM-DD`) against `data.due`. Nodes without `data.due` do not match a due filter.
 - `data_equals` is JSONB containment (`data @> …`) on one or a few top-level keys (at most 8; lowercase identifiers). Not a column per key. Nodes missing those keys do not match. Combine with `type` / other filters.
 - `origin: { system, id }` looks up the unique live `data.origin` ref (`gmail` | `calendar` | `drive` | `github`).
-- Hits are lean (id/type/title/snippet, plus `due` when `data.due` is set). Call `get` to load payload and neighbor titles.
-- If `query` is a UUID, search resolves it like `get` and returns `suggestion` to prefer `get` next time.
-- **An empty lexical result is not a license to upsert a duplicate.** The `suggestion` says so. Try a shorter token or a type filter; only upsert if the entity is new. If you already have a UUID, call `get`. An origin miss means you may upsert with that `data.origin` (ref only). To resolve one or more entity names to UUIDs, call `lookup`.
+- Hits are lean (id/type/title/snippet, plus `due` when `data.due` is set). Call `get` to load payload and neighbor titles. Call `working_set` when the hit is a root and you want the open work around it.
+- If `query` is a UUID, search resolves it like `get` and returns `suggestion` to prefer `get` (or `working_set` for the agenda) next time.
+- **An empty lexical result is not a license to upsert a duplicate.** The `suggestion` says so. Try a shorter token or a type filter; only upsert if the entity is new. If you already have a UUID, call `get` for the node or `working_set` for the agenda. An origin miss means you may upsert with that `data.origin` (ref only). To resolve one or more entity names to UUIDs, call `lookup`.
 
 ### `lookup`
 
@@ -134,7 +192,7 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 - Candidates are `{ id, type, title, status, updated_at, confidence, match, matched_value, explanation }`. `title` is the canonical node title. `updated_at` is for a later if-match upsert or link. `confidence` is algorithmic rank, not a calibrated probability, and does not authorize a write. `match` is `title_exact` | `alias_exact` | `title_fuzzy` | `alias_fuzzy` | `title_token` | `uuid`. The surrounding list is `candidates` on that result.
 - Soft-deleted nodes are excluded. Title matching uses generated `title_norm` / `title_compact` plus trigram indexes. Aliases are unnested from JSONB (well-formed string arrays only).
 - Read-only. Never writes, merges, creates, or picks an ambiguous candidate. For `candidate` or `ambiguous`, ask the operator to confirm a UUID before any mutation that depends on the identity. `get` is safe for inspection.
-- If you already have a UUID, call `get`. Listing, origin refs, due filters, and payload search stay on `search`. Lexical recall only, not embeddings. No hidden nickname list.
+- If you already have a UUID, call `get` for the node or `working_set` for the open work around it. Listing, origin refs, due filters, and payload search stay on `search`. Lexical recall only, not embeddings. No hidden nickname list. The usual path after a bound name is `working_set` with that id.
 
 ### `list_activity`
 

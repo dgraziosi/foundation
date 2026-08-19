@@ -181,6 +181,8 @@ Empty `{}` is an error (no `list_nodes` tool). Hits are lean and include `due` w
 
 `lookup` is a separate read-only tool: batch name resolution with a result per input. Unique folded title, unique operator alias, or UUID may bind. Token and fuzzy matches are candidates that need operator confirmation before a write. Each useful candidate includes `id`, `type`, canonical `title`, `updated_at`, `match`, and `confidence` plus the surrounding `candidates` list. `confidence` ranks; it is not a probability and does not authorize a write. Title folding uses generated `title_norm` / `title_compact` and trigram indexes. Aliases stay on `data.aliases` (JSONB unnest). Create-time `upsert` (no `id`) uses the same matcher: exact/alias hits refuse unless `allow_duplicate` is set; fuzzy hits warn. Not embeddings.
 
+`working_set` is a separate read-only tool over the same nodes and edges. Given one live id, it returns the actionable set around that root: open work, dues, and the parent chain when the type has `parent_types`. Walks use the live ontology (hierarchy kind and `parent_types`, associative about-targets, `start`/`end` date roles). The graph shape is unchanged. Caps and a due window keep a spine-root (`area`) from dumping a life. After `lookup` binds a name, this is the one agenda call. Parameters: [`MCP_TOOLS.md`](./MCP_TOOLS.md).
+
 ```mermaid
 flowchart TB
   search_box["search"]
@@ -190,6 +192,9 @@ flowchart TB
   lookup_box --> names["batch names → per-input outcome"]
   lookup_box --> title_idx["title_norm / trigram"]
   lookup_box --> aliases["data.aliases unnest"]
+  working_set_box["working_set"]
+  working_set_box --> rooted["one id → open work + dues + parent chain"]
+  working_set_box --> ontology_walk["ontology: hierarchy / about / date roles"]
 ```
 
 ## Origin
@@ -211,7 +216,7 @@ Agents talk to the vault over MCP. That path is not the architecture — it is t
 
 `/mcp` with `Authorization: ApiKey <FOUNDATION_API_KEY>`. Streamable HTTP on this process. Named harnesses attach with that URL and key: [`HARNESS.md`](./HARNESS.md).
 
-Thirteen tools: `bootstrap`, `search`, `lookup`, `get`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`.
+Fourteen tools: `bootstrap`, `search`, `lookup`, `get`, `working_set`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`.
 
 An agent that can reach the vault MCP may read/write; one that cannot does not.
 
@@ -221,7 +226,7 @@ The operator opens a read-only window on the view publish: `/view` (`http://127.
 
 ```mermaid
 flowchart LR
-  agents["Agents"] -->|"MCP — 13 tools, ApiKey"| vault["Vault"]
+  agents["Agents"] -->|"MCP — 14 tools, ApiKey"| vault["Vault"]
 ```
 
 Two agents may write the same node through that one MCP. Update and `link` are if-match. If the node moved, the vault **refuses**. The caller’s next move is get and retry.

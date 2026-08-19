@@ -33,7 +33,7 @@ Do not commit personal life data, documents, or secrets to this repository. Thos
 
 - [`docs/SPEC.md`](docs/SPEC.md) — product contract
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — living vault and graph
-- [`docs/MCP_TOOLS.md`](docs/MCP_TOOLS.md) — 13-tool MCP surface
+- [`docs/MCP_TOOLS.md`](docs/MCP_TOOLS.md) — 14-tool MCP surface
 - [`docs/HARNESS.md`](docs/HARNESS.md) — attach the vault MCP from a named harness
 - [`docs/AGENTS.md`](docs/AGENTS.md) — starter recipes (Chief of Staff, Vault Keeper, Executive Assistant)
 - [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md) — weekday instance checkup
@@ -85,7 +85,7 @@ Requires [Docker Compose](https://docs.docker.com/compose/) and a copy of this r
 
 4. Call `bootstrap` first. It returns the starter spine (`area → project → goal → habit | task` — preferred, not a hard gate for `task` → `project`), seeded types/relations, and how to extend the ontology.
 
-   After bootstrap, an agent can `upsert` an `area` and `project`, `link` them with `child_of`, store an HTML itinerary on a `trip` node (`payload.media_type = "text/html"`), `search` that itinerary back, list open or overdue tasks with `search` `{ type: "task", status: "active" }` or `{ type: "task", due: "overdue" }` (no query), attach a PDF blob on a `note` (`payload.storage = "blob"`), `manage_type` a custom type (including retire of an unused authored type), `list_activity` for receipts, and `undo` a reversible mutation. Destructive tools (`delete`, `unlink`, `undo`, `manage_type` retire) require `confirm: true`. If you already have a UUID, call `get`. An empty lexical `search` is not a reason to upsert a duplicate.
+   After bootstrap, an agent can `upsert` an `area` and `project`, `link` them with `child_of`, store an HTML itinerary on a `trip` node (`payload.media_type = "text/html"`), `search` that itinerary back, list open or overdue tasks with `search` `{ type: "task", status: "active" }` or `{ type: "task", due: "overdue" }` (no query), `lookup` a name then `working_set` for the open work around that node, attach a PDF blob on a `note` (`payload.storage = "blob"`), `manage_type` a custom type (including retire of an unused authored type), `list_activity` for receipts, and `undo` a reversible mutation. Destructive tools (`delete`, `unlink`, `undo`, `manage_type` retire) require `confirm: true`. If you already have a UUID, call `get` for the node or `working_set` for the agenda. An empty lexical `search` is not a reason to upsert a duplicate.
 
    With Node 22 + pnpm (and Compose already up):
 
