@@ -227,15 +227,15 @@ Row height ~36–40px. Body ~13px. Meta ~12px. Page titles ~18–22px, not displ
 
 ## Color, type, two lanes
 
-**Paper is the default lane.** Dark chrome is a second lane the operator can switch. Do not default to dark because the reference shots are dark.
+**Paper is the default lane and the first paint.** Dark is a real v1 theme on every surface (Unlock, Graph, Search, Recents, Tasks, Inspector), not a later add-on and not a single inverted screen. The operator can switch lanes with a toggle and/or follow system preference. Do not default to dark because the reference shots are dark.
 
-| Token | Paper (default) | Dark (second lane) |
+| Token | Paper (default) | Dark |
 | --- | --- | --- |
-| Background | `#f7f7f4` | near-black chrome, not blue-black |
-| Ink | `#26251e` | light paper-ink, not pure white |
-| Accent | `#f54e00` | same `#f54e00` |
-| Rule | ink at ~10% | light ink at ~12% |
-| Surface lift | paper, no shadow | one step up, still flat |
+| Background | `#f7f7f4` | `#14120b` |
+| Ink | `#26251e` | `#edecec` |
+| Accent | `#f54e00` | `#f54e00` |
+| Rule | ink at ~10% | ink at ~12% |
+| Cards / surface lift | paper, no shadow | `#1b1913` |
 
 No gradients. No box shadows. No glow. Flat surfaces, hairlines.
 
@@ -281,7 +281,7 @@ Do not toast. Do not confetti an empty vault.
 - Recents (activity rows)
 - Inspector (readable detail; blob fetch; neighbors; proposals)
 - Tasks board (three status columns, read-only)
-- Dark as a second lane (toggle in the rail foot)
+- Dark theme on every v1 surface (operator toggle and/or system preference). Paper remains the first paint. Do not drop a v1 surface to fit it.
 - Off-box unlock and session (same key, same cookie path)
 - Deep link `/view/nodes/:id` into the shell
 - Keep every read-only and blob-safety rule from the first window
@@ -314,7 +314,7 @@ The HTML string pages in the first window go away. Unlock, cookie, and blob rout
 
 ## How to tell the built UI matches this plan
 
-Review against paper (default lane) on a wide window first, then medium, then a narrow stack. Use a vault with a handful of linked nodes, at least one task with a due date, one blob node, and a first-day empty vault.
+Review against paper (default first paint) on a wide window first, then medium, then a narrow stack. Then switch to dark and judge that lane against the dark tokens, not “dark exists.” Use a vault with a handful of linked nodes, at least one task with a due date, one blob node, and a first-day empty vault.
 
 ### Layout
 
@@ -335,10 +335,11 @@ Review against paper (default lane) on a wide window first, then medium, then a 
 
 ### Color
 
-- [ ] Default background is `#f7f7f4`, ink `#26251e`, accent `#f54e00`
+- [ ] First paint is paper: background `#f7f7f4`, ink `#26251e`, accent `#f54e00`
+- [ ] Dark lane: background `#14120b`, ink `#edecec`, cards / surface lift `#1b1913`, accent `#f54e00`
+- [ ] Dark is a real theme on Unlock, Graph, Search, Recents, Tasks, and Inspector — not a single inverted screen
 - [ ] Accent appears on the selected rail item, Unlock, overdue, and selection — not on every border
 - [ ] Hairlines, no shadows, no gradients
-- [ ] Dark exists and is not the first paint
 
 ### States
 
