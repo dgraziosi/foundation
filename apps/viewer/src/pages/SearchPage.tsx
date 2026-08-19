@@ -1,6 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useOutletContext, useSearchParams } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import { fetchOntology, fetchSearch } from "../api";
 import { DueChip, TypeTag } from "../ui/Tags";
 import { LoadError, Placeholders } from "../ui/States";
@@ -30,9 +34,7 @@ export function SearchPage() {
     queryFn: () => fetchSearch(submitted),
   });
 
-  function onSubmit(event: FormEvent) {
-    event.preventDefault();
-    const next = { q: q.trim(), type, status };
+  function applyFilters(next: { q: string; type: string; status: string }) {
     setSubmitted(next);
     const url = new URLSearchParams();
     if (next.q) url.set("q", next.q);
@@ -42,78 +44,93 @@ export function SearchPage() {
     setParams(url, { replace: true });
   }
 
+  function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    applyFilters({ q: q.trim(), type, status });
+  }
+
   const searched = search.data?.searched ?? Boolean(submitted.q || submitted.type || submitted.status);
 
   return (
-    <div className="page">
-      <h1>Search</h1>
-      <form className="controls" onSubmit={onSubmit}>
-        <input
+    <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
+      <h1 className="text-title font-semibold">Search</h1>
+      <form className="flex flex-wrap gap-2" onSubmit={onSubmit}>
+        <Input
           ref={inputRef}
-          className="field"
           type="search"
           value={q}
           onChange={(event) => setQ(event.target.value)}
           placeholder="Search the graph"
+          className="min-w-[12rem] flex-1"
         />
-        <select
-          className="field"
-          value={type}
-          onChange={(event) => {
-            const nextType = event.target.value;
+        <Select
+          value={type || "all"}
+          onValueChange={(value) => {
+            const nextType = value === "all" ? "" : value;
             setType(nextType);
-            setSubmitted({ q: q.trim(), type: nextType, status });
+            applyFilters({ q: q.trim(), type: nextType, status });
           }}
         >
-          <option value="">Any</option>
-          {(ontology.data?.types ?? []).map((item) => (
-            <option key={item.slug} value={item.slug}>
-              {item.label}
-            </option>
-          ))}
-        </select>
-        <select
-          className="field"
-          value={status}
-          onChange={(event) => {
-            const nextStatus = event.target.value;
+          <SelectTrigger className="w-36">
+            <SelectValue placeholder="Any" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Any</SelectItem>
+            {(ontology.data?.types ?? []).map((item) => (
+              <SelectItem key={item.slug} value={item.slug}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={status || "all"}
+          onValueChange={(value) => {
+            const nextStatus = value === "all" ? "" : value;
             setStatus(nextStatus);
-            setSubmitted({ q: q.trim(), type, status: nextStatus });
+            applyFilters({ q: q.trim(), type, status: nextStatus });
           }}
         >
-          <option value="">Any status</option>
-          <option value="active">Active</option>
-          <option value="completed">Completed</option>
-          <option value="archived">Archived</option>
-        </select>
+          <SelectTrigger className="w-36">
+            <SelectValue placeholder="Any status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Any status</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="archived">Archived</SelectItem>
+          </SelectContent>
+        </Select>
       </form>
       {search.isLoading ? <Placeholders /> : null}
       {search.isError ? <LoadError onRetry={() => void search.refetch()} /> : null}
-      {search.data && !searched ? (
-        <p className="quiet">Search the graph, or filter by type.</p>
-      ) : null}
-      {search.data?.error ? <p className="quiet">{search.data.error}</p> : null}
+      {search.data && !searched ? <p className="text-muted-foreground">Search the graph, or filter by type.</p> : null}
+      {search.data?.error ? <p className="text-muted-foreground">{search.data.error}</p> : null}
       {search.data && searched && search.data.hits.length === 0 && !search.data.error ? (
-        <p className="quiet">No matching nodes.</p>
+        <p className="text-muted-foreground">No matching nodes.</p>
       ) : null}
       {search.data && search.data.hits.length > 0 ? (
-        <div className="rows">
+        <div className="flex flex-col">
           {search.data.hits.map((hit) => (
-            <button
+            <Button
               type="button"
-              className={`row${selectedId === hit.id ? " selected" : ""}`}
+              variant="ghost"
+              className={cn(
+                "h-auto min-h-9 w-full justify-between rounded-none border-b border-border px-1 py-2",
+                selectedId === hit.id && "ring-1 ring-inset ring-primary",
+              )}
               key={hit.id}
               onClick={() => select(hit.id)}
             >
-              <span>
-                <span className="row-title">{hit.title}</span>
-                <span className="row-meta">{hit.snippet}</span>
+              <span className="flex min-w-0 flex-col items-start">
+                <span className="font-semibold">{hit.title}</span>
+                <span className="text-meta text-muted-foreground">{hit.snippet}</span>
               </span>
-              <span className="row-meta">
+              <span className="flex items-center gap-2">
                 <TypeTag type={hit.type} />
                 {hit.due ? <DueChip due={hit.due} /> : null}
               </span>
-            </button>
+            </Button>
           ))}
         </div>
       ) : null}

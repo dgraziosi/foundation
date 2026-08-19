@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D from "react-force-graph-2d";
 import { useOutletContext } from "react-router-dom";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fetchGraph, fetchOntology } from "../api";
 import { truncate } from "../format";
 import { readThemeTokens, subscribeGraphPaint, type ThemeTokens } from "../theme-core";
@@ -71,28 +73,35 @@ export function GraphPage() {
   const empty = graph.data !== undefined && data.nodes.length === 0;
 
   return (
-    <div className="canvas-wrap" ref={wrapRef} data-surface="graph">
-      <div className="canvas-find">
-        <input
-          className="field"
+    <div className="relative min-h-[280px] flex-1" ref={wrapRef} data-surface="graph">
+      <div className="absolute left-3 top-3 z-10 flex gap-2">
+        <Input
           type="search"
           placeholder="Find on canvas"
           value={find}
           onChange={(event) => setFind(event.target.value)}
+          className="min-w-[10rem] bg-background"
         />
-        <select className="field" value={type} onChange={(event) => setType(event.target.value)}>
-          <option value="">Any</option>
-          {(ontology.data?.types ?? []).map((item) => (
-            <option key={item.slug} value={item.slug}>
-              {item.label}
-            </option>
-          ))}
-        </select>
+        <Select value={type || "all"} onValueChange={(value) => setType(value === "all" ? "" : value)}>
+          <SelectTrigger className="w-36 bg-background">
+            <SelectValue placeholder="Any" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Any</SelectItem>
+            {(ontology.data?.types ?? []).map((item) => (
+              <SelectItem key={item.slug} value={item.slug}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       {graph.isLoading ? <Placeholders /> : null}
       {graph.isError ? <LoadError onRetry={() => void graph.refetch()} /> : null}
       {empty ? (
-        <p className="canvas-empty">Search the graph, or wait for a node to land.</p>
+        <p className="pointer-events-none absolute inset-0 grid place-items-center text-muted-foreground">
+          Search the graph, or wait for a node to land.
+        </p>
       ) : null}
       {!graph.isLoading && !graph.isError && !empty ? (
         <ForceGraph2D

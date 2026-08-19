@@ -1,5 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useOutletContext } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { fetchTasks, type TaskCard } from "../api";
 import { DueChip } from "../ui/Tags";
 import { LoadError, Placeholders } from "../ui/States";
@@ -18,31 +21,41 @@ export function TasksPage() {
   const list = tasks.data?.tasks ?? [];
 
   return (
-    <div className="page">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
       {tasks.isLoading ? <Placeholders /> : null}
       {tasks.isError ? <LoadError onRetry={() => void tasks.refetch()} /> : null}
-      <div className="board" data-surface="tasks">
+      <div className="grid flex-1 grid-cols-1 items-start gap-3 md:grid-cols-3" data-surface="tasks">
         {COLUMNS.map((column) => {
           const cards = list.filter((task) => task.status === column.status);
           return (
-            <section className="column" key={column.status}>
-              <h2>{column.label}</h2>
-              {column.status === "active" && cards.length === 0 ? (
-                <p className="quiet">No tasks yet.</p>
-              ) : null}
-              {cards.map((task) => (
-                <button
-                  type="button"
-                  className={`card${selectedId === task.id ? " selected" : ""}`}
-                  key={task.id}
-                  onClick={() => select(task.id)}
-                >
-                  <span className="row-title">{task.title}</span>
-                  {task.due ? <DueChip due={task.due} tone={task.due_tone} /> : null}
-                  {task.parent_title ? <span className="row-meta">{task.parent_title}</span> : null}
-                </button>
-              ))}
-            </section>
+            <Card className="flex min-h-48 flex-col" key={column.status}>
+              <CardHeader className="pb-2">
+                <CardTitle>{column.label}</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-2">
+                {column.status === "active" && cards.length === 0 ? (
+                  <p className="text-muted-foreground">No tasks yet.</p>
+                ) : null}
+                {cards.map((task) => (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={cn(
+                      "h-auto w-full flex-col items-start gap-1 p-2 shadow-none",
+                      selectedId === task.id && "ring-1 ring-primary",
+                    )}
+                    key={task.id}
+                    onClick={() => select(task.id)}
+                  >
+                    <span className="font-semibold">{task.title}</span>
+                    {task.due ? <DueChip due={task.due} tone={task.due_tone} /> : null}
+                    {task.parent_title ? (
+                      <span className="text-meta text-muted-foreground">{task.parent_title}</span>
+                    ) : null}
+                  </Button>
+                ))}
+              </CardContent>
+            </Card>
           );
         })}
       </div>

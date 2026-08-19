@@ -1,4 +1,5 @@
 import { Outlet, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { isUuid } from "../format";
 import { Inspector } from "./Inspector";
 import { Rail } from "./Rail";
@@ -40,9 +41,16 @@ export function Shell() {
   const { selectedId, invalidPath, select, clear } = useSelectedNode();
   const open = Boolean(selectedId) || invalidPath;
   return (
-    <div className="shell">
+    <div
+      className={cn(
+        "grid min-h-dvh bg-background",
+        "grid-cols-1 grid-rows-[auto_minmax(0,1fr)]",
+        "md:grid-cols-[180px_minmax(0,1fr)] md:grid-rows-none",
+        "xl:grid-cols-[180px_minmax(0,1fr)_352px]",
+      )}
+    >
       <Rail />
-      <main className="middle">
+      <main className="relative flex min-h-0 min-w-0 flex-col">
         <Outlet context={{ selectedId, invalidPath, select }} />
       </main>
       <Inspector

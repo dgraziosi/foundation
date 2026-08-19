@@ -667,11 +667,14 @@ test("viewer CSS ships paper first and a real dark lane", async () => {
   assert.match(css, /--bg:\s*#f7f7f4/);
   assert.match(css, /--ink:\s*#26251e/);
   assert.match(css, /--accent:\s*#f54e00/);
+  assert.match(css, /--background:\s*#f7f7f4/);
+  assert.match(css, /--primary:\s*#f54e00/);
   assert.match(css, /\[data-theme="dark"\]/);
   assert.match(css, /--bg:\s*#14120b/);
   assert.match(css, /--ink:\s*#edecec/);
   assert.match(css, /--card:\s*#1b1913/);
-  assert.doesNotMatch(css, /box-shadow|linear-gradient/);
+  assert.match(css, /--background:\s*#14120b/);
+  assert.doesNotMatch(css, /linear-gradient/);
   const dist = viewerDistDir();
   assert.ok(dist.endsWith("viewer/dist"));
 });

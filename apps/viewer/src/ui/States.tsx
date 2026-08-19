@@ -1,20 +1,22 @@
+import { Button } from "@/components/ui/button";
+
 export function Placeholders() {
   return (
-    <div className="placeholder" aria-hidden="true">
-      <div className="bar" />
-      <div className="bar" />
-      <div className="bar" />
+    <div className="flex flex-col gap-2 p-4" aria-hidden="true">
+      <div className="h-2.5 animate-pulse rounded-md bg-border" />
+      <div className="h-2.5 animate-pulse rounded-md bg-border" />
+      <div className="h-2.5 animate-pulse rounded-md bg-border" />
     </div>
   );
 }
 
 export function LoadError({ onRetry }: { onRetry: () => void }) {
   return (
-    <p className="quiet">
+    <p className="text-muted-foreground">
       Could not load.{" "}
-      <button type="button" className="text-btn" onClick={onRetry}>
+      <Button type="button" variant="link" className="h-auto p-0" onClick={onRetry}>
         Retry
-      </button>
+      </Button>
     </p>
   );
 }

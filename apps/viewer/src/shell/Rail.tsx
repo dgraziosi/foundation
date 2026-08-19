@@ -1,4 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { cn } from "@/lib/utils";
 import { useTheme, type ThemeChoice } from "../theme";
 
 const items = [
@@ -21,32 +24,49 @@ export function Rail() {
   const { choice, setChoice } = useTheme();
   const location = useLocation();
   return (
-    <aside className="rail">
-      <div className="brand">Foundation</div>
-      <nav>
-        {items.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={() => (isActive(item.match, location.pathname) ? "rail-link active" : "rail-link")}
-          >
-            <span>{item.label}</span>
-          </NavLink>
-        ))}
-      </nav>
-      <div className="rail-foot">
-        <div className="theme-toggle" aria-label="Theme">
-          {themes.map((theme) => (
-            <button
-              key={theme}
-              type="button"
-              className={choice === theme ? "active" : ""}
-              onClick={() => setChoice(theme)}
+    <aside className="flex min-w-0 flex-col border-b border-border p-2 md:border-b-0 md:border-r md:p-3 max-md:flex-row max-md:items-center">
+      <div className="hidden px-2 pb-3 text-meta text-muted-foreground md:block">Foundation</div>
+      <nav className="flex flex-1 gap-0.5 max-md:flex-row md:flex-col">
+        {items.map((item) => {
+          const active = isActive(item.match, location.pathname);
+          return (
+            <Button
+              key={item.to}
+              asChild
+              variant="ghost"
+              className={cn(
+                "h-9 justify-start rounded-md px-2",
+                active && "bg-primary/10 text-foreground ring-1 ring-inset ring-primary",
+              )}
             >
+              <NavLink to={item.to}>
+                <span className="max-md:sr-only">{item.label}</span>
+                <span className="md:hidden">{item.label.slice(0, 1)}</span>
+              </NavLink>
+            </Button>
+          );
+        })}
+      </nav>
+      <div className="mt-auto p-1 max-md:mt-0 max-md:p-0">
+        <ToggleGroup
+          type="single"
+          value={choice}
+          onValueChange={(value) => {
+            if (value === "paper" || value === "dark" || value === "system") {
+              setChoice(value);
+            }
+          }}
+          variant="outline"
+          size="sm"
+          aria-label="Theme"
+          className="w-full"
+        >
+          {themes.map((theme) => (
+            <ToggleGroupItem key={theme} value={theme} aria-label={theme}>
               {theme === "paper" ? "Paper" : theme === "dark" ? "Dark" : "System"}
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
       </div>
     </aside>
   );

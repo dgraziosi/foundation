@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useOutletContext } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { fetchRecents } from "../api";
 import { relativeTime } from "../format";
 import { TypeTag } from "../ui/Tags";
@@ -12,17 +14,21 @@ export function RecentsPage() {
   const recents = useQuery({ queryKey: ["recents"], queryFn: fetchRecents });
 
   return (
-    <div className="page">
-      <h1>Recents</h1>
+    <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
+      <h1 className="text-title font-semibold">Recents</h1>
       {recents.isLoading ? <Placeholders /> : null}
       {recents.isError ? <LoadError onRetry={() => void recents.refetch()} /> : null}
-      {recents.data && recents.data.rows.length === 0 ? <p className="quiet">Nothing yet.</p> : null}
+      {recents.data && recents.data.rows.length === 0 ? <p className="text-muted-foreground">Nothing yet.</p> : null}
       {recents.data && recents.data.rows.length > 0 ? (
-        <div className="rows">
+        <div className="flex flex-col">
           {recents.data.rows.map((row) => (
-            <button
+            <Button
               type="button"
-              className={`row${selectedId === row.node_id ? " selected" : ""}`}
+              variant="ghost"
+              className={cn(
+                "h-auto min-h-9 w-full justify-between rounded-none border-b border-border px-1 py-2",
+                selectedId === row.node_id && "ring-1 ring-inset ring-primary",
+              )}
               key={row.id}
               onClick={() => {
                 if (row.node_id) {
@@ -30,15 +36,15 @@ export function RecentsPage() {
                 }
               }}
             >
-              <span>
-                <span className="row-title">{row.summary}</span>
-                <span className="row-meta">{row.action}</span>
+              <span className="flex min-w-0 flex-col items-start">
+                <span className="font-semibold">{row.summary}</span>
+                <span className="text-meta text-muted-foreground">{row.action}</span>
               </span>
-              <span className="row-meta">
+              <span className="flex items-center gap-2 text-meta text-muted-foreground">
                 {row.type ? <TypeTag type={row.type} /> : null}
                 <span>{relativeTime(row.created_at)}</span>
               </span>
-            </button>
+            </Button>
           ))}
         </div>
       ) : null}
