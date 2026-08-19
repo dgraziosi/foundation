@@ -8,18 +8,19 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createApp } from "./app.js";
 
-test("the server still registers thirteen tools", async () => {
+test("the server still registers fourteen tools", async () => {
   const register = await readFile(
     join(dirname(fileURLToPath(import.meta.url)), "tools/register.ts"),
     "utf8",
   );
   const names = [...register.matchAll(/register(\w+)Tool\(server/g)].map((match) => match[1]);
-  assert.equal(names.length, 13);
+  assert.equal(names.length, 14);
   assert.deepEqual(names, [
     "Bootstrap",
     "Search",
     "Lookup",
     "Get",
+    "WorkingSet",
     "Upsert",
     "Delete",
     "Link",
@@ -106,6 +107,8 @@ test(
       assert.match((boot.how_to_extend as { links: string }).links, /edges\[\]/);
       assert.match((boot.how_to_extend as { links: string }).links, /one transaction writes all edges or none/);
       assert.match((boot.how_to_extend as { lookup: string }).lookup, /not a probability/);
+      assert.match((boot.how_to_extend as { lookup: string }).lookup, /working_set/);
+      assert.match((boot.how_to_extend as { working_set: string }).working_set, /actionable working set/);
       assert.match((boot.how_to_extend as { search: string }).search, /call lookup/);
       const howTo = boot.how_to_extend as { summary: string };
       assert.equal(howTo.summary.includes("instance routine"), true);

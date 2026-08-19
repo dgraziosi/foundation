@@ -3,6 +3,11 @@ import { BLOB_BASE64_MAX_CHARS } from "./blobs.js";
 import { DataEqualsSchema, hasDataEqualsFilter } from "./data-equals.js";
 import { isIsoDate } from "./due.js";
 import {
+  WORKING_SET_DEPTH_MAX,
+  WORKING_SET_DUE_WITHIN_DAYS_MAX,
+  WORKING_SET_LIMIT_MAX,
+} from "./working-set.js";
+import {
   ActivityActionSchema,
   ActivityActorSchema,
   ActivitySchema,
@@ -96,6 +101,67 @@ export const GetSuccessSchema = z.object({
   /** Title-FTS proposals. Empty when none, including an empty graph. Never creates an edge. */
   suggested_links: z.array(SuggestedLinkSchema),
 });
+
+export const WorkingSetInputSchema = z.object({
+  id: z.string().uuid(),
+  include_completed: z.boolean().optional(),
+  depth: z.number().int().min(1).max(WORKING_SET_DEPTH_MAX).optional(),
+  limit: z.number().int().min(1).max(WORKING_SET_LIMIT_MAX).optional(),
+  due_within_days: z.number().int().min(1).max(WORKING_SET_DUE_WITHIN_DAYS_MAX).optional(),
+});
+export type WorkingSetInput = z.infer<typeof WorkingSetInputSchema>;
+
+export const WorkingSetViaSchema = z.object({
+  relation: z.string().min(1),
+  direction: z.enum(["incoming", "outgoing"]),
+  hops: z.number().int().min(1),
+});
+export type WorkingSetVia = z.infer<typeof WorkingSetViaSchema>;
+
+export const WorkingSetItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.string().min(1),
+  title: z.string().min(1),
+  status: NodeStatusSchema,
+  due: z.string().optional(),
+  start: z.string().optional(),
+  end: z.string().optional(),
+  role: z.enum(["work", "parent"]),
+  via: WorkingSetViaSchema,
+  parent: NeighborRefSchema.optional(),
+});
+export type WorkingSetItem = z.infer<typeof WorkingSetItemSchema>;
+
+export const WorkingSetRootSchema = z.object({
+  id: z.string().uuid(),
+  type: z.string().min(1),
+  title: z.string().min(1),
+  status: NodeStatusSchema,
+  due: z.string().optional(),
+});
+export type WorkingSetRoot = z.infer<typeof WorkingSetRootSchema>;
+
+export const WorkingSetWalkSchema = z.object({
+  work: z.enum(["children", "about", "event", "none"]),
+  ancestors: z.boolean(),
+  relations: z.array(z.string().min(1)),
+  depth: z.number().int().min(1).max(WORKING_SET_DEPTH_MAX),
+  due_window: z
+    .object({
+      days: z.number().int().min(1),
+      timezone: z.string().min(1),
+    })
+    .nullable(),
+});
+export type WorkingSetWalk = z.infer<typeof WorkingSetWalkSchema>;
+
+export const WorkingSetSuccessSchema = z.object({
+  root: WorkingSetRootSchema,
+  items: z.array(WorkingSetItemSchema),
+  walk: WorkingSetWalkSchema,
+  truncated: z.boolean(),
+});
+export type WorkingSetSuccess = z.infer<typeof WorkingSetSuccessSchema>;
 
 /** Upsert ingest: inline body, existing blob_id, bytes_base64, or uploads source_path. */
 export const UpsertPayloadSchema = z

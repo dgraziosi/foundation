@@ -46,6 +46,7 @@ export {
   listEdgesAmong,
   listEdgesTouching,
   listIncidentEdges,
+  listIncidentEdgesForNodes,
   listLiveNodesByIds,
   listRecentLiveNodes,
   listOutlineChildren,

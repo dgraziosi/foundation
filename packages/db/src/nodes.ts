@@ -723,6 +723,57 @@ export async function listIncidentEdges(db: Queryable, nodeId: string): Promise<
   }));
 }
 
+/** Live incident edges for many nodes. An edge between two requested ids appears on both. */
+export async function listIncidentEdgesForNodes(
+  db: Queryable,
+  nodeIds: string[],
+): Promise<Map<string, IncidentEdge[]>> {
+  const result = new Map<string, IncidentEdge[]>();
+  const unique = [...new Set(nodeIds)];
+  for (const id of unique) {
+    result.set(id, []);
+  }
+  if (unique.length === 0) {
+    return result;
+  }
+  type TouchRow = EdgeRow & {
+    from_title: string;
+    from_type: string;
+    to_title: string;
+    to_type: string;
+  };
+  const { rows } = await db.query<TouchRow>(
+    `SELECT e.id, e.from_id, e.to_id, e.relation_type, e.metadata, e.created_at,
+            from_node.title AS from_title, from_node.type AS from_type,
+            to_node.title AS to_title, to_node.type AS to_type
+     FROM edges e
+     JOIN nodes from_node ON from_node.id = e.from_id AND from_node.deleted_at IS NULL
+     JOIN nodes to_node ON to_node.id = e.to_id AND to_node.deleted_at IS NULL
+     WHERE e.from_id = ANY($1::uuid[]) OR e.to_id = ANY($1::uuid[])
+     ORDER BY e.created_at`,
+    [unique],
+  );
+  const wanted = new Set(unique);
+  for (const row of rows) {
+    const edge = mapEdge(row);
+    if (wanted.has(row.from_id)) {
+      result.get(row.from_id)!.push({
+        ...edge,
+        direction: "out",
+        neighbor: { id: row.to_id, title: row.to_title, type: row.to_type },
+      });
+    }
+    if (wanted.has(row.to_id)) {
+      result.get(row.to_id)!.push({
+        ...edge,
+        direction: "in",
+        neighbor: { id: row.from_id, title: row.from_title, type: row.from_type },
+      });
+    }
+  }
+  return result;
+}
+
 /** Live edges only: both endpoints must not be soft-deleted. Used by link validation. */
 export async function listEdgesTouching(
   db: Queryable,
