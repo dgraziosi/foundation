@@ -1,6 +1,6 @@
 import type { NodeType, RelationType } from "./types.js";
 import { toolError, type ToolError } from "./mcp-io.js";
-import { parseTypeViewsInput, type ViewEngineId } from "./views.js";
+import { mergeTypeViewsPatch, parseTypeViewsInput, type ViewEngineId } from "./views.js";
 
 function sameJson(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
@@ -106,6 +106,17 @@ export function typeViewsFromInput(input: {
   default_view?: unknown;
 }): { views: ViewEngineId[]; default_view?: ViewEngineId } | ToolError {
   const parsed = parseTypeViewsInput(input);
+  if (!parsed.ok) {
+    return toolError(parsed.error, parsed.suggestion);
+  }
+  return { views: parsed.views, ...(parsed.default_view ? { default_view: parsed.default_view } : {}) };
+}
+
+export function typeViewsFromUpdate(
+  existing: { views?: readonly string[] | null; default_view?: string | null },
+  patch: { views?: unknown; default_view?: unknown },
+): { views: ViewEngineId[]; default_view?: ViewEngineId } | ToolError {
+  const parsed = mergeTypeViewsPatch(existing, patch);
   if (!parsed.ok) {
     return toolError(parsed.error, parsed.suggestion);
   }

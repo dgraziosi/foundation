@@ -57,8 +57,10 @@ export {
   labelFromSlug,
   missingConfirm,
   typeViewsFromInput,
+  typeViewsFromUpdate,
 } from "./ontology-mutation.js";
 export {
+  mergeTypeViewsPatch,
   parseTypeViewsInput,
   resolveTypeViews,
   isViewEngineId,

@@ -46,6 +46,7 @@ import {
   assertSystemTypePatch,
   labelFromSlug,
   typeViewsFromInput,
+  typeViewsFromUpdate,
   isUuid,
   missingConfirm,
   storedBlobPayload,
@@ -1066,16 +1067,10 @@ export async function manageType(
     return parentErr;
   }
 
-    const viewsPatch =
-    input.views === undefined && input.default_view === undefined
-      ? {
-          views: existing.views ?? [],
-          default_view: existing.default_view,
-        }
-      : typeViewsFromInput({
-          views: input.views ?? existing.views,
-          default_view: input.default_view ?? existing.default_view,
-        });
+  const viewsPatch = typeViewsFromUpdate(existing, {
+    views: input.views,
+    default_view: input.default_view,
+  });
   if (isToolError(viewsPatch)) {
     return viewsPatch;
   }

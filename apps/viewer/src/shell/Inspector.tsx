@@ -4,6 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Sheet } from "@/components/ui/sheet";
 import { ApiError, fetchNode, type NodeDetail } from "../api";
+import { inspectorSheetOpen, useWideLane } from "./breakpoints";
 import { DueChip, StatusTag, TypeTag } from "../ui/Tags";
 import { LoadError, Placeholders, Quiet } from "../ui/States";
 
@@ -190,17 +191,19 @@ export function Inspector({
   onClose: () => void;
   open: boolean;
 }) {
+  const wide = useWideLane();
+  const sheetOpen = inspectorSheetOpen(open, wide);
   const body = <InspectorBody selectedId={selectedId} onSelect={onSelect} />;
   return (
     <>
       <aside className="hidden min-w-0 border-l border-hairline xl:flex xl:w-inspector xl:flex-col">
         <div className="px-lg pt-lg">{body}</div>
       </aside>
-      <div className="xl:hidden">
-        <Sheet open={open} onClose={onClose}>
+      {wide ? null : (
+        <Sheet open={sheetOpen} onClose={onClose}>
           {body}
         </Sheet>
-      </div>
+      )}
     </>
   );
 }

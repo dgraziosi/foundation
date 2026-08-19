@@ -405,6 +405,43 @@ test(
         );
       });
 
+      await t.test("manage_type update resolves default against views being written", async () => {
+        const created = await manageType(pool, {
+          action: "create",
+          slug: "dossier",
+          kind: "artifact",
+          views: ["board", "list"],
+          default_view: "board",
+        });
+        assert.equal(isToolError(created), false);
+        if (isToolError(created)) return;
+
+        const dropped = await manageType(pool, {
+          action: "update",
+          slug: "dossier",
+          views: ["list", "outline"],
+        });
+        assert.equal(isToolError(dropped), false);
+        if (isToolError(dropped)) return;
+        assert.deepEqual(dropped.type.views, ["list", "outline"]);
+        assert.equal(dropped.type.default_view, "list");
+
+        const cleared = await manageType(pool, {
+          action: "update",
+          slug: "dossier",
+          views: [],
+        });
+        assert.equal(isToolError(cleared), false);
+        if (isToolError(cleared)) return;
+        assert.deepEqual(cleared.type.views, []);
+        assert.equal(cleared.type.default_view, undefined);
+
+        const inspected = await inspectOntology(pool, "types");
+        const dossier = inspected.types.find((type) => type.slug === "dossier");
+        assert.deepEqual(dossier?.views, []);
+        assert.equal(dossier?.default_view, undefined);
+      });
+
       await t.test("manage_type retires an empty authored type and refuses unsafe retire", async () => {
         const created = await manageType(pool, {
           action: "create",

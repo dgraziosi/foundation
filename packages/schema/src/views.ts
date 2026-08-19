@@ -90,6 +90,39 @@ export function parseTypeViewsInput(input: {
   return { ok: true, views, default_view: input.default_view as ViewEngineId };
 }
 
+/**
+ * Update merge: resolve default against the views being written, not the stored
+ * default. An omitted default falls back to the first remaining id. Empty views
+ * clear default_view. An explicit default still has to be a member of views.
+ */
+export function mergeTypeViewsPatch(
+  existing: { views?: readonly string[] | null; default_view?: string | null },
+  patch: { views?: unknown; default_view?: unknown },
+): ParsedTypeViews {
+  if (patch.views === undefined && patch.default_view === undefined) {
+    const resolved = resolveTypeViews(existing);
+    return {
+      ok: true,
+      views: resolved.views,
+      ...(resolved.defaultView ? { default_view: resolved.defaultView } : {}),
+    };
+  }
+  const viewsInput = patch.views !== undefined ? patch.views : (existing.views ?? []);
+  if (patch.default_view !== undefined) {
+    return parseTypeViewsInput({ views: viewsInput, default_view: patch.default_view });
+  }
+  const parsed = parseTypeViewsInput({ views: viewsInput });
+  if (!parsed.ok) {
+    return parsed;
+  }
+  const resolved = resolveTypeViews({ views: parsed.views });
+  return {
+    ok: true,
+    views: resolved.views,
+    ...(resolved.defaultView ? { default_view: resolved.defaultView } : {}),
+  };
+}
+
 /** Seed types already declare views so first unlocked Home is not a wall of no-views. */
 export const SEED_TYPE_VIEWS: Readonly<
   Record<string, { views: readonly ViewEngineId[]; default_view: ViewEngineId }>

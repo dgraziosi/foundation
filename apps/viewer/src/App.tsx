@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { AuthError, session } from "./api";
 import { GraphPage } from "./pages/GraphPage";
 import { HomePage } from "./pages/HomePage";
@@ -12,6 +12,11 @@ import { UnlockPage } from "./pages/UnlockPage";
 import { Shell } from "./shell/Shell";
 import { LoadError, Placeholders } from "./ui/States";
 import { ThemeProvider } from "./theme";
+
+function TypeViewRoute() {
+  const { slug } = useParams();
+  return <TypeViewPage key={slug} />;
+}
 
 function Gate() {
   const location = useLocation();
@@ -36,7 +41,7 @@ function Gate() {
         <Route path="/graph" element={<GraphPage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/recents" element={<RecentsPage />} />
-        <Route path="/types/:slug" element={<TypeViewPage />} />
+        <Route path="/types/:slug" element={<TypeViewRoute />} />
         <Route path="/nodes/:id" element={<NodeDeepLinkPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

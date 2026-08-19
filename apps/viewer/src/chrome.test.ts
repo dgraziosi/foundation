@@ -81,6 +81,9 @@ test("shell stops match VIEWER.md: narrow <900, medium 900, wide 1280", async ()
   const inspector = await readFile(join(root, "shell/Inspector.tsx"), "utf8");
   assert.match(inspector, /xl:w-inspector/);
   assert.match(inspector, /Sheet/);
+  assert.match(inspector, /inspectorSheetOpen/);
+  assert.match(inspector, /useWideLane/);
+  assert.match(inspector, /wide \? null/);
 
   const board = await readFile(join(root, "views/TypeViews.tsx"), "utf8");
   assert.match(board, /md:grid-cols-3/);
@@ -116,8 +119,11 @@ test("Inter 400/500 only; no mono face and no weight 600", async () => {
 test("no-views copy is honest and Home is the landing surface", async () => {
   const typeView = await readFile(join(root, "pages/TypeViewPage.tsx"), "utf8");
   assert.match(typeView, /No views declared for this type/);
+  assert.match(typeView, /resolveActiveView/);
+  assert.match(typeView, /key=\{slug\}/);
   const app = await readFile(join(root, "App.tsx"), "utf8");
   assert.match(app, /path="\/" element=\{<HomePage/);
   assert.match(app, /path="\/graph"/);
+  assert.match(app, /TypeViewRoute/);
   assert.doesNotMatch(app, /TasksPage/);
 });

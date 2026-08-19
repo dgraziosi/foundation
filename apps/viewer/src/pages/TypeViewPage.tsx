@@ -7,7 +7,7 @@ import { fetchGraph, fetchNode, fetchOntology, fetchType, type ViewEngineId } fr
 import type { ShellOutlet } from "../shell/context";
 import { LoadError, Placeholders, Quiet } from "../ui/States";
 import { EngineView } from "../views/TypeViews";
-import { resolveDeclaredViews, VIEW_LABELS } from "../views/resolve";
+import { resolveActiveView, resolveDeclaredViews, VIEW_LABELS } from "../views/resolve";
 
 export function TypeViewPage({ slug: forcedSlug }: { slug?: string }) {
   const { slug: routeSlug } = useParams();
@@ -19,10 +19,8 @@ export function TypeViewPage({ slug: forcedSlug }: { slug?: string }) {
     enabled: Boolean(slug),
   });
   const resolved = resolveDeclaredViews(typeQuery.data?.type ?? {});
-  const [view, setView] = useState<ViewEngineId | "">("");
-  const active = (view && resolved.views.includes(view) ? view : resolved.defaultView) as
-    | ViewEngineId
-    | undefined;
+  const [picked, setPicked] = useState<{ slug: string; view: ViewEngineId }>();
+  const active = resolveActiveView(slug, resolved, picked);
   const graph = useQuery({
     queryKey: ["graph", "type", slug, selectedId],
     queryFn: () => fetchGraph({ focus: selectedId, type: slug }),
@@ -48,7 +46,7 @@ export function TypeViewPage({ slug: forcedSlug }: { slug?: string }) {
                   value={active}
                   onValueChange={(value) => {
                     if (resolved.views.includes(value as ViewEngineId)) {
-                      setView(value as ViewEngineId);
+                      setPicked({ slug, view: value as ViewEngineId });
                     }
                   }}
                   variant="outline"
@@ -110,5 +108,5 @@ export function NodeDeepLinkPage() {
       </div>
     );
   }
-  return <TypeViewPage slug={slug} />;
+  return <TypeViewPage key={slug} slug={slug} />;
 }

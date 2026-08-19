@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  mergeTypeViewsPatch,
   parseTypeViewsInput,
   resolveTypeViews,
   SEED_TYPE_VIEWS,
@@ -19,6 +20,32 @@ test("resolveTypeViews drops unknown ids and does not invent list", () => {
     views: ["list", "outline"],
     defaultView: "list",
   });
+});
+
+test("mergeTypeViewsPatch resolves default against views being written", () => {
+  assert.deepEqual(
+    mergeTypeViewsPatch({ views: ["board", "list"], default_view: "board" }, { views: ["list", "outline"] }),
+    { ok: true, views: ["list", "outline"], default_view: "list" },
+  );
+  assert.deepEqual(
+    mergeTypeViewsPatch({ views: ["board", "list"], default_view: "board" }, { views: [] }),
+    { ok: true, views: [] },
+  );
+  assert.deepEqual(
+    mergeTypeViewsPatch({ views: ["board", "list"], default_view: "board" }, { views: [], default_view: null }),
+    { ok: true, views: [] },
+  );
+  assert.equal(
+    mergeTypeViewsPatch(
+      { views: ["board", "list"], default_view: "board" },
+      { views: ["list"], default_view: "board" },
+    ).ok,
+    false,
+  );
+  assert.deepEqual(
+    mergeTypeViewsPatch({ views: ["board", "list"], default_view: "board" }, {}),
+    { ok: true, views: ["board", "list"], default_view: "board" },
+  );
 });
 
 test("parseTypeViewsInput refuses unknown ids and a default outside views", () => {

@@ -28,6 +28,21 @@ export function resolveDeclaredViews(input: {
   return { views, defaultView };
 }
 
+/** Picked engine is only kept while it belongs to this slug. */
+export function resolveActiveView(
+  slug: string,
+  declared: { views: ViewEngineId[]; defaultView?: ViewEngineId },
+  picked?: { slug: string; view?: ViewEngineId },
+): ViewEngineId | undefined {
+  if (declared.views.length === 0) {
+    return undefined;
+  }
+  if (picked && picked.slug === slug && picked.view && declared.views.includes(picked.view)) {
+    return picked.view;
+  }
+  return declared.defaultView;
+}
+
 export const VIEW_LABELS: Record<ViewEngineId, string> = {
   list: "List",
   card: "Card",

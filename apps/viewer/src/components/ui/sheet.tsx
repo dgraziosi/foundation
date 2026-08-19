@@ -17,7 +17,7 @@ export function Sheet({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-canvas/60 md:bg-canvas/40 xl:hidden" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-canvas/60 md:bg-canvas/40" />
         <DialogPrimitive.Content
           aria-describedby={undefined}
           className={cn(
@@ -27,7 +27,7 @@ export function Sheet({
           )}
         >
           <DialogPrimitive.Title className="sr-only">Inspector</DialogPrimitive.Title>
-          <div className="flex justify-end px-lg pt-md xl:hidden">
+          <div className="flex justify-end px-lg pt-md">
             <DialogPrimitive.Close asChild>
               <Button type="button" variant="link" className="h-auto p-0">
                 Close
