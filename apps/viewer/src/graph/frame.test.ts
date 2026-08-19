@@ -28,6 +28,7 @@ test("Home graph min-height / leftover-viewport contract (460px floor)", async (
   assert.match(canvas, /readGraphFrameSize/);
   assert.match(canvas, /stopPropagation/);
   assert.match(canvas, /globalScale/);
+  assert.match(canvas, /data\.nodes\.length === 0 \? "pointer-events-none"/);
 
   const shell = await readFile(join(root, "../shell/Shell.tsx"), "utf8");
   assert.match(shell, /h-dvh/);

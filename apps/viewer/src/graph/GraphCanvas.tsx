@@ -167,48 +167,50 @@ export function GraphCanvas({
           <Quiet>Search the graph, or wait for a node to land.</Quiet>
         </div>
       ) : null}
-      <ForceGraph2D
-        key={themeEpoch}
-        width={size.width}
-        height={size.height}
-        graphData={data}
-        backgroundColor={bg}
-        cooldownTicks={80}
-        enableNodeDrag={false}
-        nodeLabel={(node) => String(node.title)}
-        linkColor={(link) => (link.kind === "hierarchy" ? ink : ink2)}
-        linkWidth={(link) => (link.kind === "hierarchy" ? 1 : 0.6)}
-        linkLineDash={(link) => (link.kind === "hierarchy" ? [] : [2, 2])}
-        linkDirectionalArrowLength={3.5}
-        linkDirectionalArrowRelPos={1}
-        onNodeClick={(node, event) => {
-          event.stopPropagation();
-          onSelect(String(node.id));
-        }}
-        onNodeRightClick={(node, event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          setMenu({ id: String(node.id), x: event.offsetX, y: event.offsetY });
-        }}
-        nodeCanvasObject={(node, ctx, globalScale) => {
-          const match = needle !== "" && String(node.title).toLowerCase().includes(needle);
-          paintGraphMark(ctx, node, {
-            scale: globalScale,
-            selected: node.id === selectedId,
-            match,
-            ink,
-            lane,
-            types,
-          });
-        }}
-        nodePointerAreaPaint={(node, color, ctx, globalScale) => {
-          const box = measureGraphMark(ctx, node, { scale: globalScale });
-          ctx.fillStyle = color;
-          ctx.beginPath();
-          ctx.arc(node.x ?? 0, node.y ?? 0, box.radius, 0, Math.PI * 2);
-          ctx.fill();
-        }}
-      />
+      <div className={data.nodes.length === 0 ? "pointer-events-none" : undefined}>
+        <ForceGraph2D
+          key={themeEpoch}
+          width={size.width}
+          height={size.height}
+          graphData={data}
+          backgroundColor={bg}
+          cooldownTicks={80}
+          enableNodeDrag={false}
+          nodeLabel={(node) => String(node.title)}
+          linkColor={(link) => (link.kind === "hierarchy" ? ink : ink2)}
+          linkWidth={(link) => (link.kind === "hierarchy" ? 1 : 0.6)}
+          linkLineDash={(link) => (link.kind === "hierarchy" ? [] : [2, 2])}
+          linkDirectionalArrowLength={3.5}
+          linkDirectionalArrowRelPos={1}
+          onNodeClick={(node, event) => {
+            event.stopPropagation();
+            onSelect(String(node.id));
+          }}
+          onNodeRightClick={(node, event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setMenu({ id: String(node.id), x: event.offsetX, y: event.offsetY });
+          }}
+          nodeCanvasObject={(node, ctx, globalScale) => {
+            const match = needle !== "" && String(node.title).toLowerCase().includes(needle);
+            paintGraphMark(ctx, node, {
+              scale: globalScale,
+              selected: node.id === selectedId,
+              match,
+              ink,
+              lane,
+              types,
+            });
+          }}
+          nodePointerAreaPaint={(node, color, ctx, globalScale) => {
+            const box = measureGraphMark(ctx, node, { scale: globalScale });
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(node.x ?? 0, node.y ?? 0, box.radius, 0, Math.PI * 2);
+            ctx.fill();
+          }}
+        />
+      </div>
       {menu && onLocalGraph ? (
         <div
           className="absolute z-20 min-w-32 rounded-md border border-hairline bg-elevated p-1 text-meta shadow-sm"
