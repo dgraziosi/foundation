@@ -27,9 +27,11 @@ import {
 } from "@foundation/db";
 import {
   EdgeSchema,
+  isBareViewDeclaration,
   NodeSchema,
   NodeTypeSchema,
   RelationTypeSchema,
+  SEED_TYPE_VIEWS,
   missingConfirm,
   toolError,
   type Activity,
@@ -54,7 +56,23 @@ function snapshotEdge(value: unknown): Edge | null {
 
 function snapshotType(value: unknown): NodeType | null {
   const parsed = NodeTypeSchema.safeParse(value);
-  return parsed.success ? parsed.data : null;
+  if (!parsed.success) {
+    return null;
+  }
+  const type = parsed.data;
+  const seed = SEED_TYPE_VIEWS[type.slug];
+  const views = type.views ?? [];
+  if (!seed) {
+    return { ...type, fields: type.fields ?? [], views };
+  }
+  const seedById = new Map(seed.views.map((view) => [view.id, view]));
+  return {
+    ...type,
+    fields: type.fields ?? [],
+    views: views.map((view) =>
+      isBareViewDeclaration(view) ? (seedById.get(view.id) ?? view) : view,
+    ),
+  };
 }
 
 function snapshotRelation(value: unknown): RelationType | null {

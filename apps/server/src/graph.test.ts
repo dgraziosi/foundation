@@ -591,6 +591,21 @@ test(
       const ontology = await inspectOntology(pool, "types");
       const task = ontology.types.find((type) => type.slug === "task");
       assert.ok(task);
+      const restated = await manageType(pool, {
+        action: "update",
+        slug: "task",
+        views: ["board", "list", "calendar", "timeline", "outline"],
+      });
+      assert.equal(isToolError(restated), false);
+      if (isToolError(restated)) {
+        return;
+      }
+      const restatedBoard = restated.type.views?.find((view) => view.id === "board");
+      assert.deepEqual(restatedBoard?.filter, {
+        clauses: [{ bind: "status", op: "eq", value: "active" }],
+      });
+      assert.deepEqual(viewIds(restated.type.views), ["board", "list", "calendar", "timeline", "outline"]);
+
       const query = (task.views ?? []).map((view) =>
         view.id === "board"
           ? {
@@ -759,6 +774,62 @@ test(
       }
       assert.equal(dumped.node.data.dump, "keep this key");
       assert.equal(dumped.node.data.due, "2026-08-27");
+    } finally {
+      await pool.end();
+    }
+  },
+);
+
+test(
+  "manage_type fields: [] stores an empty template and compiles an open schema",
+  { skip: !databaseUrl },
+  async () => {
+    if (!databaseUrl) {
+      return;
+    }
+    const pool = await poolForSchema("graph_empty_fields");
+    try {
+      const created = await manageType(pool, {
+        action: "create",
+        slug: "empty_fields_schema",
+        kind: "artifact",
+        fields: [{ name: "label", kind: "string", display: "Label" }],
+      });
+      assert.equal(isToolError(created), false);
+      if (isToolError(created)) {
+        return;
+      }
+      const compiled = created.type.json_schema as {
+        additionalProperties?: boolean;
+        properties?: { label?: unknown };
+        required?: unknown;
+      } | null;
+      assert.equal(compiled?.additionalProperties, true);
+      assert.ok(compiled?.properties?.label);
+      assert.equal(compiled?.required, undefined);
+
+      const emptied = await manageType(pool, {
+        action: "update",
+        slug: "empty_fields_schema",
+        fields: [],
+      });
+      assert.equal(isToolError(emptied), false);
+      if (isToolError(emptied)) {
+        return;
+      }
+      assert.deepEqual(emptied.type.fields, []);
+      assert.equal(emptied.type.json_schema, null);
+
+      const dumped = await upsertGraphNode(pool, {
+        type: "empty_fields_schema",
+        title: "Voice dump",
+        data: { extra: "kept", label: "optional leftover" },
+      });
+      assert.equal(isToolError(dumped), false);
+      if (isToolError(dumped)) {
+        return;
+      }
+      assert.equal(dumped.node.data.extra, "kept");
     } finally {
       await pool.end();
     }

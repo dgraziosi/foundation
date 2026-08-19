@@ -1131,7 +1131,7 @@ export async function manageType(
   }
 
   const jsonSchema =
-    nextFields.length > 0
+    input.fields !== undefined || nextFields.length > 0
       ? compileJsonSchemaFromFields(nextFields)
       : input.json_schema === undefined
         ? existing.json_schema

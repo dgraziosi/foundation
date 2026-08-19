@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createPool, migrate, seedSystemOntology, type Pool } from "@foundation/db";
-import { isToolError } from "@foundation/schema";
+import { createPool, insertActivity, migrate, seedSystemOntology, type Pool } from "@foundation/db";
+import { isToolError, viewIds } from "@foundation/schema";
 import {
   deleteGraphNode,
   getGraphNode,
@@ -613,6 +613,104 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
         afterDelete.nodes.some((node) => node.id === trip.node.id),
         false,
       );
+    });
+
+    await t.test("undo accepts pre-slice type snapshots with string view ids", async () => {
+      const ontology = await inspectOntology(pool, "types");
+      const task = ontology.types.find((type) => type.slug === "task");
+      assert.ok(task);
+
+      const changed = await manageType(pool, {
+        action: "update",
+        slug: "task",
+        description: "changed for legacy undo",
+        views: (task.views ?? []).map((view) =>
+          view.id === "board"
+            ? {
+                ...view,
+                filter: { clauses: [{ bind: "status" as const, op: "in" as const, value: ["active", "completed"] }] },
+              }
+            : view,
+        ),
+      });
+      assert.equal(isToolError(changed), false);
+      if (isToolError(changed)) {
+        return;
+      }
+
+      const { id } = await insertActivity(pool, {
+        actor: "user",
+        action: "type_change",
+        target_kind: "type",
+        target_id: "task",
+        before: {
+          slug: task.slug,
+          label: task.label,
+          description: task.description,
+          kind: task.kind,
+          parent_types: task.parent_types,
+          json_schema: task.json_schema,
+          views: ["board", "list", "calendar", "timeline", "outline"],
+          default_view: "board",
+          is_system: true,
+        },
+        after: changed.type,
+        reversible: true,
+      });
+
+      const undone = await undoGraphActivity(pool, { id, confirm: true });
+      assert.equal(isToolError(undone), false);
+      if (isToolError(undone)) {
+        assert.fail(undone.error);
+        return;
+      }
+      const after = await inspectOntology(pool, "types");
+      const restored = after.types.find((type) => type.slug === "task");
+      assert.equal(restored?.description, task.description);
+      const board = restored?.views?.find((view) => view.id === "board");
+      assert.deepEqual(board?.filter, { clauses: [{ bind: "status", op: "eq", value: "active" }] });
+
+      const authored = await manageType(pool, {
+        action: "create",
+        slug: "legacy_snapshot_type",
+        kind: "artifact",
+        description: "legacy views",
+        views: ["card", "list"],
+        default_view: "card",
+      });
+      assert.equal(isToolError(authored), false);
+      if (isToolError(authored)) {
+        return;
+      }
+
+      const retired = await manageType(pool, {
+        action: "retire",
+        slug: "legacy_snapshot_type",
+        confirm: true,
+      });
+      assert.equal(isToolError(retired), false);
+      if (isToolError(retired)) {
+        return;
+      }
+
+      await pool.query(`UPDATE activity SET before = jsonb_set(before, '{views}', $1::jsonb) WHERE id = $2`, [
+        JSON.stringify(["card", "list"]),
+        retired.activity_id,
+      ]);
+
+      const restoredAuthored = await undoGraphActivity(pool, {
+        id: retired.activity_id,
+        confirm: true,
+      });
+      assert.equal(isToolError(restoredAuthored), false);
+      if (isToolError(restoredAuthored)) {
+        assert.fail(restoredAuthored.error);
+        return;
+      }
+      const ontology2 = await inspectOntology(pool, "types");
+      const row = ontology2.types.find((type) => type.slug === "legacy_snapshot_type");
+      assert.equal(row?.description, "legacy views");
+      assert.deepEqual(viewIds(row?.views), ["card", "list"]);
     });
   } finally {
     await pool.end();

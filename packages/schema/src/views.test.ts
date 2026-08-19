@@ -30,6 +30,39 @@ test("resolveTypeViews drops unknown ids and does not invent list", () => {
   });
 });
 
+test("mergeTypeViewsPatch keeps existing queries when restating bare ids", () => {
+  const existing = {
+    views: [
+      {
+        id: "board" as const,
+        filter: { clauses: [{ bind: "status" as const, op: "eq" as const, value: "active" }] },
+        sort: [{ bind: "date" as const, dir: "asc" as const }],
+        group: { bind: "status" as const },
+      },
+      {
+        id: "list" as const,
+        filter: { clauses: [{ bind: "status" as const, op: "eq" as const, value: "active" }] },
+      },
+    ],
+    default_view: "board",
+  };
+  const kept = mergeTypeViewsPatch(existing, { views: ["board", "list"] });
+  assert.equal(kept.ok, true);
+  if (kept.ok) {
+    assert.deepEqual(kept.views[0]?.filter, { clauses: [{ bind: "status", op: "eq", value: "active" }] });
+    assert.deepEqual(kept.views[0]?.sort, [{ bind: "date", dir: "asc" }]);
+    assert.deepEqual(kept.views[0]?.group, { bind: "status" });
+    assert.deepEqual(kept.views[1]?.filter, { clauses: [{ bind: "status", op: "eq", value: "active" }] });
+    assert.equal(kept.default_view, "board");
+  }
+  const cleared = mergeTypeViewsPatch(existing, { views: [{ id: "board" }, { id: "list" }] });
+  assert.equal(cleared.ok, true);
+  if (cleared.ok) {
+    assert.equal(cleared.views[0]?.filter, undefined);
+    assert.equal(cleared.views[1]?.filter, undefined);
+  }
+});
+
 test("mergeTypeViewsPatch resolves default against views being written", () => {
   assert.deepEqual(
     mergeTypeViewsPatch({ views: ["board", "list"], default_view: "board" }, { views: ["list", "outline"] }),

@@ -295,19 +295,42 @@ export function mergeTypeViewsPatch(
     };
   }
   const viewsInput = patch.views !== undefined ? patch.views : asViewDeclarations(existing.views);
-  if (patch.default_view !== undefined) {
-    return parseTypeViewsInput({ views: viewsInput, default_view: patch.default_view });
-  }
-  const parsed = parseTypeViewsInput({ views: viewsInput });
+  const parsed =
+    patch.default_view !== undefined
+      ? parseTypeViewsInput({ views: viewsInput, default_view: patch.default_view })
+      : parseTypeViewsInput({ views: viewsInput });
   if (!parsed.ok) {
     return parsed;
   }
-  const resolved = resolveTypeViews({ views: parsed.views });
+  const views = keepExistingQueryOnBareViewIds(existing.views, patch.views, parsed.views);
+  if (patch.default_view !== undefined) {
+    return { ...parsed, views };
+  }
+  const resolved = resolveTypeViews({ views });
   return {
     ok: true,
     views: resolved.declarations,
     ...(resolved.defaultView ? { default_view: resolved.defaultView } : {}),
   };
+}
+
+/** Bare string ids restate membership/order. Only a declaration object replaces the query. */
+function keepExistingQueryOnBareViewIds(
+  existing: readonly (string | ViewDeclaration)[] | null | undefined,
+  patchViews: unknown,
+  parsed: ViewDeclaration[],
+): ViewDeclaration[] {
+  if (!Array.isArray(patchViews)) {
+    return parsed;
+  }
+  const existingById = new Map(asViewDeclarations(existing).map((view) => [view.id, view]));
+  return parsed.map((view, index) => {
+    const raw = patchViews[index];
+    if (typeof raw !== "string") {
+      return view;
+    }
+    return existingById.get(view.id) ?? view;
+  });
 }
 
 export function sameViewIds(

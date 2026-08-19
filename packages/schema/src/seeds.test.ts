@@ -91,3 +91,27 @@ test("seed relations include child_of and associative verbs", () => {
   const relatesTo = SEED_RELATION_TYPES.find((type) => type.slug === "relates_to");
   assert.equal(relatesTo?.is_symmetric, true);
 });
+
+test("NodeTypeSchema accepts legacy string view ids", () => {
+  const parsed = NodeTypeSchema.safeParse({
+    slug: "task",
+    label: "Task",
+    description: "pre-slice snapshot",
+    kind: "artifact",
+    parent_types: ["goal", "project"],
+    json_schema: null,
+    views: ["board", "list", "calendar", "timeline", "outline"],
+    default_view: "board",
+    is_system: true,
+  });
+  assert.equal(parsed.success, true);
+  if (!parsed.success) {
+    return;
+  }
+  assert.deepEqual(
+    parsed.data.views?.map((view) => view.id),
+    ["board", "list", "calendar", "timeline", "outline"],
+  );
+  assert.deepEqual(parsed.data.views?.[0], { id: "board" });
+  assert.equal(parsed.data.fields, undefined);
+});

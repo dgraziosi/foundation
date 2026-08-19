@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { FIELD_KINDS, FIELD_ROLES, type TypeField } from "./fields.js";
-import { VIEW_BINDS, VIEW_ENGINE_IDS, type ViewDeclaration } from "./views.js";
+import { FIELD_KINDS, FIELD_ROLES } from "./fields.js";
+import { asViewDeclarations, VIEW_BINDS, VIEW_ENGINE_IDS } from "./views.js";
 
 export const NodeStatusSchema = z.enum(["active", "completed", "archived"]);
 export type NodeStatus = z.infer<typeof NodeStatusSchema>;
@@ -118,7 +118,10 @@ export const NodeTypeSchema = z.object({
   kind: TypeKindSchema,
   parent_types: z.array(z.string()),
   json_schema: z.unknown().nullable(),
-  views: z.array(ViewDeclarationSchema).optional(),
+  views: z
+    .array(z.union([ViewEngineIdSchema, ViewDeclarationSchema]))
+    .optional()
+    .transform((views) => (views === undefined ? undefined : asViewDeclarations(views))),
   default_view: ViewEngineIdSchema.optional(),
   fields: z.array(TypeFieldSchema).optional(),
   is_system: z.boolean(),
