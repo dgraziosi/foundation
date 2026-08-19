@@ -18,7 +18,8 @@ Short analog: app / folder / links → Foundation / vault / graph.
 
 - **Foundation** — the product
 - **vault** — one instance (`FOUNDATION_DATA` + Postgres)
-- **graph** — the knowledge in that vault
+- **graph** — the live network in that vault
+- **ontology** — the vocabulary (types and relations)
 - **blob** — a file on a node
 - **agent** — anything that can reach the vault MCP
 - **operator** — the human who runs Compose
@@ -30,7 +31,7 @@ Starter recipes: [`AGENTS.md`](./AGENTS.md).
 ## Primary users
 
 1. **Agents** via MCP — default interface (Cursor, Claude, and other MCP clients)
-2. **Operators** via this read-only window on the same API. The window is not a second store.
+2. **Operators** via the read-only window on the same API (`/view`). Same graph as MCP. The window is not a second store. SPEC is not a ceiling for that window — surfaces and layout live in [`VIEWER.md`](./VIEWER.md).
 
 ## Starter spine
 
@@ -69,7 +70,7 @@ Names are locked. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md).
 - Docker Compose: Postgres 16 + Foundation server
 - Durable files under `FOUNDATION_DATA`
 - Localhost MCP at `http://127.0.0.1:8787/mcp` with `Authorization: ApiKey <FOUNDATION_API_KEY>`
-- Read-only window at `http://127.0.0.1:8787/view` (same API key; not a second store)
+- Read-only window at `/view` on this process (same API key; not a second store). Unlock with the key, HttpOnly cookie `Path=/view`. Graph canvas, search, recents, a read-only task board, and an inspector. Paper first (`#f7f7f4` / `#26251e` / `#f54e00`); dark is a real second theme. Off-box access is in scope. The cookie does not unlock `/mcp` or `/blobs/:id`.
 - Blobs: `$FOUNDATION_DATA/blobs/<uuid>`; ingest on `upsert`; bytes via `GET /blobs/:id`
 
 ## Locked (do not reopen)
