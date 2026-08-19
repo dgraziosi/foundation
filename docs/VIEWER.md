@@ -94,7 +94,7 @@ No illustration. No fake nodes.
 
 ### Search
 
-Evolves the PR #27 home. Automations-style page in the middle pane: title, field, rows.
+Evolves the PR #27 home. Middle pane: title, field, rows.
 
 - Title: **Search**
 - Primary control: text field, always focused on open
@@ -164,9 +164,7 @@ Do not lead with UUID. Do not lead with raw JSON. The operator came to read.
 
 ## Shell and layout
 
-Family: Cursor / Grok Bot chrome — rail, work surface, inspector — on Foundation paper. Steal pane rhythm and density. Do not copy assets. Do not embed Cursor Gothic. Do not ingest unofficial design-kit clones.
-
-Momentum is IA only: graph / search / recents / detail / boards. Steal how views are organized. Do not clone that product’s pixels.
+Rail + middle + inspector. Paper is the first paint. Dark is a real second theme on every surface.
 
 ```text
 ┌────┬──────────────────────────────┬─────────────────┐
@@ -197,7 +195,7 @@ No logo wordmark required. If a name appears, it is **Foundation**, small, top o
 ### Middle
 
 - Graph → canvas (find field on the canvas, not a second page)
-- Search / Recents → page title + controls + rows (automations pattern)
+- Search / Recents → page title + controls + rows
 - Tasks → column headers + cards (no page-level primary write button; there is nothing to create here)
 
 ### Inspector
@@ -214,20 +212,13 @@ Fixed width on the wide stop. Scrolls independently. Hairline on its left edge. 
 
 Off-box phones are later. v1 must not *break* on a narrow window; it may stack. Do not design a separate mobile app.
 
-### Chrome density (steal from the four refs)
+### Density
 
-| Ref | Steal |
-| --- | --- |
-| Composer / IDE | Icon rail, then a focused work surface. Tight. No marketing whitespace |
-| Grok Bot desktop | Rail + main + inspector. The inspector is a column, not a dialog |
-| Automations | Page title, one obvious control, sectioned rows. Title + meta + trailing tag |
-| Usage | Summary + visualization + supporting rows. Graph uses this: canvas first, not a table first |
-
-Row height ~36–40px. Body ~13px. Meta ~12px. Page titles ~18–22px, not display type. Padding 8 / 12 / 16. Hairline rules at ink ~10% on paper (and the inverse on dark). Accent on one thing at a time: the primary unlock button, the selected rail item, an overdue chip, a selected mark.
+Row height ~36–40px. Body ~13px. Meta ~12px. Page titles ~18–22px, not display type. Padding 8 / 12 / 16. Hairline rules at ink ~10% on paper (and the inverse on dark). Accent on one thing at a time: the primary unlock button, the selected rail item, an overdue chip, a selected mark. Tight. No marketing whitespace. Lists are title + meta + trailing tag. Graph is canvas first, not a table first. The inspector is a column, not a dialog.
 
 ## Color, type, two lanes
 
-**Paper is the default lane and the first paint.** Dark is a real v1 theme on every surface (Unlock, Graph, Search, Recents, Tasks, Inspector), not a later add-on and not a single inverted screen. The operator can switch lanes with a toggle and/or follow system preference. Do not default to dark because the reference shots are dark.
+**Paper is the default lane and the first paint.** Dark is a real v1 theme on every surface (Unlock, Graph, Search, Recents, Tasks, Inspector), not a later add-on and not a single inverted screen. The operator can switch lanes with a toggle and/or follow system preference.
 
 | Token | Paper (default) | Dark |
 | --- | --- | --- |
@@ -243,7 +234,7 @@ No gradients. No box shadows. No glow. Flat surfaces, hairlines.
 
 - UI: **Inter** or **Geist** (one, not both)
 - Mono: one OFL-licensed mono (Geist Mono, IBM Plex Mono, or Source Code Pro). Use it for UUIDs, sha256, nested `data`, payload that is not prose
-- Do not use Cursor Gothic. Do not use a display serif for UI
+- Do not use a display serif for UI
 
 **Type tags**
 
@@ -329,7 +320,7 @@ Review against paper (default first paint) on a wide window first, then medium, 
 ### Density and type
 
 - [ ] Rows ~36–40px. Body ~13px. Meta ~12px. Titles are page titles, not hero type
-- [ ] Inter or Geist + one OFL mono. No Cursor Gothic. No display serif in the chrome
+- [ ] Inter or Geist + one OFL mono. No display serif in the chrome
 - [ ] Type tags are quiet pills, not a rainbow
 - [ ] Inspector reads as an article: title, tags, labeled rows, wrapped payload. UUID and sha256 are mono, not the headline
 
@@ -350,12 +341,5 @@ Review against paper (default first paint) on a wide window first, then medium, 
 - [ ] Unlock miss: same form, error line
 - [ ] Loading: placeholders, not a branded spinner
 - [ ] No write buttons anywhere (no Upsert, Delete, Link, Undo, Confirm)
-
-### Family (refs, not clones)
-
-- [ ] Feels like Composer + Grok Bot **pane rhythm** (rail, work, inspector)
-- [ ] Lists feel like Automations **rows** (title, meta, trailing tag)
-- [ ] Graph feels like Usage **viz-first** (canvas, then supporting detail — not a table pretending to be a network)
-- [ ] Does **not** look like a clone of those products’ dark marketing chrome, and does **not** look like Momentum’s pixels
 
 If a screen fails more than two boxes, it is not this plan yet. Fix the shell before adding another view.
