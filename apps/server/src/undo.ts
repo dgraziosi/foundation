@@ -27,11 +27,11 @@ import {
 } from "@foundation/db";
 import {
   EdgeSchema,
-  isBareViewDeclaration,
   NodeSchema,
   NodeTypeSchema,
-  RelationTypeSchema,
+  SEED_NODE_TYPES,
   SEED_TYPE_VIEWS,
+  RelationTypeSchema,
   missingConfirm,
   toolError,
   type Activity,
@@ -40,6 +40,7 @@ import {
   type NodeType,
   type RelationType,
   type ToolError,
+  type TypeField,
   type UndoInput,
 } from "@foundation/schema";
 import { removeAuthoredType } from "./retire-type.js";
@@ -54,24 +55,62 @@ function snapshotEdge(value: unknown): Edge | null {
   return parsed.success ? parsed.data : null;
 }
 
-function snapshotType(value: unknown): NodeType | null {
+function asSnapshotRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
+function typeSlugFromSnapshot(value: unknown): string | null {
+  const slug = asSnapshotRecord(value)?.slug;
+  return typeof slug === "string" && slug.length > 0 ? slug : null;
+}
+
+/** Legacy restyle rows stored views as id strings. Declaration objects are post-slice. */
+function isLegacyStringViews(views: unknown): boolean {
+  return Array.isArray(views) && views.length > 0 && views.every((item) => typeof item === "string");
+}
+
+function seedFieldsForSlug(slug: string): TypeField[] | undefined {
+  const fields = SEED_NODE_TYPES.find((type) => type.slug === slug)?.fields;
+  return fields && fields.length > 0 ? fields.map((field) => ({ ...field })) : undefined;
+}
+
+function snapshotFields(
+  raw: Record<string, unknown> | null,
+  parsed: NodeType,
+  live: NodeType | null,
+): TypeField[] {
+  if (Array.isArray(raw?.fields)) {
+    return parsed.fields ?? [];
+  }
+  return seedFieldsForSlug(parsed.slug) ?? live?.fields ?? parsed.fields ?? [];
+}
+
+function snapshotViews(raw: Record<string, unknown> | null, parsed: NodeType): NodeType["views"] {
+  const views = parsed.views ?? [];
+  if (!isLegacyStringViews(raw?.views)) {
+    return views;
+  }
+  const seed = SEED_TYPE_VIEWS[parsed.slug];
+  if (!seed) {
+    return views;
+  }
+  const seedById = new Map(seed.views.map((view) => [view.id, view]));
+  return views.map((view) => seedById.get(view.id) ?? view);
+}
+
+function snapshotType(value: unknown, live: NodeType | null = null): NodeType | null {
   const parsed = NodeTypeSchema.safeParse(value);
   if (!parsed.success) {
     return null;
   }
-  const type = parsed.data;
-  const seed = SEED_TYPE_VIEWS[type.slug];
-  const views = type.views ?? [];
-  if (!seed) {
-    return { ...type, fields: type.fields ?? [], views };
-  }
-  const seedById = new Map(seed.views.map((view) => [view.id, view]));
+  const raw = asSnapshotRecord(value);
   return {
-    ...type,
-    fields: type.fields ?? [],
-    views: views.map((view) =>
-      isBareViewDeclaration(view) ? (seedById.get(view.id) ?? view) : view,
-    ),
+    ...parsed.data,
+    fields: snapshotFields(raw, parsed.data, live),
+    views: snapshotViews(raw, parsed.data),
   };
 }
 
@@ -235,8 +274,10 @@ async function invertTypeChange(
   row: Activity,
   options: { purgeDeleted?: boolean } = {},
 ): Promise<{ before: unknown; after: unknown; action: Activity["action"] } | ToolError> {
-  const before = row.before == null ? null : snapshotType(row.before);
-  const after = row.after == null ? null : snapshotType(row.after);
+  const slug = typeSlugFromSnapshot(row.before) ?? typeSlugFromSnapshot(row.after);
+  const live = slug ? ((await getNodeType(client, slug)) ?? null) : null;
+  const before = row.before == null ? null : snapshotType(row.before, live);
+  const after = row.after == null ? null : snapshotType(row.after, live);
   if (row.before != null && !before) {
     return toolError("Type change is missing a valid before snapshot", "This row cannot be undone.");
   }

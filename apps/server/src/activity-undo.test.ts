@@ -615,10 +615,11 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
       );
     });
 
-    await t.test("undo accepts pre-slice type snapshots with string view ids", async () => {
+    await t.test("undo of a restyle-era task snapshot does not drop due", async () => {
       const ontology = await inspectOntology(pool, "types");
       const task = ontology.types.find((type) => type.slug === "task");
       assert.ok(task);
+      assert.ok(task.fields?.some((field) => field.name === "due"));
 
       const changed = await manageType(pool, {
         action: "update",
@@ -667,9 +668,51 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
       const after = await inspectOntology(pool, "types");
       const restored = after.types.find((type) => type.slug === "task");
       assert.equal(restored?.description, task.description);
+      assert.ok(restored?.fields?.some((field) => field.name === "due"));
       const board = restored?.views?.find((view) => view.id === "board");
       assert.deepEqual(board?.filter, { clauses: [{ bind: "status", op: "eq", value: "active" }] });
+    });
 
+    await t.test("undo of a task whose board filter was cleared stays cleared", async () => {
+      const ontology = await inspectOntology(pool, "types");
+      const task = ontology.types.find((type) => type.slug === "task");
+      assert.ok(task);
+
+      const cleared = await manageType(pool, {
+        action: "update",
+        slug: "task",
+        views: (task.views ?? []).map((view) => ({ id: view.id })),
+      });
+      assert.equal(isToolError(cleared), false);
+      if (isToolError(cleared)) {
+        return;
+      }
+      assert.equal(cleared.type.views?.find((view) => view.id === "board")?.filter, undefined);
+
+      const described = await manageType(pool, {
+        action: "update",
+        slug: "task",
+        description: "temporary description for cleared-board undo",
+      });
+      assert.equal(isToolError(described), false);
+      if (isToolError(described)) {
+        return;
+      }
+
+      const undone = await undoGraphActivity(pool, { id: described.activity_id, confirm: true });
+      assert.equal(isToolError(undone), false);
+      if (isToolError(undone)) {
+        assert.fail(undone.error);
+        return;
+      }
+      const after = await inspectOntology(pool, "types");
+      const restored = after.types.find((type) => type.slug === "task");
+      assert.equal(restored?.description, cleared.type.description);
+      assert.equal(restored?.views?.find((view) => view.id === "board")?.filter, undefined);
+      assert.ok(restored?.fields?.some((field) => field.name === "due"));
+    });
+
+    await t.test("undo accepts pre-slice type snapshots with string view ids", async () => {
       const authored = await manageType(pool, {
         action: "create",
         slug: "legacy_snapshot_type",
