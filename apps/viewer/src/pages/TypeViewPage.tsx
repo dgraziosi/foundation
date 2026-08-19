@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Toggle } from "@/components/ui/toggle";
@@ -16,7 +16,7 @@ import { resolveActiveView, resolveDeclaredViews, VIEW_LABELS } from "../views/r
 export function TypeViewPage({ slug: forcedSlug }: { slug?: string }) {
   const { slug: routeSlug } = useParams();
   const slug = forcedSlug ?? routeSlug ?? "";
-  const { openDetail } = useShell();
+  const { openDetail, openCollection } = useShell();
   const lane = useThemeLane();
   const typeQuery = useQuery({
     queryKey: ["type", slug],
@@ -54,6 +54,13 @@ export function TypeViewPage({ slug: forcedSlug }: { slug?: string }) {
   const Icon = typeIcon(identity);
   const colors = typeColors(identity, lane);
   const count = typeQuery.data?.nodes.length ?? 0;
+
+  useEffect(() => {
+    const label = typeQuery.data?.type.label;
+    if (slug && label) {
+      openCollection(slug, label);
+    }
+  }, [slug, typeQuery.data?.type.label, openCollection]);
 
   return (
     <ScrollArea className="flex min-h-0 flex-1 flex-col">
@@ -113,7 +120,10 @@ export function TypeViewPage({ slug: forcedSlug }: { slug?: string }) {
                   graphEdges={graph.data?.edges}
                   types={ontology.data?.types}
                   onSelect={(id) => {
-                    const node = queried.find((item) => item.id === id);
+                    const node =
+                      queried.find((item) => item.id === id) ??
+                      graph.data?.nodes.find((item) => item.id === id) ??
+                      typeQuery.data?.children.find((item) => item.id === id);
                     openDetail(id, node?.title);
                   }}
                   empty={empty}

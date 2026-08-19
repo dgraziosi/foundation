@@ -501,6 +501,30 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       assert.equal(write.status, 404);
     });
 
+    await t.test("ancestors are root to parent", async () => {
+      const area = await upsertGraphNode(pool, { type: "area", title: "Fixture area" });
+      assert.equal(isToolError(area), false);
+      if (isToolError(area)) {
+        return;
+      }
+      const hung = await linkGraphNodes(pool, {
+        from_id: project.node.id,
+        to_id: area.node.id,
+        relation_type: "child_of",
+        from_base_updated_at: project.node.updated_at,
+        to_base_updated_at: area.node.updated_at,
+      });
+      assert.equal(isToolError(hung), false);
+
+      const res = await fetch(`${origin}/view/api/nodes/${dueTask.node.id}`, { headers: authHeader() });
+      assert.equal(res.status, 200);
+      const body = (await res.json()) as { ancestors: Array<{ title: string }> };
+      assert.deepEqual(
+        body.ancestors.map((item) => item.title),
+        ["Fixture area", "Fixture project"],
+      );
+    });
+
     await t.test("node API shows title, payload, neighbors, and no write controls", async () => {
       const res = await fetch(`${origin}/view/api/nodes/${note.node.id}`, { headers: authHeader() });
       assert.equal(res.status, 200);

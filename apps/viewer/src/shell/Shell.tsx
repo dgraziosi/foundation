@@ -2,37 +2,19 @@ import { Menu } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { isUuid } from "../format";
 import { SearchOverlay } from "../pages/SearchPage";
 import { ShellContext, type HostTab, type ShellOutlet } from "./context";
 import { Rail } from "./Rail";
-import { tabKey, ViewStrip } from "./ViewStrip";
-
-function pathTab(pathname: string, params: { slug?: string; id?: string }): HostTab | { kind: "home" } {
-  if (pathname === "/recents" || pathname.startsWith("/recents/")) {
-    return { kind: "recents", label: "Recents" };
-  }
-  if (params.slug) {
-    return { kind: "collection", slug: params.slug, label: params.slug };
-  }
-  if (params.id && isUuid(params.id)) {
-    return { kind: "detail", id: params.id, label: "Detail" };
-  }
-  return { kind: "home" };
-}
-
-function hrefFor(tab: HostTab | { kind: "home" }): string {
-  if (tab.kind === "home") {
-    return "/";
-  }
-  if (tab.kind === "recents") {
-    return "/recents";
-  }
-  if (tab.kind === "collection") {
-    return `/types/${tab.slug}`;
-  }
-  return `/nodes/${tab.id}`;
-}
+import {
+  hrefFor,
+  pathTab,
+  syncHostTabs,
+  tabKey,
+  upsertCollectionTab,
+  upsertDetailTab,
+  upsertRecentsTab,
+} from "./tabs";
+import { ViewStrip } from "./ViewStrip";
 
 export function Shell() {
   const location = useLocation();
@@ -43,72 +25,37 @@ export function Shell() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [tabs, setTabs] = useState<HostTab[]>([]);
 
-  const current = pathTab(location.pathname, params);
+  const pathname = location.pathname;
+  const slug = params.slug;
+  const nodeId = params.id;
+  const current = useMemo(() => pathTab(pathname, { slug, id: nodeId }), [pathname, slug, nodeId]);
   const activeKey = tabKey(current);
 
   useEffect(() => {
-    if (current.kind === "home") {
-      return;
-    }
-    setTabs((existing) => {
-      const key = tabKey(current);
-      const index = existing.findIndex((tab) => tabKey(tab) === key);
-      if (index === -1) {
-        return [...existing, current];
-      }
-      const next = [...existing];
-      const prev = next[index]!;
-      if (current.kind === "collection" && prev.kind === "collection") {
-        next[index] = { ...prev, label: current.label || prev.label };
-      }
-      if (current.kind === "detail" && prev.kind === "detail" && current.label !== "Detail") {
-        next[index] = { ...prev, label: current.label };
-      }
-      return next;
-    });
+    setTabs((existing) => syncHostTabs(existing, current));
   }, [current]);
 
   const openDetail = useCallback(
     (id: string, label = "Detail") => {
       setSearchOpen(false);
-      setTabs((existing) => {
-        const key = `node:${id}`;
-        if (existing.some((tab) => tabKey(tab) === key)) {
-          return existing.map((tab) =>
-            tab.kind === "detail" && tab.id === id ? { ...tab, label: label === "Detail" ? tab.label : label } : tab,
-          );
-        }
-        return [...existing, { kind: "detail", id, label }];
-      });
+      setTabs((existing) => upsertDetailTab(existing, id, label));
       navigate(`/nodes/${id}`);
     },
     [navigate],
   );
 
   const openCollection = useCallback(
-    (slug: string, label?: string) => {
+    (nextSlug: string, label?: string) => {
       setSearchOpen(false);
-      setTabs((existing) => {
-        const key = `type:${slug}`;
-        if (existing.some((tab) => tabKey(tab) === key)) {
-          return existing.map((tab) =>
-            tab.kind === "collection" && tab.slug === slug ? { ...tab, label: label ?? tab.label } : tab,
-          );
-        }
-        return [...existing, { kind: "collection", slug, label: label ?? slug }];
-      });
-      navigate(`/types/${slug}`);
+      setTabs((existing) => upsertCollectionTab(existing, nextSlug, label));
+      navigate(`/types/${nextSlug}`);
     },
     [navigate],
   );
 
   const openRecents = useCallback(() => {
     setSearchOpen(false);
-    setTabs((existing) =>
-      existing.some((tab) => tab.kind === "recents")
-        ? existing
-        : [...existing, { kind: "recents", label: "Recents" }],
-    );
+    setTabs((existing) => upsertRecentsTab(existing));
     navigate("/recents");
   }, [navigate]);
 

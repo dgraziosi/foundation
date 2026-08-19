@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { dueTone, recencyGroup, taskDueGroup } from "./view-data.js";
+import { dueTone, recencyGroup, rootToParent, taskDueGroup } from "./view-data.js";
 
 test("dueTone marks overdue, today, and future", () => {
   assert.equal(dueTone("2026-08-01", "2026-08-19"), "overdue");
@@ -21,4 +21,11 @@ test("recencyGroup is Today / Yesterday / Earlier this week / Earlier", () => {
   assert.equal(recencyGroup("2026-08-18T12:00:00Z", now), "Yesterday");
   assert.equal(recencyGroup("2026-08-17T12:00:00Z", now), "Earlier this week");
   assert.equal(recencyGroup("2026-08-01T12:00:00Z", now), "Earlier");
+});
+
+test("ancestors are root → parent", () => {
+  assert.deepEqual(
+    rootToParent([{ title: "Project" }, { title: "Area" }]).map((item) => item.title),
+    ["Area", "Project"],
+  );
 });

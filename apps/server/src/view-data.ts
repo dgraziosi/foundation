@@ -89,6 +89,11 @@ export function recencyGroup(iso: string, now = new Date()): RecencyGroup {
 
 export type TaskDueGroup = "Overdue" | "Today" | "Upcoming" | "No date";
 
+/** Closest-first walk → root → parent for Structure and Location. */
+export function rootToParent<T>(closestFirst: readonly T[]): T[] {
+  return closestFirst.slice().reverse();
+}
+
 export function taskDueGroup(due: string | undefined, today = todayInNewYork()): TaskDueGroup {
   if (!due) {
     return "No date";
@@ -394,6 +399,7 @@ export async function viewNode(pool: Pool, id: string, dataDir: string) {
       (edge) => edge.relation_type === HIERARCHY_RELATION && edge.direction === "out",
     )?.neighbor.id;
   }
+  const orderedAncestors = rootToParent(ancestors);
   const childRows = await listOutlineChildren(pool, [got.node.id]);
   const children = childRows
     .filter((row) => row.parent_id === got.node.id)
@@ -427,7 +433,7 @@ export async function viewNode(pool: Pool, id: string, dataDir: string) {
       : null,
     edges: got.edges,
     related,
-    ancestors,
+    ancestors: orderedAncestors,
     children,
     blob: got.blob,
     suggested_links: got.suggested_links,

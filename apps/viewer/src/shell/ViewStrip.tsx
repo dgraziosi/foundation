@@ -2,6 +2,9 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { HostTab } from "./context";
+import { tabKey } from "./tabs";
+
+export { tabKey } from "./tabs";
 
 export function ViewStrip({
   tabs,
@@ -50,17 +53,4 @@ export function ViewStrip({
       })}
     </div>
   );
-}
-
-export function tabKey(tab: HostTab | { kind: "home" }): string {
-  if (tab.kind === "home") {
-    return "home";
-  }
-  if (tab.kind === "recents") {
-    return "recents";
-  }
-  if (tab.kind === "collection") {
-    return `type:${tab.slug}`;
-  }
-  return `node:${tab.id}`;
 }

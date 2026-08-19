@@ -63,12 +63,28 @@ test("click from graph / Recents / collection / search opens a detail page", asy
   assert.match(search, /data-surface="search-overlay"/);
   const typeView = await src("pages/TypeViewPage.tsx");
   assert.match(typeView, /openDetail\(id/);
+  assert.match(typeView, /graph\.data\?\.nodes/);
   const detail = await src("pages/DetailPage.tsx");
   assert.match(detail, /data-surface="detail-page"/);
   assert.match(detail, /min-w-\[240px\]/);
   assert.doesNotMatch(detail, /Sheet/);
   assert.match(detail, /Properties/);
   assert.match(detail, /openDetail\(row\.neighbor\.id/);
+  assert.match(detail, /ancestors\.map/);
+  assert.match(detail, /data-ancestors="root-to-parent"/);
+  assert.doesNotMatch(detail, /ancestors\.reverse/);
+});
+
+test("tab sync does not loop setState; collection titles stay the type label", async () => {
+  const shell = await src("shell/Shell.tsx");
+  assert.match(shell, /useMemo\(\(\) => pathTab/);
+  assert.match(shell, /syncHostTabs\(existing, current\)/);
+  assert.match(shell, /\[pathname, slug, nodeId\]/);
+  const tabs = await src("shell/tabs.ts");
+  assert.match(tabs, /return existing/);
+  assert.match(tabs, /nextLabel === slug && prev\.label !== slug/);
+  const typeView = await src("pages/TypeViewPage.tsx");
+  assert.match(typeView, /openCollection\(slug, label\)/);
 });
 
 test("type identity is read from the ontology with a quiet fallback", async () => {

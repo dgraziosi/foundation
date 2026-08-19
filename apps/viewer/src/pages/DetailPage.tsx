@@ -115,7 +115,7 @@ export function DetailPage() {
             <section className="flex max-h-[50vh] flex-col gap-sm overflow-auto">
               <h2 className="text-label text-muted-foreground">Structure</h2>
               {ancestors.length > 0 ? (
-                <div className="flex flex-wrap gap-2 text-meta">
+                <div className="flex flex-wrap gap-2 text-meta" data-ancestors="root-to-parent">
                   {ancestors.map((item, index) => (
                     <span key={item.id} className="flex items-center gap-1">
                       {index > 0 ? <span className="text-muted-foreground">/</span> : null}
@@ -216,7 +216,7 @@ export function DetailPage() {
                 {ancestors.length === 0 ? (
                   <Quiet>Home</Quiet>
                 ) : (
-                  <div className="flex flex-col">
+                  <div className="flex flex-col" data-ancestors="root-to-parent">
                     {ancestors.map((item) => (
                       <Button
                         key={item.id}
