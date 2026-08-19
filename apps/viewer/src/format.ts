@@ -60,3 +60,32 @@ export function isUuid(value: string): boolean {
     value,
   );
 }
+
+export type SearchSnippetPart = { text: string; hit: boolean };
+
+function stripHeadlineTags(text: string): string {
+  return text.replace(/<\/?b>/gi, "");
+}
+
+/** Split a Postgres ts_headline snippet so `<b>` marks become emphasis, not raw tags. */
+export function parseSearchSnippet(snippet: string): SearchSnippetPart[] {
+  const parts: SearchSnippetPart[] = [];
+  const re = /<b>(.*?)<\/b>/gi;
+  let last = 0;
+  for (const match of snippet.matchAll(re)) {
+    const index = match.index ?? 0;
+    if (index > last) {
+      const plain = stripHeadlineTags(snippet.slice(last, index));
+      if (plain) {
+        parts.push({ text: plain, hit: false });
+      }
+    }
+    parts.push({ text: match[1] ?? "", hit: true });
+    last = index + match[0].length;
+  }
+  const tail = stripHeadlineTags(snippet.slice(last));
+  if (tail) {
+    parts.push({ text: tail, hit: false });
+  }
+  return parts;
+}

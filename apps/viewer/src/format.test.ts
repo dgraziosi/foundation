@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { dueTone, isUuid, relativeTime, truncate } from "./format";
+import { dueTone, isUuid, parseSearchSnippet, relativeTime, truncate } from "./format";
 
 test("dueTone: overdue, today, future", () => {
   assert.equal(dueTone("2026-08-01", "2026-08-19"), "overdue");
@@ -21,4 +21,21 @@ test("truncate and uuid helpers", () => {
   assert.equal(truncate("abcdefghijklmnopqrstuvwxyz", 8), "abcdefg…");
   assert.equal(isUuid("11111111-1111-4111-8111-111111111111"), true);
   assert.equal(isUuid("not-a-uuid"), false);
+});
+
+test("parseSearchSnippet turns FTS <b> marks into emphasis parts", () => {
+  assert.deepEqual(parseSearchSnippet("note about <b>fiancee</b> dinner"), [
+    { text: "note about ", hit: false },
+    { text: "fiancee", hit: true },
+    { text: " dinner", hit: false },
+  ]);
+  assert.deepEqual(parseSearchSnippet("no marks here"), [{ text: "no marks here", hit: false }]);
+  assert.deepEqual(parseSearchSnippet("see <b>one</b> and <b>two</b>"), [
+    { text: "see ", hit: false },
+    { text: "one", hit: true },
+    { text: " and ", hit: false },
+    { text: "two", hit: true },
+  ]);
+  assert.deepEqual(parseSearchSnippet("raw <b>open"), [{ text: "raw open", hit: false }]);
+  assert.deepEqual(parseSearchSnippet("stray </b> close"), [{ text: "stray  close", hit: false }]);
 });

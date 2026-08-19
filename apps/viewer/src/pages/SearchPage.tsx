@@ -6,8 +6,19 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { fetchOntology, fetchSearch } from "../api";
+import { parseSearchSnippet } from "../format";
 import { DueChip, TypeTag } from "../ui/Tags";
 import { LoadError, Placeholders } from "../ui/States";
+
+function SearchSnippet({ text }: { text: string }) {
+  return (
+    <>
+      {parseSearchSnippet(text).map((part, index) =>
+        part.hit ? <b key={index}>{part.text}</b> : part.text,
+      )}
+    </>
+  );
+}
 
 type Outlet = { selectedId?: string; select: (id: string) => void };
 
@@ -125,7 +136,9 @@ export function SearchPage() {
             >
               <span className="flex min-w-0 flex-col items-start text-left">
                 <span className="break-words font-semibold">{hit.title}</span>
-                <span className="break-words text-meta text-muted-foreground">{hit.snippet}</span>
+                <span className="break-words text-meta text-muted-foreground">
+                  <SearchSnippet text={hit.snippet} />
+                </span>
               </span>
               <span className="flex shrink-0 items-center gap-2">
                 <TypeTag type={hit.type} />

@@ -35,6 +35,12 @@ test("chrome uses shadcn primitives, not homemade fields", async () => {
   assert.match(tags, /from "@\/components\/ui\/badge"/);
 });
 
+test("Search snippets render FTS highlights instead of raw <b> tags", async () => {
+  const search = await readFile(join(root, "pages/SearchPage.tsx"), "utf8");
+  assert.match(search, /parseSearchSnippet/);
+  assert.doesNotMatch(search, /\{hit\.snippet\}/);
+});
+
 test("type Select viewport can grow past the trigger height", async () => {
   const select = await readFile(join(root, "components/ui/select.tsx"), "utf8");
   assert.doesNotMatch(select, /(?<!min-)h-\[var\(--radix-select-trigger-height\)\]/);
