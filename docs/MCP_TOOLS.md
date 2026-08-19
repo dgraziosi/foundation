@@ -64,7 +64,7 @@ Read-only agenda around one live node. New tool — not a `get` flag.
 | `role` | `"work"` (open item around the root) or `"parent"` (ancestor that explains why the root exists) |
 | `due` | Value of the type’s field with role `date` when set (seed `data.due` on `task` / `goal`) |
 | `start` / `end` | Values of fields with those roles when set (seed `trip`) |
-| `via` | `{ relation, direction, hops }` — the edge that reached this row from the root. `direction` is `incoming` (neighbor points at the root: a `child_of` child, an `about` source) or `outgoing` (root points at the neighbor: a `child_of` parent). `hops` is 1 or 2 for work; ancestor hops follow the chain. |
+| `via` | `{ relation, direction, hops }` — the edge that reached this row from the root. `direction` is `incoming` (neighbor points at the root: a `child_of` child, an `about` source) or `outgoing` (root points at the neighbor: a `child_of` parent). `hops` is 1 or 2 for work; ancestor hops follow the chain. Several live edges to the same neighbor yield **one row**; `via.relation` is the more specific verb (`about` or `supports` over `relates_to`; hierarchy over associative). |
 | `parent` | Immediate live hierarchy parent `{ id, title, type }` when the item itself hangs under something |
 
 **Sort.** `role: "parent"` first, nearest parent then further ancestors. Then `role: "work"`: overdue first, then upcoming by the sort date, then undated (title as tie-break). Sort date is `due` when set, else `start`. Overdue is sort date before today in America/New_York.

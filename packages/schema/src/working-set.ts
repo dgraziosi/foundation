@@ -202,6 +202,33 @@ export function planWorkingSetWalk(
   };
 }
 
+/**
+ * Lower is more specific. Hierarchy, then targeted about-like relations,
+ * then other associative verbs (`supports`), then generic `relates_to`.
+ */
+export function workRelationSpecificity(slug: string, plan: WorkingSetWalkPlan): number {
+  if (plan.hierarchyRelations.includes(slug)) {
+    return 0;
+  }
+  if (plan.incomingOnlyRelations.includes(slug)) {
+    return 1;
+  }
+  if (slug === "relates_to") {
+    return 3;
+  }
+  return 2;
+}
+
+/** One via per neighbor: keep the more specific relation slug. */
+export function preferWorkRelation(left: string, right: string, plan: WorkingSetWalkPlan): string {
+  const leftRank = workRelationSpecificity(left, plan);
+  const rightRank = workRelationSpecificity(right, plan);
+  if (leftRank !== rightRank) {
+    return leftRank < rightRank ? left : right;
+  }
+  return left < right ? left : right;
+}
+
 export function workItemPassesSpineRootWindow(input: {
   sortDate?: string;
   hops: number;

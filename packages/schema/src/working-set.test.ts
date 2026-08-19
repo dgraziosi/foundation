@@ -7,6 +7,7 @@ import {
   compareWorkingSetItems,
   datesFromNodeData,
   planWorkingSetWalk,
+  preferWorkRelation,
   workItemPassesSpineRootWindow,
 } from "./working-set.js";
 
@@ -114,6 +115,14 @@ test("spine-root window keeps overdue, in-window, and undated depth-1", () => {
     false,
   );
   assert.equal(addIsoDays("2026-08-19", 14), "2026-09-02");
+});
+
+test("preferWorkRelation: about and supports beat relates_to", () => {
+  const person = planWorkingSetWalk(seedType("person"), SEED_NODE_TYPES, SEED_RELATION_TYPES);
+  assert.equal(preferWorkRelation("about", "relates_to", person), "about");
+  assert.equal(preferWorkRelation("relates_to", "about", person), "about");
+  const trip = planWorkingSetWalk(seedType("trip"), SEED_NODE_TYPES, SEED_RELATION_TYPES);
+  assert.equal(preferWorkRelation("supports", "relates_to", trip), "supports");
 });
 
 test("applyWorkingSetCap keeps parents then work and flags truncated", () => {

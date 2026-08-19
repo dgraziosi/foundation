@@ -123,6 +123,10 @@ test(
       const relatedNote = await created(pool, { type: "note", title: "Notes on the fixture person" });
       await linked(pool, aboutTask, person, "about");
       await linked(pool, relatedNote, person, "relates_to");
+      const dualPerson = await created(pool, { type: "person", title: "Dual-edge person" });
+      const dualTask = await created(pool, { type: "task", title: "Dual-edge task" });
+      await linked(pool, dualTask, dualPerson, "about");
+      await linked(pool, dualTask, dualPerson, "relates_to");
 
       const emptyGoal = await created(pool, { type: "goal", title: "Empty fixture goal" });
 
@@ -253,6 +257,18 @@ test(
           false,
         );
         assert.equal(set.walk.relations.includes("child_of"), false);
+      });
+
+      await t.test("person with about and relates_to to the same task is one row", async () => {
+        const set = await workingSetGraph(pool, { id: dualPerson.id });
+        assert.equal(isToolError(set), false);
+        if (isToolError(set)) {
+          return;
+        }
+        const dual = set.items.filter((item) => item.id === dualTask.id);
+        assert.equal(dual.length, 1);
+        assert.equal(dual[0]?.via.relation, "about");
+        assert.equal(set.items.filter((item) => item.role === "work").length, 1);
       });
 
       await t.test("4. task: parent chain includes a completed ancestor", async () => {

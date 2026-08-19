@@ -16,6 +16,7 @@ import {
   compareWorkingSetItems,
   datesFromNodeData,
   planWorkingSetWalk,
+  preferWorkRelation,
   sortDateOf,
   todayInNewYork,
   toolError,
@@ -178,10 +179,25 @@ async function walkWork(
   const hop1Edges = rootEdges.filter((edge) =>
     edgeMatchesWork(edge, plan, plan.work === "children" || plan.work === "event"),
   );
-  const hop1Ids = hop1Edges.map((edge) => edge.neighbor.id).filter((id) => !seen.has(id));
+  const hop1EdgeById = new Map<string, IncidentEdge>();
+  for (const edge of hop1Edges) {
+    const id = edge.neighbor.id;
+    if (seen.has(id)) {
+      continue;
+    }
+    const existing = hop1EdgeById.get(id);
+    if (!existing) {
+      hop1EdgeById.set(id, edge);
+      continue;
+    }
+    const preferred = preferWorkRelation(existing.relation_type, edge.relation_type, plan);
+    if (preferred === edge.relation_type && preferred !== existing.relation_type) {
+      hop1EdgeById.set(id, edge);
+    }
+  }
+  const hop1Ids = [...hop1EdgeById.keys()];
   const hop1Nodes = await listLiveNodesByIds(pool, hop1Ids);
   const hop1ById = new Map(hop1Nodes.map((node) => [node.id, node]));
-  const hop1EdgeById = new Map(hop1Edges.map((edge) => [edge.neighbor.id, edge]));
   const hop1ParentEdges =
     hop1Ids.length > 0 ? await listIncidentEdgesForNodes(pool, hop1Ids) : new Map();
 
