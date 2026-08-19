@@ -27,24 +27,81 @@ export function graphScreenFont(screenPx: number, scale: number): number {
   return screenPx / Math.max(scale, 0.01);
 }
 
-const glyphCache = new Map<string, HTMLImageElement>();
+const glyphSvgCache = new Map<string, string>();
 
-export function lucideGlyphImage(Icon: LucideIcon, ink: string): HTMLImageElement | undefined {
-  if (typeof Image === "undefined") {
-    return undefined;
-  }
+export function lucideGlyphSvg(Icon: LucideIcon, ink: string): string {
   const key = `${Icon.displayName ?? "icon"}:${ink}`;
-  const hit = glyphCache.get(key);
+  const hit = glyphSvgCache.get(key);
   if (hit) {
     return hit;
   }
   const svg = renderToStaticMarkup(
-    createElement(Icon, { size: GRAPH_GLYPH_PX, color: ink, strokeWidth: 2 }),
+    createElement(Icon, { size: 24, color: ink, strokeWidth: 2 }),
   );
-  const img = new Image();
-  img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-  glyphCache.set(key, img);
-  return img;
+  glyphSvgCache.set(key, svg);
+  return svg;
+}
+
+function attr(block: string, name: string): string {
+  return block.match(new RegExp(`${name}="([^"]*)"`))?.[1] ?? "";
+}
+
+export function drawLucideGlyph(
+  ctx: CanvasRenderingContext2D,
+  Icon: LucideIcon,
+  ink: string,
+  x: number,
+  y: number,
+  size: number,
+): void {
+  const svg = lucideGlyphSvg(Icon, ink);
+  const scale = size / 24;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.strokeStyle = ink;
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  for (const match of svg.matchAll(/<(path|circle|line|polyline|polygon|rect|ellipse)\b([^>]*)\/?>/g)) {
+    const tag = match[1];
+    const raw = match[2] ?? "";
+    ctx.beginPath();
+    if (tag === "path") {
+      ctx.stroke(new Path2D(attr(raw, "d")));
+      continue;
+    }
+    if (tag === "circle") {
+      ctx.arc(Number(attr(raw, "cx")), Number(attr(raw, "cy")), Number(attr(raw, "r")), 0, Math.PI * 2);
+    } else if (tag === "line") {
+      ctx.moveTo(Number(attr(raw, "x1")), Number(attr(raw, "y1")));
+      ctx.lineTo(Number(attr(raw, "x2")), Number(attr(raw, "y2")));
+    } else if (tag === "polyline" || tag === "polygon") {
+      const points = attr(raw, "points")
+        .trim()
+        .split(/\s+/)
+        .map((pair) => pair.split(",").map(Number));
+      points.forEach(([px, py], i) => {
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      });
+      if (tag === "polygon") ctx.closePath();
+    } else if (tag === "rect") {
+      ctx.rect(Number(attr(raw, "x") || 0), Number(attr(raw, "y") || 0), Number(attr(raw, "width")), Number(attr(raw, "height")));
+    } else if (tag === "ellipse") {
+      ctx.ellipse(
+        Number(attr(raw, "cx")),
+        Number(attr(raw, "cy")),
+        Number(attr(raw, "rx")),
+        Number(attr(raw, "ry")),
+        0,
+        0,
+        Math.PI * 2,
+      );
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 export function measureGraphMark(
@@ -110,10 +167,7 @@ export function paintGraphMark(
   ctx.strokeStyle = opts.selected || opts.match ? opts.ink : colors.ink;
   ctx.stroke();
 
-  const img = lucideGlyphImage(typeIcon(slug), colors.ink);
-  if (img?.complete && img.naturalWidth > 0) {
-    ctx.drawImage(img, x + pad, y + pad, glyph, glyph);
-  }
+  drawLucideGlyph(ctx, typeIcon(slug), colors.ink, x + pad, y + pad, glyph);
 
   ctx.fillStyle = colors.ink;
   ctx.font = `400 ${typePx}px Inter, ui-sans-serif, system-ui, sans-serif`;

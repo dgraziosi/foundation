@@ -18,7 +18,7 @@ test("graph marks use Lucide and keep type text at 12px", async () => {
   const canvas = await readFile(join(root, "GraphCanvas.tsx"), "utf8");
   const src = `${marks}\n${canvas}`;
   assert.match(marks, /typeIcon/);
-  assert.match(marks, /lucideGlyphImage/);
+  assert.match(marks, /drawLucideGlyph/);
   assert.match(marks, /renderToStaticMarkup/);
   assert.match(canvas, /paintGraphMark/);
   assert.doesNotMatch(src, /slice\(\s*0\s*,\s*1\s*\)/);
