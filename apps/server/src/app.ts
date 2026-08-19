@@ -10,11 +10,23 @@ import { registerViewRoutes } from "./view.js";
 /** 20MB blob cap as base64 plus JSON-RPC envelope. */
 const JSON_BODY_LIMIT = "32mb";
 
+const localhostHosts = hostHeaderValidation(["localhost", "127.0.0.1", "[::1]"]);
+
+/** MCP and agent blob paths stay localhost-Host. `/view` must work off-box. */
+function hostGuard(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  const path = (req.originalUrl.split("?")[0] ?? "").replace(/\/+$/, "") || "/";
+  if (path === "/view" || path.startsWith("/view/")) {
+    next();
+    return;
+  }
+  localhostHosts(req, res, next);
+}
+
 export function createApp(pool: Pool, config: AppConfig): Express {
   const app = express();
   app.use(express.json({ limit: JSON_BODY_LIMIT }));
   app.use(express.urlencoded({ extended: false }));
-  app.use(hostHeaderValidation(["localhost", "127.0.0.1", "[::1]"]));
+  app.use(hostGuard);
 
   app.get("/health", async (_req, res) => {
     const db = await pingDb(pool);

@@ -1,0 +1,156 @@
+export class AuthError extends Error {
+  constructor(message = "API key required") {
+    super(message);
+    this.name = "AuthError";
+  }
+}
+
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+async function viewFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(path, { credentials: "include", ...init });
+  if (res.status === 401) {
+    throw new AuthError();
+  }
+  const body = (await res.json().catch(() => ({}))) as { error?: string } & T;
+  if (!res.ok) {
+    throw new ApiError(res.status, body.error ?? "Could not load.");
+  }
+  return body;
+}
+
+export type OntologyType = { slug: string; label: string };
+export type SearchHit = {
+  id: string;
+  type: string;
+  title: string;
+  status: string;
+  snippet: string;
+  due?: string;
+};
+export type GraphNode = { id: string; title: string; type: string; status: string };
+export type GraphEdge = {
+  id: string;
+  from: string;
+  to: string;
+  relation_type: string;
+  kind: "hierarchy" | "associative";
+};
+export type RecentRow = {
+  id: string;
+  action: string;
+  summary: string;
+  title?: string;
+  type?: string;
+  node_id?: string;
+  created_at: string;
+};
+export type TaskCard = {
+  id: string;
+  title: string;
+  status: "active" | "completed" | "archived";
+  due?: string;
+  due_tone?: "overdue" | "today" | "future";
+  parent_title?: string;
+};
+export type Neighbor = { id: string; title: string; type: string };
+export type IncidentEdge = {
+  id: string;
+  relation_type: string;
+  direction: "in" | "out";
+  neighbor: Neighbor;
+};
+export type SuggestedLink = {
+  kind: string;
+  target: Neighbor;
+  reason: string;
+};
+export type NodeDetail = {
+  node: {
+    id: string;
+    title: string;
+    type: string;
+    status: string;
+    data: Record<string, unknown>;
+    payload: {
+      media_type: string;
+      storage: "inline" | "blob";
+      body?: string;
+      blob_id?: string;
+    };
+  };
+  edges: IncidentEdge[];
+  blob?: {
+    id: string;
+    media_type: string;
+    byte_size: number;
+    sha256: string;
+  };
+  suggested_links: SuggestedLink[];
+  due: string | null;
+  due_tone: "overdue" | "today" | "future" | null;
+};
+
+export function session() {
+  return viewFetch<{ ok: true }>("/view/api/session");
+}
+
+export function unlock(apiKey: string) {
+  return viewFetch<{ ok: true }>("/view/unlock", {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify({ api_key: apiKey }),
+  });
+}
+
+export function fetchOntology() {
+  return viewFetch<{ types: OntologyType[] }>("/view/api/ontology");
+}
+
+export function fetchSearch(input: { q: string; type: string; status: string }) {
+  const params = new URLSearchParams();
+  if (input.q) {
+    params.set("q", input.q);
+  }
+  if (input.type) {
+    params.set("type", input.type);
+  }
+  if (input.status) {
+    params.set("status", input.status);
+  }
+  const suffix = params.toString() ? `?${params}` : "";
+  return viewFetch<{ searched: boolean; hits: SearchHit[]; error?: string }>(
+    `/view/api/search${suffix}`,
+  );
+}
+
+export function fetchGraph(input: { focus?: string; type?: string } = {}) {
+  const params = new URLSearchParams();
+  if (input.focus) {
+    params.set("focus", input.focus);
+  }
+  if (input.type) {
+    params.set("type", input.type);
+  }
+  const suffix = params.toString() ? `?${params}` : "";
+  return viewFetch<{ nodes: GraphNode[]; edges: GraphEdge[] }>(`/view/api/graph${suffix}`);
+}
+
+export function fetchRecents() {
+  return viewFetch<{ rows: RecentRow[] }>("/view/api/recents");
+}
+
+export function fetchTasks() {
+  return viewFetch<{ tasks: TaskCard[] }>("/view/api/tasks");
+}
+
+export function fetchNode(id: string) {
+  return viewFetch<NodeDetail>(`/view/api/nodes/${encodeURIComponent(id)}`);
+}
