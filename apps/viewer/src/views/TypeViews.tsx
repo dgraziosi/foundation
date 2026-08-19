@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -6,7 +6,7 @@ import type { OntologyType, TypeField, TypeViewNode, ViewDeclaration, ViewEngine
 import { GraphCanvas } from "../graph/GraphCanvas";
 import { useThemeLane } from "../theme";
 import { typeColors, typeIcon } from "../type-meta";
-import { DueChip, StatusTag, TypeTag } from "../ui/Tags";
+import { DueChip, StatusTag } from "../ui/Tags";
 import { Quiet } from "../ui/States";
 import { boardColumnIds, calendarAxisRole } from "./query";
 
@@ -18,13 +18,21 @@ function NodeRow({
   node,
   selected,
   onSelect,
+  onFocus,
   meta,
+  types,
 }: {
   node: TypeViewNode;
   selected: boolean;
   onSelect: (id: string) => void;
+  onFocus?: (id: string) => void;
   meta?: string;
+  types?: OntologyType[];
 }) {
+  const lane = useThemeLane();
+  const identity = types?.find((type) => type.slug === node.type) ?? { slug: node.type };
+  const Icon = typeIcon(identity);
+  const colors = typeColors(identity, lane);
   return (
     <Button
       type="button"
@@ -35,18 +43,24 @@ function NodeRow({
         selected && "bg-active",
       )}
       onClick={() => onSelect(node.id)}
+      onFocus={() => onFocus?.(node.id)}
+      onMouseEnter={() => onFocus?.(node.id)}
     >
-      <span className="flex min-w-0 flex-col items-start text-left">
-        <span className="break-words font-medium">{node.title}</span>
-        {node.chips && node.chips.length > 0 ? (
-          <span className="text-meta text-muted-foreground">
-            {node.chips.map((chip) => chip.value).join(" · ")}
-          </span>
-        ) : null}
-        {meta ? <span className="text-meta text-muted-foreground">{meta}</span> : null}
+      <span className="flex min-w-0 items-center gap-2">
+        <span style={{ color: colors.ink }}>
+          <Icon size={16} strokeWidth={2} />
+        </span>
+        <span className="flex min-w-0 flex-col items-start text-left">
+          <span className="break-words font-medium">{node.title}</span>
+          {node.chips && node.chips.length > 0 ? (
+            <span className="text-meta text-muted-foreground">
+              {node.chips.map((chip) => chip.value).join(" · ")}
+            </span>
+          ) : null}
+          {meta ? <span className="text-meta text-muted-foreground">{meta}</span> : null}
+        </span>
       </span>
       <span className="flex shrink-0 items-center gap-2">
-        <TypeTag type={node.type} />
         {node.due ? <DueChip due={node.due} tone={node.due_tone} /> : null}
       </span>
     </Button>
@@ -58,20 +72,44 @@ export function ListView({
   selectedId,
   onSelect,
   empty,
+  types,
 }: {
   nodes: TypeViewNode[];
   selectedId?: string;
   onSelect: (id: string) => void;
   empty: string;
+  types?: OntologyType[];
 }) {
+  const [focused, setFocused] = useState<string>();
+  const preview = nodes.find((node) => node.id === focused) ?? nodes.find((node) => node.id === selectedId);
   if (nodes.length === 0) {
     return <Quiet>{empty}</Quiet>;
   }
   return (
-    <div className="flex flex-col">
-      {nodes.map((node) => (
-        <NodeRow key={node.id} node={node} selected={selectedId === node.id} onSelect={onSelect} />
-      ))}
+    <div className="grid min-h-0 flex-1 grid-cols-1 gap-md md:grid-cols-[minmax(0,1fr)_13rem]">
+      <div className="flex flex-col">
+        {nodes.map((node) => (
+          <NodeRow
+            key={node.id}
+            node={node}
+            selected={selectedId === node.id || focused === node.id}
+            onSelect={onSelect}
+            onFocus={setFocused}
+            types={types}
+          />
+        ))}
+      </div>
+      {preview ? (
+        <aside className="rounded-lg border border-hairline p-md" data-surface="collection-preview">
+          <div className="font-medium">{preview.title}</div>
+          {preview.chips && preview.chips.length > 0 ? (
+            <div className="text-meta text-muted-foreground">
+              {preview.chips.map((chip) => chip.value).join(" · ")}
+            </div>
+          ) : null}
+          {preview.due ? <DueChip due={preview.due} tone={preview.due_tone} /> : null}
+        </aside>
+      ) : null}
     </div>
   );
 }
@@ -81,11 +119,13 @@ export function CardView({
   selectedId,
   onSelect,
   empty,
+  types,
 }: {
   nodes: TypeViewNode[];
   selectedId?: string;
   onSelect: (id: string) => void;
   empty: string;
+  types?: OntologyType[];
 }) {
   const lane = useThemeLane();
   if (nodes.length === 0) {
@@ -94,8 +134,8 @@ export function CardView({
   return (
     <div className="grid grid-cols-1 gap-md sm:grid-cols-2 xl:grid-cols-3">
       {nodes.map((node) => {
-        const Icon = typeIcon(node.type);
-        const colors = typeColors(node.type, lane);
+        const Icon = typeIcon(types?.find((item) => item.slug === node.type) ?? { slug: node.type });
+        const colors = typeColors(types?.find((item) => item.slug === node.type) ?? { slug: node.type }, lane);
         return (
           <Button
             key={node.id}
@@ -190,14 +230,14 @@ export function BoardView({
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className="grid flex-1 grid-cols-1 items-start gap-md md:grid-cols-3" data-surface="board">
+    <div className="flex flex-wrap items-start gap-md" data-surface="board">
       {columns.map((column) => {
         const cards = nodes.filter((node) => node.status === column);
         return (
-          <Card className="flex min-h-48 flex-col" key={column}>
+          <Card className="flex min-h-48 w-[233px] shrink-0 flex-col" key={column}>
             <CardContent className="flex flex-col gap-2 p-md">
               <h3 className="text-label text-muted-foreground">{columnLabel(column)}</h3>
-              {column === "active" && cards.length === 0 ? <Quiet>No tasks yet.</Quiet> : null}
+              {cards.length === 0 ? <Quiet>Nothing yet.</Quiet> : null}
               {cards.map((node) => (
                 <Button
                   type="button"
@@ -395,6 +435,8 @@ export function EngineView({
   selectedId,
   onSelect,
   empty,
+  localGraph,
+  onLocalGraph,
 }: {
   view: ViewEngineId;
   viewDeclaration?: ViewDeclaration;
@@ -408,15 +450,17 @@ export function EngineView({
   selectedId?: string;
   onSelect: (id: string) => void;
   empty: string;
+  localGraph?: { focus: string; depth: number };
+  onLocalGraph?: (input: { focus: string; depth: number } | undefined) => void;
 }) {
   const declared = viewDeclaration ?? { id: view };
   const typeFields = fields ?? [];
   const hasDateRole = calendarAxisRole(typeFields) !== null;
   if (view === "list") {
-    return <ListView nodes={nodes} selectedId={selectedId} onSelect={onSelect} empty={empty} />;
+    return <ListView nodes={nodes} selectedId={selectedId} onSelect={onSelect} empty={empty} types={types} />;
   }
   if (view === "card") {
-    return <CardView nodes={nodes} selectedId={selectedId} onSelect={onSelect} empty={empty} />;
+    return <CardView nodes={nodes} selectedId={selectedId} onSelect={onSelect} empty={empty} types={types} />;
   }
   if (view === "table") {
     return (
@@ -479,7 +523,8 @@ export function EngineView({
       types={types}
       selectedId={selectedId}
       onSelect={onSelect}
-      findEnabled={false}
+      localGraph={localGraph}
+      onLocalGraph={onLocalGraph}
     />
   );
 }

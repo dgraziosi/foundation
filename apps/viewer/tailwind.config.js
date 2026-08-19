@@ -68,7 +68,7 @@ export default {
         row: "42px",
       },
       width: {
-        rail: "16rem",
+        rail: "14rem",
         inspector: "21rem",
       },
       boxShadow: {

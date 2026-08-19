@@ -210,6 +210,18 @@ test("upsert create accepts allow_duplicate", () => {
   assert.equal(parsed.allow_duplicate, true);
 });
 
+test("manage_type accepts hue and glyph", () => {
+  const parsed = ManageTypeInputSchema.parse({
+    action: "update",
+    slug: "task",
+    hue: "green",
+    glyph: "CircleCheck",
+  });
+  assert.equal(parsed.hue, "green");
+  assert.equal(parsed.glyph, "CircleCheck");
+  assert.throws(() => ManageTypeInputSchema.parse({ action: "update", slug: "task", hue: "#00ff00" }));
+});
+
 test("manage_type accepts retire with confirm and purge_deleted", () => {
   const retired = ManageTypeInputSchema.parse({
     action: "retire",

@@ -20,6 +20,7 @@ import {
   ViewDeclarationSchema,
   ViewEngineIdSchema,
 } from "./types.js";
+import { TypeGlyphSchema, TypeHueSchema } from "./type-identity.js";
 
 export const ToolErrorSchema = z.object({
   error: z.string(),
@@ -333,6 +334,8 @@ export const ManageTypeInputSchema = z.object({
   views: z.array(z.union([ViewEngineIdSchema, ViewDeclarationSchema])).optional(),
   default_view: ViewEngineIdSchema.optional(),
   fields: z.array(z.unknown()).optional(),
+  hue: TypeHueSchema.nullable().optional(),
+  glyph: TypeGlyphSchema.nullable().optional(),
   /** Required when action is retire. */
   confirm: z.boolean().optional(),
   /** Permanently drop leftover soft-deleted nodes when retiring a type. */

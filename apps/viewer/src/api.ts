@@ -61,6 +61,8 @@ export type OntologyType = {
   views: ViewEngineId[];
   default_view?: ViewEngineId;
   count: number;
+  hue?: string;
+  glyph?: string;
 };
 
 export type TypeViewChip = { name: string; display: string; value: string };
@@ -86,6 +88,9 @@ export type TypeView = {
     views: Array<ViewEngineId | ViewDeclaration>;
     default_view?: ViewEngineId;
     fields?: TypeField[];
+    hue?: string;
+    glyph?: string;
+    parent_types?: string[];
   };
   nodes: TypeViewNode[];
   children: TypeViewNode[];
@@ -108,12 +113,9 @@ export type GraphEdge = {
 };
 export type RecentRow = {
   id: string;
-  action: string;
-  summary: string;
-  title?: string;
-  type?: string;
-  node_id?: string;
-  created_at: string;
+  title: string;
+  type: string;
+  updated_at: string;
 };
 export type TaskCard = {
   id: string;
@@ -142,6 +144,8 @@ export type NodeDetail = {
     type: string;
     status: string;
     data: Record<string, unknown>;
+    created_at?: string;
+    updated_at?: string;
     payload: {
       media_type: string;
       storage: "inline" | "blob";
@@ -149,8 +153,18 @@ export type NodeDetail = {
       blob_id?: string;
     };
   };
-  type?: { slug: string; label: string; fields: TypeField[] } | null;
+  type?: {
+    slug: string;
+    label: string;
+    fields: TypeField[];
+    hue?: string;
+    glyph?: string;
+    parent_types?: string[];
+  } | null;
   edges: IncidentEdge[];
+  related?: Array<{ relation_type: string; direction: "in" | "out"; neighbor: Neighbor }>;
+  ancestors?: Neighbor[];
+  children?: TypeViewNode[];
   blob?: {
     id: string;
     media_type: string;
@@ -196,7 +210,7 @@ export function fetchSearch(input: { q: string; type: string; status: string }) 
   );
 }
 
-export function fetchGraph(input: { focus?: string; type?: string } = {}) {
+export function fetchGraph(input: { focus?: string; type?: string; depth?: number } = {}) {
   const params = new URLSearchParams();
   if (input.focus) {
     params.set("focus", input.focus);
@@ -204,12 +218,16 @@ export function fetchGraph(input: { focus?: string; type?: string } = {}) {
   if (input.type) {
     params.set("type", input.type);
   }
+  if (input.depth) {
+    params.set("depth", String(input.depth));
+  }
   const suffix = params.toString() ? `?${params}` : "";
   return viewFetch<{ nodes: GraphNode[]; edges: GraphEdge[] }>(`/view/api/graph${suffix}`);
 }
 
-export function fetchRecents() {
-  return viewFetch<{ rows: RecentRow[] }>("/view/api/recents");
+export function fetchRecents(limit?: number) {
+  const suffix = limit ? `?limit=${limit}` : "";
+  return viewFetch<{ rows: RecentRow[] }>(`/view/api/recents${suffix}`);
 }
 
 export function fetchTasks() {

@@ -316,6 +316,8 @@ async function invertTypeChange(
         views: before.views ?? [],
         default_view: before.default_view,
         fields: before.fields ?? [],
+        hue: before.hue,
+        glyph: before.glyph,
         is_system: before.is_system,
       });
       return { action: "type_change", before: null, after: restored };
@@ -344,6 +346,8 @@ async function invertTypeChange(
       views: before.views ?? [],
       default_view: before.default_view,
       fields: before.fields ?? [],
+      hue: before.hue,
+      glyph: before.glyph,
     });
     if (!restored) {
       return toolError(`Cannot undo type update: "${before.slug}" not found`);

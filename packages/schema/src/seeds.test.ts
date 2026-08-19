@@ -72,6 +72,10 @@ test("seed node types parse and include spine plus artifacts", () => {
   assert.deepEqual(trip?.views?.map((view) => view.id), ["list", "calendar", "timeline"]);
   const person = SEED_NODE_TYPES.find((type) => type.slug === "person");
   assert.deepEqual(person?.fields?.map((field) => field.name), ["org"]);
+  assert.equal(task?.hue, "green");
+  assert.equal(task?.glyph, "CircleCheck");
+  assert.equal(SEED_NODE_TYPES.find((type) => type.slug === "area")?.hue, "red");
+  assert.equal(SEED_NODE_TYPES.find((type) => type.slug === "note")?.glyph, "FileText");
 });
 
 test("seed relations include child_of and associative verbs", () => {

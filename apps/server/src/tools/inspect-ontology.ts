@@ -10,7 +10,7 @@ import { defineTool } from "./define-tool.js";
 export function registerInspectOntologyTool(server: McpServer, pool: Pool): void {
   defineTool(server, {
     name: "inspect_ontology",
-    description: "List type and relation registry rows (system + authored).",
+    description: "List type and relation registry rows (system + authored), including each type’s fields, view declarations, default_view, hue, and glyph.",
     input: InspectOntologyInputSchema.shape,
     output: InspectOntologySuccessSchema,
     handler: async (input) => inspectOntology(pool, input.kind ?? "all"),

@@ -48,6 +48,7 @@ import {
   typeViewsFromUpdate,
   compileJsonSchemaFromFields,
   parseTypeFieldsInput,
+  parseTypeIdentity,
   isUuid,
   missingConfirm,
   storedBlobPayload,
@@ -1027,6 +1028,10 @@ export async function manageType(
       fieldsParsed.fields.length > 0
         ? compileJsonSchemaFromFields(fieldsParsed.fields)
         : (input.json_schema ?? null);
+    const identity = parseTypeIdentity({ hue: input.hue, glyph: input.glyph });
+    if (!identity.ok) {
+      return toolError(identity.error, identity.suggestion);
+    }
     return withTransaction(pool, async (client) => {
       const type = await insertNodeType(client, {
         slug: input.slug,
@@ -1038,6 +1043,8 @@ export async function manageType(
         views: viewsInput.views,
         default_view: viewsInput.default_view,
         fields: fieldsParsed.fields,
+        hue: identity.hue ?? undefined,
+        glyph: identity.glyph ?? undefined,
       });
       const activity = await insertActivity(client, {
         ...writer,
@@ -1137,6 +1144,13 @@ export async function manageType(
         ? existing.json_schema
         : input.json_schema;
 
+  const identity = parseTypeIdentity({ hue: input.hue, glyph: input.glyph });
+  if (!identity.ok) {
+    return toolError(identity.error, identity.suggestion);
+  }
+  const hue = identity.hue === undefined ? existing.hue : (identity.hue ?? undefined);
+  const glyph = identity.glyph === undefined ? existing.glyph : (identity.glyph ?? undefined);
+
   return withTransaction(pool, async (client) => {
     const type = await updateNodeType(client, input.slug, {
       label: existing.is_system ? existing.label : (input.label ?? existing.label),
@@ -1147,6 +1161,8 @@ export async function manageType(
       views: viewsPatch.views,
       default_view: viewsPatch.default_view,
       fields: nextFields,
+      hue,
+      glyph,
     });
     if (!type) {
       return toolError(`Type "${input.slug}" not found`);

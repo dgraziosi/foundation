@@ -111,13 +111,16 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       const js = await bundle.text();
       assert.match(js, /Unlock the vault window/);
       assert.match(js, /Same key as MCP/);
-      assert.match(js, /Select a node/);
-      assert.match(js, /No tasks yet/);
+      assert.match(js, /No open tasks/);
       assert.match(js, /No views declared for this type/);
       assert.match(js, /Open tasks/);
       assert.match(js, /Show completed/);
       assert.match(js, /No date field on this type/);
+      assert.match(js, /min-h-\[460px\]/);
+      assert.match(js, /detail-page/);
+      assert.match(js, /View all/);
       assert.doesNotMatch(js, /manage_type|confirm: true|localhost-only/);
+      assert.doesNotMatch(js, /Select a node/);
 
       const session = await fetch(`${origin}/view/api/session`);
       assert.equal(session.status, 401);
@@ -165,12 +168,14 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       const ontology = await fetch(`${origin}/view/api/ontology`, { headers: authHeader() });
       assert.equal(ontology.status, 200);
       const ontologyBody = (await ontology.json()) as {
-        types: Array<{ slug: string; views: string[]; default_view?: string; count: number }>;
+        types: Array<{ slug: string; views: string[]; default_view?: string; count: number; hue?: string; glyph?: string }>;
       };
       const taskType = ontologyBody.types.find((type) => type.slug === "task");
       assert.deepEqual(taskType?.views, ["board", "list", "calendar", "timeline", "outline"]);
       assert.equal(taskType?.default_view, "board");
       assert.equal(taskType?.count, 0);
+      assert.equal(taskType?.hue, "green");
+      assert.equal(taskType?.glyph, "CircleCheck");
       const noteType = ontologyBody.types.find((type) => type.slug === "note");
       assert.deepEqual(noteType?.views, ["list"]);
       assert.equal(noteType?.default_view, "list");
@@ -450,22 +455,73 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       assert.equal(body.hits[0]?.due, "2026-08-20");
     });
 
-    await t.test("graph working set includes nodes and edges", async () => {
+    await t.test("graph includes live nodes and live relations", async () => {
+      const hierarchy = await linkGraphNodes(pool, {
+        from_id: dueTask.node.id,
+        to_id: project.node.id,
+        relation_type: "child_of",
+        from_base_updated_at: dueTask.node.updated_at,
+        to_base_updated_at: project.node.updated_at,
+      });
+      assert.equal(isToolError(hierarchy), false);
+
       const res = await fetch(`${origin}/view/api/graph`, { headers: authHeader() });
       assert.equal(res.status, 200);
       const body = (await res.json()) as {
         nodes: Array<{ title: string }>;
-        edges: Array<{ from: string; to: string; relation_type: string }>;
+        edges: Array<{ from: string; to: string; relation_type: string; kind: string }>;
       };
       const titles = body.nodes.map((node) => node.title);
       assert.ok(titles.includes("Fixture note"));
       assert.ok(titles.includes("Fixture project"));
+      assert.ok(titles.includes("Fixture due task"));
       assert.ok(
         body.edges.some(
           (edge) =>
             edge.relation_type === "relates_to" &&
+            edge.kind === "associative" &&
             (edge.from === note.node.id || edge.to === note.node.id),
         ),
+      );
+      assert.ok(
+        body.edges.some(
+          (edge) =>
+            edge.relation_type === "child_of" &&
+            edge.kind === "hierarchy" &&
+            edge.from === dueTask.node.id &&
+            edge.to === project.node.id,
+        ),
+      );
+
+      const write = await fetch(`${origin}/view/api/graph`, {
+        method: "POST",
+        headers: { ...authHeader(), "content-type": "application/json" },
+        body: JSON.stringify({ title: "must not write" }),
+      });
+      assert.equal(write.status, 404);
+    });
+
+    await t.test("ancestors are root to parent", async () => {
+      const area = await upsertGraphNode(pool, { type: "area", title: "Fixture area" });
+      assert.equal(isToolError(area), false);
+      if (isToolError(area)) {
+        return;
+      }
+      const hung = await linkGraphNodes(pool, {
+        from_id: project.node.id,
+        to_id: area.node.id,
+        relation_type: "child_of",
+        from_base_updated_at: project.node.updated_at,
+        to_base_updated_at: area.node.updated_at,
+      });
+      assert.equal(isToolError(hung), false);
+
+      const res = await fetch(`${origin}/view/api/nodes/${dueTask.node.id}`, { headers: authHeader() });
+      assert.equal(res.status, 200);
+      const body = (await res.json()) as { ancestors: Array<{ title: string }> };
+      assert.deepEqual(
+        body.ancestors.map((item) => item.title),
+        ["Fixture area", "Fixture project"],
       );
     });
 
@@ -501,11 +557,18 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       assert.equal(task.due, "2026-08-20");
     });
 
-    await t.test("recents include create rows", async () => {
-      const res = await fetch(`${origin}/view/api/recents`, { headers: authHeader() });
+    await t.test("recents are non-task objects; widget cap is 10", async () => {
+      const res = await fetch(`${origin}/view/api/recents?limit=10`, { headers: authHeader() });
       assert.equal(res.status, 200);
-      const body = (await res.json()) as { rows: Array<{ summary: string; action: string }> };
-      assert.ok(body.rows.some((row) => row.summary === "Fixture note" && row.action === "create"));
+      const body = (await res.json()) as { rows: Array<{ title: string; type: string }> };
+      assert.ok(body.rows.some((row) => row.title === "Fixture note" && row.type === "note"));
+      assert.ok(body.rows.every((row) => row.type !== "task"));
+      assert.ok(body.rows.length <= 10);
+
+      const all = await fetch(`${origin}/view/api/recents`, { headers: authHeader() });
+      const allBody = (await all.json()) as { rows: Array<{ title: string; type: string }> };
+      assert.ok(allBody.rows.every((row) => row.type !== "task"));
+      assert.ok(allBody.rows.some((row) => row.title === "Fixture note"));
     });
 
     const htmlBytes = Buffer.from(
@@ -823,6 +886,19 @@ test(
     }
   },
 );
+
+test("view window is GET-only except unlock; still 13 tools", async () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const view = await readFile(join(here, "view.ts"), "utf8");
+  const posts = [...view.matchAll(/app\.post\(/g)];
+  assert.equal(posts.length, 1);
+  assert.match(view, /app\.post\(`\$\{VIEW_PATH\}\/unlock`/);
+  assert.match(view, /app\.get\(`\$\{VIEW_PATH\}\/api\/graph`/);
+  assert.match(view, /app\.get\(`\$\{VIEW_PATH\}\/api\/recents`/);
+  const register = await readFile(join(here, "tools/register.ts"), "utf8");
+  const names = [...register.matchAll(/register(\w+)Tool\(server/g)].map((match) => match[1]);
+  assert.equal(names.length, 13);
+});
 
 test("viewer CSS ships dark first and a real light lane", async () => {
   const css = await readFile(

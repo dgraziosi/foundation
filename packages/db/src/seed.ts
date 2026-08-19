@@ -1,6 +1,7 @@
 import {
   compileJsonSchemaFromFields,
   mergeMissingFields,
+  mergeMissingTypeIdentity,
   mergeMissingViewIds,
   SEED_NODE_TYPES,
   SEED_RELATION_TYPES,
@@ -23,6 +24,8 @@ export async function seedSystemOntology(pool: pg.Pool): Promise<void> {
         views: asViewDeclarations(type.views),
         default_view: type.default_view,
         fields: type.fields ?? [],
+        hue: type.hue,
+        glyph: type.glyph,
         is_system: true,
       });
       continue;
@@ -31,6 +34,10 @@ export async function seedSystemOntology(pool: pg.Pool): Promise<void> {
     const views = mergeMissingViewIds(
       asViewDeclarations(existing.views),
       asViewDeclarations(type.views),
+    );
+    const identity = mergeMissingTypeIdentity(
+      { hue: existing.hue, glyph: existing.glyph },
+      { hue: type.hue, glyph: type.glyph },
     );
     const compiled = compileJsonSchemaFromFields(fields);
     const jsonSchema =
@@ -44,6 +51,8 @@ export async function seedSystemOntology(pool: pg.Pool): Promise<void> {
       views,
       default_view: existing.default_view ?? type.default_view,
       fields,
+      hue: identity.hue,
+      glyph: identity.glyph,
     });
     await pool.query(`UPDATE node_types SET is_system = true, updated_at = now() WHERE slug = $1`, [
       type.slug,

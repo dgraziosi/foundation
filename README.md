@@ -101,7 +101,7 @@ Requires [Docker Compose](https://docs.docker.com/compose/) and a copy of this r
 
    **Health** (no auth): `GET http://127.0.0.1:8787/health` — `{ ok, service, db }`.
 
-   **Window:** read-only operator window at `/view` (same API key as MCP). On this machine: `http://127.0.0.1:8788/view`. From another machine on this vault: `http://<this-host>:8788/view`. Unlock, then Home (widgets + type folders), Graph, Search, Recents, the type view engine, and an inspector. Dark first; Light and System are real themes. The window does not write.
+   **Window:** read-only operator window at `/view` (same API key as MCP). On this machine: `http://127.0.0.1:8788/view`. From another machine on this vault: `http://<this-host>:8788/view`. Unlock, then Home (the graph, Recents, open tasks, type folders), Collection, and Detail as a page. Search is a rail overlay. The window does not write.
 
    **Blobs:** large files are `$FOUNDATION_DATA/blobs/<uuid>` (not git, not agent-data). Ingest with `upsert` (`payload.storage = "blob"` plus `bytes_base64`, or drop a file in `$FOUNDATION_DATA/uploads` and pass `source_path`). Cap 20MB. Fetch bytes: `GET /blobs/:id` with the API key. `get` returns blob metadata, not the file body.
 

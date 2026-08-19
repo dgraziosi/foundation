@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { FIELD_KINDS, FIELD_ROLES } from "./fields.js";
+import { TypeGlyphSchema, TypeHueSchema } from "./type-identity.js";
 import { asViewDeclarations, VIEW_BINDS, VIEW_ENGINE_IDS } from "./views.js";
 
 export const NodeStatusSchema = z.enum(["active", "completed", "archived"]);
@@ -124,6 +125,8 @@ export const NodeTypeSchema = z.object({
     .transform((views) => (views === undefined ? undefined : asViewDeclarations(views))),
   default_view: ViewEngineIdSchema.optional(),
   fields: z.array(TypeFieldSchema).optional(),
+  hue: TypeHueSchema.optional(),
+  glyph: TypeGlyphSchema.optional(),
   is_system: z.boolean(),
   created_at: z.string().optional(),
   updated_at: z.string().optional(),

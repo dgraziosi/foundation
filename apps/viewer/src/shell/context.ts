@@ -1,10 +1,16 @@
 import { createContext, useContext } from "react";
 
+export type HostTab =
+  | { kind: "recents"; label: string }
+  | { kind: "collection"; slug: string; label: string }
+  | { kind: "detail"; id: string; label: string };
+
 export type ShellOutlet = {
-  selectedId?: string;
-  invalidPath: boolean;
-  select: (id: string) => void;
-  clear: () => void;
+  openDetail: (id: string, label?: string) => void;
+  openCollection: (slug: string, label?: string) => void;
+  syncCollectionLabel: (slug: string, label: string) => void;
+  openRecents: () => void;
+  openSearch: () => void;
   railOpen: boolean;
   setRailOpen: (open: boolean) => void;
   railCollapsed: boolean;

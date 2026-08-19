@@ -14,8 +14,8 @@ v1 surface is **13 tools**. Destructive tools require `confirm: true` or they re
 | `delete` | Soft-delete a node. Requires `confirm: true`. |
 | `link` | Create typed edges after validation. One edge or `edges[]` (1–20). Whole batch validates; one transaction writes all or none. Requires endpoint if-match. |
 | `unlink` | Remove a typed edge. Requires `confirm: true`. |
-| `inspect_ontology` | List type and relation registry rows (system + authored), including each type’s `fields`, view declarations, and `default_view`. |
-| `manage_type` | Create, update, or retire a node type (including `fields` and view queries). Applies immediately. Retire requires `confirm: true`. |
+| `inspect_ontology` | List type and relation registry rows (system + authored), including each type’s `fields`, view declarations, `default_view`, `hue`, and `glyph`. |
+| `manage_type` | Create, update, or retire a node type (including `fields`, view queries, hue, and glyph). Applies immediately. Retire requires `confirm: true`. |
 | `manage_relation` | Create or update a relation type. Applies immediately. |
 | `list_activity` | Read the activity log (filter by action, target, since). |
 | `undo` | Reverse a reversible activity row by id. Requires `confirm: true`. Type-create undo with leftover deleted nodes needs `purge_deleted: true`. |
@@ -89,13 +89,13 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 ### `inspect_ontology`
 
 - **In:** `{ kind?: "types"|"relations"|"all" }`
-- **Out:** `{ types, relations }`. Each type includes `fields`, view declarations, and optional `default_view` with `slug`, `label`, `kind`, `parent_types`, and compiled `json_schema`.
+- **Out:** `{ types, relations }`. Each type includes `fields`, view declarations, optional `default_view`, optional `hue`, and optional `glyph`, with `slug`, `label`, `kind`, `parent_types`, and compiled `json_schema`.
 
 ### `manage_type`
 
-- **In:** `{ action: "create"|"update"|"retire", slug, label?, description?, kind?, parent_types?, json_schema?, views?, default_view?, fields?, confirm?, purge_deleted?, actor?, actor_label? }`
+- **In:** `{ action: "create"|"update"|"retire", slug, label?, description?, kind?, parent_types?, json_schema?, views?, default_view?, fields?, hue?, glyph?, confirm?, purge_deleted?, actor?, actor_label? }`
 - **Out:** `{ type, activity_id }` or `{ error, suggestion? }`
-- Applies immediately. System seed types may edit description, `fields`, and `filter` / `sort` / `group` on views they already declare. They cannot change slug, kind, parent_types, label, retire, or the ordered view **ids** (no add, drop, or reorder of engines). `default_view` stays a member of those locked ids. Authored types keep the wider patch, including the view id list. Custom types may set `parent_types` so `child_of` placement works.
+- Applies immediately. System seed types may edit description, `fields`, `hue`, `glyph`, and `filter` / `sort` / `group` on views they already declare. They cannot change slug, kind, parent_types, label, retire, or the ordered view **ids** (no add, drop, or reorder of engines). `default_view` stays a member of those locked ids. Authored types keep the wider patch, including the view id list. Custom types may set `parent_types` so `child_of` placement works. Seed apply fills missing seed hue/glyph only; it does not overwrite an operator edit.
 - **`fields`:** ordered template `{ name, kind, display?, needed?, role?, enum_values?, ref_type? }`. Kinds: `string`, `date`, `number`, `enum`, `ref`. Roles: `title`, `status`, `date`, `start`, `end`, `subtitle`. At most one of title/status/date/start/end. `end` requires `start`. `status` requires enum. Date roles require kind date. `json_schema` is compiled from fields — pass `fields`, not a hand-written schema, once a template exists. `needed` does not block capture.
 - **`views` / `default_view`:** defining a type includes this choice. `views` is an ordered array of declarations `{ id, filter?, sort?, group? }` (bare ids still parse). `id` is `list` | `card` | `table` | `board` | `calendar` | `timeline` | `outline` | `graph`. Filter/sort/group bind to field roles or node `title` / `status` / `updated_at`. `default_view` must be a member of those ids, or omitted when `views` is empty. Seed types already declare views (`task` defaults to `board`, filter `status = active`). The Viewer reads the same contract from `inspect_ontology`.
 - **Retire:** `action: "retire"` with `confirm: true` drops an authored type that has **zero live nodes**. System seed types refuse. Live nodes refuse with `{ error, suggestion }` (delete or retype, then retry). Soft-deleted nodes of that type stay restorable — same family as undo-of-type-create: restore those deletes first, or pass `purge_deleted: true` (with `confirm: true`) to hard-delete the tombstones and their incident edges. Never a silent vault wipe. Undo of retire restores the registry row.

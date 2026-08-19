@@ -1,11 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
-import { useOutletContext, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useParams } from "react-router-dom";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { fetchGraph, fetchNode, fetchOntology, fetchType, type ViewEngineId } from "../api";
-import type { ShellOutlet } from "../shell/context";
+import { fetchGraph, fetchOntology, fetchType, type ViewEngineId } from "../api";
+import { useShell } from "../shell/context";
+import { useThemeLane } from "../theme";
+import { typeColors, typeIcon } from "../type-meta";
 import { LoadError, Placeholders, Quiet } from "../ui/States";
 import { EngineView } from "../views/TypeViews";
 import { applyViewQuery, readShowCompleted, writeShowCompleted } from "../views/query";
@@ -14,7 +16,8 @@ import { resolveActiveView, resolveDeclaredViews, VIEW_LABELS } from "../views/r
 export function TypeViewPage({ slug: forcedSlug }: { slug?: string }) {
   const { slug: routeSlug } = useParams();
   const slug = forcedSlug ?? routeSlug ?? "";
-  const { selectedId, select } = useOutletContext<ShellOutlet>();
+  const { openDetail, syncCollectionLabel } = useShell();
+  const lane = useThemeLane();
   const typeQuery = useQuery({
     queryKey: ["type", slug],
     queryFn: () => fetchType(slug),
@@ -24,6 +27,7 @@ export function TypeViewPage({ slug: forcedSlug }: { slug?: string }) {
   const resolved = resolveDeclaredViews(typeQuery.data?.type ?? {});
   const [picked, setPicked] = useState<{ slug: string; view: ViewEngineId }>();
   const [showCompleted, setShowCompleted] = useState(readShowCompleted);
+  const [localGraph, setLocalGraph] = useState<{ focus: string; depth: number }>();
   const active = resolveActiveView(slug, resolved, picked);
   const fields = typeQuery.data?.type.fields ?? [];
   const activeView =
@@ -36,12 +40,27 @@ export function TypeViewPage({ slug: forcedSlug }: { slug?: string }) {
     return applyViewQuery(typeQuery.data.nodes, activeView, fields, { showCompleted });
   }, [typeQuery.data, activeView, fields, showCompleted]);
   const graph = useQuery({
-    queryKey: ["graph", "type", slug, selectedId],
-    queryFn: () => fetchGraph({ focus: selectedId, type: slug }),
+    queryKey: ["graph", "type", slug, localGraph?.focus, localGraph?.depth],
+    queryFn: () =>
+      fetchGraph(
+        localGraph ? { focus: localGraph.focus, depth: localGraph.depth, type: slug } : { type: slug },
+      ),
     enabled: active === "graph",
   });
+  const unfiltered = typeQuery.data?.nodes.length ?? 0;
+  const empty =
+    unfiltered === 0 ? "Nothing yet." : queried.length === 0 ? "Nothing matches your filters." : "Nothing yet.";
+  const identity = typeQuery.data?.type;
+  const Icon = typeIcon(identity);
+  const colors = typeColors(identity, lane);
+  const count = typeQuery.data?.nodes.length ?? 0;
 
-  const empty = `No ${typeQuery.data?.type.label ?? slug} yet.`;
+  useEffect(() => {
+    const label = typeQuery.data?.type.label;
+    if (slug && label) {
+      syncCollectionLabel(slug, label);
+    }
+  }, [slug, typeQuery.data?.type.label, syncCollectionLabel]);
 
   return (
     <ScrollArea className="flex min-h-0 flex-1 flex-col">
@@ -50,7 +69,11 @@ export function TypeViewPage({ slug: forcedSlug }: { slug?: string }) {
         {typeQuery.isError ? <LoadError onRetry={() => void typeQuery.refetch()} /> : null}
         {typeQuery.data ? (
           <>
-            <h1 className="text-display-m">{typeQuery.data.type.label}</h1>
+            <h1 className="flex items-center gap-2 text-display-m" style={{ color: colors.ink }}>
+              <Icon size={20} strokeWidth={2} />
+              <span className="text-foreground">{typeQuery.data.type.label}</span>
+              <span className="text-meta font-normal text-muted-foreground">{count}</span>
+            </h1>
             {resolved.views.length === 0 ? (
               <Quiet>No views declared for this type.</Quiet>
             ) : (
@@ -96,9 +119,16 @@ export function TypeViewPage({ slug: forcedSlug }: { slug?: string }) {
                   graphNodes={graph.data?.nodes}
                   graphEdges={graph.data?.edges}
                   types={ontology.data?.types}
-                  selectedId={selectedId}
-                  onSelect={select}
+                  onSelect={(id) => {
+                    const node =
+                      queried.find((item) => item.id === id) ??
+                      graph.data?.nodes.find((item) => item.id === id) ??
+                      typeQuery.data?.children.find((item) => item.id === id);
+                    openDetail(id, node?.title);
+                  }}
                   empty={empty}
+                  localGraph={localGraph}
+                  onLocalGraph={setLocalGraph}
                 />
               </>
             )}
@@ -107,37 +137,4 @@ export function TypeViewPage({ slug: forcedSlug }: { slug?: string }) {
       </div>
     </ScrollArea>
   );
-}
-
-export function NodeDeepLinkPage() {
-  const { selectedId, invalidPath } = useOutletContext<ShellOutlet>();
-  const ontology = useQuery({ queryKey: ["ontology"], queryFn: fetchOntology });
-  const node = useQuery({
-    queryKey: ["node", selectedId],
-    queryFn: () => fetchNode(selectedId!),
-    enabled: Boolean(selectedId) && !invalidPath,
-    retry: false,
-  });
-  const slug = node.data?.node.type;
-  const known = useMemo(() => ontology.data?.types.some((type) => type.slug === slug), [ontology.data, slug]);
-
-  if (!selectedId || invalidPath) {
-    return (
-      <div className="p-lg">
-        <h1 className="text-display-m">Home</h1>
-        <Quiet>Not found.</Quiet>
-      </div>
-    );
-  }
-  if (node.isLoading || ontology.isLoading) {
-    return <Placeholders />;
-  }
-  if (!slug || known === false) {
-    return (
-      <div className="p-lg">
-        <Quiet>Not found.</Quiet>
-      </div>
-    );
-  }
-  return <TypeViewPage key={slug} slug={slug} />;
 }

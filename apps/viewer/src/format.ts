@@ -47,6 +47,61 @@ export function relativeTime(iso: string, now = new Date()): string {
   return new Date(then).toLocaleDateString();
 }
 
+export type RecencyGroup = "Today" | "Yesterday" | "Earlier this week" | "Earlier";
+
+function shiftIsoDate(iso: string, days: number): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  const date = new Date(Date.UTC(year, (month ?? 1) - 1, (day ?? 1) + days));
+  return date.toISOString().slice(0, 10);
+}
+
+function mondayOfWeek(iso: string): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  const date = new Date(Date.UTC(year, (month ?? 1) - 1, day ?? 1));
+  const weekday = (date.getUTCDay() + 6) % 7;
+  return shiftIsoDate(iso, -weekday);
+}
+
+export function recencyGroup(iso: string, now = new Date()): RecencyGroup {
+  const today = todayInNewYork(now);
+  const day = todayInNewYork(new Date(iso));
+  if (day === today) {
+    return "Today";
+  }
+  if (day === shiftIsoDate(today, -1)) {
+    return "Yesterday";
+  }
+  const monday = mondayOfWeek(today);
+  if (day >= monday && day < today) {
+    return "Earlier this week";
+  }
+  return "Earlier";
+}
+
+export const RECENCY_GROUPS: RecencyGroup[] = [
+  "Today",
+  "Yesterday",
+  "Earlier this week",
+  "Earlier",
+];
+
+export type TaskDueGroup = "Overdue" | "Today" | "Upcoming" | "No date";
+
+export function taskDueGroup(due: string | undefined, tone?: DueTone): TaskDueGroup {
+  if (!due) {
+    return "No date";
+  }
+  if (tone === "overdue" || (!tone && due < todayInNewYork())) {
+    return "Overdue";
+  }
+  if (tone === "today" || (!tone && due === todayInNewYork())) {
+    return "Today";
+  }
+  return "Upcoming";
+}
+
+export const TASK_DUE_GROUPS: TaskDueGroup[] = ["Overdue", "Today", "Upcoming", "No date"];
+
 export function truncate(value: string, max = 22): string {
   const trimmed = value.trim();
   if (trimmed.length <= max) {

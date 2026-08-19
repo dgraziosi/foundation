@@ -1,70 +1,102 @@
 import { Menu } from "lucide-react";
-import { useMemo, useState } from "react";
-import { Outlet, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { isUuid } from "../format";
-import { ShellContext } from "./context";
-import { Inspector } from "./Inspector";
+import { SearchOverlay } from "../pages/SearchPage";
+import { ShellContext, type HostTab, type ShellOutlet } from "./context";
 import { Rail } from "./Rail";
-
-export function useSelectedNode() {
-  const params = useParams();
-  const [search, setSearch] = useSearchParams();
-  const location = useLocation();
-  const navigate = useNavigate();
-  const fromPath = params.id && isUuid(params.id) ? params.id : undefined;
-  const fromQuery = search.get("node");
-  const selectedId = fromPath ?? (fromQuery && isUuid(fromQuery) ? fromQuery : undefined);
-  const invalidPath = Boolean(params.id && !isUuid(params.id));
-
-  function select(id: string) {
-    if (location.pathname.startsWith("/nodes/")) {
-      navigate(`/nodes/${id}`);
-      return;
-    }
-    const next = new URLSearchParams(search);
-    next.set("node", id);
-    setSearch(next, { replace: true });
-  }
-
-  function clear() {
-    if (location.pathname.startsWith("/nodes/")) {
-      navigate("/");
-      return;
-    }
-    const next = new URLSearchParams(search);
-    next.delete("node");
-    setSearch(next, { replace: true });
-  }
-
-  return { selectedId, invalidPath, select, clear };
-}
+import {
+  hrefFor,
+  pathTab,
+  syncHostTabs,
+  tabKey,
+  upsertCollectionTab,
+  upsertDetailTab,
+  upsertRecentsTab,
+} from "./tabs";
+import { ViewStrip } from "./ViewStrip";
 
 export function Shell() {
-  const { selectedId, invalidPath, select, clear } = useSelectedNode();
+  const location = useLocation();
+  const params = useParams();
+  const navigate = useNavigate();
   const [railOpen, setRailOpen] = useState(false);
   const [railCollapsed, setRailCollapsed] = useState(false);
-  const open = Boolean(selectedId) || invalidPath;
-  const value = useMemo(
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [tabs, setTabs] = useState<HostTab[]>([]);
+
+  const pathname = location.pathname;
+  const slug = params.slug;
+  const nodeId = params.id;
+  const current = useMemo(() => pathTab(pathname, { slug, id: nodeId }), [pathname, slug, nodeId]);
+  const activeKey = tabKey(current);
+
+  useEffect(() => {
+    setTabs((existing) => syncHostTabs(existing, current));
+  }, [current]);
+
+  const openDetail = useCallback(
+    (id: string, label = "Detail") => {
+      setSearchOpen(false);
+      setTabs((existing) => upsertDetailTab(existing, id, label));
+      navigate(`/nodes/${id}`);
+    },
+    [navigate],
+  );
+
+  const openCollection = useCallback(
+    (nextSlug: string, label?: string) => {
+      setSearchOpen(false);
+      setTabs((existing) => upsertCollectionTab(existing, nextSlug, label));
+      navigate(`/types/${nextSlug}`);
+    },
+    [navigate],
+  );
+
+  const syncCollectionLabel = useCallback((nextSlug: string, label: string) => {
+    setTabs((existing) => upsertCollectionTab(existing, nextSlug, label));
+  }, []);
+
+  const openRecents = useCallback(() => {
+    setSearchOpen(false);
+    setTabs((existing) => upsertRecentsTab(existing));
+    navigate("/recents");
+  }, [navigate]);
+
+  const openSearch = useCallback(() => setSearchOpen(true), []);
+
+  function closeTab(tab: HostTab) {
+    const key = tabKey(tab);
+    const index = tabs.findIndex((item) => tabKey(item) === key);
+    const remaining = tabs.filter((item) => tabKey(item) !== key);
+    setTabs(remaining);
+    if (activeKey !== key) {
+      return;
+    }
+    const left = remaining[index - 1] ?? { kind: "home" as const };
+    navigate(hrefFor(left));
+  }
+
+  const value = useMemo<ShellOutlet>(
     () => ({
-      selectedId,
-      invalidPath,
-      select,
-      clear,
+      openDetail,
+      openCollection,
+      syncCollectionLabel,
+      openRecents,
+      openSearch,
       railOpen,
       setRailOpen,
       railCollapsed,
       setRailCollapsed,
     }),
-    [selectedId, invalidPath, select, clear, railOpen, railCollapsed],
+    [openDetail, openCollection, syncCollectionLabel, openRecents, openSearch, railOpen, railCollapsed],
   );
 
   return (
     <ShellContext.Provider value={value}>
-      <div className="flex min-h-dvh bg-canvas">
+      <div className="flex h-dvh overflow-hidden bg-canvas">
         <Rail />
-        <div className="flex min-h-dvh min-w-0 flex-1 flex-col bg-elevated">
+        <div className="flex h-dvh min-w-0 flex-1 flex-col overflow-hidden bg-canvas">
           <div className="flex items-center px-md py-sm md:hidden">
             <Button
               type="button"
@@ -76,17 +108,16 @@ export function Shell() {
               <Menu size={16} strokeWidth={2} />
             </Button>
           </div>
-          <div className={cn("flex min-h-0 min-w-0 flex-1")}>
-            <main className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-              <Outlet context={value} />
-            </main>
-            <Inspector
-              selectedId={invalidPath ? "not-a-uuid" : selectedId}
-              onSelect={select}
-              onClose={clear}
-              open={open}
-            />
-          </div>
+          <ViewStrip
+            tabs={tabs}
+            activeKey={activeKey}
+            onSelect={(tab) => navigate(hrefFor(tab))}
+            onClose={closeTab}
+          />
+          <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <Outlet context={value} />
+            {searchOpen ? <SearchOverlay onClose={() => setSearchOpen(false)} /> : null}
+          </main>
         </div>
       </div>
     </ShellContext.Provider>
