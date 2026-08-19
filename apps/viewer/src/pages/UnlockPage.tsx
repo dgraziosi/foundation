@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { AuthError, unlock } from "../api";
 
@@ -26,16 +27,20 @@ export function UnlockPage() {
   }
 
   return (
-    <div className="grid min-h-dvh place-items-center bg-background p-4">
-      <form className="flex w-full max-w-xs flex-col gap-3" onSubmit={(event) => void onSubmit(event)}>
-        <h1 className="text-title font-semibold">Unlock the vault window</h1>
-        <p className="text-muted-foreground">Same key as MCP. This window is read-only.</p>
-        {error ? <p className="text-primary">{error}</p> : null}
-        <Input type="password" name="api_key" autoComplete="current-password" required />
-        <Button type="submit" disabled={busy}>
-          Unlock
-        </Button>
-      </form>
+    <div className="grid min-h-dvh place-items-center bg-canvas p-lg">
+      <Card className="w-full max-w-[20rem] rounded-2xl">
+        <CardContent className="flex flex-col gap-md p-xl">
+          <form className="flex flex-col gap-md" onSubmit={(event) => void onSubmit(event)}>
+            <h1 className="text-display-m">Unlock the vault window</h1>
+            <p className="text-muted-foreground">Same key as MCP. This window is read-only.</p>
+            <Input type="password" name="api_key" autoComplete="current-password" required />
+            {error ? <p className="text-removed">{error}</p> : null}
+            <Button type="submit" disabled={busy}>
+              Unlock
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

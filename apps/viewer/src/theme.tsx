@@ -1,10 +1,19 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { applyTheme, type ThemeChoice } from "./theme-core";
+import {
+  applyTheme,
+  normalizeThemeChoice,
+  subscribeTheme,
+  themeLane,
+  type ThemeChoice,
+  type ThemeLane,
+} from "./theme-core";
 
 export type { ThemeChoice, ThemeLane, ThemeTokens } from "./theme-core";
 export {
   applyTheme,
   DARK_TOKENS,
+  LIGHT_TOKENS,
+  normalizeThemeChoice,
   PAPER_TOKENS,
   readThemeTokens,
   subscribeGraphPaint,
@@ -16,19 +25,19 @@ const KEY = "foundation-theme";
 const ThemeContext = createContext<{
   choice: ThemeChoice;
   setChoice: (choice: ThemeChoice) => void;
-}>({ choice: "paper", setChoice: () => undefined });
+}>({ choice: "dark", setChoice: () => undefined });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [choice, setChoiceState] = useState<ThemeChoice>("paper");
+  const [choice, setChoiceState] = useState<ThemeChoice>("dark");
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(KEY);
-    if (stored === "dark" || stored === "system" || stored === "paper") {
+    const stored = normalizeThemeChoice(window.localStorage.getItem(KEY));
+    if (stored) {
       applyTheme(stored);
       setChoiceState(stored);
       return;
     }
-    applyTheme("paper");
+    applyTheme("dark");
   }, []);
 
   useEffect(() => {
@@ -59,4 +68,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
 export function useTheme() {
   return useContext(ThemeContext);
+}
+
+export function useThemeLane(): ThemeLane {
+  const [lane, setLane] = useState<ThemeLane>(() => themeLane());
+  useEffect(() => subscribeTheme(() => setLane(themeLane())), []);
+  return lane;
 }

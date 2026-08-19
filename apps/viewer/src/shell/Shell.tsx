@@ -1,6 +1,10 @@
+import { Menu } from "lucide-react";
+import { useMemo, useState } from "react";
 import { Outlet, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { isUuid } from "../format";
+import { ShellContext } from "./context";
 import { Inspector } from "./Inspector";
 import { Rail } from "./Rail";
 
@@ -15,7 +19,7 @@ export function useSelectedNode() {
   const invalidPath = Boolean(params.id && !isUuid(params.id));
 
   function select(id: string) {
-    if (location.pathname === "/" || location.pathname.startsWith("/nodes/")) {
+    if (location.pathname.startsWith("/nodes/")) {
       navigate(`/nodes/${id}`);
       return;
     }
@@ -39,26 +43,52 @@ export function useSelectedNode() {
 
 export function Shell() {
   const { selectedId, invalidPath, select, clear } = useSelectedNode();
+  const [railOpen, setRailOpen] = useState(false);
+  const [railCollapsed, setRailCollapsed] = useState(false);
   const open = Boolean(selectedId) || invalidPath;
+  const value = useMemo(
+    () => ({
+      selectedId,
+      invalidPath,
+      select,
+      clear,
+      railOpen,
+      setRailOpen,
+      railCollapsed,
+      setRailCollapsed,
+    }),
+    [selectedId, invalidPath, select, clear, railOpen, railCollapsed],
+  );
+
   return (
-    <div
-      className={cn(
-        "grid min-h-dvh bg-background",
-        "grid-cols-1 grid-rows-[auto_minmax(0,1fr)]",
-        "md:grid-cols-[180px_minmax(0,1fr)] md:grid-rows-none",
-        "xl:grid-cols-[180px_minmax(0,1fr)_352px]",
-      )}
-    >
-      <Rail />
-      <main className="relative flex min-h-0 min-w-0 flex-col">
-        <Outlet context={{ selectedId, invalidPath, select }} />
-      </main>
-      <Inspector
-        selectedId={invalidPath ? "not-a-uuid" : selectedId}
-        onSelect={select}
-        onClose={clear}
-        open={open}
-      />
-    </div>
+    <ShellContext.Provider value={value}>
+      <div className="flex min-h-dvh bg-canvas">
+        <Rail />
+        <div className="flex min-h-dvh min-w-0 flex-1 flex-col bg-elevated">
+          <div className="flex items-center px-md py-sm md:hidden">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Open rail"
+              onClick={() => setRailOpen(true)}
+            >
+              <Menu size={16} strokeWidth={2} />
+            </Button>
+          </div>
+          <div className={cn("flex min-h-0 min-w-0 flex-1")}>
+            <main className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+              <Outlet context={value} />
+            </main>
+            <Inspector
+              selectedId={invalidPath ? "not-a-uuid" : selectedId}
+              onSelect={select}
+              onClose={clear}
+              open={open}
+            />
+          </div>
+        </div>
+      </div>
+    </ShellContext.Provider>
   );
 }

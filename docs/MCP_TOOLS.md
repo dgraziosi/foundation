@@ -14,7 +14,7 @@ v1 surface is **13 tools**. Destructive tools require `confirm: true` or they re
 | `delete` | Soft-delete a node. Requires `confirm: true`. |
 | `link` | Create typed edges after validation. One edge or `edges[]` (1–20). Whole batch validates; one transaction writes all or none. Requires endpoint if-match. |
 | `unlink` | Remove a typed edge. Requires `confirm: true`. |
-| `inspect_ontology` | List type and relation registry rows (system + authored). |
+| `inspect_ontology` | List type and relation registry rows (system + authored), including each type’s `views` and `default_view`. |
 | `manage_type` | Create, update, or retire a node type. Applies immediately. Retire requires `confirm: true`. |
 | `manage_relation` | Create or update a relation type. Applies immediately. |
 | `list_activity` | Read the activity log (filter by action, target, since). |
@@ -89,13 +89,14 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 ### `inspect_ontology`
 
 - **In:** `{ kind?: "types"|"relations"|"all" }`
-- **Out:** `{ types, relations }`
+- **Out:** `{ types, relations }`. Each type includes `views` and optional `default_view` with `slug`, `label`, `kind`, `parent_types`, and `json_schema`.
 
 ### `manage_type`
 
-- **In:** `{ action: "create"|"update"|"retire", slug, label?, description?, kind?, parent_types?, json_schema?, confirm?, purge_deleted?, actor?, actor_label? }`
+- **In:** `{ action: "create"|"update"|"retire", slug, label?, description?, kind?, parent_types?, json_schema?, views?, default_view?, confirm?, purge_deleted?, actor?, actor_label? }`
 - **Out:** `{ type, activity_id }` or `{ error, suggestion? }`
 - Applies immediately. System types: description only; system slugs cannot be retired. Custom types may set `parent_types` so `child_of` placement works.
+- **`views` / `default_view`:** defining a type includes this choice. `views` is an ordered array of `list` | `card` | `table` | `board` | `calendar` | `timeline` | `outline` | `graph`. `default_view` must be a member of `views`, or omitted when `views` is empty. Seed types already declare views (`task` defaults to `board`). System types do not take a views patch from `manage_type` — those rows land via seed. The Viewer reads the same fields from `inspect_ontology`.
 - **Retire:** `action: "retire"` with `confirm: true` drops an authored type that has **zero live nodes**. System seed types refuse. Live nodes refuse with `{ error, suggestion }` (delete or retype, then retry). Soft-deleted nodes of that type stay restorable — same family as undo-of-type-create: restore those deletes first, or pass `purge_deleted: true` (with `confirm: true`) to hard-delete the tombstones and their incident edges. Never a silent vault wipe. Undo of retire restores the registry row.
 
 ### `manage_relation`

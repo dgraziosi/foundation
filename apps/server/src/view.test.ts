@@ -9,7 +9,7 @@ import { createPool, migrate, seedSystemOntology, type Pool } from "@foundation/
 import { isToolError } from "@foundation/schema";
 import type { AddressInfo, Server } from "node:net";
 import { createApp } from "./app.js";
-import { getGraphNode, linkGraphNodes, listGraphActivity, upsertGraphNode } from "./graph.js";
+import { getGraphNode, linkGraphNodes, listGraphActivity, manageType, upsertGraphNode } from "./graph.js";
 import { viewerDistDir } from "./view.js";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -106,6 +106,8 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       assert.match(js, /Same key as MCP/);
       assert.match(js, /Select a node/);
       assert.match(js, /No tasks yet/);
+      assert.match(js, /No views declared for this type/);
+      assert.match(js, /Open tasks/);
       assert.doesNotMatch(js, /manage_type|confirm: true|localhost-only/);
 
       const session = await fetch(`${origin}/view/api/session`);
@@ -150,6 +152,37 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       assert.equal(tasks.status, 200);
       const tasksBody = (await tasks.json()) as { tasks: unknown[] };
       assert.deepEqual(tasksBody.tasks, []);
+
+      const ontology = await fetch(`${origin}/view/api/ontology`, { headers: authHeader() });
+      assert.equal(ontology.status, 200);
+      const ontologyBody = (await ontology.json()) as {
+        types: Array<{ slug: string; views: string[]; default_view?: string; count: number }>;
+      };
+      const taskType = ontologyBody.types.find((type) => type.slug === "task");
+      assert.deepEqual(taskType?.views, ["board", "list", "calendar", "timeline", "outline"]);
+      assert.equal(taskType?.default_view, "board");
+      assert.equal(taskType?.count, 0);
+      const noteType = ontologyBody.types.find((type) => type.slug === "note");
+      assert.deepEqual(noteType?.views, ["list"]);
+      assert.equal(noteType?.default_view, "list");
+
+      const typeView = await fetch(`${origin}/view/api/types/task`, { headers: authHeader() });
+      assert.equal(typeView.status, 200);
+      const typeBody = (await typeView.json()) as {
+        type: { views: string[]; default_view?: string };
+        nodes: unknown[];
+      };
+      assert.deepEqual(typeBody.type.views, ["board", "list", "calendar", "timeline", "outline"]);
+      assert.equal(typeBody.type.default_view, "board");
+      assert.deepEqual(typeBody.nodes, []);
+
+      const blank = await manageType(pool, { action: "create", slug: "blank_view", kind: "artifact" });
+      assert.equal(isToolError(blank), false);
+      const blankView = await fetch(`${origin}/view/api/types/blank_view`, { headers: authHeader() });
+      assert.equal(blankView.status, 200);
+      const blankBody = (await blankView.json()) as { type: { views: string[]; default_view?: string } };
+      assert.deepEqual(blankBody.type.views, []);
+      assert.equal(blankBody.type.default_view, undefined);
     });
 
     await t.test("unlock cookie opens the window", async () => {
@@ -659,21 +692,23 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
   }
 });
 
-test("viewer CSS ships paper first and a real dark lane", async () => {
+test("viewer CSS ships dark first and a real light lane", async () => {
   const css = await readFile(
     join(dirname(fileURLToPath(import.meta.url)), "../../viewer/src/styles.css"),
     "utf8",
   );
-  assert.match(css, /--bg:\s*#f7f7f4/);
-  assert.match(css, /--ink:\s*#26251e/);
-  assert.match(css, /--accent:\s*#f54e00/);
-  assert.match(css, /--background:\s*#f7f7f4/);
-  assert.match(css, /--primary:\s*#f54e00/);
-  assert.match(css, /\[data-theme="dark"\]/);
-  assert.match(css, /--bg:\s*#14120b/);
-  assert.match(css, /--ink:\s*#edecec/);
-  assert.match(css, /--card:\s*#1b1913/);
-  assert.match(css, /--background:\s*#14120b/);
+  assert.match(css, /--canvas:\s*#0a0a0a/);
+  assert.match(css, /--ink:\s*#ffffff/);
+  assert.match(css, /--elevated:\s*#171717/);
+  assert.match(css, /--accent:\s*#ffffff/);
+  assert.match(css, /--primary:\s*#ffffff/);
+  assert.match(css, /\[data-theme="light"\]/);
+  assert.match(css, /--canvas:\s*#fafafa/);
+  assert.match(css, /--ink:\s*#171717/);
+  assert.match(css, /--elevated:\s*#ffffff/);
+  assert.match(css, /--accent:\s*#171717/);
+  assert.doesNotMatch(css, /#f54e00/);
+  assert.doesNotMatch(css, /#f7f7f4/);
   assert.doesNotMatch(css, /linear-gradient/);
   const dist = viewerDistDir();
   assert.ok(dist.endsWith("viewer/dist"));

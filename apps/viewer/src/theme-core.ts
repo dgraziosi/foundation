@@ -1,5 +1,6 @@
-export type ThemeChoice = "paper" | "dark" | "system";
-export type ThemeLane = "paper" | "dark";
+export type ThemeChoice = "light" | "dark" | "system";
+export type ThemeLane = "light" | "dark";
+export type StoredTheme = ThemeChoice | "paper";
 
 export type ThemeTokens = {
   bg: string;
@@ -9,21 +10,32 @@ export type ThemeTokens = {
   ink2: string;
 };
 
-export const PAPER_TOKENS: ThemeTokens = {
-  bg: "#f7f7f4",
-  ink: "#26251e",
-  accent: "#f54e00",
-  card: "#f7f7f4",
-  ink2: "#6b6a63",
+export const LIGHT_TOKENS: ThemeTokens = {
+  bg: "#fafafa",
+  ink: "#171717",
+  accent: "#171717",
+  card: "#ffffff",
+  ink2: "#737373",
 };
 
 export const DARK_TOKENS: ThemeTokens = {
-  bg: "#14120b",
-  ink: "#edecec",
-  accent: "#f54e00",
-  card: "#1b1913",
-  ink2: "#a8a7a2",
+  bg: "#0a0a0a",
+  ink: "#ffffff",
+  accent: "#ffffff",
+  card: "#171717",
+  ink2: "#a1a1a1",
 };
+
+/** Stored paper from Viewer v1 reads as Light. */
+export function normalizeThemeChoice(value: string | null | undefined): ThemeChoice | undefined {
+  if (value === "paper") {
+    return "light";
+  }
+  if (value === "light" || value === "dark" || value === "system") {
+    return value;
+  }
+  return undefined;
+}
 
 const listeners = new Set<() => void>();
 
@@ -42,7 +54,7 @@ function notifyTheme(): void {
 
 export function resolvedTheme(choice: ThemeChoice): ThemeLane {
   if (choice === "system") {
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "paper";
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   }
   return choice;
 }
@@ -63,19 +75,19 @@ function readCss(name: string, fallback: string): string {
 
 export function themeLane(): ThemeLane {
   if (typeof document === "undefined") {
-    return "paper";
+    return "dark";
   }
-  return document.documentElement.dataset.theme === "dark" ? "dark" : "paper";
+  return document.documentElement.dataset.theme === "light" ? "light" : "dark";
 }
 
 /** Live lane tokens for canvas paint. Prefer computed CSS; fall back to the lane constants. */
 export function readThemeTokens(): ThemeTokens {
-  const fallback = themeLane() === "dark" ? DARK_TOKENS : PAPER_TOKENS;
+  const fallback = themeLane() === "light" ? LIGHT_TOKENS : DARK_TOKENS;
   return {
-    bg: readCss("--bg", fallback.bg),
+    bg: readCss("--canvas", fallback.bg),
     ink: readCss("--ink", fallback.ink),
     accent: readCss("--accent", fallback.accent),
-    card: readCss("--card", fallback.card),
+    card: readCss("--elevated", fallback.card),
     ink2: readCss("--ink-2", fallback.ink2),
   };
 }
@@ -87,3 +99,6 @@ export function subscribeGraphPaint(onPaint: (tokens: ThemeTokens) => void): () 
     onPaint(readThemeTokens());
   });
 }
+
+/** @deprecated Use LIGHT_TOKENS. Paper is Light. */
+export const PAPER_TOKENS = LIGHT_TOKENS;

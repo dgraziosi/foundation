@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("rounded-lg border border-border bg-card text-card-foreground shadow-none", className)}
+    className={cn("rounded-lg border border-border bg-elevated text-card-foreground shadow-none", className)}
     {...props}
   />
 ));
@@ -17,7 +17,7 @@ CardHeader.displayName = "CardHeader";
 
 const CardTitle = forwardRef<HTMLHeadingElement, HTMLAttributes<HTMLHeadingElement>>(
   ({ className, ...props }, ref) => (
-    <h3 ref={ref} className={cn("text-body font-semibold leading-none", className)} {...props} />
+    <h3 ref={ref} className={cn("text-body-s font-medium leading-none", className)} {...props} />
   ),
 );
 CardTitle.displayName = "CardTitle";

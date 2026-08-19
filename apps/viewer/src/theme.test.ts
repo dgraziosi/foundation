@@ -5,7 +5,8 @@ import { test } from "node:test";
 import {
   applyTheme,
   DARK_TOKENS,
-  PAPER_TOKENS,
+  LIGHT_TOKENS,
+  normalizeThemeChoice,
   readThemeTokens,
   subscribeGraphPaint,
   subscribeTheme,
@@ -13,33 +14,33 @@ import {
 } from "./theme-core";
 import { ThemeProvider, useTheme } from "./theme";
 
-function installThemeDom(stored?: ThemeChoice): Map<string, string> {
+function installThemeDom(stored?: string): Map<string, string> {
   const store = new Map<string, string>();
   if (stored) {
     store.set("foundation-theme", stored);
   }
   const lanes: Record<string, Record<string, string>> = {
-    paper: {
-      "--bg": PAPER_TOKENS.bg,
-      "--ink": PAPER_TOKENS.ink,
-      "--accent": PAPER_TOKENS.accent,
-      "--card": PAPER_TOKENS.card,
-      "--ink-2": PAPER_TOKENS.ink2,
+    light: {
+      "--canvas": LIGHT_TOKENS.bg,
+      "--ink": LIGHT_TOKENS.ink,
+      "--accent": LIGHT_TOKENS.accent,
+      "--elevated": LIGHT_TOKENS.card,
+      "--ink-2": LIGHT_TOKENS.ink2,
     },
     dark: {
-      "--bg": DARK_TOKENS.bg,
+      "--canvas": DARK_TOKENS.bg,
       "--ink": DARK_TOKENS.ink,
       "--accent": DARK_TOKENS.accent,
-      "--card": DARK_TOKENS.card,
+      "--elevated": DARK_TOKENS.card,
       "--ink-2": DARK_TOKENS.ink2,
     },
   };
-  const root = { dataset: { theme: "paper" } };
+  const root = { dataset: { theme: "dark" } };
   Object.assign(globalThis, {
     document: { documentElement: root },
     getComputedStyle: () => ({
       getPropertyValue(name: string) {
-        const lane = root.dataset.theme === "dark" ? "dark" : "paper";
+        const lane = root.dataset.theme === "light" ? "light" : "dark";
         return lanes[lane]?.[name] ?? "";
       },
     }),
@@ -60,6 +61,14 @@ function installThemeDom(stored?: ThemeChoice): Map<string, string> {
   return store;
 }
 
+test("stored paper choice reads as Light", () => {
+  assert.equal(normalizeThemeChoice("paper"), "light");
+  assert.equal(normalizeThemeChoice("light"), "light");
+  assert.equal(normalizeThemeChoice("dark"), "dark");
+  assert.equal(normalizeThemeChoice("system"), "system");
+  assert.equal(normalizeThemeChoice("nope"), undefined);
+});
+
 test("graph paint follows the active theme, not only the first render", () => {
   installThemeDom();
   const paints: Array<{ bg: string; ink: string; card: string; accent: string }> = [];
@@ -69,28 +78,28 @@ test("graph paint follows the active theme, not only the first render", () => {
 
   assert.equal(paints.length, 1);
   assert.deepEqual(paints[0], {
-    bg: PAPER_TOKENS.bg,
-    ink: PAPER_TOKENS.ink,
-    card: PAPER_TOKENS.card,
-    accent: PAPER_TOKENS.accent,
-  });
-
-  applyTheme("dark");
-  applyTheme("paper");
-  applyTheme("system");
-
-  assert.equal(paints.length, 4);
-  assert.deepEqual(paints[1], {
     bg: DARK_TOKENS.bg,
     ink: DARK_TOKENS.ink,
     card: DARK_TOKENS.card,
     accent: DARK_TOKENS.accent,
   });
+
+  applyTheme("light");
+  applyTheme("dark");
+  applyTheme("system");
+
+  assert.equal(paints.length, 4);
+  assert.deepEqual(paints[1], {
+    bg: LIGHT_TOKENS.bg,
+    ink: LIGHT_TOKENS.ink,
+    card: LIGHT_TOKENS.card,
+    accent: LIGHT_TOKENS.accent,
+  });
   assert.deepEqual(paints[2], paints[0]);
-  assert.deepEqual(paints[3], paints[0]);
+  assert.deepEqual(paints[3], paints[1]);
   assert.notEqual(paints[1]?.bg, paints[0]?.bg);
   assert.notEqual(paints[1]?.ink, paints[0]?.ink);
-  assert.equal(readThemeTokens().bg, PAPER_TOKENS.bg);
+  assert.equal(readThemeTokens().bg, LIGHT_TOKENS.bg);
   stop();
 });
 
@@ -100,7 +109,7 @@ test("subscribeTheme fires when applyTheme changes the lane", () => {
   const stop = subscribeTheme(() => {
     fires += 1;
   });
-  applyTheme("paper");
+  applyTheme("light");
   applyTheme("dark");
   assert.equal(fires, 2);
   assert.equal(readThemeTokens().bg, DARK_TOKENS.bg);
@@ -108,8 +117,8 @@ test("subscribeTheme fires when applyTheme changes the lane", () => {
   stop();
 });
 
-test("theme context choice updates after unlock restore and each toggle", () => {
-  installThemeDom("dark");
+test("theme context restores paper as Light and toggles Light / Dark / System", () => {
+  installThemeDom("paper");
   const seen: ThemeChoice[] = [];
   let setChoice: (next: ThemeChoice) => void = () => undefined;
 
@@ -124,12 +133,12 @@ test("theme context choice updates after unlock restore and each toggle", () => 
     createRenderer(createElement(ThemeProvider, null, createElement(Probe)));
   });
 
-  assert.equal(seen.at(-1), "dark");
+  assert.equal(seen.at(-1), "light");
 
   act(() => {
-    setChoice("paper");
+    setChoice("dark");
   });
-  assert.equal(seen.at(-1), "paper");
+  assert.equal(seen.at(-1), "dark");
 
   act(() => {
     setChoice("system");
@@ -137,9 +146,9 @@ test("theme context choice updates after unlock restore and each toggle", () => 
   assert.equal(seen.at(-1), "system");
 
   act(() => {
-    setChoice("dark");
+    setChoice("light");
   });
-  assert.equal(seen.at(-1), "dark");
-  assert.ok(seen.includes("paper"));
+  assert.equal(seen.at(-1), "light");
+  assert.ok(seen.includes("dark"));
   assert.ok(seen.includes("system"));
 });
