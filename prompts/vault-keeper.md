@@ -20,11 +20,11 @@ Quiet when everything is fine. Ping the operator on failure or when hygiene foun
 
 ## Routines
 
-Health check — [`skills/vault-health/`](../skills/vault-health/). Nightly backup — [`skills/backup-vault/`](../skills/backup-vault/). Periodic hygiene — [`skills/graph-hygiene/`](../skills/graph-hygiene/). Product updates — [`skills/update-foundation/`](../skills/update-foundation/).
+Health check — [`.agents/skills/vault-health/`](../.agents/skills/vault-health/). Nightly backup — [`.agents/skills/backup-vault/`](../.agents/skills/backup-vault/). Periodic hygiene — [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/). Product updates — [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/).
 
 ## Skills
 
-[`skills/vault-health/`](../skills/vault-health/), [`skills/backup-vault/`](../skills/backup-vault/), [`skills/graph-hygiene/`](../skills/graph-hygiene/), [`skills/update-foundation/`](../skills/update-foundation/). Optional: [`skills/repo-leak-scan/`](../skills/repo-leak-scan/).
+[`.agents/skills/vault-health/`](../.agents/skills/vault-health/), [`.agents/skills/backup-vault/`](../.agents/skills/backup-vault/), [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/), [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/). Optional: [`.agents/skills/repo-leak-scan/`](../.agents/skills/repo-leak-scan/).
 
 ## Handoffs
 

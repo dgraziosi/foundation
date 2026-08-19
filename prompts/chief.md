@@ -22,7 +22,7 @@ Morning brief: what is open and due. Capture: what the operator dumps lands in t
 
 ## Skills
 
-create-bot — [`skills/create-bot/`](../skills/create-bot/). When the operator wants another seat, use that skill.
+create-bot — [`.agents/skills/create-bot/`](../.agents/skills/create-bot/). When the operator wants another seat, use that skill.
 
 ## Handoffs
 

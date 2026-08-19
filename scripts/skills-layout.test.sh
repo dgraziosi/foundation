@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Assert the product skills tree: folder name matches SKILL.md frontmatter
-# name, Vault Keeper procedure routines cite skills/<name>/, prompts/ is
-# seats only, and the blank bot template lives under create-bot.
+# name, Vault Keeper procedure routines cite .agents/skills/<name>/,
+# prompts/ is seats only, and the blank bot template lives under create-bot.
 # Does not launch harnesses or Compose.
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/.." && pwd)"
-skills_root="${repo_root}/skills"
+skills_root="${repo_root}/.agents/skills"
 prompts_root="${repo_root}/prompts"
 vault_keeper="${prompts_root}/vault-keeper.md"
 
@@ -42,6 +42,13 @@ extract_section() {
   ' "${source}"
 }
 
+if [[ -e "${repo_root}/skills" ]]; then
+  fail "repo-root skills/ must not exist; skills live in .agents/skills/"
+fi
+if [[ -e "${repo_root}/.cursor/skills" ]]; then
+  fail "do not fork skills into .cursor/skills/; use .agents/skills/ only"
+fi
+
 if [[ ! -d "${skills_root}" ]]; then
   fail "missing ${skills_root}"
 fi
@@ -59,7 +66,7 @@ while IFS= read -r skill_md; do
 done < <(find "${skills_root}" -mindepth 2 -maxdepth 2 -type f -name SKILL.md | LC_ALL=C sort)
 
 if ((skill_count < 1)); then
-  fail "no skills/*/SKILL.md files found"
+  fail "no .agents/skills/*/SKILL.md files found"
 fi
 
 if [[ ! -f "${vault_keeper}" ]]; then
@@ -72,10 +79,14 @@ if [[ -z "${routines}" ]]; then
 fi
 
 for folder in vault-health backup-vault graph-hygiene update-foundation; do
-  if ! grep -Fq -- "skills/${folder}/" <<<"${routines}"; then
-    fail "Vault Keeper Routines does not cite skills/${folder}/"
+  if ! grep -Fq -- ".agents/skills/${folder}/" <<<"${routines}"; then
+    fail "Vault Keeper Routines does not cite .agents/skills/${folder}/"
   fi
 done
+
+if grep -E -q -- '(^|[^[:alnum:]._/])skills/(vault-health|backup-vault|graph-hygiene|update-foundation)/' <<<"${routines}"; then
+  fail "Vault Keeper Routines still cites repo-root skills/ instead of .agents/skills/"
+fi
 
 if grep -E -q -- 'prompts/(vault-health|graph-hygiene|update-foundation|repo-leak-scan|bot-template)\.md' <<<"${routines}"; then
   fail "Vault Keeper Routines still cites a moved prompts/ skill form"
@@ -104,7 +115,7 @@ if [[ ! -f "${skills_root}/create-bot/bot-template.md" ]]; then
   fail "missing ${skills_root}/create-bot/bot-template.md"
 fi
 if [[ -e "${prompts_root}/bot-template.md" ]]; then
-  fail "leftover prompts/bot-template.md; template belongs under skills/create-bot/"
+  fail "leftover prompts/bot-template.md; template belongs under .agents/skills/create-bot/"
 fi
 
 echo "skills-layout.test: ok"

@@ -37,6 +37,10 @@ section_ok() {
     echo "harness-docs.test: ${name} section does not say how to confirm with bootstrap or search" >&2
     return 1
   fi
+  if ! grep -Fq -- ".agents/skills/" <<<"${body}"; then
+    echo "harness-docs.test: ${name} section does not import or point at .agents/skills/" >&2
+    return 1
+  fi
   return 0
 }
 

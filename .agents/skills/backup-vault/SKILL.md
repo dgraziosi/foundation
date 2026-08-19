@@ -7,7 +7,7 @@ description: Run the nightly vault backup script. Use when Vault Keeper's backup
 
 You are running the nightly vault backup. The operator can run this, or attach it to Vault Keeper.
 
-Read [`docs/BACKUP.md`](../../docs/BACKUP.md) and follow it. Run [`scripts/backup-vault.sh`](../../scripts/backup-vault.sh) from the clone, with Compose up. Do not rewrite the script.
+Read [`docs/BACKUP.md`](../../../docs/BACKUP.md) and follow it. Run [`scripts/backup-vault.sh`](../../../scripts/backup-vault.sh) from the clone, with Compose up. Do not rewrite the script.
 
 The operator is the human who runs Compose. A vault is this running instance (`FOUNDATION_DATA` + Postgres). Do not call the graph “the Vault.” Dumps stay out of git.
 
@@ -30,4 +30,4 @@ set -a && source .env && set +a
 ./scripts/backup-vault.sh
 ```
 
-How to restore into a throwaway instance: [`docs/BACKUP.md`](../../docs/BACKUP.md). Do not restore into a live vault.
+How to restore into a throwaway instance: [`docs/BACKUP.md`](../../../docs/BACKUP.md). Do not restore into a live vault.

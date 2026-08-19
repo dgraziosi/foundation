@@ -15,7 +15,7 @@ Short analog: app / folder / links → Foundation / vault / graph.
 
 Do not call the graph “the Vault.”
 
-The operator can run this checkup, or attach it to Vault Keeper ([`AGENTS.md`](./AGENTS.md)). Skill: [`skills/vault-health/`](../skills/vault-health/).
+The operator can run this checkup, or attach it to Vault Keeper ([`AGENTS.md`](./AGENTS.md)). Skill: [`.agents/skills/vault-health/`](../.agents/skills/vault-health/).
 
 ## What it is
 
@@ -23,7 +23,7 @@ A **quiet instance routine** (weekdays, morning local). Instance ops: process + 
 
 Do not add `get_vault_health`, `run_maintenance`, `propose_reorganize`, `audit_links`, or `cleanup_dangling_links`. Those jobs are this routine and [graph hygiene](./GRAPH_HYGIENE.md), not MCP tools.
 
-Graph-side report (duplicate titles, zero-edge nodes, type soup) is **not** this routine. That is weekly [graph hygiene](./GRAPH_HYGIENE.md). Git pull, compose rebuild, and the post-pull git-tree leak scan are **not** this routine. Those are [`skills/update-foundation/`](../skills/update-foundation/) and [`skills/repo-leak-scan/`](../skills/repo-leak-scan/).
+Graph-side report (duplicate titles, zero-edge nodes, type soup) is **not** this routine. That is weekly [graph hygiene](./GRAPH_HYGIENE.md). Git pull, compose rebuild, and the post-pull git-tree leak scan are **not** this routine. Those are [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/) and [`.agents/skills/repo-leak-scan/`](../.agents/skills/repo-leak-scan/).
 
 ## What it is not
 
