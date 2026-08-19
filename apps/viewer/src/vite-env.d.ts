@@ -18,6 +18,9 @@ declare module "react-force-graph-2d" {
     backgroundColor?: string;
     cooldownTicks?: number;
     enableNodeDrag?: boolean;
+    enableZoomInteraction?: boolean;
+    enablePanInteraction?: boolean;
+    enablePointerInteraction?: boolean;
     onNodeClick?: (node: Record<string, unknown>, event: MouseEvent) => void;
     onNodeRightClick?: (node: Record<string, unknown>, event: MouseEvent) => void;
     nodeCanvasObject?: (

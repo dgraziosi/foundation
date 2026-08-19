@@ -3,7 +3,12 @@ import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { GRAPH_FLOOR_PX, HOME_GRAPH_FRAME_CLASS, readGraphFrameSize } from "./frame.js";
+import {
+  GRAPH_FLOOR_PX,
+  HOME_GRAPH_FRAME_CLASS,
+  graphPassesPageScroll,
+  readGraphFrameSize,
+} from "./frame.js";
 
 const root = dirname(fileURLToPath(import.meta.url));
 
@@ -28,10 +33,21 @@ test("Home graph min-height / leftover-viewport contract (460px floor)", async (
   assert.match(canvas, /readGraphFrameSize/);
   assert.match(canvas, /stopPropagation/);
   assert.match(canvas, /globalScale/);
+  assert.match(canvas, /graphPassesPageScroll/);
+  assert.match(canvas, /enableZoomInteraction=\{!passPageScroll\}/);
+  assert.match(canvas, /enablePanInteraction=\{!passPageScroll\}/);
+  assert.match(canvas, /passPageScroll \? "pointer-events-none"/);
 
   const shell = await readFile(join(root, "../shell/Shell.tsx"), "utf8");
   assert.match(shell, /h-dvh/);
   assert.match(shell, /overflow-hidden/);
+});
+
+test("empty or loading graphs pass wheel and pan to the page scroller", () => {
+  assert.equal(graphPassesPageScroll({ loading: true, nodeCount: 0 }), true);
+  assert.equal(graphPassesPageScroll({ loading: true, nodeCount: 3 }), true);
+  assert.equal(graphPassesPageScroll({ loading: false, nodeCount: 0 }), true);
+  assert.equal(graphPassesPageScroll({ loading: false, nodeCount: 3 }), false);
 });
 
 test("force canvas ignores collapsed resize frames", () => {

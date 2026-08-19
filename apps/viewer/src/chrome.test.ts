@@ -47,6 +47,9 @@ test("Home graph fills leftover viewport with a 460px floor", async () => {
   const canvas = await src("graph/GraphCanvas.tsx");
   assert.match(canvas, /min-h-\[460px\]/);
   assert.doesNotMatch(canvas, /flex-1/);
+  assert.match(canvas, /enableZoomInteraction=\{!passPageScroll\}/);
+  assert.match(canvas, /enablePanInteraction=\{!passPageScroll\}/);
+  assert.match(canvas, /passPageScroll \? "pointer-events-none"/);
   assert.match(canvas, /linkWidth=\{\(link\) => \(link\.kind === "hierarchy" \? 1 : 0\.6\)\}/);
   assert.match(canvas, /linkLineDash=\{\(link\) => \(link\.kind === "hierarchy" \? \[\] : \[2, 2\]\)\}/);
   assert.match(canvas, /onNodeRightClick/);
@@ -89,7 +92,12 @@ test("tab sync does not loop setState; collection titles stay the type label", a
   assert.match(tabs, /return existing/);
   assert.match(tabs, /nextLabel === slug && prev\.label !== slug/);
   const typeView = await src("pages/TypeViewPage.tsx");
-  assert.match(typeView, /openCollection\(slug, label\)/);
+  assert.match(typeView, /syncCollectionLabel\(slug, label\)/);
+  assert.doesNotMatch(typeView, /openCollection\(slug, label\)/);
+  assert.match(
+    shell,
+    /syncCollectionLabel = useCallback\(\(nextSlug: string, label: string\) => \{\s*setTabs\(\(existing\) => upsertCollectionTab\(existing, nextSlug, label\)\);\s*\}, \[\]\)/,
+  );
 });
 
 test("type identity is read from the ontology with a quiet fallback", async () => {

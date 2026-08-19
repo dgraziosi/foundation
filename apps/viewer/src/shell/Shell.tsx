@@ -53,6 +53,10 @@ export function Shell() {
     [navigate],
   );
 
+  const syncCollectionLabel = useCallback((nextSlug: string, label: string) => {
+    setTabs((existing) => upsertCollectionTab(existing, nextSlug, label));
+  }, []);
+
   const openRecents = useCallback(() => {
     setSearchOpen(false);
     setTabs((existing) => upsertRecentsTab(existing));
@@ -77,6 +81,7 @@ export function Shell() {
     () => ({
       openDetail,
       openCollection,
+      syncCollectionLabel,
       openRecents,
       openSearch,
       railOpen,
@@ -84,7 +89,7 @@ export function Shell() {
       railCollapsed,
       setRailCollapsed,
     }),
-    [openDetail, openCollection, openRecents, openSearch, railOpen, railCollapsed],
+    [openDetail, openCollection, syncCollectionLabel, openRecents, openSearch, railOpen, railCollapsed],
   );
 
   return (
