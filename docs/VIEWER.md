@@ -13,7 +13,7 @@ Visual system: **Core Theme** (calm-clarity). Tokens, type, density, and control
 3. **Easy search** across nodes.
 4. **Recent additions** (and other recent writes).
 5. **A detail pane that is easy to read.**
-6. **One view engine for types** — List, Card, Table, Board, Calendar, Timeline, Outline, Graph. Not a unique app per type.
+6. **One view engine for types** — a shared set of views. Each type declares which of those views apply. Not a unique app per type.
 
 The window does not write. No upsert, link, unlink, delete, undo, or ontology controls. No capture composer. No planner.
 
@@ -33,7 +33,7 @@ Viewer v1 is live. Keep the door. Restyle Unlock, Graph, Search, Recents, and In
 | Empty graph is empty, not an error | First-day vault is valid |
 | Search by text, optional type, optional status | Hits show title, type, snippet, `data.due` when set |
 | Node fields | Title, type, status, `data`, payload, neighbors, blob meta, `suggested_links` as proposals |
-| Deep link `/view/nodes/:id` | Opens the shell with that node selected in its type’s view engine |
+| Deep link `/view/nodes/:id` | Opens the shell with that node selected in its type’s view engine at `default_view` |
 | No write controls | Read-only stays |
 
 Keep Unlock, Graph, Search, Recents, Inspector. Home is the landing surface. Types open through the view engine, not as extra rail items.
@@ -74,7 +74,7 @@ Landing page after unlock. Middle pane: widgets, then folders.
 Wide: three cards in a row, gap 13, radius 13. Medium and narrow: widgets stack.
 
 1. **Recents** — last few activity rows (same summary rhythm as Recents). Click a row: select that node, fill the inspector.
-2. **Open tasks** — `task` nodes with status active. Title, due chip when set. Click: select the task, fill the inspector. A control on the widget header opens that type in the view engine (Board).
+2. **Open tasks** — `task` nodes with status active. Title, due chip when set. Click: select the task, fill the inspector. A control on the widget header opens that type in the view engine at its `default_view` (`board` on the seed).
 3. **Graph** — a small canvas of the current working set (recent nodes plus neighbors). Same marks and edges as Graph, no find field. Click a node: select it, fill the inspector. A control on the widget header opens Graph.
 
 No other widgets in this restyle. No capture field. No Today / Focus / Inbox. No write actions on a widget.
@@ -83,9 +83,9 @@ No other widgets in this restyle. No capture field. No Today / Focus / Inbox. No
 
 Under a **Types** label: one folder tile per live ontology type (seed and authored). Tile: type glyph (type ink), type label, live count. Type tint as a quiet wash. Same tile geometry for every type.
 
-- Click a folder: open the view engine for that type, at that type’s default view.
-- Empty type: folder still shows, count 0. Opening it is a valid empty view, not an error.
-- Folders are not rail destinations.
+- Click a folder: open the view engine for that type, at that type’s `default_view`. If the type declared no views, open the no-views state — not a fake List.
+- Empty type (nodes): folder still shows, count 0. Opening it is a valid empty view, not an error.
+- Folders are not rail destinations. The folder does not invent views the type did not declare.
 
 **Empty Home (first-day vault)**
 
@@ -156,53 +156,95 @@ Same row rhythm as Search.
 
 ### View engine
 
-How a type is shown. One pipeline. Not a unique app per type.
+How a type is shown. One shared pipeline. Not a unique app per type.
 
-Opened from a Home folder (or from a widget header that names a type). Middle pane: type title (display M), a view switcher, then the active view. Click a node: select it, fill the inspector. No create control.
+Opened from a Home folder (or from a widget header that names a type). Middle pane: type title (display M), a view switcher of **that type’s declared views**, then the active view. Click a node: select it, fill the inspector. No create control.
 
-**View types**
+**View types** (the engine — closed set)
 
-| View | What the operator sees |
-| --- | --- |
-| **List** | Title + meta rows. Same rhythm as Search. Type tag, due when set. |
-| **Card** | Wrapping grid of cards (radius 13). Glyph, title, status, due when set. |
-| **Table** | Columns from field roles: Title, Status, Due when the type has due. Click a row to select. |
-| **Board** | Three columns: **Active** · **Completed** · **Archived**. One card per node. Title, due chip, parent title when a `child_of` neighbor exists. Read-only. Cards do not drag. |
-| **Calendar** | Month grid. Nodes sit on `data.due`. Nodes without due do not appear. No create-on-day. |
-| **Timeline** | Vertical chronological list by `data.due`. Nodes without due omitted. Empty: one quiet line. |
-| **Outline** | Tree by `child_of`. Roots of this type, children nested. Click a title to select. |
-| **Graph** | Canvas of this type’s nodes and their edges, same marks as rail Graph. Scoped to the type. |
-
-The view switcher shows only the views that type offers. Active view uses active fill. Switching a view does not write.
-
-**Which views a type offers, and the default, come from the ontology** plus simple field roles — not from a hardcoded app per type.
-
-| Role | How it is known | Unlocks |
+| Id | View | What the operator sees |
 | --- | --- | --- |
-| title | Every node | List, Card, Table, Graph |
-| status | Every node | Board, status filter |
-| due | Type schema includes `data.due` | Calendar, Timeline, due chips |
-| hierarchy | Type participates in `child_of` (`parent_types` or allowed as a parent) | Outline |
+| `list` | **List** | Title + meta rows. Same rhythm as Search. Type tag, due when set. |
+| `card` | **Card** | Wrapping grid of cards (radius 13). Glyph, title, status, due when set. |
+| `table` | **Table** | Columns: Title, Status, Due when the type has due. Click a row to select. |
+| `board` | **Board** | The current Tasks kanban. Three columns: **Active** · **Completed** · **Archived**. One card per node. Title, due chip, parent title when a `child_of` neighbor exists. Read-only. Cards do not drag. |
+| `calendar` | **Calendar** | Month grid. Nodes sit on `data.due`. Nodes without due do not appear. No create-on-day. |
+| `timeline` | **Timeline** | Vertical chronological list by `data.due`. Nodes without due omitted. Empty: one quiet line. |
+| `outline` | **Outline** | Tree by `child_of`. Roots of this type, children nested. Click a title to select. |
+| `graph` | **Graph** | Canvas of this type’s nodes and their edges, same marks as rail Graph. Scoped to the type. |
 
-Rules:
+Do not invent a ninth view for a new type. A new type picks from this set.
 
-- Every type offers **List**, **Card**, **Table**, and **Graph**.
-- **Board** is offered when the type has status (every live type). Default is Board only for `task`.
-- **Calendar** and **Timeline** are offered only when the type has due (`task`, `goal`, and any authored type that earns due).
-- **Outline** is offered only when the type participates in hierarchy.
-- **`task` defaults to Board** (the existing kanban).
-- **Every other type defaults to List** unless the ontology records a different default that it has earned (a due type may default to Calendar; a hierarchy root may default to Outline). Do not invent a default that the roles do not earn.
-- Authored types follow the same roles. Do not ship a special-case screen for a new slug.
+#### Where the declaration lives
 
-Rail **Graph** stays a first-class destination: the vault working set, any type. View-engine **Graph** is the same canvas language, scoped to one type.
+On the **type**, next to `slug`, `label`, `kind`, `parent_types`, and `json_schema`:
 
-**Empty Board (`task`)**
+| Field | Shape | Rule |
+| --- | --- | --- |
+| `views` | Array of view ids from the table above, switcher order | The subset that applies to this type. Empty or missing means no views. |
+| `default_view` | One view id, or absent | Must be a member of `views`. If `views` is empty, omit it. |
+
+Defining a type includes setting these. The choice is part of the type, not a Viewer preference and not something to remember later. The window does not write the type; it reads the declaration.
+
+**What to declare** (for the definer — Viewer does not infer this):
+
+- `list`, `card`, `table`, `graph` — title is enough
+- `board` — status columns (the kanban)
+- `calendar`, `timeline` — only when the type has dates (`data.due`). A type with no dates does not take calendar or timeline
+- `outline` — only when the type participates in `child_of`
+
+A task-like type typically takes `board` + `list` (and `calendar` / `timeline` if it has due). Viewer still only offers what that type actually declared.
+
+#### What Viewer does with it
+
+1. Resolve `views` to known engine ids, in declared order. Drop unknown ids.
+2. If none remain: **no-views state**. Do not invent `list`. Do not invent `board`.
+3. If `default_view` is missing or not in the remaining set: use the first remaining id.
+4. Paint the switcher with only those views. Active view uses active fill. Switching a view does not write.
+5. Home folders and deep links use the same resolution. Opening a type never offers a view it did not declare.
+
+Rail **Graph** stays a first-class destination: the vault working set, any type. View-engine `graph` is the same canvas language, scoped to one type, and only when that type declared `graph`.
+
+#### Seed types (first paint)
+
+Seed types already declare views so the first unlocked Home is not a wall of no-views. `task` keeps the current kanban as its default.
+
+| Type | `views` | `default_view` |
+| --- | --- | --- |
+| task | `board`, `list`, `calendar`, `timeline`, `outline` | `board` |
+| goal | `list`, `calendar`, `timeline`, `outline` | `list` |
+| area | `list`, `outline` | `list` |
+| project | `list`, `outline` | `list` |
+| habit | `list`, `outline` | `list` |
+| lesson | `list`, `outline` | `list` |
+| decision | `list`, `outline` | `list` |
+| person | `list` | `list` |
+| place | `list` | `list` |
+| company | `list` | `list` |
+| journal | `list` | `list` |
+| idea | `list` | `list` |
+| note | `list` | `list` |
+| trip | `list` | `list` |
+
+Authored types get whatever their definer set. They do not inherit a hidden Viewer default.
+
+#### Empty and no-views
+
+**No views declared** (`views` empty, missing, or only unknown ids)
+
+Type title stays. No switcher. One quiet line:
+
+> No views declared for this type.
+
+Not an error. Not a fake List. The folder still opened.
+
+**Empty Board (`task`, when `board` is declared)**
 
 One line in the Active column: **No tasks yet.** Other columns stay visible and empty.
 
-**Empty other views**
+**Empty other declared views**
 
-One quiet line: **No {type} yet.** Folder chrome and the view switcher stay.
+One quiet line: **No {type} yet.** Type title and the switcher stay.
 
 Trip HTML itineraries, journal dates, and habit frequency stay as **inspector treatments**, not new rail items and not unique view types.
 
@@ -473,7 +515,8 @@ Every surface uses this set. Copy stays this quiet.
 | **Empty recents** | “Nothing yet.” Same copy in the Home Recents widget |
 | **Empty search (not submitted)** | Field + “Search the graph, or filter by type.” |
 | **No results** | “No matching nodes.” Field and type stay so the operator can change them |
-| **Empty type** | View switcher stays. “No {type} yet.” |
+| **Empty type** | Declared switcher stays. “No {type} yet.” |
+| **No views declared** | Type title. No switcher. “No views declared for this type.” Not a fake List |
 | **Empty Board (`task`)** | Board chrome present. “No tasks yet.” in Active. Same copy in the Home Open tasks widget |
 | **Nothing selected** | Inspector: “Select a node.” |
 | **Selected** | Mark / row / card uses active fill or border-strong ring. Inspector filled |
@@ -492,8 +535,9 @@ Do not toast. Do not confetti an empty vault.
 - Unlock, then Home (widgets + type folders)
 - Graph on the rail and as a view type
 - Search, Recents, Inspector — same jobs, restyled
-- View engine: List, Card, Table, Board, Calendar, Timeline, Outline, Graph. Defaults and offered views from the ontology and field roles
-- `task` defaults to Board. Other types default to List unless the ontology earns something else
+- View engine: shared views (`list`, `card`, `table`, `board`, `calendar`, `timeline`, `outline`, `graph`). Each type declares `views` and `default_view` on the type
+- Seed types already declare views. `task` declares the current kanban (`board`) as default, plus `list`, `calendar`, `timeline`, and `outline`
+- A type with no declared views opens an honest no-views state — Viewer does not invent a default
 - Type hue + Lucide glyph on marks, tags, folders, and cards
 - Off-box unlock and session (same key, same cookie path)
 - Deep link `/view/nodes/:id` into the shell — that node’s type in the view engine, inspector filled
@@ -504,7 +548,8 @@ Do not toast. Do not confetti an empty vault.
 - Writes from the window (create, status change, drag-to-complete, accept a suggested link)
 - A unique app per type (trip map, habit heatmap, journal calendar as its own destination)
 - Capture composer, Today / Focus / Inbox, or any planner on Home
-- Types editor or ontology editor
+- Types editor or ontology editor in this window (defining a type, including `views`, stays off this window)
+- A Viewer-only view picker stored off the type
 - Extra rail destinations (including a rail item per type)
 - Trip HTML as a live document (safe render can follow; not a rail item)
 - Due-bucket board, swimlanes, filters for `origin` / `under` / `data_equals`
@@ -529,13 +574,14 @@ Review against **dark** (first paint) on a wide window first, then medium, then 
 - [ ] A folder opens the view engine for that type, not a unique app
 - [ ] Graph’s middle is a canvas with visible nodes **and** edges. A list standing in for a graph fails
 - [ ] Search / Recents are title + rows, not cards in a masonry
-- [ ] `task` in the view engine defaults to Board: three status columns, not a type-filtered list labeled “board”
-- [ ] Other types default to List unless the ontology earns another default
-- [ ] View switcher shows only earned views (Calendar / Timeline only with due; Outline only with hierarchy)
-- [ ] Graph exists on the rail and as a view type
+- [ ] `task` in the view engine opens at `board`: three status columns, not a type-filtered list labeled “board”
+- [ ] Seed types other than `task` open at their declared `default_view` (`list` in the seed table)
+- [ ] View switcher shows only that type’s declared views — not the full engine, not inferred extras
+- [ ] A type with empty `views` shows “No views declared for this type.” No fake List
+- [ ] Graph exists on the rail; view-engine `graph` appears only when the type declared it
 - [ ] Medium: inspector is a sheet (radius 21); Graph is still a canvas
 - [ ] Narrow: rail is an overlay with scrim, not a permanent icon strip; inspector is a sheet; Graph is still a canvas
-- [ ] `/view/nodes/:id` opens the shell with that node selected in its type’s view engine
+- [ ] `/view/nodes/:id` opens the shell with that node selected in its type’s view engine at `default_view` (or the no-views state)
 
 ### Density and type
 
