@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { createElement } from "react";
+import { act, create as createRenderer } from "react-test-renderer";
 import { test } from "node:test";
 import {
   applyTheme,
@@ -7,9 +9,15 @@ import {
   readThemeTokens,
   subscribeGraphPaint,
   subscribeTheme,
+  type ThemeChoice,
 } from "./theme-core";
+import { ThemeProvider, useTheme } from "./theme";
 
-function installThemeDom(): void {
+function installThemeDom(stored?: ThemeChoice): Map<string, string> {
+  const store = new Map<string, string>();
+  if (stored) {
+    store.set("foundation-theme", stored);
+  }
   const lanes: Record<string, Record<string, string>> = {
     paper: {
       "--bg": PAPER_TOKENS.bg,
@@ -41,8 +49,15 @@ function installThemeDom(): void {
         addEventListener() {},
         removeEventListener() {},
       }),
+      localStorage: {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          store.set(key, value);
+        },
+      },
     },
   });
+  return store;
 }
 
 test("graph paint follows the active theme, not only the first render", () => {
@@ -91,4 +106,40 @@ test("subscribeTheme fires when applyTheme changes the lane", () => {
   assert.equal(readThemeTokens().bg, DARK_TOKENS.bg);
   assert.equal(readThemeTokens().card, DARK_TOKENS.card);
   stop();
+});
+
+test("theme context choice updates after unlock restore and each toggle", () => {
+  installThemeDom("dark");
+  const seen: ThemeChoice[] = [];
+  let setChoice: (next: ThemeChoice) => void = () => undefined;
+
+  function Probe() {
+    const theme = useTheme();
+    setChoice = theme.setChoice;
+    seen.push(theme.choice);
+    return null;
+  }
+
+  act(() => {
+    createRenderer(createElement(ThemeProvider, null, createElement(Probe)));
+  });
+
+  assert.equal(seen.at(-1), "dark");
+
+  act(() => {
+    setChoice("paper");
+  });
+  assert.equal(seen.at(-1), "paper");
+
+  act(() => {
+    setChoice("system");
+  });
+  assert.equal(seen.at(-1), "system");
+
+  act(() => {
+    setChoice("dark");
+  });
+  assert.equal(seen.at(-1), "dark");
+  assert.ok(seen.includes("paper"));
+  assert.ok(seen.includes("system"));
 });

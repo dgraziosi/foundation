@@ -51,7 +51,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         setChoiceState(next);
       },
     }),
-    [],
+    [choice],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
