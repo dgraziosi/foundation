@@ -350,7 +350,7 @@ Rail + middle + inspector. The **page ground is canvas**. The **rail sits on ins
 
 This is a **required layout change** for the visual system to work. A single flat field with a 180px rail and a 352px inspector on the same ground does not express canvas / inset / elevated. A permanent top icon strip on a narrow window does not match the rail overlay the system uses.
 
-Do not add a second dock, a tab strip of extra destinations, or a floating composer. Those are other products. This window has four rail items and one inspector.
+Do not add a second dock, a tab strip of extra destinations, or a floating composer. This window has four rail items and one inspector.
 
 ### Rail
 
