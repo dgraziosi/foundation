@@ -342,23 +342,18 @@ export function sameViewIds(
   return left.length === right.length && left.every((id, index) => id === right[index]);
 }
 
-/** Bare `{ id }` only — restyle leftover. Seed apply may fill the query once. */
+/** Bare `{ id }` only — an intentional clear, not a leftover to paint. */
 export function isBareViewDeclaration(view: ViewDeclaration): boolean {
   return view.filter === undefined && view.sort === undefined && view.group === undefined;
 }
 
+/** Append seed views whose ids are not on the type. Do not rewrite existing declarations. */
 export function mergeMissingViewIds(
   existing: readonly ViewDeclaration[],
   seed: readonly ViewDeclaration[],
 ): ViewDeclaration[] {
   const have = new Set(existing.map((view) => view.id));
-  const next = existing.map((view) => {
-    if (!isBareViewDeclaration(view)) {
-      return view;
-    }
-    const painted = seed.find((item) => item.id === view.id);
-    return painted ?? view;
-  });
+  const next = [...existing];
   for (const view of seed) {
     if (!have.has(view.id)) {
       next.push(view);

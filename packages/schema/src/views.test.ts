@@ -5,6 +5,7 @@ import {
   boardColumnIds,
   calendarAxisRole,
   collectionChips,
+  mergeMissingViewIds,
   mergeTypeViewsPatch,
   parseTypeViewsInput,
   resolveTypeViews,
@@ -28,6 +29,31 @@ test("resolveTypeViews drops unknown ids and does not invent list", () => {
     defaultView: "list",
     declarations: [{ id: "list" }, { id: "outline" }],
   });
+});
+
+test("mergeMissingViewIds adds missing seed ids and leaves existing declarations", () => {
+  const cleared = { id: "board" as const };
+  const list = {
+    id: "list" as const,
+    filter: { clauses: [{ bind: "status" as const, op: "eq" as const, value: "active" }] },
+  };
+  const merged = mergeMissingViewIds(
+    [cleared, list],
+    [
+      {
+        id: "board",
+        filter: { clauses: [{ bind: "status", op: "eq", value: "active" }] },
+        sort: [{ bind: "date", dir: "asc" }],
+        group: { bind: "status" },
+      },
+      { id: "list", filter: { clauses: [{ bind: "status", op: "eq", value: "active" }] } },
+      { id: "outline", sort: [{ bind: "title", dir: "asc" }] },
+    ],
+  );
+  assert.deepEqual(merged[0], cleared);
+  assert.deepEqual(merged[1], list);
+  assert.equal(merged[2]?.id, "outline");
+  assert.deepEqual(merged[2]?.sort, [{ bind: "title", dir: "asc" }]);
 });
 
 test("mergeTypeViewsPatch keeps existing queries when restating bare ids", () => {

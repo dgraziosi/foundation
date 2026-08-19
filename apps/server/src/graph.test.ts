@@ -726,6 +726,46 @@ test(
 );
 
 test(
+  "operator { id } clear on a system view survives seed apply",
+  { skip: !databaseUrl },
+  async () => {
+    if (!databaseUrl) {
+      return;
+    }
+    const pool = await poolForSchema("graph_seed_clear_view");
+    try {
+      const ontology = await inspectOntology(pool, "types");
+      const task = ontology.types.find((type) => type.slug === "task");
+      assert.ok(task);
+      const cleared = await manageType(pool, {
+        action: "update",
+        slug: "task",
+        views: (task.views ?? []).map((view) =>
+          view.id === "board" ? { id: "board" as const } : view,
+        ),
+      });
+      assert.equal(isToolError(cleared), false);
+      if (isToolError(cleared)) {
+        return;
+      }
+      assert.equal(cleared.type.views?.find((view) => view.id === "board")?.filter, undefined);
+
+      await seedSystemOntology(pool);
+      const again = await inspectOntology(pool, "types");
+      const seeded = again.types.find((type) => type.slug === "task");
+      const board = seeded?.views?.find((view) => view.id === "board");
+      assert.equal(board?.filter, undefined);
+      assert.equal(board?.sort, undefined);
+      assert.equal(board?.group, undefined);
+      assert.deepEqual(viewIds(seeded?.views), ["board", "list", "calendar", "timeline", "outline"]);
+      assert.ok(seeded?.fields?.some((field) => field.name === "due"));
+    } finally {
+      await pool.end();
+    }
+  },
+);
+
+test(
   "ref field stores a pointer and does not create an edge; extra data keys still upsert",
   { skip: !databaseUrl },
   async () => {

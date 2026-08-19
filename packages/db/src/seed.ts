@@ -28,7 +28,10 @@ export async function seedSystemOntology(pool: pg.Pool): Promise<void> {
       continue;
     }
     const fields = mergeMissingFields(existing.fields ?? [], type.fields ?? []);
-    const views = mergeMissingViewIds(asViewDeclarations(existing.views), asViewDeclarations(type.views));
+    const views = mergeMissingViewIds(
+      asViewDeclarations(existing.views),
+      asViewDeclarations(type.views),
+    );
     const compiled = compileJsonSchemaFromFields(fields);
     const jsonSchema =
       fields.length > 0 ? compiled : existing.is_system ? existing.json_schema : type.json_schema;
