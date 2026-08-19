@@ -6,7 +6,7 @@ Weekly, report-only look at the **graph** in this vault. Quiet if green. Not vau
 
 Same locked terms as [`VAULT_HEALTH.md`](./VAULT_HEALTH.md): Foundation = the product; vault = one instance (`FOUNDATION_DATA` + Postgres); graph = the knowledge in that vault; blob = a file on a node; agent = anything that can reach the vault MCP; operator = the human who runs Compose. Do **not** call the graph “the Vault.”
 
-The operator can run this report, or attach it to Vault Keeper ([`AGENTS.md`](./AGENTS.md)). Paste: [`prompts/graph-hygiene.md`](../prompts/graph-hygiene.md).
+The operator can run this report, or attach it to Vault Keeper ([`AGENTS.md`](./AGENTS.md)). Skill: [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/).
 
 ## What it is
 
@@ -23,7 +23,7 @@ Do not add `get_vault_health`, `run_maintenance`, `propose_reorganize`, `audit_l
 ## What it is not
 
 - **Not vault health.** Process, `FOUNDATION_DATA`, canaries, and backup freshness are [`VAULT_HEALTH.md`](./VAULT_HEALTH.md).
-- **Not applying product updates.** Git pull + compose rebuild is [`prompts/update-foundation.md`](../prompts/update-foundation.md).
+- **Not applying product updates.** Git pull + compose rebuild is [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/).
 - **Not a mutation pass.** No `upsert` / `delete` / `unlink` / `undo` / `manage_type` on the quiet run.
 - **Not email.** No digest. Ping only when there is something to report.
 - **Not a write-ACL.** The API key is the gate.

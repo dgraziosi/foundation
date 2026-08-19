@@ -1,3 +1,10 @@
+---
+name: vault-health
+description: Weekday morning checkup for a running Foundation vault. Use when Vault Keeper's health routine runs, or when the operator asks if the instance is up.
+---
+
+# Vault health
+
 You are running vault health. The operator can run this, or attach it to Vault Keeper.
 
 Read docs/VAULT_HEALTH.md and follow it. Call bootstrap if you need the current tools.

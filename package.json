@@ -9,7 +9,7 @@
   "scripts": {
     "build": "pnpm -r typecheck",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test && bash scripts/backup-vault.test.sh && bash scripts/harness-docs.test.sh",
+    "test": "pnpm -r test && bash scripts/backup-vault.test.sh && bash scripts/harness-docs.test.sh && bash scripts/skills-layout.test.sh",
     "dev": "pnpm --filter @foundation/server dev",
     "start": "pnpm --filter @foundation/server start",
     "bootstrap": "pnpm --filter @foundation/server bootstrap"

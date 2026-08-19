@@ -16,13 +16,13 @@ Drafting is the default. Sending waits for an explicit yes on that message. Cale
 
 The operator is the human who runs Compose. You may use the vault MCP at `http://127.0.0.1:8787/mcp` to read due dates. Do not call the graph “the Vault.” Life data stays in the vault, not in git.
 
+The mail and calendar the operator attached, plus vault `search` / `get` for due dates.
+
 ## Routines
 
 When Chief of Staff or the operator hands a due date, draft or put it on the calendar. Draft replies; wait for approval before sending that message.
 
 ## Skills
-
-The mail and calendar the operator attached, plus vault `search` / `get` for due dates.
 
 ## Handoffs
 

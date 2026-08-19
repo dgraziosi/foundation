@@ -1,6 +1,6 @@
 # Vault backup
 
-The product ships [`scripts/backup-vault.sh`](../scripts/backup-vault.sh). Vault Keeper (or the operator) runs it. Health checks the path; it does not dump. Dumps stay out of git.
+The product ships [`scripts/backup-vault.sh`](../scripts/backup-vault.sh). Vault Keeper’s backup routine is [`.agents/skills/backup-vault/`](../.agents/skills/backup-vault/), which runs that script. Health checks the path; it does not dump. Dumps stay out of git.
 
 A **vault** is one instance (`FOUNDATION_DATA` + Postgres). Do not call the graph “the Vault.”
 
