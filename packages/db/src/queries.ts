@@ -1,4 +1,4 @@
-import type { NodeType, RelationType } from "@foundation/schema";
+import { resolveTypeViews, type NodeType, type RelationType, type ViewEngineId } from "@foundation/schema";
 import type pg from "pg";
 import { iso, type Queryable } from "./tx.js";
 
@@ -9,12 +9,15 @@ type NodeTypeRow = {
   kind: NodeType["kind"];
   parent_types: string[];
   json_schema: unknown;
+  views: string[];
+  default_view: string | null;
   is_system: boolean;
   created_at: Date;
   updated_at: Date;
 };
 
 function mapNodeType(row: NodeTypeRow): NodeType {
+  const resolved = resolveTypeViews({ views: row.views, default_view: row.default_view });
   return {
     slug: row.slug,
     label: row.label,
@@ -22,6 +25,8 @@ function mapNodeType(row: NodeTypeRow): NodeType {
     kind: row.kind,
     parent_types: row.parent_types,
     json_schema: row.json_schema,
+    views: resolved.views ?? [],
+    ...(resolved.defaultView ? { default_view: resolved.defaultView } : {}),
     is_system: row.is_system,
     created_at: iso(row.created_at),
     updated_at: iso(row.updated_at),
@@ -61,8 +66,8 @@ function mapRelationType(row: RelationTypeRow): RelationType {
 export async function listNodeTypes(db: Queryable): Promise<NodeType[]> {
   const { rows } = await db.query<NodeTypeRow>(
     `
-    SELECT slug, label, description, kind, parent_types, json_schema, is_system,
-           created_at, updated_at
+    SELECT slug, label, description, kind, parent_types, json_schema, views, default_view,
+           is_system, created_at, updated_at
     FROM node_types
     ORDER BY kind DESC, slug
     `,
@@ -72,8 +77,8 @@ export async function listNodeTypes(db: Queryable): Promise<NodeType[]> {
 
 export async function getNodeType(db: Queryable, slug: string): Promise<NodeType | undefined> {
   const { rows } = await db.query<NodeTypeRow>(
-    `SELECT slug, label, description, kind, parent_types, json_schema, is_system,
-            created_at, updated_at
+    `SELECT slug, label, description, kind, parent_types, json_schema, views, default_view,
+            is_system, created_at, updated_at
      FROM node_types WHERE slug = $1`,
     [slug],
   );
@@ -89,14 +94,18 @@ export async function insertNodeType(
     kind: NodeType["kind"];
     parent_types: string[];
     json_schema: unknown;
+    views?: ViewEngineId[];
+    default_view?: ViewEngineId;
   },
 ): Promise<NodeType> {
+  const views = type.views ?? [];
+  const defaultView = views.length === 0 ? null : (type.default_view ?? null);
   const { rows } = await db.query<NodeTypeRow>(
     `INSERT INTO node_types (
-       slug, label, description, kind, parent_types, json_schema, is_system
-     ) VALUES ($1, $2, $3, $4, $5::text[], $6::jsonb, false)
-     RETURNING slug, label, description, kind, parent_types, json_schema, is_system,
-               created_at, updated_at`,
+       slug, label, description, kind, parent_types, json_schema, views, default_view, is_system
+     ) VALUES ($1, $2, $3, $4, $5::text[], $6::jsonb, $7::text[], $8, false)
+     RETURNING slug, label, description, kind, parent_types, json_schema, views, default_view,
+               is_system, created_at, updated_at`,
     [
       type.slug,
       type.label,
@@ -106,6 +115,8 @@ export async function insertNodeType(
       type.json_schema === null || type.json_schema === undefined
         ? null
         : JSON.stringify(type.json_schema),
+      views,
+      defaultView,
     ],
   );
   return mapNodeType(rows[0]!);
@@ -120,8 +131,11 @@ export async function updateNodeType(
     kind: NodeType["kind"];
     parent_types: string[];
     json_schema: unknown;
+    views: ViewEngineId[];
+    default_view?: ViewEngineId;
   },
 ): Promise<NodeType | undefined> {
+  const defaultView = patch.views.length === 0 ? null : (patch.default_view ?? null);
   const { rows } = await db.query<NodeTypeRow>(
     `UPDATE node_types SET
        label = $2,
@@ -129,10 +143,12 @@ export async function updateNodeType(
        kind = $4,
        parent_types = $5::text[],
        json_schema = $6::jsonb,
+       views = $7::text[],
+       default_view = $8,
        updated_at = now()
      WHERE slug = $1
-     RETURNING slug, label, description, kind, parent_types, json_schema, is_system,
-               created_at, updated_at`,
+     RETURNING slug, label, description, kind, parent_types, json_schema, views, default_view,
+               is_system, created_at, updated_at`,
     [
       slug,
       patch.label,
@@ -142,6 +158,8 @@ export async function updateNodeType(
       patch.json_schema === null || patch.json_schema === undefined
         ? null
         : JSON.stringify(patch.json_schema),
+      patch.views,
+      defaultView,
     ],
   );
   return rows[0] ? mapNodeType(rows[0]) : undefined;
@@ -155,8 +173,8 @@ export async function updateNodeTypeDescription(
   const { rows } = await db.query<NodeTypeRow>(
     `UPDATE node_types SET description = $2, updated_at = now()
      WHERE slug = $1
-     RETURNING slug, label, description, kind, parent_types, json_schema, is_system,
-               created_at, updated_at`,
+     RETURNING slug, label, description, kind, parent_types, json_schema, views, default_view,
+               is_system, created_at, updated_at`,
     [slug, description],
   );
   return rows[0] ? mapNodeType(rows[0]) : undefined;
@@ -283,6 +301,15 @@ export async function pingDb(pool: pg.Pool): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export async function countLiveNodesGroupedByType(
+  db: Queryable,
+): Promise<Map<string, number>> {
+  const { rows } = await db.query<{ type: string; n: string }>(
+    `SELECT type, COUNT(*)::text AS n FROM nodes WHERE deleted_at IS NULL GROUP BY type`,
+  );
+  return new Map(rows.map((row) => [row.type, Number(row.n)]));
 }
 
 export async function countNodesByType(db: Queryable, slug: string): Promise<number> {

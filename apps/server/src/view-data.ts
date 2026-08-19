@@ -1,18 +1,24 @@
 import {
+  countLiveNodesGroupedByType,
+  getNodeType,
   listActivity,
   listEdgesAmong,
   listLiveNodesByIds,
+  listOutlineChildren,
   listRecentLiveNodes,
   listTaskCards,
+  listTypeCards,
   type Pool,
 } from "@foundation/db";
 import {
   dueFromData,
   isToolError,
   isUuid,
+  resolveTypeViews,
   todayInNewYork,
   type Activity,
   type SearchHit,
+  type ViewEngineId,
 } from "@foundation/schema";
 import { getGraphNode, inspectOntology, searchGraphNodes } from "./graph.js";
 
@@ -78,10 +84,105 @@ export function dueTone(due: string, today = todayInNewYork()): DueTone {
   return "future";
 }
 
-export async function viewOntology(pool: Pool): Promise<{ types: Array<{ slug: string; label: string }> }> {
+export type ViewOntologyType = {
+  slug: string;
+  label: string;
+  views: ViewEngineId[];
+  default_view?: ViewEngineId;
+  count: number;
+};
+
+export async function viewOntology(pool: Pool): Promise<{ types: ViewOntologyType[] }> {
   const ontology = await inspectOntology(pool, "types");
+  const counts = await countLiveNodesGroupedByType(pool);
   return {
-    types: ontology.types.map((type) => ({ slug: type.slug, label: type.label })),
+    types: ontology.types.map((type) => {
+      const resolved = resolveTypeViews(type);
+      return {
+        slug: type.slug,
+        label: type.label,
+        views: resolved.views,
+        ...(resolved.defaultView ? { default_view: resolved.defaultView } : {}),
+        count: counts.get(type.slug) ?? 0,
+      };
+    }),
+  };
+}
+
+export type ViewTypeNode = {
+  id: string;
+  title: string;
+  type: string;
+  status: "active" | "completed" | "archived";
+  due?: string;
+  due_tone?: DueTone;
+  parent_id?: string;
+  parent_title?: string;
+};
+
+export async function viewType(
+  pool: Pool,
+  slug: string,
+): Promise<
+  | {
+      type: {
+        slug: string;
+        label: string;
+        views: ViewEngineId[];
+        default_view?: ViewEngineId;
+      };
+      nodes: ViewTypeNode[];
+      children: ViewTypeNode[];
+    }
+  | { error: "Not found" }
+> {
+  const type = await getNodeType(pool, slug);
+  if (!type) {
+    return { error: "Not found" };
+  }
+  const today = todayInNewYork();
+  const rows = await listTypeCards(pool, slug);
+  const nodes = rows.map((row) => presentTypeCard(row, today));
+  const children = (await listOutlineChildren(pool, nodes.map((node) => node.id))).map((row) => ({
+    id: row.id,
+    title: row.title,
+    type: row.type,
+    status: row.status,
+    parent_id: row.parent_id,
+  }));
+  const resolved = resolveTypeViews(type);
+  return {
+    type: {
+      slug: type.slug,
+      label: type.label,
+      views: resolved.views,
+      ...(resolved.defaultView ? { default_view: resolved.defaultView } : {}),
+    },
+    nodes,
+    children,
+  };
+}
+
+function presentTypeCard(
+  row: {
+    id: string;
+    title: string;
+    type?: string;
+    status: "active" | "completed" | "archived";
+    due: string | null;
+    parent_id?: string | null;
+    parent_title: string | null;
+  },
+  today: string,
+): ViewTypeNode {
+  return {
+    id: row.id,
+    title: row.title,
+    type: row.type ?? "task",
+    status: row.status,
+    ...(row.due ? { due: row.due, due_tone: dueTone(row.due, today) } : {}),
+    ...(row.parent_id ? { parent_id: row.parent_id } : {}),
+    ...(row.parent_title ? { parent_title: row.parent_title } : {}),
   };
 }
 

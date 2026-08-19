@@ -17,6 +17,7 @@ import {
   RelationKindSchema,
   RelationTypeSchema,
   TypeKindSchema,
+  ViewEngineIdSchema,
 } from "./types.js";
 
 export const ToolErrorSchema = z.object({
@@ -328,6 +329,8 @@ export const ManageTypeInputSchema = z.object({
   kind: TypeKindSchema.optional(),
   parent_types: z.array(z.string()).optional(),
   json_schema: z.unknown().nullable().optional(),
+  views: z.array(ViewEngineIdSchema).optional(),
+  default_view: ViewEngineIdSchema.optional(),
   /** Required when action is retire. */
   confirm: z.boolean().optional(),
   /** Permanently drop leftover soft-deleted nodes when retiring a type. */

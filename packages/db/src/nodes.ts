@@ -814,17 +814,66 @@ export type TaskCardRow = {
 };
 
 export async function listTaskCards(db: Queryable, limit = 200): Promise<TaskCardRow[]> {
-  const { rows } = await db.query<TaskCardRow>(
-    `SELECT n.id, n.title, n.status,
+  return listTypeCards(db, "task", limit);
+}
+
+export type TypeCardRow = TaskCardRow & {
+  type: string;
+  parent_id: string | null;
+};
+
+export async function listTypeCards(
+  db: Queryable,
+  type: string,
+  limit = 200,
+): Promise<TypeCardRow[]> {
+  const { rows } = await db.query<TypeCardRow>(
+    `SELECT n.id, n.title, n.type, n.status,
             foundation_iso_date(n.data #>> '{due}') AS due,
+            parent.id AS parent_id,
             parent.title AS parent_title
      FROM nodes n
      LEFT JOIN edges e ON e.from_id = n.id AND e.relation_type = 'child_of'
      LEFT JOIN nodes parent ON parent.id = e.to_id AND parent.deleted_at IS NULL
-     WHERE n.deleted_at IS NULL AND n.type = 'task'
+     WHERE n.deleted_at IS NULL AND n.type = $1
      ORDER BY n.updated_at DESC
-     LIMIT $1`,
-    [limit],
+     LIMIT $2`,
+    [type, limit],
+  );
+  return rows;
+}
+
+export type OutlineChildRow = {
+  id: string;
+  title: string;
+  type: string;
+  status: Node["status"];
+  parent_id: string;
+};
+
+/** Descendants via child_of of the given parent ids (same vault, live nodes). */
+export async function listOutlineChildren(
+  db: Queryable,
+  parentIds: string[],
+): Promise<OutlineChildRow[]> {
+  if (parentIds.length === 0) {
+    return [];
+  }
+  const { rows } = await db.query<OutlineChildRow>(
+    `WITH RECURSIVE tree AS (
+       SELECT n.id, n.title, n.type, n.status, e.to_id AS parent_id
+       FROM nodes n
+       JOIN edges e ON e.from_id = n.id AND e.relation_type = 'child_of'
+       WHERE n.deleted_at IS NULL AND e.to_id = ANY($1::uuid[])
+       UNION
+       SELECT n.id, n.title, n.type, n.status, e.to_id AS parent_id
+       FROM nodes n
+       JOIN edges e ON e.from_id = n.id AND e.relation_type = 'child_of'
+       JOIN tree t ON e.to_id = t.id
+       WHERE n.deleted_at IS NULL
+     )
+     SELECT id, title, type, status, parent_id FROM tree`,
+    [parentIds],
   );
   return rows;
 }

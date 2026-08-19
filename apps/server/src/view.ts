@@ -14,6 +14,7 @@ import {
   viewRecents,
   viewSearch,
   viewTasks,
+  viewType,
 } from "./view-data.js";
 
 export const VIEW_PATH = "/view";
@@ -44,15 +45,15 @@ function unlockFallback(error?: string): string {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Unlock the vault window</title>
   <style>
-    :root { --bg: #f7f7f4; --ink: #26251e; --accent: #f54e00; color-scheme: light; }
-    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font: 13px/1.45 Inter, ui-sans-serif, system-ui, sans-serif; }
-    main { min-height: 100dvh; display: grid; place-items: center; padding: 16px; }
-    form { display: flex; flex-direction: column; gap: 12px; width: min(22rem, 100%); }
-    h1 { font-size: 20px; font-weight: 600; margin: 0; }
-    .quiet { color: color-mix(in srgb, var(--ink) 62%, var(--bg)); margin: 0; }
-    .notice { color: var(--accent); margin: 0; }
-    input { padding: 8px 12px; border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent); background: var(--bg); color: var(--ink); font: inherit; }
-    button { padding: 8px 12px; border: 0; background: var(--accent); color: #fff; font: inherit; cursor: pointer; }
+    :root { --canvas: #0a0a0a; --ink: #ffffff; --elevated: #171717; --accent: #ffffff; --on-accent: #0a0a0a; --removed: #ff6467; --secondary: #a1a1a1; color-scheme: dark; }
+    html, body { margin: 0; min-height: 100%; background: var(--canvas); color: var(--ink); font: 400 15px/1.6 Inter, ui-sans-serif, system-ui, sans-serif; }
+    main { min-height: 100dvh; display: grid; place-items: center; padding: 21px; }
+    form { display: flex; flex-direction: column; gap: 13px; width: min(20rem, 100%); background: var(--elevated); border-radius: 21px; padding: 34px; }
+    h1 { font-size: 21px; font-weight: 500; line-height: 1.2; letter-spacing: -0.01em; margin: 0; }
+    .quiet { color: var(--secondary); margin: 0; }
+    .notice { color: var(--removed); margin: 0; }
+    input { padding: 8px 13px; border: 1px solid #262626; border-radius: 8px; background: var(--canvas); color: var(--ink); font: inherit; }
+    button { padding: 8px 13px; border: 0; border-radius: 8px; background: var(--accent); color: var(--on-accent); font: inherit; font-weight: 500; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -143,6 +144,20 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings
       res.json(await viewOntology(pool));
     } catch (error) {
       console.error("View ontology failed", error);
+      res.status(500).json({ error: "Could not load." });
+    }
+  });
+
+  app.get(`${VIEW_PATH}/api/types/:slug`, gate, async (req, res) => {
+    try {
+      const got = await viewType(pool, String(req.params.slug ?? ""));
+      if ("error" in got) {
+        res.status(404).json({ error: "Not found" });
+        return;
+      }
+      res.json(got);
+    } catch (error) {
+      console.error("View type failed", error);
       res.status(500).json({ error: "Could not load." });
     }
   });

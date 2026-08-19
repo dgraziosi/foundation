@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { VIEW_ENGINE_IDS } from "./views.js";
 
 export const NodeStatusSchema = z.enum(["active", "completed", "archived"]);
 export type NodeStatus = z.infer<typeof NodeStatusSchema>;
@@ -72,6 +73,8 @@ export type Edge = z.infer<typeof EdgeSchema>;
 export const TypeKindSchema = z.enum(["spine", "artifact"]);
 export type TypeKind = z.infer<typeof TypeKindSchema>;
 
+export const ViewEngineIdSchema = z.enum(VIEW_ENGINE_IDS);
+
 export const NodeTypeSchema = z.object({
   slug: z.string().min(1),
   label: z.string().min(1),
@@ -79,6 +82,8 @@ export const NodeTypeSchema = z.object({
   kind: TypeKindSchema,
   parent_types: z.array(z.string()),
   json_schema: z.unknown().nullable(),
+  views: z.array(ViewEngineIdSchema).optional(),
+  default_view: ViewEngineIdSchema.optional(),
   is_system: z.boolean(),
   created_at: z.string().optional(),
   updated_at: z.string().optional(),

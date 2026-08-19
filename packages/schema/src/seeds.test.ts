@@ -52,6 +52,11 @@ test("seed node types parse and include spine plus artifacts", () => {
   assert.ok(dueSchema?.properties?.due?.anyOf?.some((item) => item.type === "null"));
   assert.deepEqual(task?.json_schema, goal?.json_schema);
   assert.equal(SEED_NODE_TYPES.find((type) => type.slug === "note")?.json_schema, null);
+  assert.deepEqual(task?.views, ["board", "list", "calendar", "timeline", "outline"]);
+  assert.equal(task?.default_view, "board");
+  assert.deepEqual(SEED_NODE_TYPES.find((type) => type.slug === "note")?.views, ["list"]);
+  assert.equal(SEED_NODE_TYPES.find((type) => type.slug === "note")?.default_view, "list");
+  assert.deepEqual(goal?.views, ["list", "calendar", "timeline", "outline"]);
 });
 
 test("seed relations include child_of and associative verbs", () => {

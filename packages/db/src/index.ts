@@ -4,6 +4,7 @@ export { seedSystemOntology } from "./seed.js";
 export {
   countDeletedNodesByType,
   countEdgesByRelation,
+  countLiveNodesGroupedByType,
   countNodesByType,
   countRelationsUsingSemanticParent,
   countTypesUsingParent,
@@ -47,7 +48,9 @@ export {
   listIncidentEdges,
   listLiveNodesByIds,
   listRecentLiveNodes,
+  listOutlineChildren,
   listTaskCards,
+  listTypeCards,
   purgeDeletedNodesByType,
   restoreEdge,
   restoreNode,

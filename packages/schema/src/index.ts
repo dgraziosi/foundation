@@ -56,7 +56,20 @@ export {
   assertSystemTypePatch,
   labelFromSlug,
   missingConfirm,
+  typeViewsFromInput,
 } from "./ontology-mutation.js";
+export {
+  parseTypeViewsInput,
+  resolveTypeViews,
+  isViewEngineId,
+  SEED_TYPE_VIEWS,
+  VIEW_ENGINE_IDS,
+  VIEW_ENGINE_ID_SET,
+  VIEWS_SUGGESTION,
+  type ParsedTypeViews,
+  type ResolvedTypeViews,
+  type ViewEngineId,
+} from "./views.js";
 export {
   DeleteInputSchema,
   GetInputSchema,
@@ -238,6 +251,7 @@ export {
   NodeSchema,
   NodeStatusSchema,
   NodeTypeSchema,
+  ViewEngineIdSchema,
   ORIGIN_SYSTEMS,
   OriginRefSchema,
   OriginSystemSchema,

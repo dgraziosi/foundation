@@ -45,6 +45,7 @@ import {
   assertSystemRelationPatch,
   assertSystemTypePatch,
   labelFromSlug,
+  typeViewsFromInput,
   isUuid,
   missingConfirm,
   storedBlobPayload,
@@ -965,6 +966,10 @@ export async function manageType(
     if (parentErr) {
       return parentErr;
     }
+    const viewsInput = typeViewsFromInput({ views: input.views, default_view: input.default_view });
+    if (isToolError(viewsInput)) {
+      return viewsInput;
+    }
     return withTransaction(pool, async (client) => {
       const type = await insertNodeType(client, {
         slug: input.slug,
@@ -973,6 +978,8 @@ export async function manageType(
         kind: input.kind ?? "artifact",
         parent_types: parentTypes,
         json_schema: input.json_schema ?? null,
+        views: [...viewsInput.views],
+        default_view: viewsInput.default_view,
       });
       const activity = await insertActivity(client, {
         ...writer,
@@ -1024,6 +1031,8 @@ export async function manageType(
     kind: input.kind,
     parent_types: input.parent_types,
     json_schema: input.json_schema,
+    views: input.views,
+    default_view: input.default_view,
   });
   if (locked) {
     return locked;
@@ -1057,6 +1066,20 @@ export async function manageType(
     return parentErr;
   }
 
+    const viewsPatch =
+    input.views === undefined && input.default_view === undefined
+      ? {
+          views: existing.views ?? [],
+          default_view: existing.default_view,
+        }
+      : typeViewsFromInput({
+          views: input.views ?? existing.views,
+          default_view: input.default_view ?? existing.default_view,
+        });
+  if (isToolError(viewsPatch)) {
+    return viewsPatch;
+  }
+
   return withTransaction(pool, async (client) => {
     const type = await updateNodeType(client, input.slug, {
       label: input.label ?? existing.label,
@@ -1064,6 +1087,8 @@ export async function manageType(
       kind: input.kind ?? existing.kind,
       parent_types: parentTypes,
       json_schema: input.json_schema === undefined ? existing.json_schema : input.json_schema,
+      views: [...(viewsPatch.views ?? [])],
+      default_view: viewsPatch.default_view,
     });
     if (!type) {
       return toolError(`Type "${input.slug}" not found`);

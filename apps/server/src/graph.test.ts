@@ -329,8 +329,28 @@ test(
         assert.equal(created.type.slug, "meeting");
         assert.equal(created.type.is_system, false);
         assert.deepEqual(created.type.parent_types, ["project"]);
+        assert.deepEqual(created.type.views, []);
+        assert.equal(created.type.default_view, undefined);
+
+        const withViews = await manageType(pool, {
+          action: "create",
+          slug: "brief",
+          kind: "artifact",
+          views: ["card", "list"],
+          default_view: "card",
+        });
+        assert.equal(isToolError(withViews), false);
+        if (isToolError(withViews)) return;
+        assert.deepEqual(withViews.type.views, ["card", "list"]);
+        assert.equal(withViews.type.default_view, "card");
 
         const ontology = await inspectOntology(pool);
+        const brief = ontology.types.find((type) => type.slug === "brief");
+        assert.deepEqual(brief?.views, ["card", "list"]);
+        assert.equal(brief?.default_view, "card");
+        const task = ontology.types.find((type) => type.slug === "task");
+        assert.deepEqual(task?.views, ["board", "list", "calendar", "timeline", "outline"]);
+        assert.equal(task?.default_view, "board");
         assert.ok(ontology.types.some((type) => type.slug === "meeting"));
 
         const node = await upsertGraphNode(pool, {
