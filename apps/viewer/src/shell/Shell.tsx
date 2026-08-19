@@ -89,9 +89,9 @@ export function Shell() {
 
   return (
     <ShellContext.Provider value={value}>
-      <div className="flex min-h-dvh bg-canvas">
+      <div className="flex h-dvh overflow-hidden bg-canvas">
         <Rail />
-        <div className="flex min-h-dvh min-w-0 flex-1 flex-col bg-canvas">
+        <div className="flex h-dvh min-w-0 flex-1 flex-col overflow-hidden bg-canvas">
           <div className="flex items-center px-md py-sm md:hidden">
             <Button
               type="button"
@@ -109,7 +109,7 @@ export function Shell() {
             onSelect={(tab) => navigate(hrefFor(tab))}
             onClose={closeTab}
           />
-          <main className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+          <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             <Outlet context={value} />
             {searchOpen ? <SearchOverlay onClose={() => setSearchOpen(false)} /> : null}
           </main>

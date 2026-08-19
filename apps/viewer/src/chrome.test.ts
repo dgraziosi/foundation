@@ -33,8 +33,9 @@ test("chrome is Home + Search; Search is an overlay; Recents is not a rail item"
 
 test("Home graph fills leftover viewport with a 460px floor", async () => {
   const home = await src("pages/HomePage.tsx");
-  assert.match(home, /min-h-\[460px\]/);
-  assert.match(home, /h-\[max\(460px,calc\(100dvh-3rem\)\)\]/);
+  assert.match(home, /HOME_GRAPH_FRAME_CLASS/);
+  assert.match(home, /min-h-0 flex-1 overflow-y-auto/);
+  assert.doesNotMatch(home, /100dvh-3rem/);
   assert.match(home, /data-surface="graph"|GraphCanvas/);
   assert.match(home, /fetchGraph/);
   assert.match(home, /View all/);
@@ -45,11 +46,15 @@ test("Home graph fills leftover viewport with a 460px floor", async () => {
   assert.match(home, /type\.count > 0/);
   const canvas = await src("graph/GraphCanvas.tsx");
   assert.match(canvas, /min-h-\[460px\]/);
+  assert.doesNotMatch(canvas, /flex-1/);
   assert.match(canvas, /linkWidth=\{\(link\) => \(link\.kind === "hierarchy" \? 1 : 0\.6\)\}/);
   assert.match(canvas, /linkLineDash=\{\(link\) => \(link\.kind === "hierarchy" \? \[\] : \[2, 2\]\)\}/);
   assert.match(canvas, /onNodeRightClick/);
   assert.match(canvas, /Depth \{depth\}/);
   assert.match(canvas, /nodeLabel=\{\(node\) => String\(node\.title\)\}/);
+  const frame = await src("graph/frame.ts");
+  assert.match(frame, /h-\[max\(460px,100%\)\] min-h-\[460px\] w-full shrink-0/);
+  assert.match(frame, /GRAPH_FLOOR_PX = 460/);
 });
 
 test("click from graph / Recents / collection / search opens a detail page", async () => {

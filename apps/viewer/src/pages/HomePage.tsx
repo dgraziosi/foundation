@@ -2,15 +2,18 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { fetchGraph, fetchOntology, fetchRecents, fetchTasks } from "../api";
 import { RECENCY_GROUPS, recencyGroup, relativeTime, TASK_DUE_GROUPS, taskDueGroup } from "../format";
+import { HOME_GRAPH_FRAME_CLASS } from "../graph/frame";
 import { GraphCanvas } from "../graph/GraphCanvas";
 import { useShell } from "../shell/context";
 import { useThemeLane } from "../theme";
 import { typeColors, typeIcon } from "../type-meta";
 import { DueChip } from "../ui/Tags";
 import { LoadError, Placeholders, Quiet } from "../ui/States";
+
+const EMPTY_NODES: never[] = [];
+const EMPTY_EDGES: never[] = [];
 
 export function HomePage() {
   const { openDetail, openCollection, openRecents } = useShell();
@@ -28,24 +31,23 @@ export function HomePage() {
   const folders = (ontology.data?.types ?? []).filter((type) => type.count > 0);
 
   return (
-    <ScrollArea className="flex min-h-0 flex-1 flex-col">
-      <div className="flex flex-col">
-        <GraphCanvas
-          className="h-[max(460px,calc(100dvh-3rem))] min-h-[460px]"
-          nodes={graph.data?.nodes ?? []}
-          edges={graph.data?.edges ?? []}
-          types={ontology.data?.types}
-          onSelect={(id) => {
-            const node = graph.data?.nodes.find((item) => item.id === id);
-            openDetail(id, node?.title);
-          }}
-          loading={graph.isLoading}
-          error={graph.isError}
-          onRetry={() => void graph.refetch()}
-          localGraph={localGraph}
-          onLocalGraph={setLocalGraph}
-        />
-        <div className="flex flex-col gap-lg p-lg">
+    <div className="h-full min-h-0 flex-1 overflow-y-auto" data-surface="home">
+      <GraphCanvas
+        className={HOME_GRAPH_FRAME_CLASS}
+        nodes={graph.data?.nodes ?? EMPTY_NODES}
+        edges={graph.data?.edges ?? EMPTY_EDGES}
+        types={ontology.data?.types}
+        onSelect={(id) => {
+          const node = graph.data?.nodes.find((item) => item.id === id);
+          openDetail(id, node?.title);
+        }}
+        loading={graph.isLoading}
+        error={graph.isError}
+        onRetry={() => void graph.refetch()}
+        localGraph={localGraph}
+        onLocalGraph={setLocalGraph}
+      />
+      <div className="flex flex-col gap-lg p-lg">
           <div className="grid grid-cols-1 gap-md xl:grid-cols-2">
             <Card>
               <CardHeader className="flex-row items-center justify-between">
@@ -165,8 +167,7 @@ export function HomePage() {
               })}
             </div>
           </section>
-        </div>
       </div>
-    </ScrollArea>
+    </div>
   );
 }

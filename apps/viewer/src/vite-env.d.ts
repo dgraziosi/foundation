@@ -18,7 +18,7 @@ declare module "react-force-graph-2d" {
     backgroundColor?: string;
     cooldownTicks?: number;
     enableNodeDrag?: boolean;
-    onNodeClick?: (node: Record<string, unknown>) => void;
+    onNodeClick?: (node: Record<string, unknown>, event: MouseEvent) => void;
     onNodeRightClick?: (node: Record<string, unknown>, event: MouseEvent) => void;
     nodeCanvasObject?: (
       node: Record<string, unknown> & { x?: number; y?: number },
@@ -30,6 +30,7 @@ declare module "react-force-graph-2d" {
       node: Record<string, unknown> & { x?: number; y?: number },
       color: string,
       ctx: CanvasRenderingContext2D,
+      globalScale: number,
     ) => void;
   };
 

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D from "react-force-graph-2d";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import type { GraphEdge, GraphNode, OntologyType } from "../api";
 import { typeColors, typeIcon } from "../type-meta";
 import { readThemeTokens, subscribeGraphPaint, type ThemeTokens } from "../theme-core";
 import { LoadError, Placeholders, Quiet } from "../ui/States";
+import { GRAPH_FLOOR_PX, readGraphFrameSize } from "./frame";
 import { measureGraphMark, paintGraphMark } from "./marks";
 
 export function GraphCanvas({
@@ -37,8 +39,7 @@ export function GraphCanvas({
   className?: string;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
-  const scaleRef = useRef(1);
-  const [size, setSize] = useState({ width: 640, height: 460 });
+  const [size, setSize] = useState({ width: 640, height: GRAPH_FLOOR_PX });
   const [paint, setPaint] = useState<ThemeTokens>(readThemeTokens);
   const [themeEpoch, setThemeEpoch] = useState(0);
   const [find, setFind] = useState("");
@@ -49,7 +50,13 @@ export function GraphCanvas({
     if (!el) {
       return;
     }
-    const update = () => setSize({ width: el.clientWidth, height: el.clientHeight });
+    const update = () => {
+      const next = readGraphFrameSize(el);
+      if (!next) {
+        return;
+      }
+      setSize((prev) => (prev.width === next.width && prev.height === next.height ? prev : next));
+    };
     update();
     const observer = new ResizeObserver(update);
     observer.observe(el);
@@ -102,7 +109,7 @@ export function GraphCanvas({
 
   return (
     <div
-      className={`relative min-h-[460px] flex-1 bg-canvas ${className ?? ""}`}
+      className={cn("relative min-h-[460px] w-full shrink-0 bg-canvas", className)}
       ref={wrapRef}
       data-surface="graph"
       onClick={() => setMenu(undefined)}
@@ -145,54 +152,63 @@ export function GraphCanvas({
           })}
         </div>
       ) : null}
-      {loading ? <Placeholders /> : null}
-      {error && onRetry ? <LoadError onRetry={onRetry} /> : null}
+      {loading ? (
+        <div className="pointer-events-none absolute inset-0 z-10">
+          <Placeholders />
+        </div>
+      ) : null}
+      {error && onRetry ? (
+        <div className="absolute left-md top-24 z-10">
+          <LoadError onRetry={onRetry} />
+        </div>
+      ) : null}
       {empty ? (
         <div className="pointer-events-none absolute inset-0 grid place-items-center">
           <Quiet>Search the graph, or wait for a node to land.</Quiet>
         </div>
       ) : null}
-      {!loading && !error && !empty ? (
-        <ForceGraph2D
-          key={themeEpoch}
-          width={size.width}
-          height={size.height}
-          graphData={data}
-          backgroundColor={bg}
-          cooldownTicks={80}
-          enableNodeDrag={false}
-          nodeLabel={(node) => String(node.title)}
-          linkColor={(link) => (link.kind === "hierarchy" ? ink : ink2)}
-          linkWidth={(link) => (link.kind === "hierarchy" ? 1 : 0.6)}
-          linkLineDash={(link) => (link.kind === "hierarchy" ? [] : [2, 2])}
-          linkDirectionalArrowLength={3.5}
-          linkDirectionalArrowRelPos={1}
-          onNodeClick={(node) => onSelect(String(node.id))}
-          onNodeRightClick={(node, event) => {
-            event.preventDefault();
-            setMenu({ id: String(node.id), x: event.offsetX, y: event.offsetY });
-          }}
-          nodeCanvasObject={(node, ctx, scale) => {
-            scaleRef.current = scale;
-            const match = needle !== "" && String(node.title).toLowerCase().includes(needle);
-            paintGraphMark(ctx, node, {
-              scale,
-              selected: node.id === selectedId,
-              match,
-              ink,
-              lane,
-              types,
-            });
-          }}
-          nodePointerAreaPaint={(node, color, ctx) => {
-            const box = measureGraphMark(ctx, node, { scale: scaleRef.current });
-            ctx.fillStyle = color;
-            ctx.beginPath();
-            ctx.arc(node.x ?? 0, node.y ?? 0, box.radius, 0, Math.PI * 2);
-            ctx.fill();
-          }}
-        />
-      ) : null}
+      <ForceGraph2D
+        key={themeEpoch}
+        width={size.width}
+        height={size.height}
+        graphData={data}
+        backgroundColor={bg}
+        cooldownTicks={80}
+        enableNodeDrag={false}
+        nodeLabel={(node) => String(node.title)}
+        linkColor={(link) => (link.kind === "hierarchy" ? ink : ink2)}
+        linkWidth={(link) => (link.kind === "hierarchy" ? 1 : 0.6)}
+        linkLineDash={(link) => (link.kind === "hierarchy" ? [] : [2, 2])}
+        linkDirectionalArrowLength={3.5}
+        linkDirectionalArrowRelPos={1}
+        onNodeClick={(node, event) => {
+          event.stopPropagation();
+          onSelect(String(node.id));
+        }}
+        onNodeRightClick={(node, event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          setMenu({ id: String(node.id), x: event.offsetX, y: event.offsetY });
+        }}
+        nodeCanvasObject={(node, ctx, globalScale) => {
+          const match = needle !== "" && String(node.title).toLowerCase().includes(needle);
+          paintGraphMark(ctx, node, {
+            scale: globalScale,
+            selected: node.id === selectedId,
+            match,
+            ink,
+            lane,
+            types,
+          });
+        }}
+        nodePointerAreaPaint={(node, color, ctx, globalScale) => {
+          const box = measureGraphMark(ctx, node, { scale: globalScale });
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(node.x ?? 0, node.y ?? 0, box.radius, 0, Math.PI * 2);
+          ctx.fill();
+        }}
+      />
       {menu && onLocalGraph ? (
         <div
           className="absolute z-20 min-w-32 rounded-md border border-hairline bg-elevated p-1 text-meta shadow-sm"
