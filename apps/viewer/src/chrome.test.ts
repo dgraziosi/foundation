@@ -84,7 +84,8 @@ test("tab sync does not loop setState; collection titles stay the type label", a
   assert.match(tabs, /return existing/);
   assert.match(tabs, /nextLabel === slug && prev\.label !== slug/);
   const typeView = await src("pages/TypeViewPage.tsx");
-  assert.match(typeView, /openCollection\(slug, label\)/);
+  assert.match(typeView, /labelCollection\(slug, label\)/);
+  assert.doesNotMatch(typeView, /openCollection\(slug, label\)/);
 });
 
 test("type identity is read from the ontology with a quiet fallback", async () => {

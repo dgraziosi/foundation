@@ -16,7 +16,7 @@ import { resolveActiveView, resolveDeclaredViews, VIEW_LABELS } from "../views/r
 export function TypeViewPage({ slug: forcedSlug }: { slug?: string }) {
   const { slug: routeSlug } = useParams();
   const slug = forcedSlug ?? routeSlug ?? "";
-  const { openDetail, openCollection } = useShell();
+  const { openDetail, labelCollection } = useShell();
   const lane = useThemeLane();
   const typeQuery = useQuery({
     queryKey: ["type", slug],
@@ -58,9 +58,9 @@ export function TypeViewPage({ slug: forcedSlug }: { slug?: string }) {
   useEffect(() => {
     const label = typeQuery.data?.type.label;
     if (slug && label) {
-      openCollection(slug, label);
+      labelCollection(slug, label);
     }
-  }, [slug, typeQuery.data?.type.label, openCollection]);
+  }, [slug, typeQuery.data?.type.label, labelCollection]);
 
   return (
     <ScrollArea className="flex min-h-0 flex-1 flex-col">

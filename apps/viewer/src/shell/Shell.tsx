@@ -44,6 +44,10 @@ export function Shell() {
     [navigate],
   );
 
+  const labelCollection = useCallback((nextSlug: string, label: string) => {
+    setTabs((existing) => upsertCollectionTab(existing, nextSlug, label));
+  }, []);
+
   const openCollection = useCallback(
     (nextSlug: string, label?: string) => {
       setSearchOpen(false);
@@ -77,6 +81,7 @@ export function Shell() {
     () => ({
       openDetail,
       openCollection,
+      labelCollection,
       openRecents,
       openSearch,
       railOpen,
@@ -84,7 +89,7 @@ export function Shell() {
       railCollapsed,
       setRailCollapsed,
     }),
-    [openDetail, openCollection, openRecents, openSearch, railOpen, railCollapsed],
+    [openDetail, openCollection, labelCollection, openRecents, openSearch, railOpen, railCollapsed],
   );
 
   return (

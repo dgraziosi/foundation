@@ -8,6 +8,7 @@ export type HostTab =
 export type ShellOutlet = {
   openDetail: (id: string, label?: string) => void;
   openCollection: (slug: string, label?: string) => void;
+  labelCollection: (slug: string, label: string) => void;
   openRecents: () => void;
   openSearch: () => void;
   railOpen: boolean;
