@@ -40,14 +40,15 @@ export function TasksPage() {
                   <Button
                     type="button"
                     variant="outline"
+                    size="row"
                     className={cn(
-                      "h-auto w-full flex-col items-start gap-1 p-2 shadow-none",
+                      "w-full flex-col items-start gap-1 p-2 shadow-none",
                       selectedId === task.id && "ring-1 ring-primary",
                     )}
                     key={task.id}
                     onClick={() => select(task.id)}
                   >
-                    <span className="font-semibold">{task.title}</span>
+                    <span className="break-words text-left font-semibold">{task.title}</span>
                     {task.due ? <DueChip due={task.due} tone={task.due_tone} /> : null}
                     {task.parent_title ? (
                       <span className="text-meta text-muted-foreground">{task.parent_title}</span>

@@ -115,18 +115,19 @@ export function SearchPage() {
             <Button
               type="button"
               variant="ghost"
+              size="row"
               className={cn(
-                "h-auto min-h-9 w-full justify-between rounded-none border-b border-border px-1 py-2",
+                "w-full justify-between rounded-none border-b border-border",
                 selectedId === hit.id && "ring-1 ring-inset ring-primary",
               )}
               key={hit.id}
               onClick={() => select(hit.id)}
             >
-              <span className="flex min-w-0 flex-col items-start">
-                <span className="font-semibold">{hit.title}</span>
-                <span className="text-meta text-muted-foreground">{hit.snippet}</span>
+              <span className="flex min-w-0 flex-col items-start text-left">
+                <span className="break-words font-semibold">{hit.title}</span>
+                <span className="break-words text-meta text-muted-foreground">{hit.snippet}</span>
               </span>
-              <span className="flex items-center gap-2">
+              <span className="flex shrink-0 items-center gap-2">
                 <TypeTag type={hit.type} />
                 {hit.due ? <DueChip due={hit.due} /> : null}
               </span>

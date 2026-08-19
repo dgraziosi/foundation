@@ -148,12 +148,13 @@ export function Inspector({
                     <Button
                       type="button"
                       variant="ghost"
-                      className="h-9 w-full justify-start rounded-none border-b border-border px-1"
+                      size="row"
+                      className="w-full justify-start rounded-none border-b border-border"
                       key={edge.id}
                       onClick={() => onSelect(edge.neighbor.id)}
                     >
-                      <span className="flex min-w-0 flex-col items-start">
-                        <span className="font-semibold">{edge.neighbor.title}</span>
+                      <span className="flex min-w-0 flex-col items-start text-left">
+                        <span className="break-words font-semibold">{edge.neighbor.title}</span>
                         <span className="text-meta text-muted-foreground">
                           {edge.relation_type} · {edge.direction}
                         </span>
@@ -174,12 +175,13 @@ export function Inspector({
                       <Button
                         type="button"
                         variant="ghost"
-                        className="h-auto min-h-9 w-full justify-between rounded-none border-b border-border px-1 py-2"
+                        size="row"
+                        className="w-full justify-between rounded-none border-b border-border"
                         key={`${item.kind}-${item.target.id}`}
                         onClick={() => onSelect(item.target.id)}
                       >
-                        <span className="flex min-w-0 flex-col items-start">
-                          <span className="font-semibold">{item.target.title}</span>
+                        <span className="flex min-w-0 flex-col items-start text-left">
+                          <span className="break-words font-semibold">{item.target.title}</span>
                           <span className="text-meta text-muted-foreground">
                             {item.kind} — {item.reason}
                           </span>

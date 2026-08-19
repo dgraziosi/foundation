@@ -2,6 +2,10 @@
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
+    screens: {
+      md: "900px",
+      xl: "1280px",
+    },
     extend: {
       colors: {
         background: "var(--background)",

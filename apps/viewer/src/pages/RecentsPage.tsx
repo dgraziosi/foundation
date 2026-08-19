@@ -25,8 +25,9 @@ export function RecentsPage() {
             <Button
               type="button"
               variant="ghost"
+              size="row"
               className={cn(
-                "h-auto min-h-9 w-full justify-between rounded-none border-b border-border px-1 py-2",
+                "w-full justify-between rounded-none border-b border-border",
                 selectedId === row.node_id && "ring-1 ring-inset ring-primary",
               )}
               key={row.id}
@@ -36,11 +37,11 @@ export function RecentsPage() {
                 }
               }}
             >
-              <span className="flex min-w-0 flex-col items-start">
-                <span className="font-semibold">{row.summary}</span>
+              <span className="flex min-w-0 flex-col items-start text-left">
+                <span className="break-words font-semibold">{row.summary}</span>
                 <span className="text-meta text-muted-foreground">{row.action}</span>
               </span>
-              <span className="flex items-center gap-2 text-meta text-muted-foreground">
+              <span className="flex shrink-0 items-center gap-2 text-meta text-muted-foreground">
                 {row.type ? <TypeTag type={row.type} /> : null}
                 <span>{relativeTime(row.created_at)}</span>
               </span>
