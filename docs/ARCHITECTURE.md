@@ -144,6 +144,7 @@ A blob is a file on a node, stored at `$FOUNDATION_DATA/blobs/<uuid>`. `get` ret
 Writes go through the graph and leave **activity**. `undo` reverses a reversible row. This is lost-update protection and a receipt, not an ACL.
 
 - **Compare-and-swap:** update and `link` are if-match. Pass `base_updated_at` (or endpoint timestamps) from `get`. Compared at millisecond precision so a never-updated node (including rows that still store leftover microseconds from `now()`) can be written when the caller passes `updated_at` from `get`. If the node moved, the vault refuses with stale (get and retry) — a CAS miss is never “node not found.”
+- **Batch link:** `link` accepts one edge or `edges[]` (1–20). The whole batch validates, then one graph transaction writes every edge or none. First error wins. One activity receipt per written edge (`links[]` in input order). Each edge carries both endpoint timestamps; a later edge does not inherit CAS from an earlier edge that named the same node. Several edges that share a node still use one agreed `updated_at`. Linking does not bump `node.updated_at`. `undo` inverts one receipt. This is a graph write (live nodes and edges), not an ontology change.
 - **data merge:** update patches `data` (`JSONB ||`). A partial patch does not wipe other keys.
 - **Create idempotency:** `idempotency_key` on create. A retry returns the same node; it does not twin.
 - Optional `actor` / `actor_label` are stored on the activity row (who wrote), not a permission gate.
@@ -156,8 +157,10 @@ flowchart LR
   write --> idemp["create idempotency_key"]
   write --> activity["activity row"]
   write --> suggestions["suggested_links (FTS, no edge)"]
+  write --> batch_link["link edges[] — one transaction"]
   activity --> undo["undo"]
   suggestions -.->|"operator or agent accepts"| link_write["link"]
+  batch_link --> activity
 ```
 
 ## Search

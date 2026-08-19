@@ -223,3 +223,103 @@ export function validateLink(
     ...(upgradeSuggestion ? { suggestion: upgradeSuggestion } : {}),
   };
 }
+
+export type LinkBatchDuplicateErr = {
+  ok: false;
+  index: number;
+  other: number;
+  kind: "exact" | "symmetric";
+  error: string;
+  suggestion: string;
+};
+
+/**
+ * In-batch exact and symmetric duplicates on the proposed relation
+ * (before upgrade), matching validateLink's duplicate-first pipeline.
+ */
+export function findInBatchLinkDuplicate(
+  proposals: readonly Pick<LinkProposal, "from_id" | "to_id" | "relation_type">[],
+  ctx: Pick<LinkValidatorContext, "relationTypes"> = {},
+): LinkBatchDuplicateErr | null {
+  const relationTypes = ctx.relationTypes ?? SEED_RELATION_TYPES;
+  for (let index = 0; index < proposals.length; index += 1) {
+    const current = proposals[index]!;
+    for (let other = 0; other < index; other += 1) {
+      const prior = proposals[other]!;
+      if (
+        current.from_id === prior.from_id &&
+        current.to_id === prior.to_id &&
+        current.relation_type === prior.relation_type
+      ) {
+        return {
+          ok: false,
+          index,
+          other,
+          kind: "exact",
+          error: `Duplicate edge in batch (same as edges[${other}])`,
+          suggestion: "Remove the extra item, or change from, to, or relation.",
+        };
+      }
+      const listed = relationTypes.find((relation) => relation.slug === current.relation_type);
+      if (
+        listed?.is_symmetric &&
+        current.relation_type === prior.relation_type &&
+        current.from_id === prior.to_id &&
+        current.to_id === prior.from_id
+      ) {
+        return {
+          ok: false,
+          index,
+          other,
+          kind: "symmetric",
+          error: `Symmetric duplicate in batch (same as edges[${other}])`,
+          suggestion: "Keep one direction of this relation.",
+        };
+      }
+    }
+  }
+  return null;
+}
+
+export type LinkSequenceOk = {
+  ok: true;
+  results: LinkValidationOk[];
+};
+
+export type LinkSequenceErr = {
+  ok: false;
+  index: number;
+  error: string;
+  suggestion?: string;
+};
+
+/**
+ * Validate edges in order. Each accepted edge (resolved relation) is visible
+ * to later edges, including a second child_of from the same source.
+ */
+export function validateLinkSequence(
+  proposals: readonly LinkProposal[],
+  ctx: LinkValidatorContext = {},
+): LinkSequenceOk | LinkSequenceErr {
+  const existingEdges = [...(ctx.existingEdges ?? [])];
+  const results: LinkValidationOk[] = [];
+  for (let index = 0; index < proposals.length; index += 1) {
+    const proposal = proposals[index]!;
+    const result = validateLink(proposal, { ...ctx, existingEdges });
+    if (!result.ok) {
+      return {
+        ok: false,
+        index,
+        error: result.error,
+        ...(result.suggestion ? { suggestion: result.suggestion } : {}),
+      };
+    }
+    existingEdges.push({
+      from_id: proposal.from_id,
+      to_id: proposal.to_id,
+      relation_type: result.relation_type,
+    });
+    results.push(result);
+  }
+  return { ok: true, results };
+}

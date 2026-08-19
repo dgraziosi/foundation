@@ -12,7 +12,7 @@ v1 surface is **13 tools**. Destructive tools require `confirm: true` or they re
 | `get` | Fetch a node by id, including payload, incident edges with neighbor titles, and `suggested_links` from title FTS. Blob payloads return metadata, not bytes. |
 | `upsert` | Create or update a node (title, type, payload, data, status). Updates require `base_updated_at`. Create accepts `idempotency_key`. Create (no id) preflights duplicates via `lookup`. Blob ingest via `bytes_base64` or `source_path`. Returns `suggested_links` (proposals only). |
 | `delete` | Soft-delete a node. Requires `confirm: true`. |
-| `link` | Create a typed edge after validation. Requires `from_base_updated_at` and `to_base_updated_at`. |
+| `link` | Create typed edges after validation. One edge or `edges[]` (1–20). Whole batch validates; one transaction writes all or none. Requires endpoint if-match. |
 | `unlink` | Remove a typed edge. Requires `confirm: true`. |
 | `inspect_ontology` | List type and relation registry rows (system + authored). |
 | `manage_type` | Create, update, or retire a node type. Applies immediately. Retire requires `confirm: true`. |
@@ -70,12 +70,16 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 
 ### `link`
 
-- **In:** `{ from_id, to_id, relation_type, upgrade?, metadata?, from_base_updated_at?, to_base_updated_at?, actor?, actor_label? }`
-- **Out:** `{ edge, activity_id, suggestion? }` or `{ error, suggestion? }`
-- Validation: [`packages/schema`](../packages/schema) `validateLink` (unknown relation, self-link, duplicate, symmetric duplicate, constraints, `child_of` uniqueness / `parent_types`). `relates_to` that fits the spine **suggests** `child_of`; it does not rewrite unless `upgrade: true`. Duplicate checks run on the proposed relation **before** the optional `relates_to` → `child_of` upgrade.
-- **If-match:** `from_base_updated_at` and `to_base_updated_at` are required and must match each endpoint's current `updated_at` from `get`. Stale or missing → `{ error, suggestion }` (get both nodes and retry). Not a write-ACL.
-- Optional `actor` / `actor_label` are stored on the activity row (who wrote). Not a permission gate.
-- Edges table is the only source of truth.
+- **In (one edge):** `{ from_id, to_id, relation_type, upgrade?, metadata?, from_base_updated_at?, to_base_updated_at?, actor?, actor_label? }`
+- **In (batch):** `{ edges: [{ from_id, to_id, relation_type, upgrade?, metadata?, from_base_updated_at?, to_base_updated_at? }], actor?, actor_label? }`
+- `edges` is 1–20. Pass either the one-edge fields or `edges[]`, not both.
+- **Out (one-edge form):** `{ edge, activity_id, suggestion?, links: [{ edge, activity_id, suggestion? }] }` or `{ error, suggestion? }`
+- **Out (`edges[]` form):** `{ links: [{ edge, activity_id, suggestion? }] }` or `{ error, suggestion? }`
+- Validation: whole batch before any write. [`packages/schema`](../packages/schema) `validateLink` per edge (unknown relation, self-link, duplicate, symmetric duplicate, constraints, `child_of` uniqueness / `parent_types`). In-batch exact and symmetric duplicates refuse. Later edges see earlier accepted edges in the same call (including a second `child_of` from the same source). `relates_to` that fits the spine **suggests** `child_of`; it does not rewrite unless that edge passes `upgrade: true`. A suggestion does not fail the batch. Duplicate checks run on the proposed relation **before** the optional `relates_to` → `child_of` upgrade.
+- **Atomic write:** one transaction. First error wins; no partial `links` and no new edges on refuse.
+- **If-match:** `from_base_updated_at` and `to_base_updated_at` are required on **each** edge and must match each endpoint's current `updated_at` from `get`. A missing timestamp on any item refuses that edge and writes nothing. A later edge does not inherit CAS from an earlier edge that named the same node. Several edges that share a node still use one agreed timestamp. Disagreeing timestamps refuse the batch. Stale or missing → `{ error, suggestion }` (get the nodes and retry). Linking does not change `updated_at`. Not a write-ACL.
+- Optional `actor` / `actor_label` are stored on each activity row (who wrote). Not a permission gate.
+- One activity receipt per written edge. `undo` inverts one receipt. Edges table is the only source of truth.
 
 ### `unlink`
 

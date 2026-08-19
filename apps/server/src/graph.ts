@@ -51,7 +51,13 @@ import {
   toolError,
   validateBlobRelativePath,
   validateInlinePayload,
-  validateLink,
+  validateLinkSequence,
+  findInBatchLinkDuplicate,
+  normalizeLinkEdges,
+  LINK_CAS_AGREE_SUGGESTION,
+  MISSING_BASE_SUGGESTION,
+  parseTimestampMs,
+  timestampsEqual,
   SEARCH_MISS_SUGGESTION,
   SEARCH_NO_SELECTOR_SUGGESTION,
   SEARCH_UUID_SUGGESTION,
@@ -81,7 +87,9 @@ import {
   type Blob,
   type Edge,
   type IncidentEdge,
+  type LinkEdgeItem,
   type LinkInput,
+  type LinkItemSuccess,
   type ListActivityInput,
   type ManageRelationInput,
   type ManageTypeInput,
@@ -678,90 +686,217 @@ export async function deleteGraphNode(
   });
 }
 
+export type LinkFlatSuccess = LinkItemSuccess & { links: LinkItemSuccess[] };
+export type LinkBatchSuccess = { links: LinkItemSuccess[] };
+
+function prefixEdgeError(
+  form: "flat" | "batch",
+  index: number,
+  error: string,
+  suggestion?: string,
+): ToolError {
+  const prefixed = form === "batch" ? `edges[${index}]: ${error}` : error;
+  return toolError(prefixed, suggestion);
+}
+
+type EndpointClaim = {
+  index: number;
+  field: "from_base_updated_at" | "to_base_updated_at";
+  value: string | undefined;
+};
+
+function assertBatchEndpointCas(
+  form: "flat" | "batch",
+  edges: readonly LinkEdgeItem[],
+  locked: ReadonlyMap<string, Node>,
+): ToolError | null {
+  for (const [index, edge] of edges.entries()) {
+    for (const field of ["from_base_updated_at", "to_base_updated_at"] as const) {
+      const value = edge[field];
+      if (value === undefined) {
+        return prefixEdgeError(form, index, `Missing ${field}`, MISSING_BASE_SUGGESTION);
+      }
+      if (parseTimestampMs(value) === null) {
+        return prefixEdgeError(
+          form,
+          index,
+          `Invalid ${field}: ${value}`,
+          "Pass an ISO-8601 timestamp from get (node.updated_at).",
+        );
+      }
+    }
+  }
+
+  const claims = new Map<string, EndpointClaim[]>();
+  const addClaim = (id: string, claim: EndpointClaim) => {
+    const list = claims.get(id) ?? [];
+    list.push(claim);
+    claims.set(id, list);
+  };
+  for (const [index, edge] of edges.entries()) {
+    addClaim(edge.from_id, {
+      index,
+      field: "from_base_updated_at",
+      value: edge.from_base_updated_at,
+    });
+    addClaim(edge.to_id, {
+      index,
+      field: "to_base_updated_at",
+      value: edge.to_base_updated_at,
+    });
+  }
+
+  for (const [nodeId, nodeClaims] of claims) {
+    const node = locked.get(nodeId)!;
+    const first = nodeClaims[0]!;
+    for (const claim of nodeClaims) {
+      if (!timestampsEqual(first.value!, claim.value!)) {
+        return prefixEdgeError(
+          form,
+          claim.index,
+          `${claim.field} disagrees with edges[${first.index}] for ${nodeId}`,
+          LINK_CAS_AGREE_SUGGESTION,
+        );
+      }
+    }
+    const stale = assertIfMatch(first.field, first.value, node.updated_at);
+    if (stale) {
+      return prefixEdgeError(form, first.index, stale.error, stale.suggestion);
+    }
+  }
+  return null;
+}
+
+export async function linkGraphNodes(
+  pool: Pool,
+  input: {
+    from_id: string;
+    to_id: string;
+    relation_type: string;
+    upgrade?: boolean;
+    metadata?: Record<string, unknown>;
+    from_base_updated_at?: string;
+    to_base_updated_at?: string;
+    actor?: Activity["actor"];
+    actor_label?: string;
+  },
+): Promise<LinkFlatSuccess | ToolError>;
+export async function linkGraphNodes(
+  pool: Pool,
+  input: {
+    edges: LinkEdgeItem[];
+    actor?: Activity["actor"];
+    actor_label?: string;
+  },
+): Promise<LinkBatchSuccess | ToolError>;
 export async function linkGraphNodes(
   pool: Pool,
   input: LinkInput,
-): Promise<{ edge: Edge; activity_id: string; suggestion?: string } | ToolError> {
+): Promise<LinkFlatSuccess | LinkBatchSuccess | ToolError>;
+export async function linkGraphNodes(
+  pool: Pool,
+  input: LinkInput,
+): Promise<LinkFlatSuccess | LinkBatchSuccess | ToolError> {
+  const normalized = normalizeLinkEdges(input);
+  if (isToolError(normalized)) {
+    return normalized;
+  }
+  const { form, edges } = normalized;
   const writer = writerOf(input);
   return withTransaction(pool, async (client) => {
-    const lockOrder =
-      input.from_id <= input.to_id
-        ? [input.from_id, input.to_id]
-        : [input.to_id, input.from_id];
+    const lockOrder = [...new Set(edges.flatMap((edge) => [edge.from_id, edge.to_id]))].sort();
     const locked = new Map<string, Node>();
     for (const id of lockOrder) {
-      if (locked.has(id)) {
-        continue;
-      }
       const node = await getNodeById(client, id, { forUpdate: true });
       if (!node) {
-        const which = id === input.from_id ? "from_id" : "to_id";
-        return toolError(
+        const first = edges.find((edge) => edge.from_id === id || edge.to_id === id)!;
+        const index = edges.indexOf(first);
+        const which = first.from_id === id ? "from_id" : "to_id";
+        return prefixEdgeError(
+          form,
+          index,
           `${which} not found: ${id}`,
           "Pass a live node UUID from upsert.",
         );
       }
       locked.set(id, node);
     }
-    const from = locked.get(input.from_id)!;
-    const to = locked.get(input.to_id)!;
-    const fromStale = assertIfMatch("from_base_updated_at", input.from_base_updated_at, from.updated_at);
-    if (fromStale) {
-      return fromStale;
-    }
-    const toStale = assertIfMatch("to_base_updated_at", input.to_base_updated_at, to.updated_at);
-    if (toStale) {
-      return toStale;
+
+    const casErr = assertBatchEndpointCas(form, edges, locked);
+    if (casErr) {
+      return casErr;
     }
 
     const nodeTypes = await listNodeTypes(client);
     const relationTypes = await listRelationTypes(client);
-    const existingEdges = await listEdgesTouching(client, [from.id, to.id]);
+    const existingEdges = await listEdgesTouching(client, lockOrder);
 
-    const result = validateLink(
-      {
+    const duplicate = findInBatchLinkDuplicate(edges, { relationTypes });
+    if (duplicate) {
+      return prefixEdgeError(form, duplicate.index, duplicate.error, duplicate.suggestion);
+    }
+
+    const proposals = edges.map((edge) => {
+      const from = locked.get(edge.from_id)!;
+      const to = locked.get(edge.to_id)!;
+      return {
         from_id: from.id,
         to_id: to.id,
-        relation_type: input.relation_type,
+        relation_type: edge.relation_type,
         from_type: from.type,
         to_type: to.type,
-        upgrade: input.upgrade,
-      },
-      { nodeTypes, relationTypes, existingEdges },
-    );
-    if (!result.ok) {
-      return toolError(result.error, result.suggestion);
+        upgrade: edge.upgrade,
+      };
+    });
+    const sequenced = validateLinkSequence(proposals, { nodeTypes, relationTypes, existingEdges });
+    if (!sequenced.ok) {
+      return prefixEdgeError(form, sequenced.index, sequenced.error, sequenced.suggestion);
     }
 
-    const { edge, droppedStaleChildOf } = await insertEdge(client, {
-      from_id: from.id,
-      to_id: to.id,
-      relation_type: result.relation_type,
-      metadata: input.metadata ?? {},
-    });
-    for (const dropped of droppedStaleChildOf) {
-      await insertActivity(client, {
+    const links: LinkItemSuccess[] = [];
+    for (const [index, edgeInput] of edges.entries()) {
+      const result = sequenced.results[index]!;
+      const { edge, droppedStaleChildOf } = await insertEdge(client, {
+        from_id: edgeInput.from_id,
+        to_id: edgeInput.to_id,
+        relation_type: result.relation_type,
+        metadata: edgeInput.metadata ?? {},
+      });
+      for (const dropped of droppedStaleChildOf) {
+        await insertActivity(client, {
+          ...writer,
+          action: "unlink",
+          target_kind: "edge",
+          target_id: dropped.id,
+          before: dropped,
+          after: null,
+        });
+      }
+      const activity = await insertActivity(client, {
         ...writer,
-        action: "unlink",
+        action: "link",
         target_kind: "edge",
-        target_id: dropped.id,
-        before: dropped,
-        after: null,
+        target_id: edge.id,
+        before: null,
+        after: edge,
+      });
+      links.push({
+        edge,
+        activity_id: activity.id,
+        ...(result.suggestion ? { suggestion: result.suggestion } : {}),
       });
     }
-    const activity = await insertActivity(client, {
-      ...writer,
-      action: "link",
-      target_kind: "edge",
-      target_id: edge.id,
-      before: null,
-      after: edge,
-    });
-    return {
-      edge,
-      activity_id: activity.id,
-      ...(result.suggestion ? { suggestion: result.suggestion } : {}),
-    };
+
+    if (form === "flat") {
+      const only = links[0]!;
+      return {
+        edge: only.edge,
+        activity_id: only.activity_id,
+        ...(only.suggestion ? { suggestion: only.suggestion } : {}),
+        links,
+      };
+    }
+    return { links };
   });
 }
 

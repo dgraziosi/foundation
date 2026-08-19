@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   GetSuccessSchema,
+  LINK_BATCH_MAX,
+  LinkInputSchema,
+  LinkSuccessSchema,
   LookupInputSchema,
   LookupSuccessSchema,
   ManageTypeInputSchema,
@@ -9,6 +12,8 @@ import {
   SuggestedLinkSchema,
   UpsertInputSchema,
   UpsertSuccessSchema,
+  isToolError,
+  normalizeLinkEdges,
   searchHasSelector,
 } from "./mcp-io.js";
 
@@ -112,6 +117,87 @@ test("suggested_links are seed relations to a live target", () => {
     node: empty.node,
     edges: [],
     suggested_links: [],
+  });
+});
+
+test("link accepts a flat one-edge call or a capped edges batch", () => {
+  const ids = {
+    a: "11111111-1111-4111-8111-111111111111",
+    b: "22222222-2222-4222-8222-222222222222",
+  };
+  const flat = LinkInputSchema.parse({
+    from_id: ids.a,
+    to_id: ids.b,
+    relation_type: "relates_to",
+    from_base_updated_at: "2026-08-19T00:00:00.000Z",
+    to_base_updated_at: "2026-08-19T00:00:00.000Z",
+  });
+  assert.equal(flat.from_id, ids.a);
+  assert.equal(flat.edges, undefined);
+
+  const batch = LinkInputSchema.parse({
+    edges: [
+      {
+        from_id: ids.a,
+        to_id: ids.b,
+        relation_type: "relates_to",
+        from_base_updated_at: "2026-08-19T00:00:00.000Z",
+        to_base_updated_at: "2026-08-19T00:00:00.000Z",
+      },
+    ],
+  });
+  assert.equal(batch.edges?.length, 1);
+  assert.throws(() => LinkInputSchema.parse({ edges: [] }));
+  assert.throws(() =>
+    LinkInputSchema.parse({
+      edges: Array.from({ length: LINK_BATCH_MAX + 1 }, () => ({
+        from_id: ids.a,
+        to_id: ids.b,
+        relation_type: "relates_to",
+      })),
+    }),
+  );
+
+  const mixed = normalizeLinkEdges({
+    from_id: ids.a,
+    to_id: ids.b,
+    relation_type: "relates_to",
+    edges: [
+      { from_id: ids.a, to_id: ids.b, relation_type: "relates_to" },
+    ],
+  });
+  assert.equal(isToolError(mixed), true);
+  if (!isToolError(mixed)) return;
+  assert.match(mixed.error, /not both/);
+
+  const incomplete = normalizeLinkEdges({ from_id: ids.a });
+  assert.equal(isToolError(incomplete), true);
+
+  const normalizedFlat = normalizeLinkEdges({
+    from_id: ids.a,
+    to_id: ids.b,
+    relation_type: "relates_to",
+  });
+  assert.equal(isToolError(normalizedFlat), false);
+  if (isToolError(normalizedFlat)) return;
+  assert.equal(normalizedFlat.form, "flat");
+  assert.equal(normalizedFlat.edges.length, 1);
+
+  const edge = {
+    id: "33333333-3333-4333-8333-333333333333",
+    from_id: ids.a,
+    to_id: ids.b,
+    relation_type: "relates_to",
+    metadata: {},
+    created_at: "2026-08-19T00:00:00.000Z",
+  };
+  LinkSuccessSchema.parse({
+    edge,
+    activity_id: "44444444-4444-4444-8444-444444444444",
+    links: [{ edge, activity_id: "44444444-4444-4444-8444-444444444444" }],
+  });
+  LinkSuccessSchema.parse({
+    links: [{ edge, activity_id: "44444444-4444-4444-8444-444444444444" }],
   });
 });
 
