@@ -811,6 +811,8 @@ export type TaskCardRow = {
   status: Node["status"];
   due: string | null;
   parent_title: string | null;
+  data?: Record<string, unknown>;
+  updated_at?: string;
 };
 
 export async function listTaskCards(db: Queryable, limit = 200): Promise<TaskCardRow[]> {
@@ -828,7 +830,8 @@ export async function listTypeCards(
   limit = 200,
 ): Promise<TypeCardRow[]> {
   const { rows } = await db.query<TypeCardRow>(
-    `SELECT n.id, n.title, n.type, n.status,
+    `SELECT n.id, n.title, n.type, n.status, n.data,
+            n.updated_at::text AS updated_at,
             foundation_iso_date(n.data #>> '{due}') AS due,
             parent.id AS parent_id,
             parent.title AS parent_title

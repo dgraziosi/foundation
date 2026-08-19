@@ -36,6 +36,25 @@ export type ViewEngineId =
   | "outline"
   | "graph";
 
+export type ViewBind = "title" | "status" | "date" | "start" | "end" | "subtitle" | "updated_at";
+
+export type ViewDeclaration = {
+  id: ViewEngineId;
+  filter?: { clauses: Array<{ bind: ViewBind; op: "eq" | "in"; value: string | string[] }> };
+  sort?: Array<{ bind: ViewBind; dir: "asc" | "desc" }>;
+  group?: { bind: ViewBind };
+};
+
+export type TypeField = {
+  name: string;
+  display: string;
+  kind: "string" | "date" | "number" | "enum" | "ref";
+  needed: boolean;
+  role?: "title" | "status" | "date" | "start" | "end" | "subtitle";
+  enum_values?: string[];
+  ref_type?: string;
+};
+
 export type OntologyType = {
   slug: string;
   label: string;
@@ -43,6 +62,8 @@ export type OntologyType = {
   default_view?: ViewEngineId;
   count: number;
 };
+
+export type TypeViewChip = { name: string; display: string; value: string };
 
 export type TypeViewNode = {
   id: string;
@@ -53,14 +74,18 @@ export type TypeViewNode = {
   due_tone?: "overdue" | "today" | "future";
   parent_id?: string;
   parent_title?: string;
+  chips?: TypeViewChip[];
+  data?: Record<string, unknown>;
+  updated_at?: string;
 };
 
 export type TypeView = {
   type: {
     slug: string;
     label: string;
-    views: ViewEngineId[];
+    views: Array<ViewEngineId | ViewDeclaration>;
     default_view?: ViewEngineId;
+    fields?: TypeField[];
   };
   nodes: TypeViewNode[];
   children: TypeViewNode[];
@@ -124,6 +149,7 @@ export type NodeDetail = {
       blob_id?: string;
     };
   };
+  type?: { slug: string; label: string; fields: TypeField[] } | null;
   edges: IncidentEdge[];
   blob?: {
     id: string;
@@ -132,6 +158,7 @@ export type NodeDetail = {
     sha256: string;
   };
   suggested_links: SuggestedLink[];
+  resolved_refs?: Record<string, { id: string; title: string; type: string }>;
   due: string | null;
   due_tone: "overdue" | "today" | "future" | null;
 };

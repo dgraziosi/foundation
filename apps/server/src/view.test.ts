@@ -6,10 +6,17 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { createPool, migrate, seedSystemOntology, type Pool } from "@foundation/db";
-import { isToolError } from "@foundation/schema";
+import {
+  applyViewQuery,
+  asViewDeclarations,
+  findViewDeclaration,
+  isToolError,
+  type TypeField,
+  type ViewDeclaration,
+} from "@foundation/schema";
 import type { AddressInfo, Server } from "node:net";
 import { createApp } from "./app.js";
-import { getGraphNode, linkGraphNodes, listGraphActivity, manageType, upsertGraphNode } from "./graph.js";
+import { getGraphNode, inspectOntology, linkGraphNodes, listGraphActivity, manageType, upsertGraphNode } from "./graph.js";
 import { viewerDistDir } from "./view.js";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -108,6 +115,8 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       assert.match(js, /No tasks yet/);
       assert.match(js, /No views declared for this type/);
       assert.match(js, /Open tasks/);
+      assert.match(js, /Show completed/);
+      assert.match(js, /No date field on this type/);
       assert.doesNotMatch(js, /manage_type|confirm: true|localhost-only/);
 
       const session = await fetch(`${origin}/view/api/session`);
@@ -169,18 +178,22 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       const typeView = await fetch(`${origin}/view/api/types/task`, { headers: authHeader() });
       assert.equal(typeView.status, 200);
       const typeBody = (await typeView.json()) as {
-        type: { views: string[]; default_view?: string };
+        type: { views: Array<string | { id: string }>; default_view?: string; fields?: Array<{ name: string }> };
         nodes: unknown[];
       };
-      assert.deepEqual(typeBody.type.views, ["board", "list", "calendar", "timeline", "outline"]);
+      assert.deepEqual(
+        typeBody.type.views.map((view) => (typeof view === "string" ? view : view.id)),
+        ["board", "list", "calendar", "timeline", "outline"],
+      );
       assert.equal(typeBody.type.default_view, "board");
+      assert.deepEqual(typeBody.type.fields?.map((field) => field.name), ["due"]);
       assert.deepEqual(typeBody.nodes, []);
 
       const blank = await manageType(pool, { action: "create", slug: "blank_view", kind: "artifact" });
       assert.equal(isToolError(blank), false);
       const blankView = await fetch(`${origin}/view/api/types/blank_view`, { headers: authHeader() });
       assert.equal(blankView.status, 200);
-      const blankBody = (await blankView.json()) as { type: { views: string[]; default_view?: string } };
+      const blankBody = (await blankView.json()) as { type: { views: Array<string | { id: string }>; default_view?: string } };
       assert.deepEqual(blankBody.type.views, []);
       assert.equal(blankBody.type.default_view, undefined);
     });
@@ -691,6 +704,125 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
     await pool.end();
   }
 });
+
+test(
+  "manage_type default filter drives collection and Home Open tasks",
+  { skip: !databaseUrl },
+  async () => {
+    if (!databaseUrl) {
+      return;
+    }
+    const pool = await poolForSchema("view_default_filter");
+    const dataDir = await mkdtemp(join(tmpdir(), "foundation-view-filter-"));
+    const bindings = {
+      FOUNDATION_API_KEY: apiKey,
+      DATABASE_URL: databaseUrl,
+      FOUNDATION_DATA: dataDir,
+      PORT: 0,
+      HOST: "127.0.0.1",
+      VIEW_PORT: 0,
+      VIEW_HOST: "0.0.0.0",
+    };
+    const viewApp = createApp(pool, bindings, "view");
+    const viewServer = viewApp.listen(0);
+    try {
+      const viewOrigin = await listenOrigin(viewServer);
+      const cookie = await unlockCookie(viewOrigin);
+
+      const open = await upsertGraphNode(pool, { type: "task", title: "Open one", status: "active" });
+      const done = await upsertGraphNode(pool, { type: "task", title: "Done one", status: "completed" });
+      const archived = await upsertGraphNode(pool, { type: "task", title: "Archived one", status: "archived" });
+      assert.equal(isToolError(open), false);
+      assert.equal(isToolError(done), false);
+      assert.equal(isToolError(archived), false);
+
+      const beforeTasks = await fetch(`${viewOrigin}/view/api/tasks`, { headers: { cookie } });
+      const beforeTaskBody = (await beforeTasks.json()) as { tasks: Array<{ title: string }> };
+      assert.deepEqual(
+        beforeTaskBody.tasks.map((task) => task.title).sort(),
+        ["Open one"],
+      );
+
+      const beforeType = await fetch(`${viewOrigin}/view/api/types/task`, { headers: { cookie } });
+      const beforeTypeBody = (await beforeType.json()) as {
+        type: { views: ViewDeclaration[]; default_view?: string; fields?: TypeField[] };
+        nodes: Array<{ id: string; title: string; status: string; data?: Record<string, unknown> }>;
+      };
+      const beforeView = findViewDeclaration(
+        asViewDeclarations(beforeTypeBody.type.views),
+        beforeTypeBody.type.default_view ?? "board",
+      );
+      assert.ok(beforeView);
+      const beforeCollection = applyViewQuery(
+        beforeTypeBody.nodes.map((node) => ({ ...node, data: node.data ?? {} })),
+        beforeView,
+        beforeTypeBody.type.fields ?? [],
+      );
+      assert.deepEqual(
+        beforeCollection.map((node) => node.title).sort(),
+        ["Open one"],
+      );
+
+      const types = await inspectOntology(pool, "types");
+      const task = types.types.find((type) => type.slug === "task");
+      assert.ok(task);
+      const views = (task.views ?? []).map((view) =>
+        view.id === task.default_view
+          ? {
+              ...view,
+              filter: { clauses: [{ bind: "status" as const, op: "in" as const, value: ["active", "completed"] }] },
+            }
+          : view,
+      );
+      const patched = await manageType(pool, { action: "update", slug: "task", views });
+      assert.equal(isToolError(patched), false);
+
+      const afterTasks = await fetch(`${viewOrigin}/view/api/tasks`, { headers: { cookie } });
+      const afterTaskBody = (await afterTasks.json()) as { tasks: Array<{ title: string }> };
+      assert.deepEqual(
+        afterTaskBody.tasks.map((task) => task.title).sort(),
+        ["Done one", "Open one"],
+      );
+
+      const afterType = await fetch(`${viewOrigin}/view/api/types/task`, { headers: { cookie } });
+      const afterTypeBody = (await afterType.json()) as {
+        type: { views: ViewDeclaration[]; default_view?: string; fields?: TypeField[] };
+        nodes: Array<{ id: string; title: string; status: string; data?: Record<string, unknown> }>;
+      };
+      const afterView = findViewDeclaration(
+        asViewDeclarations(afterTypeBody.type.views),
+        afterTypeBody.type.default_view ?? "board",
+      );
+      assert.ok(afterView);
+      const afterCollection = applyViewQuery(
+        afterTypeBody.nodes.map((node) => ({ ...node, data: node.data ?? {} })),
+        afterView,
+        afterTypeBody.type.fields ?? [],
+      );
+      assert.deepEqual(
+        afterCollection.map((node) => node.title).sort(),
+        ["Done one", "Open one"],
+      );
+
+      const person = await upsertGraphNode(pool, {
+        type: "person",
+        title: "Ada",
+        data: { org: "Labs", secret: "hidden" },
+      });
+      assert.equal(isToolError(person), false);
+      const personView = await fetch(`${viewOrigin}/view/api/types/person`, { headers: { cookie } });
+      const personBody = (await personView.json()) as {
+        nodes: Array<{ title: string; chips?: Array<{ name: string; value: string }>; due?: string }>;
+      };
+      const ada = personBody.nodes.find((node) => node.title === "Ada");
+      assert.deepEqual(ada?.chips, [{ name: "org", display: "Org", value: "Labs" }]);
+      assert.equal(ada?.due, undefined);
+    } finally {
+      await new Promise<void>((resolve) => viewServer.close(() => resolve()));
+      await pool.end();
+    }
+  },
+);
 
 test("viewer CSS ships dark first and a real light lane", async () => {
   const css = await readFile(

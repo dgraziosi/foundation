@@ -30,7 +30,6 @@ import {
   unlinkQuiet,
   updateNode,
   updateNodeType,
-  updateNodeTypeDescription,
   updateRelationType,
   updateRelationTypeDescription,
   withTransaction,
@@ -47,6 +46,8 @@ import {
   labelFromSlug,
   typeViewsFromInput,
   typeViewsFromUpdate,
+  compileJsonSchemaFromFields,
+  parseTypeFieldsInput,
   isUuid,
   missingConfirm,
   storedBlobPayload,
@@ -145,6 +146,42 @@ function validateUpsertData(type: NodeType, data: Record<string, unknown>): Tool
     return toolError("data.due must be an ISO date YYYY-MM-DD", DUE_DATE_SUGGESTION);
   }
   return validateDataAgainstJsonSchema(data, type.json_schema, type.slug);
+}
+
+async function validateRefFields(
+  db: Queryable,
+  type: NodeType,
+  data: Record<string, unknown>,
+): Promise<ToolError | null> {
+  for (const field of type.fields ?? []) {
+    if (field.kind !== "ref") {
+      continue;
+    }
+    const value = data[field.name];
+    if (value === undefined || value === null || value === "") {
+      continue;
+    }
+    if (typeof value !== "string" || !isUuid(value)) {
+      return toolError(
+        `data.${field.name} must be a node UUID`,
+        `Pass a live ${field.ref_type ?? "node"} id. A ref field is a pointer, not an edge.`,
+      );
+    }
+    const target = await getNodeById(db, value);
+    if (!target) {
+      return toolError(
+        `data.${field.name} is not a live node`,
+        "Call get or lookup for a live UUID. A ref field does not create an edge.",
+      );
+    }
+    if (field.ref_type && target.type !== field.ref_type) {
+      return toolError(
+        `data.${field.name} must be a ${field.ref_type}`,
+        `Call inspect_ontology. This ref points at type ${field.ref_type}.`,
+      );
+    }
+  }
+  return null;
 }
 
 async function originUniqueError(
@@ -502,6 +539,10 @@ export async function upsertGraphNode(
       const dataErr = validateUpsertData(type, nextData);
       if (dataErr) {
         return dataErr;
+      }
+      const refErr = await validateRefFields(client, type, nextData);
+      if (refErr) {
+        return refErr;
       }
 
       if (existing) {
@@ -971,6 +1012,21 @@ export async function manageType(
     if (isToolError(viewsInput)) {
       return viewsInput;
     }
+    const knownSlugs = (await listNodeTypes(pool)).map((type) => type.slug);
+    const fieldsParsed = parseTypeFieldsInput(input.fields ?? [], [...knownSlugs, input.slug]);
+    if (!fieldsParsed.ok) {
+      return toolError(fieldsParsed.error, fieldsParsed.suggestion);
+    }
+    if (input.json_schema !== undefined && input.json_schema !== null && fieldsParsed.fields.length > 0) {
+      return toolError(
+        `Type "${input.slug}" has a field template; edit fields, not json_schema`,
+        "Pass fields to manage_type. json_schema is compiled from fields.",
+      );
+    }
+    const jsonSchema =
+      fieldsParsed.fields.length > 0
+        ? compileJsonSchemaFromFields(fieldsParsed.fields)
+        : (input.json_schema ?? null);
     return withTransaction(pool, async (client) => {
       const type = await insertNodeType(client, {
         slug: input.slug,
@@ -978,9 +1034,10 @@ export async function manageType(
         description: input.description ?? "",
         kind: input.kind ?? "artifact",
         parent_types: parentTypes,
-        json_schema: input.json_schema ?? null,
-        views: [...viewsInput.views],
+        json_schema: jsonSchema,
+        views: viewsInput.views,
         default_view: viewsInput.default_view,
+        fields: fieldsParsed.fields,
       });
       const activity = await insertActivity(client, {
         ...writer,
@@ -1027,44 +1084,42 @@ export async function manageType(
     });
   }
 
+  const knownSlugs = (await listNodeTypes(pool)).map((type) => type.slug);
+  const fieldsParsed =
+    input.fields === undefined
+      ? { ok: true as const, fields: existing.fields ?? [] }
+      : parseTypeFieldsInput(input.fields, knownSlugs);
+  if (!fieldsParsed.ok) {
+    return toolError(fieldsParsed.error, fieldsParsed.suggestion);
+  }
+  const nextFields = fieldsParsed.fields;
+  if (input.json_schema !== undefined && nextFields.length > 0) {
+    return toolError(
+      `Type "${input.slug}" has a field template; edit fields, not json_schema`,
+      "Pass fields to manage_type. json_schema is compiled from fields.",
+    );
+  }
+
   const locked = assertSystemTypePatch(existing, {
+    slug: input.slug,
     label: input.label,
     kind: input.kind,
     parent_types: input.parent_types,
     json_schema: input.json_schema,
     views: input.views,
     default_view: input.default_view,
+    fields: input.fields === undefined ? undefined : nextFields,
   });
   if (locked) {
     return locked;
   }
 
-  if (existing.is_system) {
-    return withTransaction(pool, async (client) => {
-      const type = await updateNodeTypeDescription(
-        client,
-        input.slug,
-        input.description ?? existing.description,
-      );
-      if (!type) {
-        return toolError(`Type "${input.slug}" not found`);
-      }
-      const activity = await insertActivity(client, {
-        ...writer,
-        action: "type_change",
-        target_kind: "type",
-        target_id: type.slug,
-        before: existing,
-        after: type,
-      });
-      return { type, activity_id: activity.id };
-    });
-  }
-
-  const parentTypes = input.parent_types ?? existing.parent_types;
-  const parentErr = await assertTypeSlugsExist(pool, parentTypes, "parent_types");
-  if (parentErr) {
-    return parentErr;
+  const parentTypes = existing.is_system ? existing.parent_types : (input.parent_types ?? existing.parent_types);
+  if (!existing.is_system) {
+    const parentErr = await assertTypeSlugsExist(pool, parentTypes, "parent_types");
+    if (parentErr) {
+      return parentErr;
+    }
   }
 
   const viewsPatch = typeViewsFromUpdate(existing, {
@@ -1075,15 +1130,23 @@ export async function manageType(
     return viewsPatch;
   }
 
+  const jsonSchema =
+    input.fields !== undefined || nextFields.length > 0
+      ? compileJsonSchemaFromFields(nextFields)
+      : input.json_schema === undefined
+        ? existing.json_schema
+        : input.json_schema;
+
   return withTransaction(pool, async (client) => {
     const type = await updateNodeType(client, input.slug, {
-      label: input.label ?? existing.label,
+      label: existing.is_system ? existing.label : (input.label ?? existing.label),
       description: input.description ?? existing.description,
-      kind: input.kind ?? existing.kind,
+      kind: existing.is_system ? existing.kind : (input.kind ?? existing.kind),
       parent_types: parentTypes,
-      json_schema: input.json_schema === undefined ? existing.json_schema : input.json_schema,
-      views: [...(viewsPatch.views ?? [])],
+      json_schema: jsonSchema,
+      views: viewsPatch.views,
       default_view: viewsPatch.default_view,
+      fields: nextFields,
     });
     if (!type) {
       return toolError(`Type "${input.slug}" not found`);

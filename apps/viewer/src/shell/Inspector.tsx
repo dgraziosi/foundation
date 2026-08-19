@@ -5,7 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { Sheet } from "@/components/ui/sheet";
 import { ApiError, fetchNode, type NodeDetail } from "../api";
 import { inspectorSheetOpen, useWideLane } from "./breakpoints";
-import { DueChip, StatusTag, TypeTag } from "../ui/Tags";
+import { StatusTag, TypeTag } from "../ui/Tags";
 import { LoadError, Placeholders, Quiet } from "../ui/States";
 
 function formatDataValue(value: unknown): string {
@@ -15,17 +15,45 @@ function formatDataValue(value: unknown): string {
   return JSON.stringify(value, null, 2);
 }
 
-function DataBlock({ data }: { data: Record<string, unknown> }) {
-  const entries = Object.entries(data);
-  if (entries.length === 0) {
+function DataBlock({
+  data,
+  fields,
+  resolvedRefs,
+  onSelect,
+}: {
+  data: Record<string, unknown>;
+  fields: Array<{ name: string; display: string; kind: string }>;
+  resolvedRefs?: Record<string, { id: string; title: string; type: string }>;
+  onSelect: (id: string) => void;
+}) {
+  const templateNames = new Set(fields.map((field) => field.name));
+  const extras = Object.entries(data).filter(([key]) => !templateNames.has(key));
+  const rows = [
+    ...fields.map((field) => ({
+      key: field.name,
+      label: field.display,
+      value: data[field.name],
+      ref: resolvedRefs?.[field.name],
+    })),
+    ...extras.map(([key, value]) => ({ key, label: key, value, ref: resolvedRefs?.[key] })),
+  ].filter((row) => row.value !== undefined || row.ref);
+  if (rows.length === 0) {
     return <Quiet>No data fields.</Quiet>;
   }
   return (
     <dl>
-      {entries.map(([key, value]) => (
-        <div className="grid min-h-row grid-cols-[7rem_minmax(0,1fr)] items-start gap-2 border-b border-hairline py-1.5" key={key}>
-          <dt className="text-meta text-muted-foreground">{key}</dt>
-          <dd className="m-0 break-words whitespace-pre-wrap text-meta">{formatDataValue(value)}</dd>
+      {rows.map((row) => (
+        <div className="grid min-h-row grid-cols-[7rem_minmax(0,1fr)] items-start gap-2 border-b border-hairline py-1.5" key={row.key}>
+          <dt className="text-meta text-muted-foreground">{row.label}</dt>
+          <dd className="m-0 break-words whitespace-pre-wrap text-meta">
+            {row.ref ? (
+              <Button type="button" variant="link" className="h-auto p-0" onClick={() => onSelect(row.ref!.id)}>
+                {row.ref.title}
+              </Button>
+            ) : (
+              formatDataValue(row.value)
+            )}
+          </dd>
         </div>
       ))}
     </dl>
@@ -107,10 +135,14 @@ function InspectorBody({
                 <StatusTag status={query.data.node.status} />
               </div>
             </header>
-            {query.data.due ? <DueChip due={query.data.due} tone={query.data.due_tone ?? undefined} /> : null}
             <section>
               <h3 className="mb-2 text-label text-muted-foreground">Data</h3>
-              <DataBlock data={query.data.node.data} />
+              <DataBlock
+                data={query.data.node.data}
+                fields={query.data.type?.fields ?? []}
+                resolvedRefs={query.data.resolved_refs}
+                onSelect={onSelect}
+              />
             </section>
             <Separator />
             <section>

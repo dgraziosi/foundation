@@ -26,7 +26,7 @@ export function HomePage() {
     queryFn: () => fetchGraph({ focus: selectedId }),
   });
   const slugs = (ontology.data?.types ?? []).map((type) => type.slug);
-  const openTasks = (tasks.data?.tasks ?? []).filter((task) => task.status === "active");
+  const openTasks = tasks.data?.tasks ?? [];
   const recentRows = (recents.data?.rows ?? []).slice(0, 6);
 
   function openType(slug: string) {

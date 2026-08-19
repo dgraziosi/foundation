@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { VIEW_ENGINE_IDS } from "./views.js";
+import { FIELD_KINDS, FIELD_ROLES } from "./fields.js";
+import { asViewDeclarations, VIEW_BINDS, VIEW_ENGINE_IDS } from "./views.js";
 
 export const NodeStatusSchema = z.enum(["active", "completed", "archived"]);
 export type NodeStatus = z.infer<typeof NodeStatusSchema>;
@@ -74,6 +75,41 @@ export const TypeKindSchema = z.enum(["spine", "artifact"]);
 export type TypeKind = z.infer<typeof TypeKindSchema>;
 
 export const ViewEngineIdSchema = z.enum(VIEW_ENGINE_IDS);
+export const ViewBindSchema = z.enum(VIEW_BINDS);
+
+export const ViewDeclarationSchema = z.object({
+  id: ViewEngineIdSchema,
+  filter: z
+    .object({
+      clauses: z.array(
+        z.object({
+          bind: ViewBindSchema,
+          op: z.enum(["eq", "in"]),
+          value: z.union([z.string(), z.array(z.string())]),
+        }),
+      ),
+    })
+    .optional(),
+  sort: z
+    .array(
+      z.object({
+        bind: ViewBindSchema,
+        dir: z.enum(["asc", "desc"]),
+      }),
+    )
+    .optional(),
+  group: z.object({ bind: ViewBindSchema }).optional(),
+});
+
+export const TypeFieldSchema = z.object({
+  name: z.string().min(1),
+  display: z.string(),
+  kind: z.enum(FIELD_KINDS),
+  needed: z.boolean(),
+  role: z.enum(FIELD_ROLES).optional(),
+  enum_values: z.array(z.string()).optional(),
+  ref_type: z.string().optional(),
+});
 
 export const NodeTypeSchema = z.object({
   slug: z.string().min(1),
@@ -82,8 +118,12 @@ export const NodeTypeSchema = z.object({
   kind: TypeKindSchema,
   parent_types: z.array(z.string()),
   json_schema: z.unknown().nullable(),
-  views: z.array(ViewEngineIdSchema).optional(),
+  views: z
+    .array(z.union([ViewEngineIdSchema, ViewDeclarationSchema]))
+    .optional()
+    .transform((views) => (views === undefined ? undefined : asViewDeclarations(views))),
   default_view: ViewEngineIdSchema.optional(),
+  fields: z.array(TypeFieldSchema).optional(),
   is_system: z.boolean(),
   created_at: z.string().optional(),
   updated_at: z.string().optional(),

@@ -1,38 +1,53 @@
-import { SEED_NODE_TYPES, SEED_RELATION_TYPES } from "@foundation/schema";
+import {
+  compileJsonSchemaFromFields,
+  mergeMissingFields,
+  mergeMissingViewIds,
+  SEED_NODE_TYPES,
+  SEED_RELATION_TYPES,
+  asViewDeclarations,
+} from "@foundation/schema";
 import type pg from "pg";
+import { getNodeType, insertNodeType, updateNodeType } from "./queries.js";
 
 export async function seedSystemOntology(pool: pg.Pool): Promise<void> {
   for (const type of SEED_NODE_TYPES) {
-    await pool.query(
-      `
-      INSERT INTO node_types (
-        slug, label, description, kind, parent_types, json_schema, views, default_view, is_system
-      ) VALUES ($1, $2, $3, $4, $5::text[], $6::jsonb, $7::text[], $8, true)
-      ON CONFLICT (slug) DO UPDATE SET
-        label = EXCLUDED.label,
-        description = CASE
-          WHEN node_types.is_system THEN node_types.description
-          ELSE EXCLUDED.description
-        END,
-        kind = EXCLUDED.kind,
-        parent_types = EXCLUDED.parent_types,
-        json_schema = EXCLUDED.json_schema,
-        views = EXCLUDED.views,
-        default_view = EXCLUDED.default_view,
-        is_system = true,
-        updated_at = now()
-      `,
-      [
-        type.slug,
-        type.label,
-        type.description,
-        type.kind,
-        type.parent_types,
-        type.json_schema === null ? null : JSON.stringify(type.json_schema),
-        type.views,
-        type.default_view ?? null,
-      ],
+    const existing = await getNodeType(pool, type.slug);
+    if (!existing) {
+      await insertNodeType(pool, {
+        slug: type.slug,
+        label: type.label,
+        description: type.description,
+        kind: type.kind,
+        parent_types: type.parent_types,
+        json_schema: type.json_schema,
+        views: asViewDeclarations(type.views),
+        default_view: type.default_view,
+        fields: type.fields ?? [],
+        is_system: true,
+      });
+      continue;
+    }
+    const fields = mergeMissingFields(existing.fields ?? [], type.fields ?? []);
+    const views = mergeMissingViewIds(
+      asViewDeclarations(existing.views),
+      asViewDeclarations(type.views),
     );
+    const compiled = compileJsonSchemaFromFields(fields);
+    const jsonSchema =
+      fields.length > 0 ? compiled : existing.is_system ? existing.json_schema : type.json_schema;
+    await updateNodeType(pool, type.slug, {
+      label: type.label,
+      description: existing.is_system ? existing.description : type.description,
+      kind: type.kind,
+      parent_types: type.parent_types,
+      json_schema: jsonSchema,
+      views,
+      default_view: existing.default_view ?? type.default_view,
+      fields,
+    });
+    await pool.query(`UPDATE node_types SET is_system = true, updated_at = now() WHERE slug = $1`, [
+      type.slug,
+    ]);
   }
 
   for (const relation of SEED_RELATION_TYPES) {
