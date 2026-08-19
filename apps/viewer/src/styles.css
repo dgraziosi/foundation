@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg: #f7f7f4;
+    --ink: #26251e;
+    --accent: #f54e00;
+    --card: #f7f7f4;
+    --rule: color-mix(in srgb, var(--ink) 10%, transparent);
+    --ink-2: color-mix(in srgb, var(--ink) 62%, var(--bg));
+    --ink-3: color-mix(in srgb, var(--ink) 42%, var(--bg));
+    --background: #f7f7f4;
+    --foreground: #26251e;
+    --card-foreground: #26251e;
+    --primary: #f54e00;
+    --primary-foreground: #ffffff;
+    --muted: color-mix(in srgb, var(--ink) 6%, var(--bg));
+    --muted-foreground: color-mix(in srgb, var(--ink) 62%, var(--bg));
+    --accent-foreground: #ffffff;
+    --border: color-mix(in srgb, var(--ink) 10%, transparent);
+    --input: color-mix(in srgb, var(--ink) 10%, transparent);
+    --ring: #f54e00;
+    --radius: 0.5rem;
+    --font: "Inter", ui-sans-serif, system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+    color-scheme: light;
+  }
+
+  [data-theme="dark"] {
+    --bg: #14120b;
+    --ink: #edecec;
+    --accent: #f54e00;
+    --card: #1b1913;
+    --rule: color-mix(in srgb, var(--ink) 12%, transparent);
+    --background: #14120b;
+    --foreground: #edecec;
+    --card-foreground: #edecec;
+    --primary: #f54e00;
+    --primary-foreground: #ffffff;
+    --muted: color-mix(in srgb, var(--ink) 8%, var(--bg));
+    --muted-foreground: color-mix(in srgb, var(--ink) 62%, var(--bg));
+    --accent-foreground: #ffffff;
+    --border: color-mix(in srgb, var(--ink) 12%, transparent);
+    --input: color-mix(in srgb, var(--ink) 12%, transparent);
+    --ring: #f54e00;
+    color-scheme: dark;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    margin: 0;
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+}

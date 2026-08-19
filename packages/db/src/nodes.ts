@@ -744,6 +744,91 @@ export async function listEdgesTouching(
   return rows;
 }
 
+const NODE_COLUMNS = `id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at`;
+
+/** Newest live nodes. Empty graph returns []. Used by the read-only window working set. */
+export async function listRecentLiveNodes(
+  db: Queryable,
+  options: { limit?: number; type?: string } = {},
+): Promise<Node[]> {
+  const limit = options.limit ?? 48;
+  const { rows } = await db.query<NodeRow>(
+    `SELECT ${NODE_COLUMNS}
+     FROM nodes
+     WHERE deleted_at IS NULL
+       AND ($1::text IS NULL OR type = $1)
+     ORDER BY updated_at DESC
+     LIMIT $2`,
+    [options.type ?? null, limit],
+  );
+  return rows.map(mapNode);
+}
+
+export async function listLiveNodesByIds(db: Queryable, ids: string[]): Promise<Node[]> {
+  if (ids.length === 0) {
+    return [];
+  }
+  const unique = [...new Set(ids)];
+  const { rows } = await db.query<NodeRow>(
+    `SELECT ${NODE_COLUMNS}
+     FROM nodes
+     WHERE deleted_at IS NULL AND id = ANY($1::uuid[])`,
+    [unique],
+  );
+  return rows.map(mapNode);
+}
+
+/** Live edges whose both ends are in the set. */
+export async function listEdgesAmong(
+  db: Queryable,
+  nodeIds: string[],
+): Promise<Array<{ id: string; from_id: string; to_id: string; relation_type: string }>> {
+  if (nodeIds.length === 0) {
+    return [];
+  }
+  const { rows } = await db.query<{
+    id: string;
+    from_id: string;
+    to_id: string;
+    relation_type: string;
+  }>(
+    `SELECT e.id, e.from_id, e.to_id, e.relation_type
+     FROM edges e
+     JOIN nodes from_node ON from_node.id = e.from_id
+     JOIN nodes to_node ON to_node.id = e.to_id
+     WHERE e.from_id = ANY($1::uuid[])
+       AND e.to_id = ANY($1::uuid[])
+       AND from_node.deleted_at IS NULL
+       AND to_node.deleted_at IS NULL`,
+    [nodeIds],
+  );
+  return rows;
+}
+
+export type TaskCardRow = {
+  id: string;
+  title: string;
+  status: Node["status"];
+  due: string | null;
+  parent_title: string | null;
+};
+
+export async function listTaskCards(db: Queryable, limit = 200): Promise<TaskCardRow[]> {
+  const { rows } = await db.query<TaskCardRow>(
+    `SELECT n.id, n.title, n.status,
+            foundation_iso_date(n.data #>> '{due}') AS due,
+            parent.title AS parent_title
+     FROM nodes n
+     LEFT JOIN edges e ON e.from_id = n.id AND e.relation_type = 'child_of'
+     LEFT JOIN nodes parent ON parent.id = e.to_id AND parent.deleted_at IS NULL
+     WHERE n.deleted_at IS NULL AND n.type = 'task'
+     ORDER BY n.updated_at DESC
+     LIMIT $1`,
+    [limit],
+  );
+  return rows;
+}
+
 export async function findEdge(
   db: Queryable,
   fromId: string,

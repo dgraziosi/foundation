@@ -49,10 +49,7 @@ test("blob nodes: ingest, get metadata, HTTP bytes, snapshots, delete keeps file
   const apiKey = "test-foundation-key";
   const app = createApp(pool, {
     FOUNDATION_API_KEY: apiKey,
-    DATABASE_URL: databaseUrl,
     FOUNDATION_DATA: dataDir,
-    PORT: 0,
-    HOST: "127.0.0.1",
   });
   const httpServer = app.listen(0);
   await new Promise<void>((resolve) => httpServer.on("listening", () => resolve()));

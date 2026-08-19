@@ -41,10 +41,16 @@ services:
       DATABASE_URL: postgres://foundation:foundation@db:5432/foundation
       FOUNDATION_DATA: /data
       PORT: "8787"
+      HOST: "0.0.0.0"
+      VIEW_PORT: "8788"
+      VIEW_HOST: "0.0.0.0"
     volumes:
       - ${FOUNDATION_DATA:-./data}:/data
+    # MCP + health + agent blobs: host-only. Documented attach is 127.0.0.1:8787.
+    # /view is a separate publish so another machine on this vault can open the window.
     ports:
       - "127.0.0.1:${PORT:-8787}:8787"
+      - "${VIEW_PORT:-8788}:8788"
     restart: unless-stopped
     healthcheck:
       test:

@@ -5,16 +5,14 @@
 Foundation is a life management system. It gives you a vault to record your life, a method for organizing that vault, and bots that help you take action on what is in it. It is self-hosted. It can run on your computer or any virtual machine. It is designed to work with any harness (Grok Bot, Hermes, OpenClaw, Claude Code, Codex, and others).
 
 ## 1. Vault
-The vault is a bot-managed typed knowledge graph. It is a system of record that adapts to your life. As you add to it, connections get made and related information gets pulled together.
+The vault is one running instance. It holds the **graph** — the live network of your projects, goals, tasks, people, places, and the files that belong with them. Bots read and write that graph. It always stays yours.
 
-It holds your projects, goals, tasks, people, and places, and the files that belong with them. It always stays yours.
-
-## 2. Method
-The method is a recommended way to organize your vault. Starter types to get you going, and a recommended structure. Use them, change them, or add your own.
+## 2. Ontology
+The ontology is the vocabulary of the graph: types and relations. Starter types get you going. You can use them, change them, or add your own.
 
 Starter types: area, project, goal, task, person, place, company, note, habit, journal, idea, trip, decision, lesson
 
-Recommended structure: Area → project → goal → task. The point is to break your life into smaller pieces so bots can take them on. A habit hangs under a goal. A task may child_of a goal or a project.
+Recommended structure: Area → project → goal → task. The point is to break work into smaller pieces so bots can take them on. A habit hangs under a goal. A task may child_of a goal or a project.
 
 ## 3. Bots
 The bots help you take action on what is in your vault. Three starter recipes ship with the repo. You can add more later using your platform of choice. Paste them from [`docs/AGENTS.md`](docs/AGENTS.md).
@@ -27,7 +25,7 @@ Out of the box: health check; nightly backup; backup freshness; periodic hygiene
 
 Executive Assistant — Inbox and calendar for due dates in the vault. Drafts email; sends when you approve that specific message. Puts vault due dates on the calendar.
 
-**Glossary (locked):** **Foundation** = the product. A **vault** = one instance (`FOUNDATION_DATA` + Postgres). The **graph** = the knowledge in that vault. A **blob** = a file on a node. An **agent** = anything that can reach the vault MCP. The **operator** = the human who runs Compose. Do not call the graph “the Vault.” Short analog: app / folder / links → Foundation / vault / graph.
+**Glossary (locked):** **Foundation** = the product. A **vault** = one instance (`FOUNDATION_DATA` + Postgres). The **graph** = the live network in that vault. A **blob** = a file on a node. An **agent** = anything that can reach the vault MCP. The **operator** = the human who runs Compose. Do not call the graph “the Vault.” Short analog: app / folder / links → Foundation / vault / graph. Ontology is the vocabulary (types and relations).
 
 Do not commit personal life data, documents, or secrets to this repository. Those belong in the operator’s vault, not in git.
 
@@ -41,6 +39,7 @@ Do not commit personal life data, documents, or secrets to this repository. Thos
 - [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md) — weekday instance checkup
 - [`docs/BACKUP.md`](docs/BACKUP.md) — nightly backup script and throwaway restore
 - [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md) — weekly graph report
+- [`docs/VIEWER.md`](docs/VIEWER.md) — operator window contract: surfaces, shell, tokens, states
 
 ## Install
 
@@ -102,7 +101,7 @@ Requires [Docker Compose](https://docs.docker.com/compose/) and a copy of this r
 
    **Health** (no auth): `GET http://127.0.0.1:8787/health` — `{ ok, service, db }`.
 
-   **Window:** read-only graph at `http://127.0.0.1:8787/view` (same API key as MCP).
+   **Window:** read-only operator window at `/view` (same API key as MCP). On this machine: `http://127.0.0.1:8788/view`. From another machine on this vault: `http://<this-host>:8788/view`. Unlock, then Graph, Search, Recents, Tasks, and an inspector. Paper first; dark is a second theme. The window does not write.
 
    **Blobs:** large files are `$FOUNDATION_DATA/blobs/<uuid>` (not git, not agent-data). Ingest with `upsert` (`payload.storage = "blob"` plus `bytes_base64`, or drop a file in `$FOUNDATION_DATA/uploads` and pass `source_path`). Cap 20MB. Fetch bytes: `GET /blobs/:id` with the API key. `get` returns blob metadata, not the file body.
 

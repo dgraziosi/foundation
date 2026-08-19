@@ -10,10 +10,13 @@ const EnvSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   FOUNDATION_DATA: z.string().default("./data"),
   PORT: z.coerce.number().int().positive().default(8787),
-  HOST: z.string().default("0.0.0.0"),
+  HOST: z.string().default("127.0.0.1"),
+  VIEW_PORT: z.coerce.number().int().positive().default(8788),
+  VIEW_HOST: z.string().default("0.0.0.0"),
 });
 
 export type AppConfig = z.infer<typeof EnvSchema>;
+export type AppBindings = Pick<AppConfig, "FOUNDATION_API_KEY" | "FOUNDATION_DATA">;
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = EnvSchema.safeParse(env);

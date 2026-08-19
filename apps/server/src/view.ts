@@ -1,21 +1,73 @@
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Pool } from "@foundation/db";
-import {
-  isToolError,
-  isUuid,
-  type Blob,
-  type IncidentEdge,
-  type Node,
-  type NodeType,
-  type SearchHit,
-  type SuggestedLink,
-} from "@foundation/schema";
 import type { Express, NextFunction, Request, Response } from "express";
+import express from "express";
 import { apiKeyCookieHeader, providedApiKey } from "./auth.js";
 import { sendBlob } from "./blobs-http.js";
-import type { AppConfig } from "./config.js";
-import { getGraphNode, inspectOntology, searchGraphNodes } from "./graph.js";
+import type { AppBindings } from "./config.js";
+import {
+  viewGraph,
+  viewNode,
+  viewOntology,
+  viewRecents,
+  viewSearch,
+  viewTasks,
+} from "./view-data.js";
 
 export const VIEW_PATH = "/view";
+
+const here = dirname(fileURLToPath(import.meta.url));
+
+export function viewerDistDir(): string {
+  return join(here, "../../viewer/dist");
+}
+
+function wantsJson(req: Request): boolean {
+  const accept = req.header("accept") ?? "";
+  const type = req.header("content-type") ?? "";
+  return accept.includes("application/json") || type.includes("application/json");
+}
+
+function queryString(req: Request, name: string): string {
+  const value = req.query[name];
+  return typeof value === "string" ? value : "";
+}
+
+function unlockFallback(error?: string): string {
+  const notice = error ? `<p class="notice">${escapeHtml(error)}</p>` : "";
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Unlock the vault window</title>
+  <style>
+    :root { --bg: #f7f7f4; --ink: #26251e; --accent: #f54e00; color-scheme: light; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font: 13px/1.45 Inter, ui-sans-serif, system-ui, sans-serif; }
+    main { min-height: 100dvh; display: grid; place-items: center; padding: 16px; }
+    form { display: flex; flex-direction: column; gap: 12px; width: min(22rem, 100%); }
+    h1 { font-size: 20px; font-weight: 600; margin: 0; }
+    .quiet { color: color-mix(in srgb, var(--ink) 62%, var(--bg)); margin: 0; }
+    .notice { color: var(--accent); margin: 0; }
+    input { padding: 8px 12px; border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent); background: var(--bg); color: var(--ink); font: inherit; }
+    button { padding: 8px 12px; border: 0; background: var(--accent); color: #fff; font: inherit; cursor: pointer; }
+  </style>
+</head>
+<body>
+<main>
+  <form method="post" action="${VIEW_PATH}/unlock">
+    <h1>Unlock the vault window</h1>
+    <p class="quiet">Same key as MCP. This window is read-only.</p>
+    ${notice}
+    <input type="password" name="api_key" autocomplete="current-password" required>
+    <button type="submit">Unlock</button>
+  </form>
+</main>
+</body>
+</html>`;
+}
 
 function escapeHtml(value: string): string {
   return value
@@ -26,251 +78,133 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
-function page(title: string, body: string): string {
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${escapeHtml(title)}</title>
-  <style>
-    :root { color-scheme: light dark; }
-    body { font-family: system-ui, sans-serif; max-width: 48rem; margin: 1.5rem auto; padding: 0 1rem; line-height: 1.45; }
-    form.row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: end; margin-bottom: 1.25rem; }
-    label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.9rem; }
-    input, select { min-width: 12rem; padding: 0.35rem 0.5rem; }
-    button { padding: 0.4rem 0.75rem; }
-    ul.results, ul.neighbors, ul.proposals { list-style: none; padding: 0; }
-    ul.results li, ul.neighbors li, ul.proposals li { padding: 0.45rem 0; border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent); }
-    .meta { opacity: 0.65; font-size: 0.9rem; }
-    .notice { opacity: 0.8; }
-    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: color-mix(in srgb, currentColor 6%, transparent); padding: 0.75rem; }
-    dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; }
-    dt { font-weight: 600; }
-    .proposals-box { border-left: 3px solid color-mix(in srgb, currentColor 30%, transparent); padding-left: 0.75rem; }
-  </style>
-</head>
-<body>
-${body}
-</body>
-</html>`;
-}
-
-function unlockPage(error?: string): string {
-  const notice = error ? `<p class="notice">${escapeHtml(error)}</p>` : "";
-  return page(
-    "Unlock vault window",
-    `<h1>Unlock the vault window</h1>
-<p>Same API key that unlocks MCP. This window is read-only.</p>
-${notice}
-<form class="row" method="post" action="${VIEW_PATH}/unlock">
-  <label>API key <input type="password" name="api_key" autocomplete="current-password" required></label>
-  <button type="submit">Unlock</button>
-</form>`,
-  );
-}
-
 function requireViewAuth(expected: string) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const provided = providedApiKey(req);
     if (!provided || provided !== expected) {
       res.setHeader("WWW-Authenticate", 'ApiKey realm="foundation"');
-      res.status(401).type("html").send(unlockPage("API key required"));
+      res.status(401).json({ error: "API key required" });
       return;
     }
     next();
   };
 }
 
-function queryString(req: Request, name: string): string {
-  const value = req.query[name];
-  return typeof value === "string" ? value : "";
-}
-
-function formatDataValue(value: unknown): string {
-  if (typeof value === "string") {
-    return value;
+function sendViewerApp(res: Response): void {
+  const index = join(viewerDistDir(), "index.html");
+  if (existsSync(index)) {
+    res.sendFile(index);
+    return;
   }
-  return JSON.stringify(value, null, 2);
+  res.type("html").send(unlockFallback());
 }
 
-function typeOptions(types: NodeType[], selected: string): string {
-  const options = [`<option value="">Any</option>`];
-  for (const type of types) {
-    const sel = type.slug === selected ? " selected" : "";
-    options.push(
-      `<option value="${escapeHtml(type.slug)}"${sel}>${escapeHtml(type.label)} (${escapeHtml(type.slug)})</option>`,
-    );
-  }
-  return options.join("");
+function isApiPath(path: string): boolean {
+  return path.startsWith(`${VIEW_PATH}/api`);
 }
 
-function searchPage(input: {
-  q: string;
-  type: string;
-  types: NodeType[];
-  hits: SearchHit[];
-  searched: boolean;
-  notice?: string;
-}): string {
-  const rows = input.hits.map((hit) => {
-    const due = hit.due ? ` · due ${escapeHtml(hit.due)}` : "";
-    return `<li><a href="${VIEW_PATH}/nodes/${encodeURIComponent(hit.id)}">${escapeHtml(hit.title)}</a> <span class="meta">${escapeHtml(hit.type)}${due}</span></li>`;
-  });
-  let results: string;
-  if (!input.searched) {
-    results = `<p class="notice">Search the graph, or filter by type.</p><ul class="results"></ul>`;
-  } else if (input.hits.length === 0) {
-    results = `<p class="notice">No matching nodes.</p><ul class="results"></ul>`;
-  } else {
-    results = `<ul class="results">${rows.join("")}</ul>`;
-  }
-  const notice = input.notice ? `<p class="notice">${escapeHtml(input.notice)}</p>` : "";
-  return page(
-    "Vault",
-    `<h1>Vault</h1>
-<p>Read-only window on this vault. Same graph as MCP.</p>
-<form class="row" method="get" action="${VIEW_PATH}">
-  <label>Search <input type="search" name="q" value="${escapeHtml(input.q)}"></label>
-  <label>Type <select name="type">${typeOptions(input.types, input.type)}</select></label>
-  <button type="submit">Search</button>
-</form>
-${notice}
-${results}`,
-  );
+function isBlobPath(path: string): boolean {
+  return path.startsWith(`${VIEW_PATH}/blobs/`);
 }
 
-function nodePage(got: {
-  node: Node;
-  edges: IncidentEdge[];
-  blob?: Blob;
-  suggested_links: SuggestedLink[];
-}): string {
-  const { node, edges, blob, suggested_links } = got;
-  const dataEntries = Object.entries(node.data);
-  const dataBlock =
-    dataEntries.length === 0
-      ? `<p class="notice">No data fields.</p>`
-      : `<dl>${dataEntries
-          .map(
-            ([key, value]) =>
-              `<dt>${escapeHtml(key)}</dt><dd><pre>${escapeHtml(formatDataValue(value))}</pre></dd>`,
-          )
-          .join("")}</dl>`;
-
-  let payloadBlock: string;
-  if (node.payload.storage === "blob") {
-    const blobId = blob?.id ?? node.payload.blob_id ?? "";
-    const meta = blob
-      ? `<dl>
-  <dt>blob_id</dt><dd>${escapeHtml(blob.id)}</dd>
-  <dt>media_type</dt><dd>${escapeHtml(blob.media_type)}</dd>
-  <dt>byte_size</dt><dd>${escapeHtml(String(blob.byte_size))}</dd>
-  <dt>sha256</dt><dd>${escapeHtml(blob.sha256)}</dd>
-</dl>`
-      : `<p class="notice">Blob metadata unavailable.</p>`;
-    const fetch =
-      blobId !== ""
-        ? `<p><a href="${VIEW_PATH}/blobs/${encodeURIComponent(blobId)}" download>Fetch bytes</a></p>`
-        : "";
-    payloadBlock = `${meta}${fetch}`;
-  } else {
-    payloadBlock = `<pre>${escapeHtml(node.payload.body ?? "")}</pre>`;
-  }
-
-  const neighborItems = edges.map((edge) => {
-    const href = `${VIEW_PATH}/nodes/${encodeURIComponent(edge.neighbor.id)}`;
-    return `<li><a href="${href}">${escapeHtml(edge.neighbor.title)}</a> <span class="meta">${escapeHtml(edge.relation_type)} · ${escapeHtml(edge.direction)}</span></li>`;
-  });
-  const neighbors =
-    neighborItems.length === 0
-      ? `<p class="notice">No neighbors.</p>`
-      : `<ul class="neighbors">${neighborItems.join("")}</ul>`;
-
-  const suggestions =
-    suggested_links.length === 0
-      ? ""
-      : `<section class="proposals-box">
-  <h2>Suggested links</h2>
-  <p class="notice">Proposals only. This window cannot create an edge.</p>
-  <ul class="proposals">${suggested_links
-    .map((item) => {
-      const href = `${VIEW_PATH}/nodes/${encodeURIComponent(item.target.id)}`;
-      return `<li>${escapeHtml(item.kind)} → <a href="${href}">${escapeHtml(item.target.title)}</a> <span class="meta">${escapeHtml(item.target.type)}</span> — ${escapeHtml(item.reason)}</li>`;
-    })
-    .join("")}</ul>
-</section>`;
-
-  return page(
-    node.title,
-    `<p><a href="${VIEW_PATH}">Back to search</a></p>
-<article>
-  <h1>${escapeHtml(node.title)}</h1>
-  <dl>
-    <dt>Type</dt><dd>${escapeHtml(node.type)}</dd>
-    <dt>Status</dt><dd>${escapeHtml(node.status)}</dd>
-  </dl>
-  <h2>Data</h2>
-  ${dataBlock}
-  <h2>Payload</h2>
-  ${payloadBlock}
-  <h2>Neighbors</h2>
-  ${neighbors}
-  ${suggestions}
-</article>`,
-  );
-}
-
-export function registerViewRoutes(app: Express, pool: Pool, config: AppConfig): void {
+export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings): void {
   const gate = requireViewAuth(config.FOUNDATION_API_KEY);
+  const dist = viewerDistDir();
 
   app.get(`${VIEW_PATH}/unlock`, (_req, res) => {
-    res.type("html").send(unlockPage());
+    sendViewerApp(res);
   });
 
   app.post(`${VIEW_PATH}/unlock`, (req, res) => {
     const key = typeof req.body?.api_key === "string" ? req.body.api_key : "";
     if (key !== config.FOUNDATION_API_KEY) {
       res.setHeader("WWW-Authenticate", 'ApiKey realm="foundation"');
-      res.status(401).type("html").send(unlockPage("API key required"));
+      if (wantsJson(req)) {
+        res.status(401).json({ error: "API key required" });
+        return;
+      }
+      res.status(401).type("html").send(unlockFallback("API key required"));
       return;
     }
     res.setHeader("Set-Cookie", apiKeyCookieHeader(key));
+    if (wantsJson(req)) {
+      res.json({ ok: true });
+      return;
+    }
     res.redirect(303, VIEW_PATH);
   });
 
-  app.get(VIEW_PATH, gate, async (req, res) => {
+  app.get(`${VIEW_PATH}/api/session`, gate, (_req, res) => {
+    res.json({ ok: true });
+  });
+
+  app.get(`${VIEW_PATH}/api/ontology`, gate, async (_req, res) => {
     try {
-      const q = queryString(req, "q");
-      const type = queryString(req, "type");
-      const ontology = await inspectOntology(pool, "types");
-      const searched = Boolean(q.trim() || type.trim());
-      let hits: SearchHit[] = [];
-      let notice: string | undefined;
-      if (searched) {
-        const result = await searchGraphNodes(pool, {
-          query: q.trim() || undefined,
-          type: type.trim() || undefined,
-        });
-        if (isToolError(result)) {
-          notice = result.error;
-        } else {
-          hits = result.nodes;
-        }
-      }
-      res.type("html").send(
-        searchPage({
-          q,
-          type,
-          types: ontology.types,
-          hits,
-          searched,
-          notice,
+      res.json(await viewOntology(pool));
+    } catch (error) {
+      console.error("View ontology failed", error);
+      res.status(500).json({ error: "Could not load." });
+    }
+  });
+
+  app.get(`${VIEW_PATH}/api/search`, gate, async (req, res) => {
+    try {
+      res.json(
+        await viewSearch(pool, {
+          q: queryString(req, "q"),
+          type: queryString(req, "type"),
+          status: queryString(req, "status"),
         }),
       );
     } catch (error) {
       console.error("View search failed", error);
-      res.status(500).type("html").send(page("Vault", "<p>Internal server error</p>"));
+      res.status(500).json({ error: "Could not load." });
+    }
+  });
+
+  app.get(`${VIEW_PATH}/api/graph`, gate, async (req, res) => {
+    try {
+      res.json(
+        await viewGraph(pool, {
+          focus: queryString(req, "focus") || undefined,
+          type: queryString(req, "type") || undefined,
+        }),
+      );
+    } catch (error) {
+      console.error("View graph failed", error);
+      res.status(500).json({ error: "Could not load." });
+    }
+  });
+
+  app.get(`${VIEW_PATH}/api/recents`, gate, async (_req, res) => {
+    try {
+      res.json(await viewRecents(pool));
+    } catch (error) {
+      console.error("View recents failed", error);
+      res.status(500).json({ error: "Could not load." });
+    }
+  });
+
+  app.get(`${VIEW_PATH}/api/tasks`, gate, async (_req, res) => {
+    try {
+      res.json(await viewTasks(pool));
+    } catch (error) {
+      console.error("View tasks failed", error);
+      res.status(500).json({ error: "Could not load." });
+    }
+  });
+
+  app.get(`${VIEW_PATH}/api/nodes/:id`, gate, async (req, res) => {
+    try {
+      const got = await viewNode(pool, String(req.params.id ?? ""), config.FOUNDATION_DATA);
+      if ("error" in got) {
+        res.status(404).json({ error: "Not found" });
+        return;
+      }
+      res.json(got);
+    } catch (error) {
+      console.error("View node failed", error);
+      res.status(500).json({ error: "Could not load." });
     }
   });
 
@@ -280,27 +214,21 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppConfig):
     } catch (error) {
       console.error("View blob fetch failed", error);
       if (!res.headersSent) {
-        res.status(500).type("html").send(page("Vault", "<p>Internal server error</p>"));
+        res.status(500).json({ error: "Could not load." });
       }
     }
   });
 
-  app.get(`${VIEW_PATH}/nodes/:id`, gate, async (req, res) => {
-    try {
-      const id = String(req.params.id ?? "");
-      if (!isUuid(id)) {
-        res.status(404).type("html").send(page("Not found", "<p>Node not found.</p>"));
-        return;
-      }
-      const got = await getGraphNode(pool, id, { blobs: { dataDir: config.FOUNDATION_DATA } });
-      if (isToolError(got)) {
-        res.status(404).type("html").send(page("Not found", `<p>${escapeHtml(got.error)}</p>`));
-        return;
-      }
-      res.type("html").send(nodePage(got));
-    } catch (error) {
-      console.error("View node failed", error);
-      res.status(500).type("html").send(page("Vault", "<p>Internal server error</p>"));
+  if (existsSync(dist)) {
+    app.use(VIEW_PATH, express.static(dist, { index: false, fallthrough: true }));
+  }
+
+  app.get([VIEW_PATH, `${VIEW_PATH}/{*path}`], (req, res, next) => {
+    const path = req.path;
+    if (isApiPath(path) || isBlobPath(path)) {
+      next();
+      return;
     }
+    sendViewerApp(res);
   });
 }

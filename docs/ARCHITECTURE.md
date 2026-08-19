@@ -6,7 +6,7 @@ When a change alters the graph or vault shape, update this file in the same PR.
 
 ## Glossary
 
-**Foundation** is the product. A **vault** is one instance (`FOUNDATION_DATA` + Postgres). The **graph** is the knowledge in that vault. A **blob** is a file on a node. An **agent** is anything that can reach the vault MCP. The **operator** is the human who runs Compose. Do not call the graph “the Vault.” A git clone is the product, not this vault — `compose up` elsewhere starts a different instance.
+**Foundation** is the product. A **vault** is one instance (`FOUNDATION_DATA` + Postgres). The **graph** is the live network in that vault. The **ontology** is the vocabulary (types and relations). A **blob** is a file on a node. An **agent** is anything that can reach the vault MCP. The **operator** is the human who runs Compose. Do not call the graph “the Vault.” A git clone is the product, not this vault — `compose up` elsewhere starts a different instance.
 
 ## Vault
 
@@ -36,11 +36,11 @@ flowchart TB
   product --> other_vault
 ```
 
-Compose publishes the server at `127.0.0.1:8787` only. Do not bind 8787 beyond localhost.
+The server listens on this process. MCP attach from a named harness is documented in [`HARNESS.md`](./HARNESS.md). The operator window is `/view` on the view publish (Compose: 8788) and is meant to work from another machine on this vault.
 
 ## Graph
 
-The graph is the knowledge in that vault: **nodes**, **typed edges**, and **activity**. Edges are the only source of truth for links. Ontology (types and relations) is data in the same vault and can grow; seeds are the day-one vocabulary.
+The graph is the live network in that vault: **nodes**, **typed edges**, and **activity**. Edges are the only source of truth for links. The ontology (types and relations) is the vocabulary in the same vault and can grow; seeds are the day-one words.
 
 ```mermaid
 flowchart LR
@@ -209,7 +209,7 @@ flowchart LR
 
 Agents talk to the vault over MCP. That path is not the architecture — it is the door.
 
-`http://127.0.0.1:8787/mcp` with `Authorization: ApiKey <FOUNDATION_API_KEY>`. Streamable HTTP on this process. Port stays localhost. Named harnesses attach with that same URL and key: [`HARNESS.md`](./HARNESS.md).
+`/mcp` with `Authorization: ApiKey <FOUNDATION_API_KEY>`. Streamable HTTP on this process. Named harnesses attach with that URL and key: [`HARNESS.md`](./HARNESS.md).
 
 Thirteen tools: `bootstrap`, `search`, `lookup`, `get`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`.
 
@@ -217,11 +217,11 @@ An agent that can reach the vault MCP may read/write; one that cannot does not.
 
 ## How the operator looks at the vault
 
-The operator opens a read-only HTTP window on the same localhost process: `http://127.0.0.1:8787/view`. Same API key as MCP. HTML pages on this server — not a second app and not a second graph. Search and open nodes; the window does not write. Blob bytes from a node page are `GET /view/blobs/:id` (unlock cookie or Authorization header). Agents still fetch `GET /blobs/:id` with the header.
+The operator opens a read-only window on the view publish: `/view` (`http://127.0.0.1:8788/view`; from another machine, `http://<this-host>:8788/view`). Same API key as MCP. Same graph — not a second store. Vite + React on this process. Surfaces: Unlock, Graph (nodes and edges on a canvas), Search, Recents, a read-only Tasks board, and an Inspector pane. Paper is first paint; dark is a second theme on every surface. Off-box unlock and session use the same key and `Path=/view` cookie. The window does not write. Blob bytes from the inspector are `GET /view/blobs/:id` (unlock cookie or Authorization header). Agents still fetch `GET /blobs/:id` with the header. Contract: [`VIEWER.md`](./VIEWER.md).
 
 ```mermaid
 flowchart LR
-  agents["Agents"] -->|"MCP on localhost — 13 tools, ApiKey"| vault["Vault"]
+  agents["Agents"] -->|"MCP — 13 tools, ApiKey"| vault["Vault"]
 ```
 
 Two agents may write the same node through that one MCP. Update and `link` are if-match. If the node moved, the vault **refuses**. The caller’s next move is get and retry.

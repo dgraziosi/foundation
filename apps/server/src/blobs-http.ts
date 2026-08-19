@@ -5,7 +5,7 @@ import {
 } from "@foundation/db";
 import { isUuid } from "@foundation/schema";
 import type { Request, Response } from "express";
-import type { AppConfig } from "./config.js";
+import type { AppBindings } from "./config.js";
 
 const MEDIA_TYPE_RE =
   /^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/i;
@@ -32,7 +32,7 @@ function safeBlobMediaType(stored: string): string {
 
 export async function sendBlob(
   pool: Pool,
-  config: AppConfig,
+  config: AppBindings,
   req: Request,
   res: Response,
 ): Promise<void> {

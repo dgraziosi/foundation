@@ -13,17 +13,23 @@ if (ran.length) {
   console.log(`Applied migrations: ${ran.join(", ")}`);
 }
 
-const app = createApp(pool, config);
-const server = app.listen(config.PORT, config.HOST, () => {
+const mcp = createApp(pool, config, "mcp");
+const view = createApp(pool, config, "view");
+
+const mcpServer = mcp.listen(config.PORT, config.HOST, () => {
   console.log(`Foundation MCP listening on http://${config.HOST}:${config.PORT}/mcp`);
   console.log(`Health: http://${config.HOST}:${config.PORT}/health`);
-  console.log(`View:   http://${config.HOST}:${config.PORT}/view`);
   console.log(`Blobs:  http://${config.HOST}:${config.PORT}/blobs/:id`);
+});
+
+const viewServer = view.listen(config.VIEW_PORT, config.VIEW_HOST, () => {
+  console.log(`View:   http://${config.VIEW_HOST}:${config.VIEW_PORT}/view`);
 });
 
 async function shutdown(signal: string): Promise<void> {
   console.log(`Received ${signal}, shutting down`);
-  server.close();
+  mcpServer.close();
+  viewServer.close();
   await pool.end();
   process.exit(0);
 }
