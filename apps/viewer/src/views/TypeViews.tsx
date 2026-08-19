@@ -2,18 +2,17 @@ import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { OntologyType, TypeViewNode, ViewEngineId } from "../api";
+import type { OntologyType, TypeField, TypeViewNode, ViewDeclaration, ViewEngineId } from "../api";
 import { GraphCanvas } from "../graph/GraphCanvas";
 import { useThemeLane } from "../theme";
 import { typeColors, typeIcon } from "../type-meta";
 import { DueChip, StatusTag, TypeTag } from "../ui/Tags";
 import { Quiet } from "../ui/States";
+import { boardColumnIds, calendarAxisRole } from "./query";
 
-const BOARD_COLUMNS: Array<{ status: TypeViewNode["status"]; label: string }> = [
-  { status: "active", label: "Active" },
-  { status: "completed", label: "Completed" },
-  { status: "archived", label: "Archived" },
-];
+function columnLabel(id: string): string {
+  return id.replace(/_/g, " ").replace(/^./, (char) => char.toUpperCase());
+}
 
 function NodeRow({
   node,
@@ -39,6 +38,11 @@ function NodeRow({
     >
       <span className="flex min-w-0 flex-col items-start text-left">
         <span className="break-words font-medium">{node.title}</span>
+        {node.chips && node.chips.length > 0 ? (
+          <span className="text-meta text-muted-foreground">
+            {node.chips.map((chip) => chip.value).join(" · ")}
+          </span>
+        ) : null}
         {meta ? <span className="text-meta text-muted-foreground">{meta}</span> : null}
       </span>
       <span className="flex shrink-0 items-center gap-2">
@@ -110,6 +114,11 @@ export function CardView({
             </span>
             <span className="flex flex-wrap gap-2">
               <StatusTag status={node.status} />
+              {node.chips?.map((chip) => (
+                <span key={chip.name} className="text-meta text-muted-foreground">
+                  {chip.value}
+                </span>
+              ))}
               {node.due ? <DueChip due={node.due} tone={node.due_tone} /> : null}
             </span>
           </Button>
@@ -171,22 +180,24 @@ export function TableView({
 
 export function BoardView({
   nodes,
+  columns,
   selectedId,
   onSelect,
 }: {
   nodes: TypeViewNode[];
+  columns: string[];
   selectedId?: string;
   onSelect: (id: string) => void;
 }) {
   return (
     <div className="grid flex-1 grid-cols-1 items-start gap-md md:grid-cols-3" data-surface="board">
-      {BOARD_COLUMNS.map((column) => {
-        const cards = nodes.filter((node) => node.status === column.status);
+      {columns.map((column) => {
+        const cards = nodes.filter((node) => node.status === column);
         return (
-          <Card className="flex min-h-48 flex-col" key={column.status}>
+          <Card className="flex min-h-48 flex-col" key={column}>
             <CardContent className="flex flex-col gap-2 p-md">
-              <h3 className="text-label text-muted-foreground">{column.label}</h3>
-              {column.status === "active" && cards.length === 0 ? <Quiet>No tasks yet.</Quiet> : null}
+              <h3 className="text-label text-muted-foreground">{columnLabel(column)}</h3>
+              {column === "active" && cards.length === 0 ? <Quiet>No tasks yet.</Quiet> : null}
               {cards.map((node) => (
                 <Button
                   type="button"
@@ -237,12 +248,17 @@ export function CalendarView({
   selectedId,
   onSelect,
   empty,
+  hasDateRole,
 }: {
   nodes: TypeViewNode[];
   selectedId?: string;
   onSelect: (id: string) => void;
   empty: string;
+  hasDateRole: boolean;
 }) {
+  if (!hasDateRole) {
+    return <Quiet>No date field on this type.</Quiet>;
+  }
   const dated = nodes.filter((node) => node.due);
   const days = useMemo(() => monthGrid(new Date()), []);
   const month = days[15]?.getMonth();
@@ -292,12 +308,17 @@ export function TimelineView({
   selectedId,
   onSelect,
   empty,
+  hasDateRole,
 }: {
   nodes: TypeViewNode[];
   selectedId?: string;
   onSelect: (id: string) => void;
   empty: string;
+  hasDateRole: boolean;
 }) {
+  if (!hasDateRole) {
+    return <Quiet>No date field on this type.</Quiet>;
+  }
   const dated = [...nodes.filter((node) => node.due)].sort((a, b) => (a.due ?? "").localeCompare(b.due ?? ""));
   if (dated.length === 0) {
     return <Quiet>{empty}</Quiet>;
@@ -363,6 +384,9 @@ export function OutlineView({
 
 export function EngineView({
   view,
+  viewDeclaration,
+  fields,
+  showCompleted,
   nodes,
   childNodes,
   graphNodes,
@@ -373,6 +397,9 @@ export function EngineView({
   empty,
 }: {
   view: ViewEngineId;
+  viewDeclaration?: ViewDeclaration;
+  fields?: TypeField[];
+  showCompleted?: boolean;
   nodes: TypeViewNode[];
   childNodes: TypeViewNode[];
   graphNodes?: Array<{ id: string; title: string; type: string; status: string }>;
@@ -382,6 +409,9 @@ export function EngineView({
   onSelect: (id: string) => void;
   empty: string;
 }) {
+  const declared = viewDeclaration ?? { id: view };
+  const typeFields = fields ?? [];
+  const hasDateRole = calendarAxisRole(typeFields) !== null;
   if (view === "list") {
     return <ListView nodes={nodes} selectedId={selectedId} onSelect={onSelect} empty={empty} />;
   }
@@ -395,18 +425,41 @@ export function EngineView({
         selectedId={selectedId}
         onSelect={onSelect}
         empty={empty}
-        showDue={nodes.some((node) => node.due)}
+        showDue={hasDateRole}
       />
     );
   }
   if (view === "board") {
-    return <BoardView nodes={nodes} selectedId={selectedId} onSelect={onSelect} />;
+    return (
+      <BoardView
+        nodes={nodes}
+        columns={boardColumnIds(typeFields, declared, { showCompleted })}
+        selectedId={selectedId}
+        onSelect={onSelect}
+      />
+    );
   }
   if (view === "calendar") {
-    return <CalendarView nodes={nodes} selectedId={selectedId} onSelect={onSelect} empty={empty} />;
+    return (
+      <CalendarView
+        nodes={nodes}
+        selectedId={selectedId}
+        onSelect={onSelect}
+        empty={empty}
+        hasDateRole={hasDateRole}
+      />
+    );
   }
   if (view === "timeline") {
-    return <TimelineView nodes={nodes} selectedId={selectedId} onSelect={onSelect} empty={empty} />;
+    return (
+      <TimelineView
+        nodes={nodes}
+        selectedId={selectedId}
+        onSelect={onSelect}
+        empty={empty}
+        hasDateRole={hasDateRole}
+      />
+    );
   }
   if (view === "outline") {
     return (

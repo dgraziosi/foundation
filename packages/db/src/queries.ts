@@ -1,6 +1,17 @@
-import { resolveTypeViews, type NodeType, type RelationType, type ViewEngineId } from "@foundation/schema";
+import {
+  asViewDeclarations,
+  resolveTypeViews,
+  type NodeType,
+  type RelationType,
+  type TypeField,
+  type ViewDeclaration,
+  type ViewEngineId,
+} from "@foundation/schema";
 import type pg from "pg";
 import { iso, type Queryable } from "./tx.js";
+
+const TYPE_COLUMNS = `slug, label, description, kind, parent_types, json_schema, views, default_view,
+           fields, is_system, created_at, updated_at`;
 
 type NodeTypeRow = {
   slug: string;
@@ -9,15 +20,20 @@ type NodeTypeRow = {
   kind: NodeType["kind"];
   parent_types: string[];
   json_schema: unknown;
-  views: string[];
+  views: unknown;
   default_view: string | null;
+  fields: unknown;
   is_system: boolean;
   created_at: Date;
   updated_at: Date;
 };
 
 function mapNodeType(row: NodeTypeRow): NodeType {
-  const resolved = resolveTypeViews({ views: row.views, default_view: row.default_view });
+  const resolved = resolveTypeViews({
+    views: asViewDeclarations(row.views as ViewDeclaration[]),
+    default_view: row.default_view,
+  });
+  const fields = Array.isArray(row.fields) ? (row.fields as TypeField[]) : [];
   return {
     slug: row.slug,
     label: row.label,
@@ -25,7 +41,8 @@ function mapNodeType(row: NodeTypeRow): NodeType {
     kind: row.kind,
     parent_types: row.parent_types,
     json_schema: row.json_schema,
-    views: resolved.views ?? [],
+    views: resolved.declarations,
+    fields,
     ...(resolved.defaultView ? { default_view: resolved.defaultView } : {}),
     is_system: row.is_system,
     created_at: iso(row.created_at),
@@ -66,8 +83,7 @@ function mapRelationType(row: RelationTypeRow): RelationType {
 export async function listNodeTypes(db: Queryable): Promise<NodeType[]> {
   const { rows } = await db.query<NodeTypeRow>(
     `
-    SELECT slug, label, description, kind, parent_types, json_schema, views, default_view,
-           is_system, created_at, updated_at
+    SELECT ${TYPE_COLUMNS}
     FROM node_types
     ORDER BY kind DESC, slug
     `,
@@ -77,8 +93,7 @@ export async function listNodeTypes(db: Queryable): Promise<NodeType[]> {
 
 export async function getNodeType(db: Queryable, slug: string): Promise<NodeType | undefined> {
   const { rows } = await db.query<NodeTypeRow>(
-    `SELECT slug, label, description, kind, parent_types, json_schema, views, default_view,
-            is_system, created_at, updated_at
+    `SELECT ${TYPE_COLUMNS}
      FROM node_types WHERE slug = $1`,
     [slug],
   );
@@ -94,18 +109,19 @@ export async function insertNodeType(
     kind: NodeType["kind"];
     parent_types: string[];
     json_schema: unknown;
-    views?: ViewEngineId[];
+    views?: ViewDeclaration[];
     default_view?: ViewEngineId;
+    fields?: TypeField[];
+    is_system?: boolean;
   },
 ): Promise<NodeType> {
-  const views = type.views ?? [];
+  const views = asViewDeclarations(type.views);
   const defaultView = views.length === 0 ? null : (type.default_view ?? null);
   const { rows } = await db.query<NodeTypeRow>(
     `INSERT INTO node_types (
-       slug, label, description, kind, parent_types, json_schema, views, default_view, is_system
-     ) VALUES ($1, $2, $3, $4, $5::text[], $6::jsonb, $7::text[], $8, false)
-     RETURNING slug, label, description, kind, parent_types, json_schema, views, default_view,
-               is_system, created_at, updated_at`,
+       slug, label, description, kind, parent_types, json_schema, views, default_view, fields, is_system
+     ) VALUES ($1, $2, $3, $4, $5::text[], $6::jsonb, $7::jsonb, $8, $9::jsonb, $10)
+     RETURNING ${TYPE_COLUMNS}`,
     [
       type.slug,
       type.label,
@@ -115,8 +131,10 @@ export async function insertNodeType(
       type.json_schema === null || type.json_schema === undefined
         ? null
         : JSON.stringify(type.json_schema),
-      views,
+      JSON.stringify(views),
       defaultView,
+      JSON.stringify(type.fields ?? []),
+      type.is_system === true,
     ],
   );
   return mapNodeType(rows[0]!);
@@ -131,11 +149,13 @@ export async function updateNodeType(
     kind: NodeType["kind"];
     parent_types: string[];
     json_schema: unknown;
-    views: ViewEngineId[];
+    views: ViewDeclaration[];
     default_view?: ViewEngineId;
+    fields: TypeField[];
   },
 ): Promise<NodeType | undefined> {
-  const defaultView = patch.views.length === 0 ? null : (patch.default_view ?? null);
+  const views = asViewDeclarations(patch.views);
+  const defaultView = views.length === 0 ? null : (patch.default_view ?? null);
   const { rows } = await db.query<NodeTypeRow>(
     `UPDATE node_types SET
        label = $2,
@@ -143,12 +163,12 @@ export async function updateNodeType(
        kind = $4,
        parent_types = $5::text[],
        json_schema = $6::jsonb,
-       views = $7::text[],
+       views = $7::jsonb,
        default_view = $8,
+       fields = $9::jsonb,
        updated_at = now()
      WHERE slug = $1
-     RETURNING slug, label, description, kind, parent_types, json_schema, views, default_view,
-               is_system, created_at, updated_at`,
+     RETURNING ${TYPE_COLUMNS}`,
     [
       slug,
       patch.label,
@@ -158,8 +178,9 @@ export async function updateNodeType(
       patch.json_schema === null || patch.json_schema === undefined
         ? null
         : JSON.stringify(patch.json_schema),
-      patch.views,
+      JSON.stringify(views),
       defaultView,
+      JSON.stringify(patch.fields),
     ],
   );
   return rows[0] ? mapNodeType(rows[0]) : undefined;
@@ -173,8 +194,7 @@ export async function updateNodeTypeDescription(
   const { rows } = await db.query<NodeTypeRow>(
     `UPDATE node_types SET description = $2, updated_at = now()
      WHERE slug = $1
-     RETURNING slug, label, description, kind, parent_types, json_schema, views, default_view,
-               is_system, created_at, updated_at`,
+     RETURNING ${TYPE_COLUMNS}`,
     [slug, description],
   );
   return rows[0] ? mapNodeType(rows[0]) : undefined;
@@ -359,8 +379,7 @@ export async function deleteNodeType(db: Queryable, slug: string): Promise<NodeT
   const { rows } = await db.query<NodeTypeRow>(
     `DELETE FROM node_types
      WHERE slug = $1 AND is_system = false
-     RETURNING slug, label, description, kind, parent_types, json_schema, is_system,
-               created_at, updated_at`,
+     RETURNING ${TYPE_COLUMNS}`,
     [slug],
   );
   return rows[0] ? mapNodeType(rows[0]) : undefined;

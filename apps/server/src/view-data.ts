@@ -6,18 +6,28 @@ import {
   listLiveNodesByIds,
   listOutlineChildren,
   listRecentLiveNodes,
+  getNodeById,
   listTaskCards,
   listTypeCards,
   type Pool,
 } from "@foundation/db";
 import {
-  dueFromData,
+  applyViewQuery,
+  asViewDeclarations,
+  collectionAxisDate,
+  collectionChips,
+  collectionLabel,
+  dateValueFromData,
+  fieldByRole,
+  findViewDeclaration,
   isToolError,
   isUuid,
   resolveTypeViews,
   todayInNewYork,
   type Activity,
   type SearchHit,
+  type TypeField,
+  type ViewDeclaration,
   type ViewEngineId,
 } from "@foundation/schema";
 import { getGraphNode, inspectOntology, searchGraphNodes } from "./graph.js";
@@ -109,6 +119,8 @@ export async function viewOntology(pool: Pool): Promise<{ types: ViewOntologyTyp
   };
 }
 
+export type ViewTypeChip = { name: string; display: string; value: string };
+
 export type ViewTypeNode = {
   id: string;
   title: string;
@@ -118,48 +130,24 @@ export type ViewTypeNode = {
   due_tone?: DueTone;
   parent_id?: string;
   parent_title?: string;
+  chips?: ViewTypeChip[];
+  data?: Record<string, unknown>;
+  updated_at?: string;
 };
 
-export async function viewType(
-  pool: Pool,
-  slug: string,
-): Promise<
-  | {
-      type: {
-        slug: string;
-        label: string;
-        views: ViewEngineId[];
-        default_view?: ViewEngineId;
-      };
-      nodes: ViewTypeNode[];
-      children: ViewTypeNode[];
-    }
-  | { error: "Not found" }
-> {
-  const type = await getNodeType(pool, slug);
-  if (!type) {
-    return { error: "Not found" };
-  }
-  const today = todayInNewYork();
-  const rows = await listTypeCards(pool, slug);
-  const nodes = rows.map((row) => presentTypeCard(row, today));
-  const children = (await listOutlineChildren(pool, nodes.map((node) => node.id))).map((row) => ({
+function asQueryNode(row: {
+  id: string;
+  title: string;
+  status: "active" | "completed" | "archived";
+  data?: Record<string, unknown>;
+  updated_at?: string;
+}) {
+  return {
     id: row.id,
     title: row.title,
-    type: row.type,
     status: row.status,
-    parent_id: row.parent_id,
-  }));
-  const resolved = resolveTypeViews(type);
-  return {
-    type: {
-      slug: type.slug,
-      label: type.label,
-      views: resolved.views,
-      ...(resolved.defaultView ? { default_view: resolved.defaultView } : {}),
-    },
-    nodes,
-    children,
+    data: row.data ?? {},
+    updated_at: row.updated_at ?? "",
   };
 }
 
@@ -172,17 +160,72 @@ function presentTypeCard(
     due: string | null;
     parent_id?: string | null;
     parent_title: string | null;
+    data?: Record<string, unknown>;
+    updated_at?: string;
   },
+  fields: TypeField[],
   today: string,
 ): ViewTypeNode {
+  const queryNode = asQueryNode(row);
+  const axis = collectionAxisDate(queryNode, fields);
+  const chips = collectionChips(queryNode, fields);
   return {
     id: row.id,
-    title: row.title,
+    title: collectionLabel(queryNode, fields),
     type: row.type ?? "task",
     status: row.status,
-    ...(row.due ? { due: row.due, due_tone: dueTone(row.due, today) } : {}),
+    chips,
+    data: queryNode.data,
+    updated_at: queryNode.updated_at,
+    ...(axis ? { due: axis, due_tone: dueTone(axis, today) } : {}),
     ...(row.parent_id ? { parent_id: row.parent_id } : {}),
     ...(row.parent_title ? { parent_title: row.parent_title } : {}),
+  };
+}
+
+export async function viewType(
+  pool: Pool,
+  slug: string,
+): Promise<
+  | {
+      type: {
+        slug: string;
+        label: string;
+        views: ViewDeclaration[];
+        default_view?: ViewEngineId;
+        fields: TypeField[];
+      };
+      nodes: ViewTypeNode[];
+      children: ViewTypeNode[];
+    }
+  | { error: "Not found" }
+> {
+  const type = await getNodeType(pool, slug);
+  if (!type) {
+    return { error: "Not found" };
+  }
+  const today = todayInNewYork();
+  const fields = type.fields ?? [];
+  const declarations = asViewDeclarations(type.views);
+  const rows = await listTypeCards(pool, slug);
+  const nodes = rows.map((row) => presentTypeCard(row, fields, today));
+  const children = (await listOutlineChildren(pool, nodes.map((node) => node.id))).map((row) => ({
+    id: row.id,
+    title: row.title,
+    type: row.type,
+    status: row.status,
+    parent_id: row.parent_id,
+  }));
+  return {
+    type: {
+      slug: type.slug,
+      label: type.label,
+      views: declarations,
+      fields,
+      ...(type.default_view ? { default_view: type.default_view } : {}),
+    },
+    nodes,
+    children,
   };
 }
 
@@ -258,12 +301,34 @@ export async function viewNode(pool: Pool, id: string, dataDir: string) {
   if (isToolError(got)) {
     return { error: "Not found" as const };
   }
-  const due = dueFromData(got.node.data);
+  const type = await getNodeType(pool, got.node.type);
+  const fields = type?.fields ?? [];
+  const dateField = fieldByRole(fields, "date") ?? fieldByRole(fields, "start");
+  const due = dateField ? dateValueFromData(got.node.data, dateField.name) : undefined;
+  const resolved_refs: Record<string, { id: string; title: string; type: string }> = {};
+  for (const field of fields.filter((entry) => entry.kind === "ref")) {
+    const value = got.node.data[field.name];
+    if (typeof value !== "string" || !isUuid(value)) {
+      continue;
+    }
+    const target = await getNodeById(pool, value);
+    if (target) {
+      resolved_refs[field.name] = { id: target.id, title: target.title, type: target.type };
+    }
+  }
   return {
     node: got.node,
+    type: type
+      ? {
+          slug: type.slug,
+          label: type.label,
+          fields,
+        }
+      : null,
     edges: got.edges,
     blob: got.blob,
     suggested_links: got.suggested_links,
+    resolved_refs,
     due: due ?? null,
     due_tone: due ? dueTone(due) : null,
   };
@@ -349,15 +414,36 @@ export async function viewRecents(pool: Pool): Promise<{ rows: ViewRecentRow[] }
 
 export async function viewTasks(pool: Pool): Promise<{ tasks: ViewTaskCard[] }> {
   const today = todayInNewYork();
+  const type = await getNodeType(pool, "task");
+  const fields = type?.fields ?? [];
+  const view =
+    findViewDeclaration(type?.views, type?.default_view ?? "board") ??
+    asViewDeclarations(type?.views)[0] ??
+    { id: "board" as const };
   const rows = await listTaskCards(pool);
+  const queried = applyViewQuery(
+    rows.map((row) => asQueryNode(row)),
+    view,
+    fields,
+  );
+  const byId = new Map(rows.map((row) => [row.id, row]));
   return {
-    tasks: rows.map((row) => ({
-      id: row.id,
-      title: row.title,
-      status: row.status,
-      ...(row.due ? { due: row.due, due_tone: dueTone(row.due, today) } : {}),
-      ...(row.parent_title ? { parent_title: row.parent_title } : {}),
-    })),
+    tasks: queried.flatMap((item) => {
+      const row = byId.get(item.id);
+      if (!row) {
+        return [];
+      }
+      const card = presentTypeCard(row, fields, today);
+      return [
+        {
+          id: card.id,
+          title: card.title,
+          status: card.status,
+          ...(card.due ? { due: card.due, due_tone: card.due_tone } : {}),
+          ...(card.parent_title ? { parent_title: card.parent_title } : {}),
+        },
+      ];
+    }),
   };
 }
 

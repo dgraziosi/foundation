@@ -256,6 +256,8 @@ async function invertTypeChange(
         json_schema: before.json_schema,
         views: before.views ?? [],
         default_view: before.default_view,
+        fields: before.fields ?? [],
+        is_system: before.is_system,
       });
       return { action: "type_change", before: null, after: restored };
     } catch (error) {
@@ -274,17 +276,16 @@ async function invertTypeChange(
     if (!current) {
       return toolError(`Cannot undo type update: "${before.slug}" not found`);
     }
-    const restored = current.is_system
-      ? await updateNodeTypeDescription(client, before.slug, before.description)
-      : await updateNodeType(client, before.slug, {
-          label: before.label,
-          description: before.description,
-          kind: before.kind,
-          parent_types: before.parent_types,
-          json_schema: before.json_schema,
-          views: before.views ?? [],
-          default_view: before.default_view,
-        });
+    const restored = await updateNodeType(client, before.slug, {
+      label: current.is_system ? current.label : before.label,
+      description: before.description,
+      kind: current.is_system ? current.kind : before.kind,
+      parent_types: current.is_system ? current.parent_types : before.parent_types,
+      json_schema: before.json_schema,
+      views: before.views ?? [],
+      default_view: before.default_view,
+      fields: before.fields ?? [],
+    });
     if (!restored) {
       return toolError(`Cannot undo type update: "${before.slug}" not found`);
     }

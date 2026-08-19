@@ -1,12 +1,37 @@
-import { DUE_DATA_JSON_SCHEMA } from "./due.js";
+import { compileJsonSchemaFromFields, type TypeField } from "./fields.js";
 import type { NodeType, RelationType } from "./types.js";
 import { SEED_TYPE_VIEWS } from "./views.js";
 
-function withSeedViews(type: Omit<NodeType, "views" | "default_view">): NodeType {
+const DUE_FIELD: TypeField = {
+  name: "due",
+  display: "Due",
+  kind: "date",
+  needed: false,
+  role: "date",
+};
+
+const TRIP_FIELDS: TypeField[] = [
+  { name: "start", display: "Start", kind: "date", needed: false, role: "start" },
+  { name: "end", display: "End", kind: "date", needed: false, role: "end" },
+  { name: "place", display: "Place", kind: "string", needed: false, role: "subtitle" },
+];
+
+const PERSON_FIELDS: TypeField[] = [
+  { name: "org", display: "Org", kind: "string", needed: false, role: "subtitle" },
+];
+
+function withSeedContract(
+  type: Omit<NodeType, "views" | "default_view" | "fields" | "json_schema"> & {
+    fields?: TypeField[];
+  },
+): NodeType {
   const declared = SEED_TYPE_VIEWS[type.slug];
+  const fields = type.fields ?? [];
   return {
     ...type,
-    views: declared ? [...declared.views] : [],
+    fields,
+    json_schema: compileJsonSchemaFromFields(fields),
+    views: declared ? declared.views.map((view) => ({ ...view })) : [],
     ...(declared ? { default_view: declared.default_view } : {}),
   };
 }
@@ -27,23 +52,21 @@ export const ARTIFACT_TYPE_SLUGS = [
   "decision",
 ] as const;
 
-const SEED_NODE_TYPE_DEFS: readonly Omit<NodeType, "views" | "default_view">[] = [
+const SEED_NODE_TYPE_DEFS = [
   {
     slug: "area",
     label: "Area",
     description: "Spine root. A life domain and what you value (Health, Work, Family, …).",
-    kind: "spine",
+    kind: "spine" as const,
     parent_types: [],
-    json_schema: null,
     is_system: true,
   },
   {
     slug: "project",
     label: "Project",
     description: "A bounded effort that lives under an area.",
-    kind: "spine",
+    kind: "spine" as const,
     parent_types: ["area"],
-    json_schema: null,
     is_system: true,
   },
   {
@@ -51,9 +74,9 @@ const SEED_NODE_TYPE_DEFS: readonly Omit<NodeType, "views" | "default_view">[] =
     label: "Goal",
     description:
       "An outcome a project is aiming at. Optional data.due is an ISO date (YYYY-MM-DD).",
-    kind: "spine",
+    kind: "spine" as const,
     parent_types: ["project"],
-    json_schema: DUE_DATA_JSON_SCHEMA,
+    fields: [DUE_FIELD],
     is_system: true,
   },
   {
@@ -61,9 +84,8 @@ const SEED_NODE_TYPE_DEFS: readonly Omit<NodeType, "views" | "default_view">[] =
     label: "Habit",
     description:
       "A repeating practice under a goal. Frequency and tracking live on the node data object.",
-    kind: "spine",
+    kind: "spine" as const,
     parent_types: ["goal"],
-    json_schema: null,
     is_system: true,
   },
   {
@@ -71,72 +93,66 @@ const SEED_NODE_TYPE_DEFS: readonly Omit<NodeType, "views" | "default_view">[] =
     label: "Task",
     description:
       "A discrete action. Prefer child_of a goal when there is a real outcome; child_of a project is allowed. Cannot child_of an area. Optional data.due is an ISO date (YYYY-MM-DD).",
-    kind: "spine",
+    kind: "spine" as const,
     parent_types: ["goal", "project"],
-    json_schema: DUE_DATA_JSON_SCHEMA,
+    fields: [DUE_FIELD],
     is_system: true,
   },
   {
     slug: "lesson",
     label: "Lesson",
     description: "Something learned. May hang under an area, project, or goal.",
-    kind: "artifact",
+    kind: "artifact" as const,
     parent_types: ["area", "project", "goal"],
-    json_schema: null,
     is_system: true,
   },
   {
     slug: "person",
     label: "Person",
     description: "A person. Typical target of the about relation.",
-    kind: "artifact",
+    kind: "artifact" as const,
     parent_types: [],
-    json_schema: null,
+    fields: PERSON_FIELDS,
     is_system: true,
   },
   {
     slug: "place",
     label: "Place",
     description: "A location (home, office, city, venue, …).",
-    kind: "artifact",
+    kind: "artifact" as const,
     parent_types: [],
-    json_schema: null,
     is_system: true,
   },
   {
     slug: "company",
     label: "Company",
     description: "An organization (employer, vendor, school, …).",
-    kind: "artifact",
+    kind: "artifact" as const,
     parent_types: [],
-    json_schema: null,
     is_system: true,
   },
   {
     slug: "journal",
     label: "Journal",
     description: "A dated reflection or log entry.",
-    kind: "artifact",
+    kind: "artifact" as const,
     parent_types: [],
-    json_schema: null,
     is_system: true,
   },
   {
     slug: "idea",
     label: "Idea",
     description: "A spark to capture before it has a home on the spine.",
-    kind: "artifact",
+    kind: "artifact" as const,
     parent_types: [],
-    json_schema: null,
     is_system: true,
   },
   {
     slug: "note",
     label: "Note",
     description: "Universal capture sink when no more specific type fits yet.",
-    kind: "artifact",
+    kind: "artifact" as const,
     parent_types: [],
-    json_schema: null,
     is_system: true,
   },
   {
@@ -144,23 +160,22 @@ const SEED_NODE_TYPE_DEFS: readonly Omit<NodeType, "views" | "default_view">[] =
     label: "Trip",
     description:
       "A journey. Motivating payload example: store an HTML itinerary (text/html, inline) and re-show it as HTML.",
-    kind: "artifact",
+    kind: "artifact" as const,
     parent_types: [],
-    json_schema: null,
+    fields: TRIP_FIELDS,
     is_system: true,
   },
   {
     slug: "decision",
     label: "Decision",
     description: "A choice that was made. May hang under an area, project, or goal.",
-    kind: "artifact",
+    kind: "artifact" as const,
     parent_types: ["area", "project", "goal"],
-    json_schema: null,
     is_system: true,
   },
 ];
 
-export const SEED_NODE_TYPES: readonly NodeType[] = SEED_NODE_TYPE_DEFS.map(withSeedViews);
+export const SEED_NODE_TYPES: readonly NodeType[] = SEED_NODE_TYPE_DEFS.map(withSeedContract);
 
 export const SEED_RELATION_TYPES: readonly RelationType[] = [
   {

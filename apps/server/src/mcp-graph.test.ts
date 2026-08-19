@@ -1,9 +1,36 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { createPool, migrate, seedSystemOntology, type Pool } from "@foundation/db";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createApp } from "./app.js";
+
+test("the server still registers thirteen tools", async () => {
+  const register = await readFile(
+    join(dirname(fileURLToPath(import.meta.url)), "tools/register.ts"),
+    "utf8",
+  );
+  const names = [...register.matchAll(/register(\w+)Tool\(server/g)].map((match) => match[1]);
+  assert.equal(names.length, 13);
+  assert.deepEqual(names, [
+    "Bootstrap",
+    "Search",
+    "Lookup",
+    "Get",
+    "Upsert",
+    "Delete",
+    "Link",
+    "Unlink",
+    "InspectOntology",
+    "ManageType",
+    "ManageRelation",
+    "ListActivity",
+    "Undo",
+  ]);
+});
 
 const databaseUrl = process.env.DATABASE_URL;
 const apiKey = "test-foundation-key";

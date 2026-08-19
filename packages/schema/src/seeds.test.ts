@@ -45,18 +45,33 @@ test("seed node types parse and include spine plus artifacts", () => {
   assert.match(task?.description ?? "", /child_of a project is allowed/);
   const dueSchema = task?.json_schema as {
     properties?: { due?: { anyOf?: Array<{ pattern?: string; type?: string }> } };
+    additionalProperties?: boolean;
+    required?: unknown;
   } | null;
   assert.ok(
     dueSchema?.properties?.due?.anyOf?.some((item) => item.pattern === "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"),
   );
   assert.ok(dueSchema?.properties?.due?.anyOf?.some((item) => item.type === "null"));
+  assert.equal(dueSchema?.additionalProperties, true);
+  assert.equal(dueSchema?.required, undefined);
   assert.deepEqual(task?.json_schema, goal?.json_schema);
   assert.equal(SEED_NODE_TYPES.find((type) => type.slug === "note")?.json_schema, null);
-  assert.deepEqual(task?.views, ["board", "list", "calendar", "timeline", "outline"]);
+  assert.deepEqual(task?.fields?.map((field) => field.name), ["due"]);
+  assert.deepEqual(
+    task?.views?.map((view) => view.id),
+    ["board", "list", "calendar", "timeline", "outline"],
+  );
   assert.equal(task?.default_view, "board");
-  assert.deepEqual(SEED_NODE_TYPES.find((type) => type.slug === "note")?.views, ["list"]);
+  assert.deepEqual(SEED_NODE_TYPES.find((type) => type.slug === "note")?.views?.map((view) => view.id), [
+    "list",
+  ]);
   assert.equal(SEED_NODE_TYPES.find((type) => type.slug === "note")?.default_view, "list");
-  assert.deepEqual(goal?.views, ["list", "calendar", "timeline", "outline"]);
+  assert.deepEqual(goal?.views?.map((view) => view.id), ["list", "calendar", "timeline", "outline"]);
+  const trip = SEED_NODE_TYPES.find((type) => type.slug === "trip");
+  assert.deepEqual(trip?.fields?.map((field) => field.name), ["start", "end", "place"]);
+  assert.deepEqual(trip?.views?.map((view) => view.id), ["list", "calendar", "timeline"]);
+  const person = SEED_NODE_TYPES.find((type) => type.slug === "person");
+  assert.deepEqual(person?.fields?.map((field) => field.name), ["org"]);
 });
 
 test("seed relations include child_of and associative verbs", () => {

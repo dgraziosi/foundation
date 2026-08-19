@@ -40,7 +40,7 @@ The server listens on this process. MCP attach from a named harness is documente
 
 ## Graph
 
-The graph is the live network in that vault: **nodes**, **typed edges**, and **activity**. Edges are the only source of truth for links. The ontology (types and relations) is the vocabulary in the same vault and can grow; seeds are the day-one words. A type may declare `views` and `default_view` — the Viewer reads that declaration and does not invent a view.
+The graph is the live network in that vault: **nodes**, **typed edges**, and **activity**. Edges are the only source of truth for links. The ontology (types and relations) is the vocabulary in the same vault and can grow; seeds are the day-one words. A type owns `fields` and view declarations (`id` plus optional `filter` / `sort` / `group`) with `default_view`. `json_schema` is compiled from `fields`. The Viewer reads that contract and does not invent a view.
 
 ```mermaid
 flowchart LR
@@ -59,7 +59,7 @@ flowchart LR
 A node has **type**, **title**, **status**, a **payload**, and **data**. Identity is UUID.
 
 - **Payload** is either **inline** (`text/markdown`, `text/html`, `application/json`, `text/plain`) or a **blob** (file on the node).
-- **data** is structured JSON. If the type has `json_schema`, upsert validates the merged object. `data.origin` is an optional pointer, not a mirrored body. `data.due` is an optional ISO date (`YYYY-MM-DD`) on `task` and `goal` (enforced when present; omit it and the node still writes; `due: null` clears). `data.aliases` is an optional string array of operator-authored alternate names (any type; used by `lookup`). Stored on the JSONB `data` object, not a separate column.
+- **data** is structured JSON. The type’s `fields` compile to `json_schema` (`additionalProperties: true`). upsert validates the merged object against that document. Extra keys still write. `needed` on a field is a hint, not JSON Schema `required`. A `ref` field is a typed UUID pointer, not an edge. `data.origin` is an optional pointer, not a mirrored body. `data.due` is the seed `task` / `goal` date field (ISO `YYYY-MM-DD`; omit it and the node still writes; `due: null` clears). `data.aliases` is an optional string array of operator-authored alternate names (any type; used by `lookup`). Stored on the JSONB `data` object, not a separate column.
 
 ```mermaid
 flowchart TB
@@ -75,9 +75,9 @@ flowchart TB
 
   node_data --> structured["structured fields"]
   node_data --> origin["origin ref"]
-  node_data --> due["data.due on task / goal"]
+  node_data --> due["date-role fields (due on task / goal)"]
   node_data --> aliases["data.aliases"]
-  node_data --> schema["json_schema on the type"]
+  node_data --> schema["json_schema compiled from fields"]
 ```
 
 ### Spine and artifacts
@@ -217,7 +217,7 @@ An agent that can reach the vault MCP may read/write; one that cannot does not.
 
 ## How the operator looks at the vault
 
-The operator opens a read-only window on the view publish: `/view` (`http://127.0.0.1:8788/view`; from another machine, `http://<this-host>:8788/view`). Same API key as MCP. Same graph — not a second store. Vite + React on this process. Surfaces: Unlock, then Home (Recents, Open tasks, a small Graph, and a folder per live ontology type), rail Graph, Search, Recents, a view engine for a type’s declared views, and an Inspector pane. Dark is first paint; Light and System are full themes. A stored `paper` choice reads as Light. Off-box unlock and session use the same key and `Path=/view` cookie. The window does not write. Blob bytes from the inspector are `GET /view/blobs/:id` (unlock cookie or Authorization header). Agents still fetch `GET /blobs/:id` with the header. Contract: [`VIEWER.md`](./VIEWER.md).
+The operator opens a read-only window on the view publish: `/view` (`http://127.0.0.1:8788/view`; from another machine, `http://<this-host>:8788/view`). Same API key as MCP. Same graph — not a second store. Vite + React on this process. Surfaces: Unlock, then Home (Recents, Open tasks from the `task` default-view filter, a small Graph, and a folder per live ontology type), rail Graph, Search, Recents, a view engine that applies each type’s view query and field roles, and an Inspector pane (template fields, then extra `data` keys, then payload, then neighbors). Session Show completed is window chrome, not a vault write. Dark is first paint; Light and System are full themes. A stored `paper` choice reads as Light. Off-box unlock and session use the same key and `Path=/view` cookie. The window does not write. Blob bytes from the inspector are `GET /view/blobs/:id` (unlock cookie or Authorization header). Agents still fetch `GET /blobs/:id` with the header. Contract: [`VIEWER.md`](./VIEWER.md).
 
 ```mermaid
 flowchart LR

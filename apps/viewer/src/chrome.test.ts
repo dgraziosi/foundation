@@ -132,7 +132,10 @@ test("no-views copy is honest and Home is the landing surface", async () => {
   const typeView = await readFile(join(root, "pages/TypeViewPage.tsx"), "utf8");
   assert.match(typeView, /No views declared for this type/);
   assert.match(typeView, /resolveActiveView/);
+  assert.match(typeView, /Show completed/);
   assert.match(typeView, /key=\{slug\}/);
+  const views = await readFile(join(root, "views/TypeViews.tsx"), "utf8");
+  assert.match(views, /No date field on this type/);
   const app = await readFile(join(root, "App.tsx"), "utf8");
   assert.match(app, /path="\/" element=\{<HomePage/);
   assert.match(app, /path="\/graph"/);

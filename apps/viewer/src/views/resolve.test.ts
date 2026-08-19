@@ -3,9 +3,9 @@ import { test } from "node:test";
 import { resolveActiveView, resolveDeclaredViews } from "./resolve.js";
 
 test("viewer does not invent list when views are empty", () => {
-  assert.deepEqual(resolveDeclaredViews({ views: [] }), { views: [] });
-  assert.deepEqual(resolveDeclaredViews({}), { views: [] });
-  assert.deepEqual(resolveDeclaredViews({ views: ["kanban"] }), { views: [] });
+  assert.deepEqual(resolveDeclaredViews({ views: [] }), { views: [], declarations: [] });
+  assert.deepEqual(resolveDeclaredViews({}), { views: [], declarations: [] });
+  assert.deepEqual(resolveDeclaredViews({ views: ["kanban"] }), { views: [], declarations: [] });
 });
 
 test("active engine resets to default_view when the type slug changes", () => {
@@ -22,9 +22,22 @@ test("viewer keeps declared order and falls back to the first known id", () => {
   assert.deepEqual(resolveDeclaredViews({ views: ["board", "list"], default_view: "board" }), {
     views: ["board", "list"],
     defaultView: "board",
+    declarations: [{ id: "board" }, { id: "list" }],
   });
   assert.deepEqual(resolveDeclaredViews({ views: ["list", "outline"], default_view: "kanban" }), {
     views: ["list", "outline"],
     defaultView: "list",
+    declarations: [{ id: "list" }, { id: "outline" }],
   });
+  assert.deepEqual(
+    resolveDeclaredViews({
+      views: [{ id: "board", filter: { clauses: [{ bind: "status", op: "eq", value: "active" }] } }],
+      default_view: "board",
+    }),
+    {
+      views: ["board"],
+      defaultView: "board",
+      declarations: [{ id: "board", filter: { clauses: [{ bind: "status", op: "eq", value: "active" }] } }],
+    },
+  );
 });

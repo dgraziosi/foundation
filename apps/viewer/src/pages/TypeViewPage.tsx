@@ -2,11 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useOutletContext, useParams } from "react-router-dom";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { fetchGraph, fetchNode, fetchOntology, fetchType, type ViewEngineId } from "../api";
 import type { ShellOutlet } from "../shell/context";
 import { LoadError, Placeholders, Quiet } from "../ui/States";
 import { EngineView } from "../views/TypeViews";
+import { applyViewQuery, readShowCompleted, writeShowCompleted } from "../views/query";
 import { resolveActiveView, resolveDeclaredViews, VIEW_LABELS } from "../views/resolve";
 
 export function TypeViewPage({ slug: forcedSlug }: { slug?: string }) {
@@ -21,7 +23,18 @@ export function TypeViewPage({ slug: forcedSlug }: { slug?: string }) {
   const ontology = useQuery({ queryKey: ["ontology"], queryFn: fetchOntology });
   const resolved = resolveDeclaredViews(typeQuery.data?.type ?? {});
   const [picked, setPicked] = useState<{ slug: string; view: ViewEngineId }>();
+  const [showCompleted, setShowCompleted] = useState(readShowCompleted);
   const active = resolveActiveView(slug, resolved, picked);
+  const fields = typeQuery.data?.type.fields ?? [];
+  const activeView =
+    resolved.declarations.find((view) => view.id === active) ??
+    (active ? { id: active } : resolved.declarations[0]);
+  const queried = useMemo(() => {
+    if (!typeQuery.data || !activeView) {
+      return [];
+    }
+    return applyViewQuery(typeQuery.data.nodes, activeView, fields, { showCompleted });
+  }, [typeQuery.data, activeView, fields, showCompleted]);
   const graph = useQuery({
     queryKey: ["graph", "type", slug, selectedId],
     queryFn: () => fetchGraph({ focus: selectedId, type: slug }),
@@ -42,27 +55,43 @@ export function TypeViewPage({ slug: forcedSlug }: { slug?: string }) {
               <Quiet>No views declared for this type.</Quiet>
             ) : (
               <>
-                <ToggleGroup
-                  type="single"
-                  value={active}
-                  onValueChange={(value) => {
-                    if (resolved.views.includes(value as ViewEngineId)) {
-                      setPicked({ slug, view: value as ViewEngineId });
-                    }
-                  }}
-                  variant="outline"
-                  size="sm"
-                  aria-label="View"
-                >
-                  {resolved.views.map((id) => (
-                    <ToggleGroupItem key={id} value={id}>
-                      {VIEW_LABELS[id]}
-                    </ToggleGroupItem>
-                  ))}
-                </ToggleGroup>
+                <div className="flex flex-wrap items-center gap-md">
+                  <ToggleGroup
+                    type="single"
+                    value={active}
+                    onValueChange={(value) => {
+                      if (resolved.views.includes(value as ViewEngineId)) {
+                        setPicked({ slug, view: value as ViewEngineId });
+                      }
+                    }}
+                    variant="outline"
+                    size="sm"
+                    aria-label="View"
+                  >
+                    {resolved.views.map((id) => (
+                      <ToggleGroupItem key={id} value={id}>
+                        {VIEW_LABELS[id]}
+                      </ToggleGroupItem>
+                    ))}
+                  </ToggleGroup>
+                  <Toggle
+                    pressed={showCompleted}
+                    onPressedChange={(next) => {
+                      setShowCompleted(next);
+                      writeShowCompleted(next);
+                    }}
+                    size="sm"
+                    aria-label="Show completed"
+                  >
+                    Show completed
+                  </Toggle>
+                </div>
                 <EngineView
                   view={active ?? resolved.views[0]!}
-                  nodes={typeQuery.data.nodes}
+                  viewDeclaration={activeView}
+                  fields={fields}
+                  showCompleted={showCompleted}
+                  nodes={queried}
                   childNodes={typeQuery.data.children}
                   graphNodes={graph.data?.nodes}
                   graphEdges={graph.data?.edges}

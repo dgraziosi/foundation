@@ -14,8 +14,8 @@ v1 surface is **13 tools**. Destructive tools require `confirm: true` or they re
 | `delete` | Soft-delete a node. Requires `confirm: true`. |
 | `link` | Create typed edges after validation. One edge or `edges[]` (1–20). Whole batch validates; one transaction writes all or none. Requires endpoint if-match. |
 | `unlink` | Remove a typed edge. Requires `confirm: true`. |
-| `inspect_ontology` | List type and relation registry rows (system + authored), including each type’s `views` and `default_view`. |
-| `manage_type` | Create, update, or retire a node type. Applies immediately. Retire requires `confirm: true`. |
+| `inspect_ontology` | List type and relation registry rows (system + authored), including each type’s `fields`, view declarations, and `default_view`. |
+| `manage_type` | Create, update, or retire a node type (including `fields` and view queries). Applies immediately. Retire requires `confirm: true`. |
 | `manage_relation` | Create or update a relation type. Applies immediately. |
 | `list_activity` | Read the activity log (filter by action, target, since). |
 | `undo` | Reverse a reversible activity row by id. Requires `confirm: true`. Type-create undo with leftover deleted nodes needs `purge_deleted: true`. |
@@ -54,7 +54,7 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 - Omit `id` to create. Pass `id` to update, or to create with a chosen UUID.
 - **Update if-match:** when `id` already exists, `base_updated_at` is required and must match the node's current `updated_at` at millisecond precision (the instant `get` returns). Mismatch or omit → `{ error, suggestion }` (call `get` and retry). A CAS miss is stale, never “node not found.” This is lost-update protection, not a write-ACL.
 - **`data` merges** on update (`JSONB ||`, top-level keys). A partial `data` patch does not wipe other keys. Omit `data` to leave it unchanged.
-- **`json_schema`:** if the type has `json_schema`, upsert validates the **merged** `data` object against it. Miss → `{ error, suggestion }` (inspect_ontology, fix data or the type schema). Types with `json_schema: null` skip this check. Seed `task` and `goal` schemas accept optional `data.due` (`YYYY-MM-DD`); omit it and the node still writes.
+- **`json_schema`:** compiled from the type’s `fields`. upsert validates the **merged** `data` object against it. Miss → `{ error, suggestion }` (inspect_ontology, fix data or the type fields). Types with no fields skip this check (`json_schema: null`). `additionalProperties` stays true, so extra keys (a voice dump) still write. Seed `task` and `goal` accept optional `data.due` (`YYYY-MM-DD`); omit it and the node still writes. A `ref` field must be a live node UUID of `ref_type` and does not create an edge.
 - **`data.due`:** optional ISO date on `task` and `goal`. Stored on the JSONB `data` object. Pass `due: null` to clear. `get` returns it on `node.data`; search hits also surface `due` so briefs do not have to open every node.
 - **`data.origin`:** optional `{ system, id }` for `gmail` | `calendar` | `drive` | `github`. Unique on **live** nodes. Look up with `search` `{ origin }` (or `get` once you have the UUID) so agents do not twin people. Foundation stores the ref only — **never fetch or mirror** those systems' bodies.
 - **`data.aliases`:** optional string array of operator-authored alternate names (any type). Validated only when the incoming `data` patch includes `aliases`. `aliases: []` clears. Explicit malformed values refuse, including values that fold empty after `name_norm` (punctuation-only). A successful aliases patch leaves a well-formed non-empty array, or is `[]`. Omit the key to leave aliases unchanged (including legacy malformed values). `lookup` ignores malformed stored aliases. Alias dedupe uses the same fold as SQL `foundation_name_norm`.
@@ -89,14 +89,15 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 ### `inspect_ontology`
 
 - **In:** `{ kind?: "types"|"relations"|"all" }`
-- **Out:** `{ types, relations }`. Each type includes `views` and optional `default_view` with `slug`, `label`, `kind`, `parent_types`, and `json_schema`.
+- **Out:** `{ types, relations }`. Each type includes `fields`, view declarations, and optional `default_view` with `slug`, `label`, `kind`, `parent_types`, and compiled `json_schema`.
 
 ### `manage_type`
 
-- **In:** `{ action: "create"|"update"|"retire", slug, label?, description?, kind?, parent_types?, json_schema?, views?, default_view?, confirm?, purge_deleted?, actor?, actor_label? }`
+- **In:** `{ action: "create"|"update"|"retire", slug, label?, description?, kind?, parent_types?, json_schema?, views?, default_view?, fields?, confirm?, purge_deleted?, actor?, actor_label? }`
 - **Out:** `{ type, activity_id }` or `{ error, suggestion? }`
-- Applies immediately. System types: description only; system slugs cannot be retired. Custom types may set `parent_types` so `child_of` placement works.
-- **`views` / `default_view`:** defining a type includes this choice. `views` is an ordered array of `list` | `card` | `table` | `board` | `calendar` | `timeline` | `outline` | `graph`. `default_view` must be a member of `views`, or omitted when `views` is empty. Seed types already declare views (`task` defaults to `board`). System types do not take a views patch from `manage_type` — those rows land via seed. The Viewer reads the same fields from `inspect_ontology`.
+- Applies immediately. System seed types may edit description, `fields`, and `filter` / `sort` / `group` on views they already declare. They cannot change slug, kind, parent_types, label, retire, or the ordered view **ids** (no add, drop, or reorder of engines). `default_view` stays a member of those locked ids. Authored types keep the wider patch, including the view id list. Custom types may set `parent_types` so `child_of` placement works.
+- **`fields`:** ordered template `{ name, kind, display?, needed?, role?, enum_values?, ref_type? }`. Kinds: `string`, `date`, `number`, `enum`, `ref`. Roles: `title`, `status`, `date`, `start`, `end`, `subtitle`. At most one of title/status/date/start/end. `end` requires `start`. `status` requires enum. Date roles require kind date. `json_schema` is compiled from fields — pass `fields`, not a hand-written schema, once a template exists. `needed` does not block capture.
+- **`views` / `default_view`:** defining a type includes this choice. `views` is an ordered array of declarations `{ id, filter?, sort?, group? }` (bare ids still parse). `id` is `list` | `card` | `table` | `board` | `calendar` | `timeline` | `outline` | `graph`. Filter/sort/group bind to field roles or node `title` / `status` / `updated_at`. `default_view` must be a member of those ids, or omitted when `views` is empty. Seed types already declare views (`task` defaults to `board`, filter `status = active`). The Viewer reads the same contract from `inspect_ontology`.
 - **Retire:** `action: "retire"` with `confirm: true` drops an authored type that has **zero live nodes**. System seed types refuse. Live nodes refuse with `{ error, suggestion }` (delete or retype, then retry). Soft-deleted nodes of that type stay restorable — same family as undo-of-type-create: restore those deletes first, or pass `purge_deleted: true` (with `confirm: true`) to hard-delete the tombstones and their incident edges. Never a silent vault wipe. Undo of retire restores the registry row.
 
 ### `manage_relation`

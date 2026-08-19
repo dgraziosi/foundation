@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createPool, migrate, seedSystemOntology, type Pool } from "@foundation/db";
-import { isToolError } from "@foundation/schema";
+import { isToolError, viewIds } from "@foundation/schema";
 import {
   deleteGraphNode,
   getGraphNode,
@@ -329,7 +329,7 @@ test(
         assert.equal(created.type.slug, "meeting");
         assert.equal(created.type.is_system, false);
         assert.deepEqual(created.type.parent_types, ["project"]);
-        assert.deepEqual(created.type.views, []);
+        assert.deepEqual(viewIds(created.type.views), []);
         assert.equal(created.type.default_view, undefined);
 
         const withViews = await manageType(pool, {
@@ -341,15 +341,15 @@ test(
         });
         assert.equal(isToolError(withViews), false);
         if (isToolError(withViews)) return;
-        assert.deepEqual(withViews.type.views, ["card", "list"]);
+        assert.deepEqual(viewIds(withViews.type.views), ["card", "list"]);
         assert.equal(withViews.type.default_view, "card");
 
         const ontology = await inspectOntology(pool);
         const brief = ontology.types.find((type) => type.slug === "brief");
-        assert.deepEqual(brief?.views, ["card", "list"]);
+        assert.deepEqual(viewIds(brief?.views), ["card", "list"]);
         assert.equal(brief?.default_view, "card");
         const task = ontology.types.find((type) => type.slug === "task");
-        assert.deepEqual(task?.views, ["board", "list", "calendar", "timeline", "outline"]);
+        assert.deepEqual(viewIds(task?.views), ["board", "list", "calendar", "timeline", "outline"]);
         assert.equal(task?.default_view, "board");
         assert.ok(ontology.types.some((type) => type.slug === "meeting"));
 
@@ -423,7 +423,7 @@ test(
         });
         assert.equal(isToolError(dropped), false);
         if (isToolError(dropped)) return;
-        assert.deepEqual(dropped.type.views, ["list", "outline"]);
+        assert.deepEqual(viewIds(dropped.type.views), ["list", "outline"]);
         assert.equal(dropped.type.default_view, "list");
 
         const cleared = await manageType(pool, {
@@ -433,12 +433,12 @@ test(
         });
         assert.equal(isToolError(cleared), false);
         if (isToolError(cleared)) return;
-        assert.deepEqual(cleared.type.views, []);
+        assert.deepEqual(viewIds(cleared.type.views), []);
         assert.equal(cleared.type.default_view, undefined);
 
         const inspected = await inspectOntology(pool, "types");
         const dossier = inspected.types.find((type) => type.slug === "dossier");
-        assert.deepEqual(dossier?.views, []);
+        assert.deepEqual(viewIds(dossier?.views), []);
         assert.equal(dossier?.default_view, undefined);
       });
 
@@ -573,6 +573,192 @@ test(
         });
         assert.equal(isToolError(linked), false);
       });
+    } finally {
+      await pool.end();
+    }
+  },
+);
+
+test(
+  "system task may edit fields and view queries; view ids and slug stay locked",
+  { skip: !databaseUrl },
+  async () => {
+    if (!databaseUrl) {
+      return;
+    }
+    const pool = await poolForSchema("graph_system_task_patch");
+    try {
+      const ontology = await inspectOntology(pool, "types");
+      const task = ontology.types.find((type) => type.slug === "task");
+      assert.ok(task);
+      const query = (task.views ?? []).map((view) =>
+        view.id === "board"
+          ? {
+              ...view,
+              filter: { clauses: [{ bind: "status" as const, op: "in" as const, value: ["active", "completed"] }] },
+            }
+          : view,
+      );
+      const filtered = await manageType(pool, { action: "update", slug: "task", views: query });
+      assert.equal(isToolError(filtered), false);
+      if (isToolError(filtered)) {
+        return;
+      }
+      const board = filtered.type.views?.find((view) => view.id === "board");
+      assert.deepEqual(board?.filter, {
+        clauses: [{ bind: "status", op: "in", value: ["active", "completed"] }],
+      });
+      assert.deepEqual(viewIds(filtered.type.views), ["board", "list", "calendar", "timeline", "outline"]);
+
+      const withField = await manageType(pool, {
+        action: "update",
+        slug: "task",
+        fields: [
+          ...(filtered.type.fields ?? []),
+          { name: "note", kind: "string", display: "Note" },
+        ],
+      });
+      assert.equal(isToolError(withField), false);
+      if (isToolError(withField)) {
+        return;
+      }
+      assert.ok(withField.type.fields?.some((field) => field.name === "note"));
+      assert.ok(withField.type.fields?.some((field) => field.name === "due"));
+
+      const addGraph = await manageType(pool, {
+        action: "update",
+        slug: "task",
+        views: [...(withField.type.views ?? []), { id: "graph" }],
+      });
+      assert.equal(isToolError(addGraph), true);
+      if (isToolError(addGraph)) {
+        assert.match(addGraph.error, /views/);
+      }
+
+      const dropBoard = await manageType(pool, {
+        action: "update",
+        slug: "task",
+        views: (withField.type.views ?? []).filter((view) => view.id !== "board"),
+      });
+      assert.equal(isToolError(dropBoard), true);
+      if (isToolError(dropBoard)) {
+        assert.match(dropBoard.error, /views/);
+      }
+
+      const described = await manageType(pool, {
+        action: "update",
+        slug: "task",
+        description: "Discrete action — operator note.",
+      });
+      assert.equal(isToolError(described), false);
+      if (isToolError(described)) {
+        return;
+      }
+      assert.equal(described.type.slug, "task");
+      assert.deepEqual(viewIds(described.type.views), ["board", "list", "calendar", "timeline", "outline"]);
+    } finally {
+      await pool.end();
+    }
+  },
+);
+
+test(
+  "seed apply fills missing seed fields and view ids and keeps operator edits",
+  { skip: !databaseUrl },
+  async () => {
+    if (!databaseUrl) {
+      return;
+    }
+    const pool = await poolForSchema("graph_seed_apply");
+    try {
+      const ontology = await inspectOntology(pool, "types");
+      const task = ontology.types.find((type) => type.slug === "task");
+      assert.ok(task);
+      const editedViews = (task.views ?? []).map((view) =>
+        view.id === "board"
+          ? {
+              ...view,
+              filter: { clauses: [{ bind: "status" as const, op: "in" as const, value: ["active", "completed"] }] },
+            }
+          : view,
+      );
+      const edited = await manageType(pool, {
+        action: "update",
+        slug: "task",
+        description: "Operator description",
+        views: editedViews,
+        fields: [
+          ...(task.fields ?? []),
+          { name: "note", kind: "string", display: "Note" },
+        ],
+      });
+      assert.equal(isToolError(edited), false);
+      await seedSystemOntology(pool);
+      const again = await inspectOntology(pool, "types");
+      const seeded = again.types.find((type) => type.slug === "task");
+      assert.equal(seeded?.description, "Operator description");
+      assert.ok(seeded?.fields?.some((field) => field.name === "note"));
+      assert.ok(seeded?.fields?.some((field) => field.name === "due"));
+      const board = seeded?.views?.find((view) => view.id === "board");
+      assert.deepEqual(board?.filter, {
+        clauses: [{ bind: "status", op: "in", value: ["active", "completed"] }],
+      });
+      assert.deepEqual(viewIds(seeded?.views), ["board", "list", "calendar", "timeline", "outline"]);
+    } finally {
+      await pool.end();
+    }
+  },
+);
+
+test(
+  "ref field stores a pointer and does not create an edge; extra data keys still upsert",
+  { skip: !databaseUrl },
+  async () => {
+    if (!databaseUrl) {
+      return;
+    }
+    const pool = await poolForSchema("graph_ref_extra");
+    try {
+      const created = await manageType(pool, {
+        action: "create",
+        slug: "mention",
+        kind: "artifact",
+        fields: [{ name: "who", kind: "ref", ref_type: "person", display: "Who" }],
+      });
+      assert.equal(isToolError(created), false);
+      const person = await upsertGraphNode(pool, { type: "person", title: "Ada" });
+      assert.equal(isToolError(person), false);
+      if (isToolError(person)) {
+        return;
+      }
+      const mention = await upsertGraphNode(pool, {
+        type: "mention",
+        title: "Named Ada",
+        data: { who: person.node.id },
+      });
+      assert.equal(isToolError(mention), false);
+      if (isToolError(mention)) {
+        return;
+      }
+      assert.equal(mention.node.data.who, person.node.id);
+      const got = await getGraphNode(pool, mention.node.id);
+      assert.equal(isToolError(got), false);
+      if (isToolError(got)) {
+        return;
+      }
+      assert.equal(got.edges.length, 0);
+
+      const dumped = await upsertGraphNode(pool, {
+        type: "task",
+        title: "Voice dump",
+        data: { due: "2026-08-27", dump: "keep this key" },
+      });
+      assert.equal(isToolError(dumped), false);
+      if (isToolError(dumped)) {
+        return;
+      }
+      assert.equal(dumped.node.data.dump, "keep this key");
+      assert.equal(dumped.node.data.due, "2026-08-27");
     } finally {
       await pool.end();
     }
