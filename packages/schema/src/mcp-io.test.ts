@@ -7,6 +7,8 @@ import {
   LinkSuccessSchema,
   LookupInputSchema,
   LookupSuccessSchema,
+  WorkingSetInputSchema,
+  WorkingSetSuccessSchema,
   ManageTypeInputSchema,
   SearchInputSchema,
   SuggestedLinkSchema,
@@ -43,6 +45,48 @@ test("search query is optional when a filter is set", () => {
 test("search still accepts a lexical query", () => {
   const parsed = SearchInputSchema.parse({ query: "Ada", type: "person" });
   assert.equal(parsed.query, "Ada");
+});
+
+test("working_set input defaults are optional and cap at 40 / depth 2", () => {
+  const parsed = WorkingSetInputSchema.parse({ id: "11111111-1111-4111-8111-111111111111" });
+  assert.equal(parsed.include_completed, undefined);
+  assert.equal(parsed.depth, undefined);
+  WorkingSetInputSchema.parse({
+    id: "11111111-1111-4111-8111-111111111111",
+    include_completed: true,
+    depth: 2,
+    limit: 40,
+    due_within_days: 14,
+  });
+  assert.throws(() =>
+    WorkingSetInputSchema.parse({
+      id: "11111111-1111-4111-8111-111111111111",
+      depth: 3,
+    }),
+  );
+  assert.throws(() =>
+    WorkingSetInputSchema.parse({
+      id: "11111111-1111-4111-8111-111111111111",
+      limit: 41,
+    }),
+  );
+  WorkingSetSuccessSchema.parse({
+    root: {
+      id: "11111111-1111-4111-8111-111111111111",
+      type: "goal",
+      title: "Ship",
+      status: "active",
+    },
+    items: [],
+    walk: {
+      work: "children",
+      ancestors: true,
+      relations: ["child_of"],
+      depth: 1,
+      due_window: null,
+    },
+    truncated: false,
+  });
 });
 
 test("lookup accepts a batch of names and rejects an empty list", () => {

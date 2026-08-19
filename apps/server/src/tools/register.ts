@@ -13,12 +13,14 @@ import { registerSearchTool } from "./search.js";
 import { registerUndoTool } from "./undo.js";
 import { registerUnlinkTool } from "./unlink.js";
 import { registerUpsertTool } from "./upsert.js";
+import { registerWorkingSetTool } from "./working-set.js";
 
 export function registerTools(server: McpServer, pool: Pool, dataDir: string): void {
   registerBootstrapTool(server, pool);
   registerSearchTool(server, pool);
   registerLookupTool(server, pool);
   registerGetTool(server, pool, dataDir);
+  registerWorkingSetTool(server, pool);
   registerUpsertTool(server, pool, dataDir);
   registerDeleteTool(server, pool);
   registerLinkTool(server, pool);

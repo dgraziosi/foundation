@@ -218,6 +218,7 @@ export const BootstrapOutputSchema = z.object({
     activity: z.string(),
     search: z.string(),
     lookup: z.string(),
+    working_set: z.string(),
   }),
 });
 export type BootstrapOutput = z.infer<typeof BootstrapOutputSchema>;

@@ -887,7 +887,7 @@ test(
   },
 );
 
-test("view window is GET-only except unlock; still 13 tools", async () => {
+test("view window is GET-only except unlock; still 14 tools", async () => {
   const here = dirname(fileURLToPath(import.meta.url));
   const view = await readFile(join(here, "view.ts"), "utf8");
   const posts = [...view.matchAll(/app\.post\(/g)];
@@ -897,7 +897,8 @@ test("view window is GET-only except unlock; still 13 tools", async () => {
   assert.match(view, /app\.get\(`\$\{VIEW_PATH\}\/api\/recents`/);
   const register = await readFile(join(here, "tools/register.ts"), "utf8");
   const names = [...register.matchAll(/register(\w+)Tool\(server/g)].map((match) => match[1]);
-  assert.equal(names.length, 13);
+  assert.equal(names.length, 14);
+  assert.ok(names.includes("WorkingSet"));
 });
 
 test("viewer CSS ships dark first and a real light lane", async () => {
