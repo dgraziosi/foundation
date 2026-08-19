@@ -10,33 +10,39 @@ async function src(file: string): Promise<string> {
   return readFile(join(root, file), "utf8");
 }
 
-test("chrome is Home + Search; Search is an overlay; Recents is not a rail item", async () => {
+test("chrome is Home + Graph + Search; Search is an overlay; Recents is not a rail item", async () => {
   const rail = await src("shell/Rail.tsx");
   assert.match(rail, /Home/);
+  assert.match(rail, /Graph/);
+  assert.match(rail, /to="\/graph"/);
   assert.match(rail, /Search/);
   assert.match(rail, /openSearch/);
   assert.match(rail, /w-14/);
   assert.match(rail, /w-rail/);
   assert.doesNotMatch(rail, /Recents/);
-  assert.doesNotMatch(rail, /Graph/);
   assert.doesNotMatch(rail, /Tasks/);
   const app = await src("App.tsx");
   assert.match(app, /path="\/" element=\{<HomePage/);
+  assert.match(app, /path="\/graph" element=\{<GraphPage/);
   assert.match(app, /DetailPage/);
-  assert.doesNotMatch(app, /path="\/graph"/);
   assert.doesNotMatch(app, /Inspector/);
+  const strip = await src("shell/ViewStrip.tsx");
+  assert.match(strip, /kind: "graph"/);
   const shell = await src("shell/Shell.tsx");
   assert.match(shell, /ViewStrip/);
   assert.match(shell, /SearchOverlay/);
   assert.doesNotMatch(shell, /Inspector/);
 });
 
-test("Home graph fills leftover viewport with a 460px floor", async () => {
+test("Graph page fills leftover viewport with a 460px floor; Home does not host it", async () => {
+  const page = await src("pages/GraphPage.tsx");
+  assert.match(page, /min-h-\[460px\]/);
+  assert.match(page, /h-\[max\(460px,calc\(100dvh-3rem\)\)\]/);
+  assert.match(page, /GraphCanvas/);
+  assert.match(page, /fetchGraph/);
   const home = await src("pages/HomePage.tsx");
-  assert.match(home, /min-h-\[460px\]/);
-  assert.match(home, /h-\[max\(460px,calc\(100dvh-3rem\)\)\]/);
-  assert.match(home, /data-surface="graph"|GraphCanvas/);
-  assert.match(home, /fetchGraph/);
+  assert.doesNotMatch(home, /GraphCanvas/);
+  assert.doesNotMatch(home, /fetchGraph/);
   assert.match(home, /View all/);
   assert.match(home, /fetchRecents\(10\)/);
   assert.match(home, /h-\[160px\]/);
@@ -53,6 +59,8 @@ test("Home graph fills leftover viewport with a 460px floor", async () => {
 });
 
 test("click from graph / Recents / collection / search opens a detail page", async () => {
+  const page = await src("pages/GraphPage.tsx");
+  assert.match(page, /openDetail/);
   const home = await src("pages/HomePage.tsx");
   assert.match(home, /openDetail/);
   const recents = await src("pages/RecentsPage.tsx");

@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { AuthError, session } from "./api";
 import { DetailPage } from "./pages/DetailPage";
+import { GraphPage } from "./pages/GraphPage";
 import { HomePage } from "./pages/HomePage";
 import { RecentsPage } from "./pages/RecentsPage";
 import { TypeViewPage } from "./pages/TypeViewPage";
@@ -36,6 +37,7 @@ function Gate() {
     <Routes location={location}>
       <Route element={<Shell />}>
         <Route path="/" element={<HomePage />} />
+        <Route path="/graph" element={<GraphPage />} />
         <Route path="/recents" element={<RecentsPage />} />
         <Route path="/types/:slug" element={<TypeViewRoute />} />
         <Route path="/nodes/:id" element={<DetailPage />} />

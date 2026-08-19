@@ -8,15 +8,16 @@ Live at `/view`. Unlock with the MCP API key. Session is an HttpOnly cookie, `Pa
 
 ## What the window is
 
-One chrome. A content host. Three surfaces. The ontology owns identity and which layouts a type may use. The window never writes.
+One chrome. A content host. Four surfaces. The ontology owns identity and which layouts a type may use. The window never writes.
 
 | Surface | What it is |
 | --- | --- |
-| Home | First paint is the graph, filling the remaining viewport. Recents, open tasks, and type folders sit below it on the same page. |
+| Home | Recents, open tasks, and type folders. First paint of the window. |
+| Graph | The live graph as its own page. Fills the remaining viewport. |
 | Collection | One type's objects in the layout that type declared. |
 | Detail | One object, as a page in the content host. Title, body, structure, properties. |
 
-Search is chrome, not a fourth surface. Recents is a Home widget; **View all** opens the Recents page. The rail is Home and Search. Home is the graph page.
+Search is chrome, not a fifth surface. Recents is a Home widget; **View all** opens the Recents page. The rail is Home, Graph, and Search. Graph is not on Home.
 
 The window has no docked inspector. Properties live on the detail page.
 
@@ -24,7 +25,7 @@ The window has no docked inspector. Properties live on the detail page.
 
 ## Scope
 
-**In the window:** Home, Collection, Detail, Recents, Search.
+**In the window:** Home, Graph, Collection, Detail, Recents, Search.
 
 **Not in the window:** onboarding, settings, capture, composer, Today, Focus, Inbox, check-ins, health, library, trash, an ontology editor.
 
@@ -32,7 +33,7 @@ The window has no docked inspector. Properties live on the detail page.
 
 ## Click
 
-A click on a record or a graph node opens that object's **detail page** in the content host. The page fills the main pane. It does not open a pane beside Home or a collection.
+A click on a record or a graph node opens that object's **detail page** in the content host. The page fills the main pane. It does not open a pane beside Home, Graph, or a collection.
 
 That click comes from: a graph node, a Recents row, an open-task row, a collection row or card or cell or board card or calendar item or outline row, a search result, a related object on a detail page.
 
@@ -42,11 +43,11 @@ Right-click a graph node: local graph, depth **1–4**, default **2**.
 
 ## Chrome
 
-**Left rail.** Logo, then Home, then Search. Collapse to icons. Width **56px** collapsed, **224px** expanded. Theme toggle lives here.
+**Left rail.** Logo, then Home, then Graph, then Search. Collapse to icons. Width **56px** collapsed, **224px** expanded. Theme toggle lives here.
 
-Home is the graph homepage. Search opens the search overlay.
+Home is the landing page. Graph is the graph page. Search opens the search overlay.
 
-**Content host.** View strip across the top of the main pane. Home is pinned. Opening a collection or a detail is a view in this strip. The active view fills the pane under the strip.
+**Content host.** View strip across the top of the main pane. Home and Graph are pinned. Opening a collection or a detail is a view in this strip. The active view fills the pane under the strip.
 
 **Accent is the text color**, not a brand stripe. Active rail row is a quiet fill.
 
@@ -54,9 +55,7 @@ Home is the graph homepage. Search opens the search overlay.
 
 ## Home
 
-First paint is the graph. It fills the height left under the view strip. Floor **460px**. Find field on the graph. Type legend. Nodes and edges from live objects and live relations. Click a node: that object's detail page.
-
-Below the graph, on the same page:
+First paint is Recents, open tasks, and type folders. Home does not host the graph.
 
 **Recents.** Last **10** objects that are not tasks, newest first. Body height **160px**; overflow scrolls inside the card. Grouped **Today / Yesterday / Earlier this week / Earlier**. Each row: type glyph, title, relative time. **View all** opens Recents. Empty: **Nothing yet.**
 
@@ -64,13 +63,11 @@ Below the graph, on the same page:
 
 **Type folders.** One folder per type that has objects, in type-order. Each folder: type glyph, type color, type name, count. Open: that type's collection.
 
-The page scrolls under the graph. The graph keeps the remaining viewport.
-
 ---
 
 ## Graph
 
-Home's first paint. Directed force layout. Nodes are objects. Edges are relations.
+Its own page, opened from the rail or the pinned Graph view. Directed force layout. It fills the height left under the view strip. Floor **460px**. Find field on the graph. Type legend. Nodes and edges from live objects and live relations. Click a node: that object's detail page.
 
 Two edge kinds, both drawn:
 
@@ -80,6 +77,8 @@ Two edge kinds, both drawn:
 | Associative | Dashed `[2, 2]`, about **0.6px** |
 
 Node fill is the type's color. Node glyph is the type's icon. Hover shows the title. Click opens that object's detail page. Every live relation is an edge.
+
+The graph canvas is a field, not a card.
 
 ---
 
@@ -101,7 +100,7 @@ Layouts the type may name: list, card, table, board, calendar, timeline, outline
 
 **Outline.** Nested by the hierarchy relation. Open a row: detail page.
 
-**Graph.** Same directed graph as Home, scoped to this type. Click a node: detail page.
+**Graph.** Same directed graph as the Graph page, scoped to this type. Click a node: detail page.
 
 Empty collection: **Nothing yet.** Filtered to zero: **Nothing matches your filters.**
 

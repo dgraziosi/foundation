@@ -8,7 +8,12 @@ import { ShellContext, type HostTab, type ShellOutlet } from "./context";
 import { Rail } from "./Rail";
 import { tabKey, ViewStrip } from "./ViewStrip";
 
-function pathTab(pathname: string, params: { slug?: string; id?: string }): HostTab | { kind: "home" } {
+type PinnedSurface = { kind: "home" } | { kind: "graph" };
+
+function pathTab(pathname: string, params: { slug?: string; id?: string }): HostTab | PinnedSurface {
+  if (pathname === "/graph" || pathname.startsWith("/graph/")) {
+    return { kind: "graph" };
+  }
   if (pathname === "/recents" || pathname.startsWith("/recents/")) {
     return { kind: "recents", label: "Recents" };
   }
@@ -21,9 +26,12 @@ function pathTab(pathname: string, params: { slug?: string; id?: string }): Host
   return { kind: "home" };
 }
 
-function hrefFor(tab: HostTab | { kind: "home" }): string {
+function hrefFor(tab: HostTab | PinnedSurface): string {
   if (tab.kind === "home") {
     return "/";
+  }
+  if (tab.kind === "graph") {
+    return "/graph";
   }
   if (tab.kind === "recents") {
     return "/recents";
@@ -47,7 +55,7 @@ export function Shell() {
   const activeKey = tabKey(current);
 
   useEffect(() => {
-    if (current.kind === "home") {
+    if (current.kind === "home" || current.kind === "graph") {
       return;
     }
     setTabs((existing) => {

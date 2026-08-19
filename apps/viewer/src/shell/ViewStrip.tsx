@@ -11,7 +11,7 @@ export function ViewStrip({
 }: {
   tabs: HostTab[];
   activeKey: string;
-  onSelect: (tab: HostTab | { kind: "home" }) => void;
+  onSelect: (tab: HostTab | { kind: "home" } | { kind: "graph" }) => void;
   onClose: (tab: HostTab) => void;
 }) {
   return (
@@ -27,6 +27,15 @@ export function ViewStrip({
         onClick={() => onSelect({ kind: "home" })}
       >
         Home
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className={cn("rounded-md", activeKey === "graph" && "bg-active")}
+        onClick={() => onSelect({ kind: "graph" })}
+      >
+        Graph
       </Button>
       {tabs.map((tab) => {
         const key = tabKey(tab);
@@ -52,9 +61,12 @@ export function ViewStrip({
   );
 }
 
-export function tabKey(tab: HostTab | { kind: "home" }): string {
+export function tabKey(tab: HostTab | { kind: "home" } | { kind: "graph" }): string {
   if (tab.kind === "home") {
     return "home";
+  }
+  if (tab.kind === "graph") {
+    return "graph";
   }
   if (tab.kind === "recents") {
     return "recents";

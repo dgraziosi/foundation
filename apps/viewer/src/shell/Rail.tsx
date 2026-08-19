@@ -1,4 +1,4 @@
-import { House, PanelLeft, Search } from "lucide-react";
+import { House, PanelLeft, Search, Waypoints } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -64,6 +64,20 @@ export function Rail() {
             >
               <House size={16} strokeWidth={2} />
               <span className={cn(collapsed && "md:sr-only")}>Home</span>
+            </NavLink>
+          </Button>
+          <Button
+            asChild
+            variant="ghost"
+            className={cn("h-9 justify-start rounded-md px-2", collapsed && "md:justify-center md:px-0")}
+          >
+            <NavLink
+              to="/graph"
+              onClick={() => setRailOpen(false)}
+              className={({ isActive }) => cn(isActive && "bg-active text-foreground")}
+            >
+              <Waypoints size={16} strokeWidth={2} />
+              <span className={cn(collapsed && "md:sr-only")}>Graph</span>
             </NavLink>
           </Button>
           {collapsed ? (
