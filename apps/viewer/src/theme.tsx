@@ -1,17 +1,17 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { applyTheme, type ThemeChoice } from "./theme-core";
 
-export type ThemeChoice = "paper" | "dark" | "system";
+export type { ThemeChoice, ThemeLane, ThemeTokens } from "./theme-core";
+export {
+  applyTheme,
+  DARK_TOKENS,
+  PAPER_TOKENS,
+  readThemeTokens,
+  subscribeGraphPaint,
+  subscribeTheme,
+} from "./theme-core";
 
 const KEY = "foundation-theme";
-
-function systemTheme(): "paper" | "dark" {
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "paper";
-}
-
-function applyTheme(choice: ThemeChoice): void {
-  const resolved = choice === "system" ? systemTheme() : choice;
-  document.documentElement.dataset.theme = resolved;
-}
 
 const ThemeContext = createContext<{
   choice: ThemeChoice;
@@ -24,8 +24,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const stored = window.localStorage.getItem(KEY);
     if (stored === "dark" || stored === "system" || stored === "paper") {
-      setChoiceState(stored);
       applyTheme(stored);
+      setChoiceState(stored);
       return;
     }
     applyTheme("paper");
@@ -47,10 +47,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       choice,
       setChoice: (next: ThemeChoice) => {
         window.localStorage.setItem(KEY, next);
+        applyTheme(next);
         setChoiceState(next);
       },
     }),
-    [choice],
+    [],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

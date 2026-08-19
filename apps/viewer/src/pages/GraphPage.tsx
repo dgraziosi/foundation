@@ -4,13 +4,10 @@ import ForceGraph2D from "react-force-graph-2d";
 import { useOutletContext } from "react-router-dom";
 import { fetchGraph, fetchOntology } from "../api";
 import { truncate } from "../format";
+import { readThemeTokens, subscribeGraphPaint, type ThemeTokens } from "../theme-core";
 import { LoadError, Placeholders } from "../ui/States";
 
 type Outlet = { selectedId?: string; select: (id: string) => void };
-
-function readCssToken(name: string, fallback: string): string {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
-}
 
 export function GraphPage() {
   const { selectedId, select } = useOutletContext<Outlet>();
@@ -18,6 +15,8 @@ export function GraphPage() {
   const [type, setType] = useState("");
   const wrapRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 640, height: 420 });
+  const [paint, setPaint] = useState<ThemeTokens>(readThemeTokens);
+  const [themeEpoch, setThemeEpoch] = useState(0);
 
   const ontology = useQuery({ queryKey: ["ontology"], queryFn: fetchOntology });
   const graph = useQuery({
@@ -37,11 +36,19 @@ export function GraphPage() {
     return () => observer.disconnect();
   }, []);
 
-  const ink = readCssToken("--ink", "#26251e");
-  const bg = readCssToken("--bg", "#f7f7f4");
-  const accent = readCssToken("--accent", "#f54e00");
-  const card = readCssToken("--card", "#f7f7f4");
-  const ink2 = readCssToken("--ink-2", "#6b6a63");
+  useEffect(() => {
+    let first = true;
+    return subscribeGraphPaint((tokens) => {
+      setPaint(tokens);
+      if (first) {
+        first = false;
+        return;
+      }
+      setThemeEpoch((epoch) => epoch + 1);
+    });
+  }, []);
+
+  const { ink, bg, accent, card, ink2 } = paint;
 
   const data = useMemo(() => {
     const nodes = (graph.data?.nodes ?? []).map((node) => ({
@@ -89,6 +96,7 @@ export function GraphPage() {
       ) : null}
       {!graph.isLoading && !graph.isError && !empty ? (
         <ForceGraph2D
+          key={themeEpoch}
           width={size.width}
           height={size.height}
           graphData={data}
