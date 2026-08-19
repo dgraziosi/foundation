@@ -49,10 +49,7 @@ test(
     const pool = await poolForSchema("mcp_graph");
     const app = createApp(pool, {
       FOUNDATION_API_KEY: apiKey,
-      DATABASE_URL: databaseUrl,
       FOUNDATION_DATA: "/tmp/foundation-mcp-test",
-      PORT: 0,
-      HOST: "127.0.0.1",
     });
     const httpServer = app.listen(0);
     await new Promise<void>((resolve) => httpServer.on("listening", () => resolve()));

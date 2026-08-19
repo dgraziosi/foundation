@@ -36,7 +36,7 @@ flowchart TB
   product --> other_vault
 ```
 
-The server listens on this process. MCP attach from a named harness is documented in [`HARNESS.md`](./HARNESS.md). The operator window is `/view` on the same process and is meant to work from another machine on this vault.
+The server listens on this process. MCP attach from a named harness is documented in [`HARNESS.md`](./HARNESS.md). The operator window is `/view` on the view publish (Compose: 8788) and is meant to work from another machine on this vault.
 
 ## Graph
 
@@ -217,7 +217,7 @@ An agent that can reach the vault MCP may read/write; one that cannot does not.
 
 ## How the operator looks at the vault
 
-The operator opens a read-only window on the same process: `/view`. Same API key as MCP. Same graph — not a second store. Vite + React on this process. Surfaces: Unlock, Graph (nodes and edges on a canvas), Search, Recents, a read-only Tasks board, and an Inspector pane. Paper is first paint; dark is a second theme on every surface. Off-box unlock and session use the same key and `Path=/view` cookie. The window does not write. Blob bytes from the inspector are `GET /view/blobs/:id` (unlock cookie or Authorization header). Agents still fetch `GET /blobs/:id` with the header. Contract: [`VIEWER.md`](./VIEWER.md).
+The operator opens a read-only window on the view publish: `/view` (`http://127.0.0.1:8788/view`; from another machine, `http://<this-host>:8788/view`). Same API key as MCP. Same graph — not a second store. Vite + React on this process. Surfaces: Unlock, Graph (nodes and edges on a canvas), Search, Recents, a read-only Tasks board, and an Inspector pane. Paper is first paint; dark is a second theme on every surface. Off-box unlock and session use the same key and `Path=/view` cookie. The window does not write. Blob bytes from the inspector are `GET /view/blobs/:id` (unlock cookie or Authorization header). Agents still fetch `GET /blobs/:id` with the header. Contract: [`VIEWER.md`](./VIEWER.md).
 
 ```mermaid
 flowchart LR

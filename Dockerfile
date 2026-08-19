@@ -20,6 +20,8 @@ RUN pnpm --filter @foundation/viewer build
 
 ENV NODE_ENV=production
 ENV PORT=8787
+ENV VIEW_PORT=8788
 EXPOSE 8787
+EXPOSE 8788
 
 CMD ["pnpm", "--filter", "@foundation/server", "start"]

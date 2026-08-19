@@ -1,49 +1,31 @@
 import { pingDb, type Pool } from "@foundation/db";
-import { hostHeaderValidation } from "@modelcontextprotocol/sdk/server/middleware/hostHeaderValidation.js";
 import express, { type Express } from "express";
 import { requireApiKey } from "./auth.js";
 import { sendBlob } from "./blobs-http.js";
-import type { AppConfig } from "./config.js";
+import type { AppBindings } from "./config.js";
 import { handleMcpRequest } from "./mcp.js";
-import { isAgentPath, isViewPath, requestIsLoopback } from "./security.js";
+import { isAgentPath } from "./security.js";
 import { registerViewRoutes } from "./view.js";
 
 /** 20MB blob cap as base64 plus JSON-RPC envelope. */
 const JSON_BODY_LIMIT = "32mb";
 
-const localhostHosts = hostHeaderValidation(["localhost", "127.0.0.1", "[::1]"]);
+export type AppDoor = "mcp" | "view";
 
 function requestPath(req: express.Request): string {
   return (req.originalUrl.split("?")[0] ?? "").replace(/\/+$/, "") || "/";
 }
 
-/**
- * `/view` works off-box (published 8787). `/mcp` and `/blobs` require a loopback
- * connection — a Host: localhost header on a remote socket is not enough.
- */
-function hostGuard(req: express.Request, res: express.Response, next: express.NextFunction): void {
-  const path = requestPath(req);
-  if (isViewPath(path)) {
-    next();
+/** View publish must not serve write-capable agent routes, Host header or not. */
+function refuseAgentPaths(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  if (isAgentPath(requestPath(req))) {
+    res.status(403).json({ error: "Not available on the view door" });
     return;
   }
-  if (isAgentPath(path)) {
-    if (!requestIsLoopback(req)) {
-      res.status(403).json({ error: "Loopback only" });
-      return;
-    }
-    next();
-    return;
-  }
-  localhostHosts(req, res, next);
+  next();
 }
 
-export function createApp(pool: Pool, config: AppConfig): Express {
-  const app = express();
-  app.use(express.json({ limit: JSON_BODY_LIMIT }));
-  app.use(express.urlencoded({ extended: false }));
-  app.use(hostGuard);
-
+function registerHealth(app: Express, pool: Pool): void {
   app.get("/health", async (_req, res) => {
     const db = await pingDb(pool);
     res.status(db ? 200 : 503).json({
@@ -52,9 +34,9 @@ export function createApp(pool: Pool, config: AppConfig): Express {
       db: db ? "up" : "down",
     });
   });
+}
 
-  registerViewRoutes(app, pool, config);
-
+function registerMcpAndBlobs(app: Express, pool: Pool, config: AppBindings): void {
   app.get("/blobs/:id", requireApiKey(config.FOUNDATION_API_KEY), async (req, res) => {
     try {
       await sendBlob(pool, config, req, res);
@@ -98,6 +80,22 @@ export function createApp(pool: Pool, config: AppConfig): Express {
       id: null,
     });
   });
+}
 
+export function createApp(pool: Pool, config: AppBindings, door: AppDoor = "mcp"): Express {
+  const app = express();
+  app.use(express.json({ limit: JSON_BODY_LIMIT }));
+  app.use(express.urlencoded({ extended: false }));
+
+  if (door === "view") {
+    app.use(refuseAgentPaths);
+    registerHealth(app, pool);
+    registerViewRoutes(app, pool, config);
+    return app;
+  }
+
+  registerHealth(app, pool);
+  registerViewRoutes(app, pool, config);
+  registerMcpAndBlobs(app, pool, config);
   return app;
 }

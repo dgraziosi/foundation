@@ -6,7 +6,7 @@ import type { Express, NextFunction, Request, Response } from "express";
 import express from "express";
 import { apiKeyCookieHeader, providedApiKey } from "./auth.js";
 import { sendBlob } from "./blobs-http.js";
-import type { AppConfig } from "./config.js";
+import type { AppBindings } from "./config.js";
 import {
   viewGraph,
   viewNode,
@@ -107,7 +107,7 @@ function isBlobPath(path: string): boolean {
   return path.startsWith(`${VIEW_PATH}/blobs/`);
 }
 
-export function registerViewRoutes(app: Express, pool: Pool, config: AppConfig): void {
+export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings): void {
   const gate = requireViewAuth(config.FOUNDATION_API_KEY);
   const dist = viewerDistDir();
 

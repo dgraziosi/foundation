@@ -70,7 +70,7 @@ Names are locked. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md).
 - Docker Compose: Postgres 16 + Foundation server
 - Durable files under `FOUNDATION_DATA`
 - Localhost MCP at `http://127.0.0.1:8787/mcp` with `Authorization: ApiKey <FOUNDATION_API_KEY>`
-- Read-only window at `/view` on this process (same API key; not a second store). Unlock with the key, HttpOnly cookie `Path=/view`. Graph canvas, search, recents, a read-only task board, and an inspector. Paper first (`#f7f7f4` / `#26251e` / `#f54e00`); dark is a real second theme. Off-box access is in scope. The cookie does not unlock `/mcp` or `/blobs/:id`.
+- Read-only window at `/view` (same API key; not a second store). Compose view publish: `http://127.0.0.1:8788/view`, and `http://<this-host>:8788/view` from another machine on this vault. Unlock with the key, HttpOnly cookie `Path=/view`. Graph canvas, search, recents, a read-only task board, and an inspector. Paper first (`#f7f7f4` / `#26251e` / `#f54e00`); dark is a real second theme. The cookie does not unlock `/mcp` or `/blobs/:id`.
 - Blobs: `$FOUNDATION_DATA/blobs/<uuid>`; ingest on `upsert`; bytes via `GET /blobs/:id`
 
 ## Locked (do not reopen)

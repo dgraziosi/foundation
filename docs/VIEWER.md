@@ -16,7 +16,7 @@ An implementer should be able to build the UI from this file without inventing l
 
 The window does not write. No upsert, link, unlink, delete, undo, or ontology controls.
 
-Off-box access is in scope. The operator may open `/view` from another machine on this vault. Unlock, cookie, and every surface must work on that origin. Do not ship localhost-only chrome or a localhost-only unlock.
+Off-box access is in scope. The operator may open `/view` from another machine on this vault at `http://<this-host>:8788/view`. Unlock, cookie, and every surface must work on that origin. Do not ship localhost-only chrome or a localhost-only unlock. MCP stays on `http://127.0.0.1:8787/mcp`.
 
 ## Starting point (keep)
 
