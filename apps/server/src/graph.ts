@@ -55,6 +55,7 @@ import {
   findInBatchLinkDuplicate,
   normalizeLinkEdges,
   LINK_CAS_AGREE_SUGGESTION,
+  MISSING_BASE_SUGGESTION,
   parseTimestampMs,
   timestampsEqual,
   SEARCH_MISS_SUGGESTION,
@@ -709,6 +710,23 @@ function assertBatchEndpointCas(
   edges: readonly LinkEdgeItem[],
   locked: ReadonlyMap<string, Node>,
 ): ToolError | null {
+  for (const [index, edge] of edges.entries()) {
+    for (const field of ["from_base_updated_at", "to_base_updated_at"] as const) {
+      const value = edge[field];
+      if (value === undefined) {
+        return prefixEdgeError(form, index, `Missing ${field}`, MISSING_BASE_SUGGESTION);
+      }
+      if (parseTimestampMs(value) === null) {
+        return prefixEdgeError(
+          form,
+          index,
+          `Invalid ${field}: ${value}`,
+          "Pass an ISO-8601 timestamp from get (node.updated_at).",
+        );
+      }
+    }
+  }
+
   const claims = new Map<string, EndpointClaim[]>();
   const addClaim = (id: string, claim: EndpointClaim) => {
     const list = claims.get(id) ?? [];
@@ -730,36 +748,20 @@ function assertBatchEndpointCas(
 
   for (const [nodeId, nodeClaims] of claims) {
     const node = locked.get(nodeId)!;
-    let agreed: EndpointClaim | undefined;
+    const first = nodeClaims[0]!;
     for (const claim of nodeClaims) {
-      if (claim.value === undefined) {
-        continue;
-      }
-      if (parseTimestampMs(claim.value) === null) {
+      if (!timestampsEqual(first.value!, claim.value!)) {
         return prefixEdgeError(
           form,
           claim.index,
-          `Invalid ${claim.field}: ${claim.value}`,
-          "Pass an ISO-8601 timestamp from get (node.updated_at).",
-        );
-      }
-      if (!agreed) {
-        agreed = claim;
-        continue;
-      }
-      if (!timestampsEqual(agreed.value!, claim.value)) {
-        return prefixEdgeError(
-          form,
-          claim.index,
-          `${claim.field} disagrees with edges[${agreed.index}] for ${nodeId}`,
+          `${claim.field} disagrees with edges[${first.index}] for ${nodeId}`,
           LINK_CAS_AGREE_SUGGESTION,
         );
       }
     }
-    const check = agreed ?? nodeClaims[0]!;
-    const stale = assertIfMatch(check.field, check.value, node.updated_at);
+    const stale = assertIfMatch(first.field, first.value, node.updated_at);
     if (stale) {
-      return prefixEdgeError(form, check.index, stale.error, stale.suggestion);
+      return prefixEdgeError(form, first.index, stale.error, stale.suggestion);
     }
   }
   return null;

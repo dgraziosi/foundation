@@ -316,6 +316,40 @@ test("batch link: two forms, atomic write, shared-node CAS, undo per receipt", {
       assert.match(stale.error, /to_base_updated_at does not match/);
     });
 
+    await t.test("shared node: later edge that omits if-match refuses and writes nothing", async () => {
+      await resetGraph(pool);
+      const person = await upsertGraphNode(pool, { type: "person", title: "Shared person" });
+      const noteA = await upsertGraphNode(pool, { type: "note", title: "Note one" });
+      const noteB = await upsertGraphNode(pool, { type: "note", title: "Note two" });
+      if (isToolError(person) || isToolError(noteA) || isToolError(noteB)) {
+        assert.fail("upsert failed");
+        return;
+      }
+
+      const omitted = await linkGraphNodes(pool, {
+        edges: [
+          {
+            from_id: noteA.node.id,
+            to_id: person.node.id,
+            relation_type: "about",
+            from_base_updated_at: noteA.node.updated_at,
+            to_base_updated_at: person.node.updated_at,
+          },
+          {
+            from_id: noteB.node.id,
+            to_id: person.node.id,
+            relation_type: "about",
+            from_base_updated_at: noteB.node.updated_at,
+          },
+        ],
+      });
+      assert.equal(isToolError(omitted), true);
+      if (!isToolError(omitted)) return;
+      assert.match(omitted.error, /edges\[1\]: Missing to_base_updated_at/);
+      assert.equal(await edgeCount(pool), 0);
+      assert.equal(await linkActivityCount(pool), 0);
+    });
+
     await t.test("relates_to without upgrade succeeds and suggests; it does not fail the batch", async () => {
       await resetGraph(pool);
       const area = await upsertGraphNode(pool, { type: "area", title: "Work" });
