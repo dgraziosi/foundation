@@ -116,6 +116,18 @@ test("Inter 400/500 only; no mono face and no weight 600", async () => {
   assert.doesNotMatch(css, /--mono/);
 });
 
+test("graph canvas marks use Lucide, not a first-letter circle", async () => {
+  const canvas = await readFile(join(root, "graph/GraphCanvas.tsx"), "utf8");
+  const marks = await readFile(join(root, "graph/marks.ts"), "utf8");
+  assert.match(canvas, /paintGraphMark/);
+  assert.match(marks, /typeIcon/);
+  assert.match(marks, /GRAPH_GLYPH_PX = 16/);
+  assert.match(marks, /GRAPH_TYPE_PX = 12/);
+  assert.match(marks, /GRAPH_TITLE_PX = 11/);
+  assert.doesNotMatch(`${canvas}\n${marks}`, /slice\(\s*0\s*,\s*1\s*\)/);
+  assert.doesNotMatch(`${canvas}\n${marks}`, /9\s*\/\s*Math\.max|10\s*\/\s*Math\.max|9px|10px/);
+});
+
 test("no-views copy is honest and Home is the landing surface", async () => {
   const typeView = await readFile(join(root, "pages/TypeViewPage.tsx"), "utf8");
   assert.match(typeView, /No views declared for this type/);

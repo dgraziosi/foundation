@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { TypeViewNode, ViewEngineId } from "../api";
+import type { OntologyType, TypeViewNode, ViewEngineId } from "../api";
 import { GraphCanvas } from "../graph/GraphCanvas";
 import { useThemeLane } from "../theme";
 import { typeColors, typeIcon } from "../type-meta";
@@ -367,6 +367,7 @@ export function EngineView({
   childNodes,
   graphNodes,
   graphEdges,
+  types,
   selectedId,
   onSelect,
   empty,
@@ -376,6 +377,7 @@ export function EngineView({
   childNodes: TypeViewNode[];
   graphNodes?: Array<{ id: string; title: string; type: string; status: string }>;
   graphEdges?: Array<{ id: string; from: string; to: string; relation_type: string; kind: "hierarchy" | "associative" }>;
+  types?: OntologyType[];
   selectedId?: string;
   onSelect: (id: string) => void;
   empty: string;
@@ -421,6 +423,7 @@ export function EngineView({
     <GraphCanvas
       nodes={graphNodes ?? nodes.map((node) => ({ id: node.id, title: node.title, type: node.type, status: node.status }))}
       edges={graphEdges ?? []}
+      types={types}
       selectedId={selectedId}
       onSelect={onSelect}
       findEnabled={false}

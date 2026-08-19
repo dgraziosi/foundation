@@ -18,6 +18,7 @@ export function TypeViewPage({ slug: forcedSlug }: { slug?: string }) {
     queryFn: () => fetchType(slug),
     enabled: Boolean(slug),
   });
+  const ontology = useQuery({ queryKey: ["ontology"], queryFn: fetchOntology });
   const resolved = resolveDeclaredViews(typeQuery.data?.type ?? {});
   const [picked, setPicked] = useState<{ slug: string; view: ViewEngineId }>();
   const active = resolveActiveView(slug, resolved, picked);
@@ -65,6 +66,7 @@ export function TypeViewPage({ slug: forcedSlug }: { slug?: string }) {
                   childNodes={typeQuery.data.children}
                   graphNodes={graph.data?.nodes}
                   graphEdges={graph.data?.edges}
+                  types={ontology.data?.types}
                   selectedId={selectedId}
                   onSelect={select}
                   empty={empty}

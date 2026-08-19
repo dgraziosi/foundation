@@ -3,10 +3,9 @@ import ForceGraph2D from "react-force-graph-2d";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { GraphEdge, GraphNode, OntologyType } from "../api";
-import { truncate } from "../format";
 import { readThemeTokens, subscribeGraphPaint, type ThemeTokens } from "../theme-core";
-import { typeColors } from "../type-meta";
 import { LoadError, Placeholders, Quiet } from "../ui/States";
+import { measureGraphMark, paintGraphMark, typeMarkLabel } from "./marks";
 
 export function GraphCanvas({
   nodes,
@@ -34,6 +33,7 @@ export function GraphCanvas({
   onTypeFilter?: (type: string) => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
+  const scaleRef = useRef(1);
   const [size, setSize] = useState({ width: 640, height: 420 });
   const [paint, setPaint] = useState<ThemeTokens>(readThemeTokens);
   const [themeEpoch, setThemeEpoch] = useState(0);
@@ -130,45 +130,41 @@ export function GraphCanvas({
           backgroundColor={bg}
           cooldownTicks={80}
           enableNodeDrag={false}
-          nodeLabel={(node) => `${String(node.title)} · ${String(node.type)}`}
+          nodeLabel={(node) =>
+            `${String(node.title)} · ${typeMarkLabel(String(node.type), types)}`
+          }
           linkColor={(link) => (link.kind === "hierarchy" ? ink : ink2)}
           linkWidth={(link) => (link.kind === "hierarchy" ? 1.6 : 1)}
           linkLineDash={(link) => (link.kind === "hierarchy" ? undefined : [3, 3])}
           onNodeClick={(node) => onSelect(String(node.id))}
           nodeCanvasObject={(node, ctx, scale) => {
-            const x = node.x ?? 0;
-            const y = node.y ?? 0;
-            const selected = node.id === selectedId;
+            scaleRef.current = scale;
             const match =
               needle !== "" &&
-              `${String(node.title)} ${String(node.type)}`.toLowerCase().includes(needle);
-            const colors = typeColors(String(node.type), lane, slugs);
-            const radius = 8;
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, Math.PI * 2);
-            ctx.fillStyle = colors.tint;
-            ctx.fill();
-            ctx.lineWidth = (selected || match ? 2 : 1) / Math.max(scale, 0.6);
-            ctx.strokeStyle = selected || match ? ink : colors.ink;
-            ctx.stroke();
-            ctx.fillStyle = colors.ink;
-            ctx.font = `${10 / Math.max(scale, 0.75)}px Inter, ui-sans-serif, system-ui, sans-serif`;
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText(String(node.type).slice(0, 1).toUpperCase(), x, y);
-            const label = truncate(String(node.title), 20);
-            ctx.font = `${11 / Math.max(scale, 0.75)}px Inter, ui-sans-serif, system-ui, sans-serif`;
-            ctx.textBaseline = "top";
-            ctx.fillStyle = ink;
-            ctx.fillText(label, x, y + radius + 3);
-            ctx.font = `${9 / Math.max(scale, 0.75)}px Inter, ui-sans-serif, system-ui, sans-serif`;
-            ctx.fillStyle = colors.ink;
-            ctx.fillText(String(node.type), x, y + radius + 15);
+              `${String(node.title)} ${typeMarkLabel(String(node.type), types)}`
+                .toLowerCase()
+                .includes(needle);
+            paintGraphMark(ctx, node, {
+              scale,
+              selected: node.id === selectedId,
+              match,
+              ink,
+              lane,
+              slugs,
+              types,
+            });
           }}
           nodePointerAreaPaint={(node, color, ctx) => {
+            const box = measureGraphMark(ctx, node, { scale: scaleRef.current, types });
             ctx.fillStyle = color;
             ctx.beginPath();
-            ctx.arc(node.x ?? 0, node.y ?? 0, 12, 0, Math.PI * 2);
+            ctx.roundRect(
+              (node.x ?? 0) - box.width / 2,
+              (node.y ?? 0) - box.height / 2,
+              box.width,
+              box.height,
+              box.radius,
+            );
             ctx.fill();
           }}
         />
