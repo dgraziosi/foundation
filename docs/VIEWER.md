@@ -4,23 +4,24 @@ Operator-facing, read-only window on this vault. Same graph as MCP. Same API key
 
 This file is the clone-ready contract for how the window looks and works. An implementer ships the restyle from these surfaces, tokens, layout, states, and acceptance checks. The original SPEC is not a ceiling.
 
-Visual system: **Core Theme** (calm-clarity). Tokens, type, density, and control rhythm come from that system. `MOMENTUM_STANDARD.md` is not present; this file is the product source. The window does not take on another product’s screens or feature set.
+Visual system: **Core Theme** (calm-clarity). Tokens, type, density, and control rhythm come from that system. `MOMENTUM_STANDARD.md` is not present; this file is the product source.
 
 ## What the operator opens it for
 
-1. **The live graph, visually** — nodes and edges on a canvas. A list is not a graph.
-2. **Easy search** across nodes.
-3. **Recent additions** (and other recent writes).
-4. **A detail pane that is easy to read.**
-5. **Type-specific views only where they earn it.** Tasks as a board. No view per type.
+1. **Home** — widgets plus a folder per live type. Landing page after unlock.
+2. **The live graph, visually** — nodes and edges on a canvas. A list is not a graph.
+3. **Easy search** across nodes.
+4. **Recent additions** (and other recent writes).
+5. **A detail pane that is easy to read.**
+6. **One view engine for types** — List, Card, Table, Board, Calendar, Timeline, Outline, Graph. Not a unique app per type.
 
-The window does not write. No upsert, link, unlink, delete, undo, or ontology controls.
+The window does not write. No upsert, link, unlink, delete, undo, or ontology controls. No capture composer. No planner.
 
 Off-box access is in scope. The operator may open `/view` from another machine on this vault. Unlock, cookie, and every surface must work on that origin. Do not ship localhost-only chrome or a localhost-only unlock.
 
 ## Starting point (keep)
 
-Viewer v1 is live. Keep the door and the surfaces. Restyle them. Do not throw them away.
+Viewer v1 is live. Keep the door. Restyle Unlock, Graph, Search, Recents, and Inspector. Add Home and the view engine. Do not throw the door away.
 
 | Keep | Why |
 | --- | --- |
@@ -32,23 +33,26 @@ Viewer v1 is live. Keep the door and the surfaces. Restyle them. Do not throw th
 | Empty graph is empty, not an error | First-day vault is valid |
 | Search by text, optional type, optional status | Hits show title, type, snippet, `data.due` when set |
 | Node fields | Title, type, status, `data`, payload, neighbors, blob meta, `suggested_links` as proposals |
-| Deep link `/view/nodes/:id` | Opens the shell with that node selected |
+| Deep link `/view/nodes/:id` | Opens the shell with that node selected in its type’s view engine |
 | No write controls | Read-only stays |
 
-Surfaces stay: Unlock, Graph, Search, Recents, Tasks, Inspector.
+Keep Unlock, Graph, Search, Recents, Inspector. Home is the landing surface. Types open through the view engine, not as extra rail items.
 
 ## Surfaces
 
-Five things the operator can open. Detail is a pane, not a sixth destination.
+Rail destinations plus Home folders and the inspector pane. Detail is a pane, not a rail item.
 
 | Surface | Rail | What the operator sees |
 | --- | --- | --- |
-| **Unlock** | — | One field, one action, one error line. Then the shell. |
-| **Graph** | Graph | Nodes and edges on a canvas. Default after unlock. |
+| **Unlock** | — | One field, one action, one error line. Then Home. |
+| **Home** | Home | Widgets plus a folder per live ontology type. Default after unlock. |
+| **Graph** | Graph | Nodes and edges on a canvas. Also a view type inside the view engine. |
 | **Search** | Search | Query, type, status, results as rows. |
 | **Recents** | Recents | Newest activity as rows. |
-| **Tasks** | Tasks | Task nodes as a kanban. The only type-specific surface. |
+| **View engine** | — | How a type is shown. Opened from a Home folder. One pipeline. |
 | **Inspector** | — | Readable detail for the selected node. Right pane when a node is selected. |
+
+Type folders live on Home. Do not add a rail item per type. Do not add a types editor or an ontology editor.
 
 ### Unlock
 
@@ -59,7 +63,43 @@ Full viewport. No rail. No vault contents.
 - One password field (API key). One primary button: **Unlock** (neutral ink fill)
 - One quiet line in secondary ink: same key as MCP; this window is read-only
 - Wrong key: the same form, one error line under the field in **removed** ink — not a different page
-- Success: cookie, then Graph
+- Success: cookie, then Home
+
+### Home
+
+Landing page after unlock. Middle pane: widgets, then folders.
+
+**Widgets** (read-only, operator-useful)
+
+Wide: three cards in a row, gap 13, radius 13.
+
+1. **Recents** — last few activity rows (same summary rhythm as Recents). Click a row: select that node, fill the inspector.
+2. **Open tasks** — `task` nodes with status active. Title, due chip when set. Click: select the task, fill the inspector. A control on the widget header opens that type in the view engine (Board).
+3. **Graph** — a small canvas of the current working set (recent nodes plus neighbors). Same marks and edges as Graph, no find field. Click a node: select it, fill the inspector. A control on the widget header opens Graph.
+
+No other widgets in this restyle. No capture field. No Today / Focus / Inbox. No write actions on a widget.
+
+**Folders**
+
+Under a **Types** label: one folder tile per live ontology type (seed and authored). Tile: type glyph (type ink), type label, live count. Type tint as a quiet wash. Same tile geometry for every type.
+
+- Click a folder: open the view engine for that type, at that type’s default view.
+- Empty type: folder still shows, count 0. Opening it is a valid empty view, not an error.
+- Folders are not rail destinations.
+
+**Empty Home (first-day vault)**
+
+- Recents widget: **Nothing yet.**
+- Open tasks widget: **No tasks yet.**
+- Graph widget: **Search the graph, or wait for a node to land.**
+- Folders still list every live type. No illustration. No fake nodes.
+
+**What Home is not**
+
+- Not Graph with a different heading
+- Not a planner
+- Not a composer
+- Not a unique page per type
 
 ### Graph
 
@@ -114,30 +154,57 @@ Same row rhythm as Search.
 - Click a node activity: select that node, fill the inspector
 - No undo. No “confirm”. This is a log, not a toolbar
 
-### Tasks (kanban)
+### View engine
 
-The only type-specific surface. Status is already on every node.
+How a type is shown. One pipeline. Not a unique app per type.
 
-**Board**
+Opened from a Home folder (or from a widget header that names a type). Middle pane: type title (display M), a view switcher, then the active view. Click a node: select it, fill the inspector. No create control.
 
-- Three columns: **Active** · **Completed** · **Archived**
-- Each column is a card (radius 13, elevated surface, hairline)
-- One card per `task`. Title, due chip when `data.due` is set, parent title when a `child_of` neighbor exists
-- Overdue due chip uses **removed**. Today is ink. Future is secondary
-- Click a card: select it, fill the inspector
-- Read-only. Cards do not drag. Dragging would be a write
+**View types**
 
-**Empty board**
+| View | What the operator sees |
+| --- | --- |
+| **List** | Title + meta rows. Same rhythm as Search. Type tag, due when set. |
+| **Card** | Wrapping grid of cards (radius 13). Glyph, title, status, due when set. |
+| **Table** | Columns from field roles: Title, Status, Due when the type has due. Click a row to select. |
+| **Board** | Three columns: **Active** · **Completed** · **Archived**. One card per node. Title, due chip, parent title when a `child_of` neighbor exists. Read-only. Cards do not drag. |
+| **Calendar** | Month grid. Nodes sit on `data.due`. Nodes without due do not appear. No create-on-day. |
+| **Timeline** | Vertical chronological list by `data.due`. Nodes without due omitted. Empty: one quiet line. |
+| **Outline** | Tree by `child_of`. Roots of this type, children nested. Click a title to select. |
+| **Graph** | Canvas of this type’s nodes and their edges, same marks as rail Graph. Scoped to the type. |
+
+The view switcher shows only the views that type offers. Active view uses active fill. Switching a view does not write.
+
+**Which views a type offers, and the default, come from the ontology** plus simple field roles — not from a hardcoded app per type.
+
+| Role | How it is known | Unlocks |
+| --- | --- | --- |
+| title | Every node | List, Card, Table, Graph |
+| status | Every node | Board, status filter |
+| due | Type schema includes `data.due` | Calendar, Timeline, due chips |
+| hierarchy | Type participates in `child_of` (`parent_types` or allowed as a parent) | Outline |
+
+Rules:
+
+- Every type offers **List**, **Card**, **Table**, and **Graph**.
+- **Board** is offered when the type has status (every live type). Default is Board only for `task`.
+- **Calendar** and **Timeline** are offered only when the type has due (`task`, `goal`, and any authored type that earns due).
+- **Outline** is offered only when the type participates in hierarchy.
+- **`task` defaults to Board** (the existing kanban).
+- **Every other type defaults to List** unless the ontology records a different default that it has earned (a due type may default to Calendar; a hierarchy root may default to Outline). Do not invent a default that the roles do not earn.
+- Authored types follow the same roles. Do not ship a special-case screen for a new slug.
+
+Rail **Graph** stays a first-class destination: the vault working set, any type. View-engine **Graph** is the same canvas language, scoped to one type.
+
+**Empty Board (`task`)**
 
 One line in the Active column: **No tasks yet.** Other columns stay visible and empty.
 
-**Not in this restyle**
+**Empty other views**
 
-- A second board by due bucket
-- Boards for goals, habits, trips, journals, or any other type
-- Swimlanes
+One quiet line: **No {type} yet.** Folder chrome and the view switcher stay.
 
-Trip HTML itineraries, journal dates, and habit frequency stay as **inspector treatments**, not new rail items.
+Trip HTML itineraries, journal dates, and habit frequency stay as **inspector treatments**, not new rail items and not unique view types.
 
 ### Inspector
 
@@ -158,7 +225,7 @@ Pane stays. One quiet line: **Select a node.**
 
 **Not found** (`/view/nodes/:id` unknown or not a UUID)
 
-Inspector title **Not found**. One line. Graph / Search still usable.
+Inspector title **Not found**. One line. Home / Graph / Search still usable.
 
 Do not lead with UUID. Do not lead with raw JSON. The operator came to read.
 
@@ -172,7 +239,7 @@ Three rules:
 
 ### Light and dark
 
-Two lanes. **Dark is the first paint** and the default stored choice. Light is a full second theme on every surface (Unlock, Graph, Search, Recents, Tasks, Inspector). The operator switches with Light / Dark / System. System follows `prefers-color-scheme`.
+Two lanes. **Dark is the first paint** and the default stored choice. Light is a full second theme on every surface (Unlock, Home, Graph, Search, Recents, View engine, Inspector). The operator switches with Light / Dark / System. System follows `prefers-color-scheme`.
 
 A stored “paper” choice, if any, reads as Light.
 
@@ -260,7 +327,7 @@ Stack: `'Inter Variable', 'Inter', ui-sans-serif, system-ui, sans-serif`.
 | Role | Size | Weight | Line | Tracking | Use |
 | --- | --- | --- | --- | --- | --- |
 | Display L | 34 | 500 | 1.1 | −0.01em | Not used in this window |
-| Display M | 21 | 500 | 1.2 | −0.01em | Page titles (Search, Recents, Unlock) |
+| Display M | 21 | 500 | 1.2 | −0.01em | Page titles (Home, Search, Recents, Unlock, type title in the view engine) |
 | Display S | 13 | 500 | 1.3 | 0 | Inspector title |
 | Body | 15 | 400 | 1.6 | 0 | Reading text, payload prose |
 | Body S | 13 | 400 | 1.6 | 0 | Compact chrome |
@@ -321,13 +388,13 @@ Required chrome:
 - **Input** — Unlock, Search, find-on-canvas
 - **Select** — type, status
 - **Badge** — type (tint fill, ink text), status (outline), due (outline; overdue = removed)
-- **Card** — Task columns, Unlock
+- **Card** — Home widgets, type folders, Board columns, Unlock
 - **Separator** — Inspector sections
 - **Sheet** — Inspector on medium and narrow
 - **Skeleton** — loading placeholders
-- **Scroll area** — Inspector, long lists
-- **Toggle** — Light / Dark / System
-- **List row** — Search, Recents, neighbors
+- **Scroll area** — Inspector, long lists, Home
+- **Toggle** — Light / Dark / System, view-engine view switcher
+- **List row** — Search, Recents, neighbors, List view
 - **Empty state** — one quiet secondary line, no illustration
 - **Tooltip** — rail labels when the rail is collapsed
 
@@ -339,18 +406,18 @@ Rail + middle + inspector. The **page ground is canvas**. The **rail sits on ins
 
 ```text
 ┌──────────┬──────────────────────────────────┬─────────────────┐
-│          │  Graph | Search | Recents        │                 │
+│          │  Home | Graph | Search | Recents │                 │
 │  Rail    │  ─────────────────────────────   │   Inspector     │
 │  16rem   │                                  │   21rem         │
 │  inset   │     middle (elevated card)       │   selected      │
-│          │     canvas / rows / board        │   node          │
+│          │     widgets / canvas / engine    │   node          │
 │          │                                  │                 │
 └──────────┴──────────────────────────────────┴─────────────────┘
 ```
 
 This is a **required layout change** for the visual system to work. A single flat field with a 180px rail and a 352px inspector on the same ground does not express canvas / inset / elevated. A permanent top icon strip on a narrow window does not match the rail overlay the system uses.
 
-Do not add a second dock, a tab strip of extra destinations, or a floating composer. This window has four rail items and one inspector.
+Do not add a second dock or a floating composer. This window has four rail items — Home, Graph, Search, Recents — plus the inspector. Type folders are on Home, not on the rail.
 
 ### Rail
 
@@ -358,10 +425,10 @@ Labeled width **16rem**. Collapsible to **56px** icon-only (24px glyph tile + pa
 
 Order, top to bottom:
 
-1. Graph (default) — Network
-2. Search — Search
-3. Recents — Clock
-4. Tasks — CircleCheck
+1. Home (default after unlock) — House
+2. Graph — Network
+3. Search — Search
+4. Recents — Clock
 
 Selected item: active fill. Unselected: ink, quiet. Glyphs in ink, not type-colored.
 
@@ -371,9 +438,10 @@ Theme control at the bottom: Light / Dark / System.
 
 ### Middle
 
+- Home → widgets, then the Types folder grid
 - Graph → canvas (find field on the canvas, not a second page)
 - Search / Recents → page title + controls + rows
-- Tasks → column headers + cards (no page-level primary write button)
+- View engine → type title + view switcher + the active view (no page-level write button)
 
 ### Inspector
 
@@ -387,7 +455,7 @@ Medium and narrow: **sheet**, radius 21, shadow 2xl, scrim. Selecting a node ope
 | --- | --- | --- |
 | Wide | ≥ 1280 | Rail (16rem, collapsible) + middle + inspector (21rem) |
 | Medium | 900–1279 | Rail docked (16rem, collapsible) + middle. Inspector is a sheet over the middle |
-| Narrow | < 900 | Rail off-canvas overlay + scrim. One surface in the middle. Inspector is a full-width sheet. Graph is still a canvas |
+| Narrow | < 900 | Rail off-canvas overlay + scrim. One surface in the middle. Home widgets stack; folders wrap. Inspector is a full-width sheet. Graph is still a canvas |
 
 Off-box phones are later. This restyle must not *break* on a narrow window; it may stack. Do not design a separate mobile app.
 
@@ -400,11 +468,13 @@ Every surface uses this set. Copy stays this quiet.
 | **Locked** | Unlock only. No graph peek |
 | **Unlock error** | Same form. “API key required” (or the same sense). Field stays. Error in removed ink |
 | **Loading** | Middle and inspector show skeleton placeholders. No spinner circus. No fake nodes |
-| **Empty graph** | Canvas + the one line above. Search and Recents still open |
-| **Empty recents** | “Nothing yet.” |
+| **Empty Home** | Widgets show their empty lines. Type folders still list. Not an error |
+| **Empty graph** | Canvas + the one line above. Home, Search, and Recents still open |
+| **Empty recents** | “Nothing yet.” Same copy in the Home Recents widget |
 | **Empty search (not submitted)** | Field + “Search the graph, or filter by type.” |
 | **No results** | “No matching nodes.” Field and type stay so the operator can change them |
-| **Empty tasks** | Board chrome present. “No tasks yet.” in Active |
+| **Empty type** | View switcher stays. “No {type} yet.” |
+| **Empty Board (`task`)** | Board chrome present. “No tasks yet.” in Active. Same copy in the Home Open tasks widget |
 | **Nothing selected** | Inspector: “Select a node.” |
 | **Selected** | Mark / row / card uses active fill or border-strong ring. Inspector filled |
 | **Not found** | Inspector: “Not found.” |
@@ -416,27 +486,34 @@ Do not toast. Do not confetti an empty vault.
 
 ### This restyle — ship this
 
-- Core Theme on every v1 surface: tokens, type, density, components, light and dark
+- Core Theme on every surface: tokens, type, density, components, light and dark
 - Dark first paint; Light and System as real choices
 - Shell restyle: canvas / inset rail / elevated middle; 16rem rail; 21rem inspector; rail overlay on narrow; inspector sheet on medium and narrow
-- Unlock, Graph, Search, Recents, Tasks, Inspector — same jobs, restyled
-- Type hue + Lucide glyph on marks, tags, and board cards
+- Unlock, then Home (widgets + type folders)
+- Graph on the rail and as a view type
+- Search, Recents, Inspector — same jobs, restyled
+- View engine: List, Card, Table, Board, Calendar, Timeline, Outline, Graph. Defaults and offered views from the ontology and field roles
+- `task` defaults to Board. Other types default to List unless the ontology earns something else
+- Type hue + Lucide glyph on marks, tags, folders, and cards
 - Off-box unlock and session (same key, same cookie path)
-- Deep link `/view/nodes/:id` into the shell
+- Deep link `/view/nodes/:id` into the shell — that node’s type in the view engine, inspector filled
 - Keep every read-only and blob-safety rule
 
 ### Later — do not build these now
 
 - Writes from the window (create, status change, drag-to-complete, accept a suggested link)
-- A view per type (person directory, trip map, habit heatmap, journal calendar, …)
+- A unique app per type (trip map, habit heatmap, journal calendar as its own destination)
+- Capture composer, Today / Focus / Inbox, or any planner on Home
+- Types editor or ontology editor
+- Extra rail destinations (including a rail item per type)
 - Trip HTML as a live document (safe render can follow; not a rail item)
 - Due-bucket board, swimlanes, filters for `origin` / `under` / `data_equals`
 - Full-vault hairball, mini-map, clustering, embeddings
-- Ontology browser, undo, activity “confirm”
+- Undo, activity “confirm”
 - A separate mobile app
-- Extra rail destinations, a second dock, or a write composer
+- A second dock
 
-If a later type view is proposed, it must beat a filtered Search + inspector. Tasks already do. Most types will not.
+If a later unique type app is proposed, it must beat the view engine + inspector. Board for `task` already does. Most types will not.
 
 ## How to tell the built UI matches
 
@@ -446,12 +523,19 @@ Review against **dark** (first paint) on a wide window first, then medium, then 
 
 - [ ] Wide: three columns — inset rail (16rem), elevated middle, inspector (21rem). Inspector is not a modal
 - [ ] Page ground is canvas; rail is inset; middle is an elevated card. One flat field fails
+- [ ] Unlock lands on Home, not Graph
+- [ ] Rail order is Home, Graph, Search, Recents. No Tasks rail item. No type on the rail
+- [ ] Home is widgets (Recents, Open tasks, Graph) plus one folder per live ontology type
+- [ ] A folder opens the view engine for that type, not a unique app
 - [ ] Graph’s middle is a canvas with visible nodes **and** edges. A list standing in for a graph fails
 - [ ] Search / Recents are title + rows, not cards in a masonry
-- [ ] Tasks is three columns, not a type-filtered list labeled “board”
+- [ ] `task` in the view engine defaults to Board: three status columns, not a type-filtered list labeled “board”
+- [ ] Other types default to List unless the ontology earns another default
+- [ ] View switcher shows only earned views (Calendar / Timeline only with due; Outline only with hierarchy)
+- [ ] Graph exists on the rail and as a view type
 - [ ] Medium: inspector is a sheet (radius 21); Graph is still a canvas
 - [ ] Narrow: rail is an overlay with scrim, not a permanent icon strip; inspector is a sheet; Graph is still a canvas
-- [ ] `/view/nodes/:id` opens the shell with that node selected
+- [ ] `/view/nodes/:id` opens the shell with that node selected in its type’s view engine
 
 ### Density and type
 
@@ -466,7 +550,7 @@ Review against **dark** (first paint) on a wide window first, then medium, then 
 
 - [ ] First paint is dark: canvas `#0a0a0a`, ink `#ffffff`, elevated `#171717`, accent `#ffffff`
 - [ ] Light lane: canvas `#fafafa`, ink `#171717`, elevated `#ffffff`, accent `#171717`
-- [ ] Both lanes cover Unlock, Graph, Search, Recents, Tasks, and Inspector
+- [ ] Both lanes cover Unlock, Home, Graph, Search, Recents, View engine, and Inspector
 - [ ] Chrome accent is neutral ink — not a chromatic primary
 - [ ] Seed types match the hue table (task green, area red, project blue, …)
 - [ ] Overdue uses removed. Selected rail uses active fill. Focus uses border-strong
@@ -475,6 +559,7 @@ Review against **dark** (first paint) on a wide window first, then medium, then 
 ### Components and states
 
 - [ ] Controls are real primitives (buttons, inputs, selects, badges, cards, sheet, skeleton, toggle). Homemade unstyled controls fail
+- [ ] Empty Home: widgets empty, folders listed, not an error
 - [ ] Empty graph: one line, no fake nodes, not an error
 - [ ] Search with no query: the prompt, not “no results”
 - [ ] Search miss: “No matching nodes.”
@@ -482,5 +567,6 @@ Review against **dark** (first paint) on a wide window first, then medium, then 
 - [ ] Unlock miss: same form, error line in removed ink
 - [ ] Loading: skeletons, not a branded spinner
 - [ ] No write buttons anywhere (no Upsert, Delete, Link, Undo, Confirm)
+- [ ] No capture composer. No Today / Focus / Inbox on Home
 
 If a screen fails more than two boxes, it is not this contract yet. Fix the shell before adding another view.
