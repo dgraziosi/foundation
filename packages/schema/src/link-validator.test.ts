@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { listValidRelationSlugs, validateLink } from "./link-validator.js";
+import {
+  findInBatchLinkDuplicate,
+  listValidRelationSlugs,
+  validateLink,
+  validateLinkSequence,
+} from "./link-validator.js";
 import { SEED_NODE_TYPES } from "./seeds.js";
 import type { NodeType } from "./types.js";
 
@@ -292,6 +297,74 @@ test("custom type with parent_types may child_of that parent", () => {
   assert.equal(result.ok, true);
   if (!result.ok) return;
   assert.equal(result.relation_type, "child_of");
+});
+
+test("in-batch exact and symmetric duplicates refuse before write rules", () => {
+  const exact = findInBatchLinkDuplicate([
+    { from_id: ids.a, to_id: ids.b, relation_type: "relates_to" },
+    { from_id: ids.a, to_id: ids.b, relation_type: "relates_to" },
+  ]);
+  assert.equal(exact?.kind, "exact");
+  assert.equal(exact?.index, 1);
+  assert.equal(exact?.other, 0);
+
+  const symmetric = findInBatchLinkDuplicate([
+    { from_id: ids.a, to_id: ids.b, relation_type: "relates_to" },
+    { from_id: ids.b, to_id: ids.a, relation_type: "relates_to" },
+  ]);
+  assert.equal(symmetric?.kind, "symmetric");
+  assert.equal(symmetric?.index, 1);
+
+  const reverseInspired = findInBatchLinkDuplicate([
+    { from_id: ids.a, to_id: ids.b, relation_type: "inspired_by" },
+    { from_id: ids.b, to_id: ids.a, relation_type: "inspired_by" },
+  ]);
+  assert.equal(reverseInspired, null);
+});
+
+test("later edges in a batch see earlier accepted child_of", () => {
+  const secondParent = validateLinkSequence([
+    {
+      from_id: ids.a,
+      to_id: ids.b,
+      relation_type: "child_of",
+      from_type: "project",
+      to_type: "area",
+    },
+    {
+      from_id: ids.a,
+      to_id: ids.c,
+      relation_type: "child_of",
+      from_type: "project",
+      to_type: "area",
+    },
+  ]);
+  assert.equal(secondParent.ok, false);
+  if (secondParent.ok) return;
+  assert.equal(secondParent.index, 1);
+  assert.match(secondParent.error, /already has a child_of parent/);
+
+  const upgradedThenChild = validateLinkSequence([
+    {
+      from_id: ids.a,
+      to_id: ids.b,
+      relation_type: "relates_to",
+      from_type: "project",
+      to_type: "area",
+      upgrade: true,
+    },
+    {
+      from_id: ids.a,
+      to_id: ids.c,
+      relation_type: "child_of",
+      from_type: "project",
+      to_type: "area",
+    },
+  ]);
+  assert.equal(upgradedThenChild.ok, false);
+  if (upgradedThenChild.ok) return;
+  assert.equal(upgradedThenChild.index, 1);
+  assert.match(upgradedThenChild.error, /already has a child_of parent/);
 });
 
 test("types without parent_types still cannot use child_of", () => {

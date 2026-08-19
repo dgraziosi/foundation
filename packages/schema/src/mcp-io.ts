@@ -176,7 +176,21 @@ export const MutationOkSchema = z.object({
   activity_id: z.string().uuid(),
 });
 
-export const LinkInputSchema = z.object({
+export const LINK_BATCH_MAX = 20;
+
+export const LINK_FORM_SUGGESTION =
+  "Use from_id, to_id, and relation_type for one edge, or edges (max 20) for several.";
+
+export const LINK_INCOMPLETE_SUGGESTION =
+  "Each edge needs from_id, to_id, relation_type, and endpoint timestamps from get.";
+
+export const LINK_BATCH_MAX_SUGGESTION =
+  "Pass edges with 1 to 20 items, or use from_id, to_id, and relation_type for one edge.";
+
+export const LINK_CAS_AGREE_SUGGESTION =
+  "Use one updated_at from get for that node on every edge that touches it.";
+
+export const LinkEdgeItemSchema = z.object({
   from_id: z.string().uuid(),
   to_id: z.string().uuid(),
   relation_type: z.string().min(1),
@@ -186,16 +200,107 @@ export const LinkInputSchema = z.object({
   from_base_updated_at: z.string().min(1).optional(),
   /** Required: `to` node's `updated_at` from get. */
   to_base_updated_at: z.string().min(1).optional(),
+});
+export type LinkEdgeItem = z.infer<typeof LinkEdgeItemSchema>;
+
+export const LinkInputSchema = z.object({
+  from_id: z.string().uuid().optional(),
+  to_id: z.string().uuid().optional(),
+  relation_type: z.string().min(1).optional(),
+  upgrade: z.boolean().optional(),
+  metadata: JsonObjectSchema.optional(),
+  /** Required: `from` node's `updated_at` from get. */
+  from_base_updated_at: z.string().min(1).optional(),
+  /** Required: `to` node's `updated_at` from get. */
+  to_base_updated_at: z.string().min(1).optional(),
+  /** 1–20 edges. Pass this or the one-edge fields, not both. */
+  edges: z.array(LinkEdgeItemSchema).min(1).max(LINK_BATCH_MAX).optional(),
   actor: ActivityActorSchema.optional(),
   actor_label: z.string().trim().min(1).max(200).optional(),
 });
 export type LinkInput = z.infer<typeof LinkInputSchema>;
 
-export const LinkSuccessSchema = z.object({
+export const LinkItemSuccessSchema = z.object({
   edge: EdgeSchema,
   activity_id: z.string().uuid(),
   suggestion: z.string().optional(),
 });
+export type LinkItemSuccess = z.infer<typeof LinkItemSuccessSchema>;
+
+export const LinkSuccessSchema = z.object({
+  /** Always present. Input order. One receipt per written edge. */
+  links: z.array(LinkItemSuccessSchema).min(1).max(LINK_BATCH_MAX),
+  /** One-edge form only — the same item as `links[0]`. */
+  edge: EdgeSchema.optional(),
+  activity_id: z.string().uuid().optional(),
+  suggestion: z.string().optional(),
+});
+export type LinkSuccess = z.infer<typeof LinkSuccessSchema>;
+
+const LINK_FLAT_KEYS = [
+  "from_id",
+  "to_id",
+  "relation_type",
+  "upgrade",
+  "metadata",
+  "from_base_updated_at",
+  "to_base_updated_at",
+] as const;
+
+export function linkInputHasFlatFields(input: LinkInput): boolean {
+  return LINK_FLAT_KEYS.some((key) => input[key] !== undefined);
+}
+
+export type NormalizedLinkEdges = {
+  form: "flat" | "batch";
+  edges: LinkEdgeItem[];
+};
+
+/** Two forms, not both. Cap and empty `edges` are also enforced in Zod. */
+export function normalizeLinkEdges(input: LinkInput): NormalizedLinkEdges | ToolError {
+  const hasFlat = linkInputHasFlatFields(input);
+  const hasEdges = input.edges !== undefined;
+  if (hasFlat && hasEdges) {
+    return toolError("Pass either a single edge or edges[], not both", LINK_FORM_SUGGESTION);
+  }
+  if (hasEdges) {
+    const edges = input.edges ?? [];
+    if (edges.length === 0) {
+      return toolError("edges must contain at least one item", LINK_BATCH_MAX_SUGGESTION);
+    }
+    if (edges.length > LINK_BATCH_MAX) {
+      return toolError(
+        `edges accepts at most ${LINK_BATCH_MAX} items`,
+        LINK_BATCH_MAX_SUGGESTION,
+      );
+    }
+    return { form: "batch", edges };
+  }
+  if (
+    input.from_id === undefined ||
+    input.to_id === undefined ||
+    input.relation_type === undefined
+  ) {
+    return toolError(
+      "Pass from_id, to_id, and relation_type for one edge, or edges (1 to 20) for several",
+      LINK_INCOMPLETE_SUGGESTION,
+    );
+  }
+  return {
+    form: "flat",
+    edges: [
+      {
+        from_id: input.from_id,
+        to_id: input.to_id,
+        relation_type: input.relation_type,
+        upgrade: input.upgrade,
+        metadata: input.metadata,
+        from_base_updated_at: input.from_base_updated_at,
+        to_base_updated_at: input.to_base_updated_at,
+      },
+    ],
+  };
+}
 
 export const UnlinkInputSchema = z.object({
   from_id: z.string().uuid(),

@@ -79,6 +79,8 @@ test(
       assert.equal((boot.how_to_extend as { activity: string }).activity.includes("list_activity"), true);
       assert.equal((boot.how_to_extend as { search: string }).search.includes("full-text"), true);
       assert.match((boot.how_to_extend as { lookup: string }).lookup, /lookup resolves/);
+      assert.match((boot.how_to_extend as { links: string }).links, /edges\[\]/);
+      assert.match((boot.how_to_extend as { links: string }).links, /one transaction writes all edges or none/);
       assert.match((boot.how_to_extend as { lookup: string }).lookup, /not a probability/);
       assert.match((boot.how_to_extend as { search: string }).search, /call lookup/);
       const howTo = boot.how_to_extend as { summary: string };
@@ -133,6 +135,47 @@ test(
       );
       assert.equal(linked.error, undefined);
       assert.equal((linked.edge as { relation_type: string }).relation_type, "child_of");
+      const flatLinks = linked.links as Array<{ edge: { relation_type: string }; activity_id: string }>;
+      assert.equal(flatLinks.length, 1);
+      assert.equal(flatLinks[0]?.edge.relation_type, "child_of");
+      assert.equal(flatLinks[0]?.activity_id, linked.activity_id);
+
+      const note = asObject(
+        await client.callTool({
+          name: "upsert",
+          arguments: { type: "note", title: "Trip notes" },
+        }),
+      );
+      const batched = asObject(
+        await client.callTool({
+          name: "link",
+          arguments: {
+            edges: [
+              {
+                from_id: (note.node as { id: string }).id,
+                to_id: tripId,
+                relation_type: "inspired_by",
+                from_base_updated_at: (note.node as { updated_at: string }).updated_at,
+                to_base_updated_at: (trip.node as { updated_at: string }).updated_at,
+              },
+              {
+                from_id: tripId,
+                to_id: projectId,
+                relation_type: "relates_to",
+                from_base_updated_at: (trip.node as { updated_at: string }).updated_at,
+                to_base_updated_at: (project.node as { updated_at: string }).updated_at,
+              },
+            ],
+          },
+        }),
+      );
+      assert.equal(batched.error, undefined);
+      assert.equal(batched.edge, undefined);
+      const batchLinks = batched.links as Array<{ edge: { relation_type: string }; activity_id: string }>;
+      assert.equal(batchLinks.length, 2);
+      assert.equal(batchLinks[0]?.edge.relation_type, "inspired_by");
+      assert.equal(batchLinks[1]?.edge.relation_type, "relates_to");
+      assert.notEqual(batchLinks[0]?.activity_id, batchLinks[1]?.activity_id);
 
       const gotTrip = asObject(await client.callTool({ name: "get", arguments: { id: tripId } }));
       assert.equal((gotTrip.node as { payload: { body: string } }).payload.body, html);
