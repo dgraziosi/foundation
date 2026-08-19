@@ -31,7 +31,7 @@ Starter recipes: [`AGENTS.md`](./AGENTS.md).
 ## Primary users
 
 1. **Agents** via MCP — default interface (Cursor, Claude, and other MCP clients)
-2. **Operators** via the read-only window on the same API (`/view`). Same graph as MCP. The window is not a second store. SPEC is not a ceiling for that window — surfaces and layout live in [`VIEWER.md`](./VIEWER.md).
+2. **Operators** via the read-only window on the same API (`/view`). Same graph as MCP. The window is not a second store. Surfaces, shell, tokens, and states: [`VIEWER.md`](./VIEWER.md).
 
 ## Starter spine
 
