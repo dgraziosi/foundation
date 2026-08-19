@@ -222,44 +222,31 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       assert.ok(mcp.status === 401 || mcp.status === 403);
     });
 
-    await t.test("non-loopback cannot reach /mcp or /blobs even with localhost Host", async () => {
-      const { rows: countBefore } = await pool.query<{ n: string }>(
-        "SELECT COUNT(*)::text AS n FROM nodes WHERE deleted_at IS NULL",
-      );
-      for (const host of ["127.0.0.1", "localhost"]) {
-        const mcp = await fetch(`${origin}/mcp`, {
-          method: "POST",
-          headers: {
-            ...authHeader(),
-            host,
-            "x-foundation-remote": "192.168.10.20",
-            "content-type": "application/json",
-            accept: "application/json, text/event-stream",
-          },
-          body: mcpUpsertBody("Host spoof must not write"),
-        });
-        assert.equal(mcp.status, 403);
-
-        const blob = await fetch(`${origin}/blobs/11111111-1111-4111-8111-111111111111`, {
-          headers: {
-            ...authHeader(),
-            host,
-            "x-foundation-remote": "192.168.10.20",
-          },
-        });
-        assert.equal(blob.status, 403);
-      }
-      const { rows: countAfter } = await pool.query<{ n: string }>(
-        "SELECT COUNT(*)::text AS n FROM nodes WHERE deleted_at IS NULL",
-      );
-      assert.equal(countAfter[0]?.n, countBefore[0]?.n);
-    });
-
     await t.test("Authorization header still succeeds on MCP", async () => {
       const res = await fetch(`${origin}/mcp`, {
         method: "POST",
         headers: {
           ...authHeader(),
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: { name: "bootstrap", arguments: {} },
+        }),
+      });
+      assert.equal(res.status, 200);
+    });
+
+    await t.test("Compose published-port peer can reach /mcp with localhost Host", async () => {
+      const res = await fetch(`${origin}/mcp`, {
+        method: "POST",
+        headers: {
+          ...authHeader(),
+          host: "127.0.0.1",
+          "x-foundation-remote": "172.17.0.1",
           "content-type": "application/json",
           accept: "application/json, text/event-stream",
         },
@@ -516,17 +503,6 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       });
       assert.equal(offboxDownload.status, 200);
       assert.match(offboxDownload.headers.get("content-disposition") ?? "", /attachment/i);
-
-      for (const host of ["127.0.0.1", "localhost"]) {
-        const spoofed = await fetch(`${origin}/blobs/${got.blob.id}`, {
-          headers: {
-            cookie,
-            host,
-            "x-foundation-remote": "10.0.0.8",
-          },
-        });
-        assert.equal(spoofed.status, 403);
-      }
 
       const headerAgentPath = await fetch(`${origin}/blobs/${got.blob.id}`, {
         headers: authHeader(),

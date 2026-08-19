@@ -44,7 +44,7 @@ services:
     volumes:
       - ${FOUNDATION_DATA:-./data}:/data
     # Published so /view works from another machine on this vault.
-    # /mcp and /blobs stay loopback-only in the process (Host is not isolation).
+    # Host harnesses attach at 127.0.0.1:${PORT:-8787}/mcp (Host is the gate).
     ports:
       - "${PORT:-8787}:8787"
     restart: unless-stopped

@@ -5,7 +5,7 @@ import { requireApiKey } from "./auth.js";
 import { sendBlob } from "./blobs-http.js";
 import type { AppConfig } from "./config.js";
 import { handleMcpRequest } from "./mcp.js";
-import { isAgentPath, isViewPath, requestIsLoopback } from "./security.js";
+import { isViewPath } from "./security.js";
 import { registerViewRoutes } from "./view.js";
 
 /** 20MB blob cap as base64 plus JSON-RPC envelope. */
@@ -18,20 +18,13 @@ function requestPath(req: express.Request): string {
 }
 
 /**
- * `/view` works off-box (published 8787). `/mcp` and `/blobs` require a loopback
- * connection — a Host: localhost header on a remote socket is not enough.
+ * `/view` works off-box (published 8787). Other paths need a localhost Host.
+ * Socket loopback is not the gate: Compose's published port presents the
+ * bridge gateway as the peer, which would 403 the documented host harness.
  */
 function hostGuard(req: express.Request, res: express.Response, next: express.NextFunction): void {
   const path = requestPath(req);
   if (isViewPath(path)) {
-    next();
-    return;
-  }
-  if (isAgentPath(path)) {
-    if (!requestIsLoopback(req)) {
-      res.status(403).json({ error: "Loopback only" });
-      return;
-    }
     next();
     return;
   }
