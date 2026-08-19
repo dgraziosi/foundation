@@ -1,4 +1,5 @@
-import { type HTMLAttributes, type ReactNode } from "react";
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+import { type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export function Tooltip({
@@ -9,10 +10,25 @@ export function Tooltip({
   label: string;
   children: ReactNode;
   className?: string;
-} & HTMLAttributes<HTMLSpanElement>) {
+}) {
   return (
-    <span className={cn("relative inline-flex", className)} title={label}>
-      {children}
-    </span>
+    <TooltipPrimitive.Provider delayDuration={200}>
+      <TooltipPrimitive.Root>
+        <TooltipPrimitive.Trigger asChild className={className}>
+          {children}
+        </TooltipPrimitive.Trigger>
+        <TooltipPrimitive.Portal>
+          <TooltipPrimitive.Content
+            side="right"
+            sideOffset={8}
+            className={cn(
+              "z-50 rounded-md border border-border bg-elevated px-2 py-1 text-meta text-foreground shadow-md",
+            )}
+          >
+            {label}
+          </TooltipPrimitive.Content>
+        </TooltipPrimitive.Portal>
+      </TooltipPrimitive.Root>
+    </TooltipPrimitive.Provider>
   );
 }

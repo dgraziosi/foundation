@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { resolveDeclaredViews } from "./views/resolve.js";
+import { resolveDeclaredViews } from "./resolve.js";
 
 test("viewer does not invent list when views are empty", () => {
   assert.deepEqual(resolveDeclaredViews({ views: [] }), { views: [] });

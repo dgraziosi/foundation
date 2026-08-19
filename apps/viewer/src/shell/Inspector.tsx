@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Sheet } from "@/components/ui/sheet";
-import { cn } from "@/lib/utils";
 import { ApiError, fetchNode, type NodeDetail } from "../api";
 import { DueChip, StatusTag, TypeTag } from "../ui/Tags";
 import { LoadError, Placeholders, Quiet } from "../ui/States";
@@ -198,7 +197,7 @@ export function Inspector({
         <div className="px-lg pt-lg">{body}</div>
       </aside>
       <div className="xl:hidden">
-        <Sheet open={open} onClose={onClose} className={cn(!open && "hidden")}>
+        <Sheet open={open} onClose={onClose}>
           {body}
         </Sheet>
       </div>

@@ -9,7 +9,7 @@ const root = dirname(fileURLToPath(import.meta.url));
 test("chrome uses shadcn primitives, not homemade fields", async () => {
   const files = [
     "pages/UnlockPage.tsx",
-    "pages/GraphPage.tsx",
+    "graph/GraphCanvas.tsx",
     "pages/SearchPage.tsx",
     "pages/RecentsPage.tsx",
     "pages/HomePage.tsx",
@@ -41,6 +41,12 @@ test("chrome uses shadcn primitives, not homemade fields", async () => {
   assert.match(board, /No tasks yet/);
   const tags = await readFile(join(root, "ui/Tags.tsx"), "utf8");
   assert.match(tags, /from "@\/components\/ui\/badge"/);
+  const sheet = await readFile(join(root, "components/ui/sheet.tsx"), "utf8");
+  assert.match(sheet, /@radix-ui\/react-dialog/);
+  const scroll = await readFile(join(root, "components/ui/scroll-area.tsx"), "utf8");
+  assert.match(scroll, /@radix-ui\/react-scroll-area/);
+  const tooltip = await readFile(join(root, "components/ui/tooltip.tsx"), "utf8");
+  assert.match(tooltip, /@radix-ui\/react-tooltip/);
 });
 
 test("Search snippets render FTS highlights instead of raw <b> tags", async () => {
