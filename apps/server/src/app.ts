@@ -5,6 +5,7 @@ import { requireApiKey } from "./auth.js";
 import { sendBlob } from "./blobs-http.js";
 import type { AppConfig } from "./config.js";
 import { handleMcpRequest } from "./mcp.js";
+import { isAgentPath, isViewPath, requestIsLoopback } from "./security.js";
 import { registerViewRoutes } from "./view.js";
 
 /** 20MB blob cap as base64 plus JSON-RPC envelope. */
@@ -12,10 +13,25 @@ const JSON_BODY_LIMIT = "32mb";
 
 const localhostHosts = hostHeaderValidation(["localhost", "127.0.0.1", "[::1]"]);
 
-/** MCP and agent blob paths stay localhost-Host. `/view` must work off-box. */
+function requestPath(req: express.Request): string {
+  return (req.originalUrl.split("?")[0] ?? "").replace(/\/+$/, "") || "/";
+}
+
+/**
+ * `/view` works off-box (published 8787). `/mcp` and `/blobs` require a loopback
+ * connection — a Host: localhost header on a remote socket is not enough.
+ */
 function hostGuard(req: express.Request, res: express.Response, next: express.NextFunction): void {
-  const path = (req.originalUrl.split("?")[0] ?? "").replace(/\/+$/, "") || "/";
-  if (path === "/view" || path.startsWith("/view/")) {
+  const path = requestPath(req);
+  if (isViewPath(path)) {
+    next();
+    return;
+  }
+  if (isAgentPath(path)) {
+    if (!requestIsLoopback(req)) {
+      res.status(403).json({ error: "Loopback only" });
+      return;
+    }
     next();
     return;
   }
