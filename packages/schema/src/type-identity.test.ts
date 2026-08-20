@@ -23,6 +23,7 @@ test("seed types carry a first-paint hue and Lucide glyph", () => {
     "note",
     "trip",
     "decision",
+    "spend",
   ]) {
     const identity = SEED_TYPE_IDENTITY[slug];
     assert.ok(identity, slug);
@@ -33,6 +34,8 @@ test("seed types carry a first-paint hue and Lucide glyph", () => {
   assert.equal(SEED_TYPE_IDENTITY.task?.glyph, "CircleCheck");
   assert.equal(SEED_TYPE_IDENTITY.area?.hue, "red");
   assert.equal(SEED_TYPE_IDENTITY.project?.hue, "blue");
+  assert.equal(SEED_TYPE_IDENTITY.spend?.hue, "teal");
+  assert.equal(SEED_TYPE_IDENTITY.spend?.glyph, "Receipt");
 });
 
 test("parseTypeIdentity accepts named hue and Lucide glyph", () => {

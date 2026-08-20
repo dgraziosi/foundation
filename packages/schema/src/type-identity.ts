@@ -89,6 +89,7 @@ export const SEED_TYPE_IDENTITY: Record<string, { hue: TypeHueName; glyph: strin
   note: { hue: "sky", glyph: "FileText" },
   trip: { hue: "orange", glyph: "Plane" },
   decision: { hue: "indigo", glyph: "Split" },
+  spend: { hue: "teal", glyph: "Receipt" },
 };
 
 /** Fill missing seed hue/glyph only. Do not overwrite an operator edit. */

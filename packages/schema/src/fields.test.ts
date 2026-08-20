@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   compileJsonSchemaFromFields,
+  mergeMissingFields,
   parseTypeFieldsInput,
   validateDataAgainstJsonSchema,
 } from "./index.js";
@@ -51,4 +52,47 @@ test("compile: needed is not required; extra keys pass; wrong kind misses", () =
   const miss = validateDataAgainstJsonSchema({ due: "tomorrow" }, schema, "task");
   assert.ok(miss);
   assert.match(miss.error, /does not match json_schema/);
+});
+
+test("spend fields: fixture data passes; bad stage misses; merge keeps operator field", () => {
+  const parsed = parseTypeFieldsInput([
+    { name: "amount", kind: "number", display: "Amount", needed: true },
+    { name: "currency", kind: "string", display: "Currency", needed: true },
+    { name: "due", kind: "date", display: "Date", needed: false, role: "date" },
+    { name: "vendor", kind: "string", display: "Vendor", needed: false },
+    { name: "stage", kind: "enum", display: "Stage", needed: true, enum_values: ["quoted", "paid"] },
+  ]);
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) {
+    return;
+  }
+  const schema = compileJsonSchemaFromFields(parsed.fields);
+  assert.equal(
+    validateDataAgainstJsonSchema(
+      {
+        amount: 12.5,
+        currency: "USD",
+        due: "2026-08-20",
+        vendor: "Fixture vendor",
+        stage: "quoted",
+      },
+      schema,
+      "spend",
+    ),
+    null,
+  );
+  const badStage = validateDataAgainstJsonSchema({ stage: "invoiced" }, schema, "spend");
+  assert.ok(badStage);
+  assert.match(badStage.error, /does not match json_schema for type "spend"/);
+  assert.match(badStage.suggestion ?? "", /inspect_ontology/);
+
+  const seed = parsed.fields;
+  const operator = [{ name: "budget_amount", display: "Envelope", kind: "number" as const, needed: false }];
+  const merged = mergeMissingFields(operator, [
+    { name: "budget_amount", display: "Budget", kind: "number", needed: false },
+    { name: "budget_currency", display: "Budget currency", kind: "string", needed: false },
+  ]);
+  assert.equal(merged.find((field) => field.name === "budget_amount")?.display, "Envelope");
+  assert.ok(merged.some((field) => field.name === "budget_currency"));
+  assert.equal(seed.length, 5);
 });

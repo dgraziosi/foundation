@@ -99,6 +99,7 @@ test(
       const bootSlugs = (boot.types as Array<{ slug: string }>).map((type) => type.slug);
       assert.ok(bootSlugs.includes("place"));
       assert.ok(bootSlugs.includes("company"));
+      assert.ok(bootSlugs.includes("spend"));
       assert.match((boot.how_to_extend as { search: string }).search, /data_equals/);
       assert.equal((boot.how_to_extend as { nodes: string }).nodes.includes("upsert"), true);
       assert.equal((boot.how_to_extend as { activity: string }).activity.includes("list_activity"), true);

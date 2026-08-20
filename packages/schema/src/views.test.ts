@@ -161,6 +161,8 @@ test("seed type views match first-paint queries", () => {
   ]);
   assert.equal(SEED_TYPE_VIEWS.task.default_view, "board");
   assert.equal(SEED_TYPE_VIEWS.note?.default_view, "list");
+  assert.equal(SEED_TYPE_VIEWS.spend?.default_view, "list");
+  assert.deepEqual(viewIds(SEED_TYPE_VIEWS.spend?.views), ["list"]);
   assert.deepEqual(viewIds(SEED_TYPE_VIEWS.goal?.views), ["list", "calendar", "timeline", "outline"]);
   assert.deepEqual(viewIds(SEED_TYPE_VIEWS.trip?.views), ["list", "calendar", "timeline"]);
   const board = SEED_TYPE_VIEWS.task.views.find((view) => view.id === "board");

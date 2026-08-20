@@ -21,6 +21,19 @@ const PERSON_FIELDS: TypeField[] = [
   { name: "org", display: "Org", kind: "string", needed: false, role: "subtitle" },
 ];
 
+const PROJECT_FIELDS: TypeField[] = [
+  { name: "budget_amount", display: "Budget", kind: "number", needed: false },
+  { name: "budget_currency", display: "Budget currency", kind: "string", needed: false },
+];
+
+const SPEND_FIELDS: TypeField[] = [
+  { name: "amount", display: "Amount", kind: "number", needed: true },
+  { name: "currency", display: "Currency", kind: "string", needed: true },
+  { name: "due", display: "Date", kind: "date", needed: false, role: "date" },
+  { name: "vendor", display: "Vendor", kind: "string", needed: false },
+  { name: "stage", display: "Stage", kind: "enum", needed: true, enum_values: ["quoted", "paid"] },
+];
+
 function withSeedContract(
   type: Omit<NodeType, "views" | "default_view" | "fields" | "json_schema" | "hue" | "glyph"> & {
     fields?: TypeField[];
@@ -53,6 +66,7 @@ export const ARTIFACT_TYPE_SLUGS = [
   "note",
   "trip",
   "decision",
+  "spend",
 ] as const;
 
 const SEED_NODE_TYPE_DEFS = [
@@ -67,9 +81,11 @@ const SEED_NODE_TYPE_DEFS = [
   {
     slug: "project",
     label: "Project",
-    description: "A bounded effort that lives under an area.",
+    description:
+      "A bounded effort that lives under an area. Optional budget_amount and budget_currency hold the envelope.",
     kind: "spine" as const,
     parent_types: ["area"],
+    fields: PROJECT_FIELDS,
     is_system: true,
   },
   {
@@ -174,6 +190,16 @@ const SEED_NODE_TYPE_DEFS = [
     description: "A choice that was made. May hang under an area, project, or goal.",
     kind: "artifact" as const,
     parent_types: ["area", "project", "goal"],
+    is_system: true,
+  },
+  {
+    slug: "spend",
+    label: "Spend",
+    description:
+      "One recorded money line under a project (a bid or a payment). Hang with child_of a project. Optional amount, currency, due (Date), vendor, and stage (quoted or paid).",
+    kind: "artifact" as const,
+    parent_types: ["project"],
+    fields: SPEND_FIELDS,
     is_system: true,
   },
 ];
