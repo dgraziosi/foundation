@@ -59,7 +59,7 @@ flowchart LR
 A node has **type**, **title**, **status**, a **payload**, and **data**. Identity is UUID.
 
 - **Payload** is either **inline** (`text/markdown`, `text/html`, `application/json`, `text/plain`) or a **blob** (file on the node).
-- **data** is structured JSON. The type’s `fields` compile to `json_schema` (`additionalProperties: true`). upsert validates the merged object against that document. Extra keys still write. `needed` on a field is a hint, not JSON Schema `required`. A `ref` field is a typed UUID pointer, not an edge. `data.origin` is an optional pointer, not a mirrored body. `data.due` is the seed `task` / `goal` date field (ISO `YYYY-MM-DD`; omit it and the node still writes; `due: null` clears). `data.aliases` is an optional string array of operator-authored alternate names (any type; used by `lookup`). Stored on the JSONB `data` object, not a separate column.
+- **data** is structured JSON. The type’s `fields` compile to `json_schema` (`additionalProperties: true`). upsert validates the merged object against that document. Extra keys still write. `needed` on a field is a hint, not JSON Schema `required`. A `ref` field is a typed UUID pointer, not an edge. `data.origin` is an optional pointer, not a mirrored body. `data.due` is the seed date field (ISO `YYYY-MM-DD`; omit it and the node still writes; `due: null` clears) on `task`, `goal`, and `spend` (on `spend`, display is Date). `project` may hold optional `budget_amount` / `budget_currency`. `spend` holds `amount`, `currency`, `due`, `vendor` (string), and `stage` (`quoted` | `paid`). `data.aliases` is an optional string array of operator-authored alternate names (any type; used by `lookup`). Stored on the JSONB `data` object, not a separate column. Seed apply fills missing seed fields and missing seed hue/glyph only; it does not overwrite an operator edit.
 
 ```mermaid
 flowchart TB
@@ -75,7 +75,8 @@ flowchart TB
 
   node_data --> structured["structured fields"]
   node_data --> origin["origin ref"]
-  node_data --> due["date-role fields (due on task / goal)"]
+  node_data --> due["date-role fields (due on task / goal / spend)"]
+  node_data --> budget["budget_amount / budget_currency on project"]
   node_data --> aliases["data.aliases"]
   node_data --> schema["json_schema compiled from fields"]
 ```
@@ -86,9 +87,9 @@ Hierarchy verb is `child_of`. At most one `child_of` per node. Allowed parents c
 
 Spine: **area → project → goal → habit | task** — preferred placement, not a hard gate. `task` may `child_of` `goal` or `project` (prefer goal when there is a real outcome). `task` cannot `child_of` `area`.
 
-Recommended structure: Area → project → goal → task. A habit hangs under a goal. A task may child_of a goal or a project.
+Recommended structure: Area → project → goal → task. A habit hangs under a goal. A task may child_of a goal or a project. A spend hangs under a project.
 
-Artifacts hang off that spine or sit beside it. Seeds include person, place, company, decision, note, lesson, journal, idea, trip. `lesson` and `decision` may hang under area, project, or goal. `person`, `place`, `company`, `note`, and the other artifacts sit beside unless an agent links them.
+Artifacts hang off that spine or sit beside it. Seeds include person, place, company, decision, note, lesson, journal, idea, trip, spend. `lesson` and `decision` may hang under area, project, or goal. `spend` hangs under a project (`child_of`). `person`, `place`, `company`, `note`, and the other artifacts sit beside unless an agent links them. `spend` is one money line, not a ledger.
 
 ```mermaid
 flowchart TB
@@ -108,6 +109,9 @@ flowchart TB
   hang -.-> area
   hang -.-> project
   hang -.-> goal
+
+  spend["spend"]
+  spend -.->|"child_of"| project
 
   beside["person / place / company / note / ..."]
   beside -.-> area
@@ -175,7 +179,7 @@ flowchart LR
 - `origin` — unique live `data.origin` ref
 - `due` — `overdue` or `today` (`America/New_York`)
 - `due_on_or_before` / `due_on_or_after` — inclusive ISO date window on `data.due`
-- `data_equals` — one or a few top-level `data` keys equal a string value (JSONB `@>`, same family as `data.origin` / `data.due`; not a column per key). Example shape: `{ kind: "…", status: "…" }`.
+- `data_equals` — one or a few top-level `data` keys equal a string value (JSONB `@>`, same family as `data.origin` / `data.due`; not a column per key). Example shape: `{ kind: "…", status: "…" }`. Seed `spend` filters `{ stage: "quoted" }` or `{ currency: "USD" }` this way; `amount` is a number and does not.
 
 Empty `{}` is an error (no `list_nodes` tool). Hits are lean and include `due` when `data.due` is set; `get` loads payload, `data.due`, and neighbor titles.
 
