@@ -10,9 +10,9 @@ The vault is one running instance. It holds the **graph** — the live network o
 ## 2. Ontology
 The ontology is the vocabulary of the graph: types and relations. Starter types get you going. You can use them, change them, or add your own.
 
-Starter types: area, project, goal, task, person, place, company, note, habit, journal, idea, trip, decision, lesson
+Starter types: area, project, goal, task, person, place, company, note, habit, journal, idea, trip, decision, lesson, spend
 
-Recommended structure: Area → project → goal → task. The point is to break work into smaller pieces so bots can take them on. A habit hangs under a goal. A task may child_of a goal or a project.
+Recommended structure: Area → project → goal → task. The point is to break work into smaller pieces so bots can take them on. A habit hangs under a goal. A task may child_of a goal or a project. A spend hangs under a project. A project may hold a budget amount and currency.
 
 ## 3. Bots
 The bots help you take action on what is in your vault. Three starter recipes ship with the repo. You can add more later using your platform of choice. Paste them from [`docs/AGENTS.md`](docs/AGENTS.md).
@@ -85,7 +85,7 @@ Requires [Docker Compose](https://docs.docker.com/compose/) and a copy of this r
 
 4. Call `bootstrap` first. It returns the starter spine (`area → project → goal → habit | task` — preferred, not a hard gate for `task` → `project`), seeded types/relations, and how to extend the ontology.
 
-   After bootstrap, an agent can `upsert` an `area` and `project`, `link` them with `child_of`, store an HTML itinerary on a `trip` node (`payload.media_type = "text/html"`), `search` that itinerary back, list open or overdue tasks with `search` `{ type: "task", status: "active" }` or `{ type: "task", due: "overdue" }` (no query), `lookup` a name then `working_set` for the open work around that node, attach a PDF blob on a `note` (`payload.storage = "blob"`), `manage_type` a custom type (including retire of an unused authored type), `list_activity` for receipts, and `undo` a reversible mutation. Destructive tools (`delete`, `unlink`, `undo`, `manage_type` retire) require `confirm: true`. If you already have a UUID, call `get` for the node or `working_set` for the agenda. An empty lexical `search` is not a reason to upsert a duplicate.
+   After bootstrap, an agent can `upsert` an `area` and `project`, `link` them with `child_of`, store an HTML itinerary on a `trip` node (`payload.media_type = "text/html"`), `search` that itinerary back, list open or overdue tasks with `search` `{ type: "task", status: "active" }` or `{ type: "task", due: "overdue" }` (no query), `upsert` a `spend` under a project (`amount` `12.50`, `currency` `USD`, `vendor` `Fixture vendor`, `stage` `quoted` or `paid`) and list those lines with `search` `{ type: "spend", under }` or `{ type: "spend", data_equals: { stage: "paid" } }`, `lookup` a name then `working_set` for the open work around that node, attach a PDF blob on a `note` (`payload.storage = "blob"`), `manage_type` a custom type (including retire of an unused authored type), `list_activity` for receipts, and `undo` a reversible mutation. Destructive tools (`delete`, `unlink`, `undo`, `manage_type` retire) require `confirm: true`. If you already have a UUID, call `get` for the node or `working_set` for the agenda. An empty lexical `search` is not a reason to upsert a duplicate.
 
    With Node 22 + pnpm (and Compose already up):
 

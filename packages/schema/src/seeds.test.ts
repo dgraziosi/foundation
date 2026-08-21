@@ -28,6 +28,7 @@ test("seed node types parse and include spine plus artifacts", () => {
   assert.ok(slugs.includes("place"));
   assert.ok(slugs.includes("company"));
   assert.ok(slugs.includes("decision"));
+  assert.ok(slugs.includes("spend"));
   assert.equal(slugs.includes("core_value"), false);
   const place = SEED_NODE_TYPES.find((type) => type.slug === "place");
   const company = SEED_NODE_TYPES.find((type) => type.slug === "company");
@@ -76,6 +77,31 @@ test("seed node types parse and include spine plus artifacts", () => {
   assert.equal(task?.glyph, "CircleCheck");
   assert.equal(SEED_NODE_TYPES.find((type) => type.slug === "area")?.hue, "red");
   assert.equal(SEED_NODE_TYPES.find((type) => type.slug === "note")?.glyph, "FileText");
+  const spend = SEED_NODE_TYPES.find((type) => type.slug === "spend");
+  assert.equal(spend?.kind, "artifact");
+  assert.deepEqual(spend?.parent_types, ["project"]);
+  assert.deepEqual(spend?.fields?.map((field) => field.name), [
+    "amount",
+    "currency",
+    "due",
+    "vendor",
+    "stage",
+  ]);
+  assert.equal(spend?.fields?.find((field) => field.name === "due")?.display, "Date");
+  assert.equal(spend?.fields?.find((field) => field.name === "due")?.role, "date");
+  assert.deepEqual(spend?.fields?.find((field) => field.name === "stage")?.enum_values, [
+    "quoted",
+    "paid",
+  ]);
+  assert.deepEqual(spend?.views?.map((view) => view.id), ["list"]);
+  assert.equal(spend?.default_view, "list");
+  assert.equal(spend?.hue, "teal");
+  assert.equal(spend?.glyph, "Receipt");
+  const project = SEED_NODE_TYPES.find((type) => type.slug === "project");
+  assert.deepEqual(project?.fields?.map((field) => field.name), [
+    "budget_amount",
+    "budget_currency",
+  ]);
 });
 
 test("seed relations include child_of and associative verbs", () => {

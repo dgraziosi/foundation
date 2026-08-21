@@ -191,6 +191,7 @@ test(
       assert.ok(typeSlugs.includes("place"));
       assert.ok(typeSlugs.includes("company"));
       assert.ok(typeSlugs.includes("decision"));
+      assert.ok(typeSlugs.includes("spend"));
       const place = types.find((type) => type.slug === "place");
       assert.equal(place?.kind, "artifact");
       assert.deepEqual(place?.parent_types, []);

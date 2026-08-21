@@ -604,6 +604,7 @@ export const SEED_TYPE_VIEWS: Readonly<
   journal: { views: seedViews(["list"], { sort: TITLE_SORT }), default_view: "list" },
   idea: { views: seedViews(["list"], { sort: TITLE_SORT }), default_view: "list" },
   note: { views: seedViews(["list"], { sort: TITLE_SORT }), default_view: "list" },
+  spend: { views: seedViews(["list"], { sort: TITLE_SORT }), default_view: "list" },
   trip: {
     views: seedViews(["list", "calendar", "timeline"], {
       sort: START_THEN_TITLE,
