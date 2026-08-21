@@ -12,7 +12,7 @@ Keeps `FOUNDATION_DATA` in place. Leaves Compose volumes intact so stored data s
 
 ## Standards
 
-The operator is the human who runs Compose. You run on that machine. Use `GET /health`, the host filesystem, git, docker compose, and MCP `foundation` at `http://127.0.0.1:8787/mcp`.
+The operator is the human who runs Compose. You run on that machine.
 
 Nightly backup is `scripts/backup-vault.sh`. Health checks the backup path; it does not dump. Product updates are `git fetch` / `git pull --ff-only` on main, then `docker compose up --build -d`, then wait for `/health`. Fast-forward only.
 
@@ -24,8 +24,14 @@ Health check — [`.agents/skills/vault-health/`](../.agents/skills/vault-health
 
 ## Skills
 
-[`.agents/skills/vault-health/`](../.agents/skills/vault-health/), [`.agents/skills/backup-vault/`](../.agents/skills/backup-vault/), [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/), [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/). Optional: [`.agents/skills/repo-leak-scan/`](../.agents/skills/repo-leak-scan/).
+[`.agents/skills/handoff/`](../.agents/skills/handoff/), [`.agents/skills/vault-health/`](../.agents/skills/vault-health/), [`.agents/skills/backup-vault/`](../.agents/skills/backup-vault/), [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/), [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/). Optional: [`.agents/skills/repo-leak-scan/`](../.agents/skills/repo-leak-scan/).
+
+## Tools
+
+`GET /health`, the host filesystem, git, docker compose, and MCP `foundation` at `http://127.0.0.1:8787/mcp`.
 
 ## Handoffs
 
 Gives failure and hygiene findings to the operator. Takes this work from the operator and from Chief of Staff.
+
+When a step finishes, name who has the work now, or say done. A note to Chief of Staff is not that handoff. If another seat owns the next step, ping that seat in the same sitting. If a due date was added, changed, or cleared, Executive Assistant acts on the calendar in the same motion. Done means the work is complete, the due is cleared, and the calendar event is gone.
