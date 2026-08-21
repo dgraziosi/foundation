@@ -231,6 +231,15 @@ export {
   originFromData,
   canonicalizeOriginInData,
 } from "./origin.js";
+export {
+  RECEIPT_INCOMPLETE_SUGGESTION,
+  RECEIPT_PAIR_SUGGESTION,
+  RECEIPT_UNKNOWN_SUGGESTION,
+  isToolErrorReceipt,
+  receiptConflictError,
+  receiptFromData,
+  canonicalizeReceiptInData,
+} from "./receipt.js";
 export { validateDataAgainstJsonSchema } from "./json-schema.js";
 export {
   ALIASES_MAX,
@@ -350,6 +359,11 @@ export {
   ORIGIN_SYSTEMS,
   OriginRefSchema,
   OriginSystemSchema,
+  RECEIPT_KINDS,
+  RECEIPT_SYSTEMS,
+  ReceiptKindSchema,
+  ReceiptRefSchema,
+  ReceiptSystemSchema,
   PayloadSchema,
   PayloadStorageSchema,
   RelationKindSchema,
@@ -365,6 +379,9 @@ export {
   type NodeType,
   type OriginRef,
   type OriginSystem,
+  type ReceiptKind,
+  type ReceiptRef,
+  type ReceiptSystem,
   type Payload,
   type PayloadStorage,
   type RelationKind,

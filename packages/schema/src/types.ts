@@ -48,6 +48,22 @@ export const OriginRefSchema = z.object({
 });
 export type OriginRef = z.infer<typeof OriginRefSchema>;
 
+/** Mail sent or calendar event gone. Pointer only — never fetch or mirror bodies. */
+export const RECEIPT_SYSTEMS = ["gmail", "calendar"] as const;
+export type ReceiptSystem = (typeof RECEIPT_SYSTEMS)[number];
+
+export const RECEIPT_KINDS = ["sent", "cleared"] as const;
+export type ReceiptKind = (typeof RECEIPT_KINDS)[number];
+
+export const ReceiptSystemSchema = z.enum(RECEIPT_SYSTEMS);
+export const ReceiptKindSchema = z.enum(RECEIPT_KINDS);
+export const ReceiptRefSchema = z.object({
+  system: ReceiptSystemSchema,
+  id: z.string().trim().min(1),
+  kind: ReceiptKindSchema,
+});
+export type ReceiptRef = z.infer<typeof ReceiptRefSchema>;
+
 export const NodeSchema = z.object({
   id: z.string().uuid(),
   type: z.string().min(1),
