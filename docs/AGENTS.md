@@ -4,7 +4,7 @@ After Compose is up, paste these three bots into your harness. They use the vaul
 
 `GET http://127.0.0.1:8787/health` should return `{ "ok": true, "service": "foundation", "db": "up" }`. How to attach MCP (URL, API key, confirm with `bootstrap` or a simple `search`): [`HARNESS.md`](./HARNESS.md).
 
-Each recipe uses the same locked headings: Job, Responsibilities, Standards, Routines, Skills, Handoffs. Paste the seats. Their routines cite skill folders; do not paste those folders as extra bots.
+Each recipe uses the same locked headings: Job, Responsibilities, Standards, Routines, Skills, Tools, Handoffs. Skills are named recipe folders under [`.agents/skills/`](../.agents/skills/). Tools are connectors and runtimes. Paste the bots. Their routines cite skill folders; do not paste those folders as extra bots.
 
 ## Chief of Staff
 
@@ -19,7 +19,7 @@ Paste [`prompts/vault-keeper.md`](../prompts/vault-keeper.md). Same machine, sam
 3. Graph hygiene — [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/). Read [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md).
 4. Product updates — [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/). On the machine that runs Compose: `git fetch` / `git pull --ff-only` on main, `docker compose up --build -d`, wait for `/health`.
 
-Fill in the operator config (data dir, optional well-known nodes, `BACKUP_ROOT`, clone path). Vault Keeper keeps `FOUNDATION_DATA` in place and leaves Compose volumes intact.
+Fill in the user config (data dir, optional well-known nodes, `BACKUP_ROOT`, clone path). Vault Keeper keeps `FOUNDATION_DATA` in place and leaves Compose volumes intact.
 
 ## Executive Assistant
 
@@ -27,9 +27,9 @@ Paste [`prompts/executive-assistant.md`](../prompts/executive-assistant.md). Giv
 
 ## Another bot
 
-Chief of Staff uses [`.agents/skills/create-bot/`](../.agents/skills/create-bot/), fills the six headings on the blank template in that folder, and pastes the result into the operator’s harness.
+Chief of Staff uses [`.agents/skills/create-bot/`](../.agents/skills/create-bot/), fills the seven headings on the blank template in that folder, and pastes the result into the user’s harness.
 
-## Where seats live
+## Where bots live
 
 | File | Paste into |
 | --- | --- |
@@ -39,11 +39,13 @@ Chief of Staff uses [`.agents/skills/create-bot/`](../.agents/skills/create-bot/
 
 ## Where skills live
 
-Named skill folders under [`.agents/skills/`](../.agents/skills/). Do not paste these as seats. How a named harness loads that folder: [`HARNESS.md`](./HARNESS.md).
+Named skill folders under [`.agents/skills/`](../.agents/skills/). Do not paste these as bots. How a named harness loads that folder: [`HARNESS.md`](./HARNESS.md).
 
 | Folder | Use |
 | --- | --- |
-| [`.agents/skills/create-bot/`](../.agents/skills/create-bot/) | Another seat from the blank template |
+| [`.agents/skills/create-bot/`](../.agents/skills/create-bot/) | Another bot from the blank template |
+| [`.agents/skills/handoff/`](../.agents/skills/handoff/) | Name who has the work now, or say done |
+| [`.agents/skills/foundation-mcp/`](../.agents/skills/foundation-mcp/) | Vault MCP — which call to use |
 | [`.agents/skills/vault-health/`](../.agents/skills/vault-health/) | Weekday morning vault-health routine |
 | [`.agents/skills/backup-vault/`](../.agents/skills/backup-vault/) | Nightly backup (`scripts/backup-vault.sh`) |
 | [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/) | Weekly graph-hygiene routine |
