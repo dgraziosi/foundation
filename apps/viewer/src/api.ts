@@ -230,8 +230,9 @@ export function fetchRecents(limit?: number) {
   return viewFetch<{ rows: RecentRow[] }>(`/view/api/recents${suffix}`);
 }
 
-export function fetchTasks() {
-  return viewFetch<{ tasks: TaskCard[] }>("/view/api/tasks");
+export function fetchTasks(limit?: number) {
+  const suffix = limit ? `?limit=${limit}` : "";
+  return viewFetch<{ tasks: TaskCard[] }>(`/view/api/tasks${suffix}`);
 }
 
 export function fetchType(slug: string) {

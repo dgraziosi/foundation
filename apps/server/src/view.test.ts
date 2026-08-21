@@ -545,7 +545,7 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       assert.doesNotMatch(html, />\s*(Upsert|Delete|Link|Unlink|Undo|Confirm)\s*</i);
     });
 
-    await t.test("tasks board lists the fixture task", async () => {
+    await t.test("tasks board lists the fixture task; widget cap is 5 in due order", async () => {
       const res = await fetch(`${origin}/view/api/tasks`, { headers: authHeader() });
       assert.equal(res.status, 200);
       const body = (await res.json()) as {
@@ -555,15 +555,71 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       assert.ok(task);
       assert.equal(task.status, "active");
       assert.equal(task.due, "2026-08-20");
+
+      await upsertGraphNode(pool, { type: "task", title: "Widget overdue old", data: { due: "2020-01-01" } });
+      await upsertGraphNode(pool, { type: "task", title: "Widget overdue new", data: { due: "2020-06-01" } });
+      await upsertGraphNode(pool, { type: "task", title: "Widget upcoming far", data: { due: "2099-01-01" } });
+      await upsertGraphNode(pool, { type: "task", title: "Widget undated a" });
+      await upsertGraphNode(pool, { type: "task", title: "Widget undated b" });
+      await upsertGraphNode(pool, { type: "task", title: "Widget undated c" });
+
+      const limited = await fetch(`${origin}/view/api/tasks?limit=5`, { headers: authHeader() });
+      assert.equal(limited.status, 200);
+      const limitedBody = (await limited.json()) as {
+        tasks: Array<{ title: string; due?: string }>;
+      };
+      assert.equal(limitedBody.tasks.length, 5);
+      assert.deepEqual(
+        limitedBody.tasks.map((item) => item.title),
+        [
+          "Widget overdue old",
+          "Widget overdue new",
+          "Fixture due task",
+          "Widget upcoming far",
+          "Widget undated a",
+        ],
+      );
     });
 
-    await t.test("recents are non-task objects; widget cap is 10", async () => {
-      const res = await fetch(`${origin}/view/api/recents?limit=10`, { headers: authHeader() });
+    await t.test("recents are non-task objects; widget cap is 5, newest first", async () => {
+      for (let i = 0; i < 6; i += 1) {
+        const created = await upsertGraphNode(pool, { type: "note", title: `Widget recent ${i}` });
+        assert.equal(isToolError(created), false);
+      }
+      // Insert alpha first so created_at DESC would put zebra first; title ASC puts alpha first.
+      const olderTie = await upsertGraphNode(pool, { type: "note", title: "Recents tie alpha" });
+      assert.equal(isToolError(olderTie), false);
+      if (isToolError(olderTie)) {
+        return;
+      }
+      const newerTie = await upsertGraphNode(pool, { type: "note", title: "Recents tie zebra" });
+      assert.equal(isToolError(newerTie), false);
+      if (isToolError(newerTie)) {
+        return;
+      }
+      await pool.query(
+        `UPDATE nodes
+         SET updated_at = date_trunc('milliseconds', timestamptz '2099-01-01 00:00:00+00')
+         WHERE id = ANY($1::uuid[])`,
+        [[olderTie.node.id, newerTie.node.id]],
+      );
+
+      const res = await fetch(`${origin}/view/api/recents?limit=5`, { headers: authHeader() });
       assert.equal(res.status, 200);
-      const body = (await res.json()) as { rows: Array<{ title: string; type: string }> };
-      assert.ok(body.rows.some((row) => row.title === "Fixture note" && row.type === "note"));
+      const body = (await res.json()) as {
+        rows: Array<{ title: string; type: string; updated_at: string }>;
+      };
+      assert.equal(body.rows.length, 5);
       assert.ok(body.rows.every((row) => row.type !== "task"));
-      assert.ok(body.rows.length <= 10);
+      assert.equal(body.rows[0]?.updated_at, body.rows[1]?.updated_at);
+      assert.deepEqual(
+        body.rows.slice(0, 2).map((row) => row.title),
+        ["Recents tie alpha", "Recents tie zebra"],
+      );
+      assert.ok(body.rows.some((row) => row.title.startsWith("Widget recent")));
+      for (let i = 1; i < body.rows.length; i += 1) {
+        assert.ok(body.rows[i - 1]!.updated_at >= body.rows[i]!.updated_at);
+      }
 
       const all = await fetch(`${origin}/view/api/recents`, { headers: authHeader() });
       const allBody = (await all.json()) as { rows: Array<{ title: string; type: string }> };

@@ -31,19 +31,25 @@ test("chrome is Home + Search; Search is an overlay; Recents is not a rail item"
   assert.doesNotMatch(shell, /Inspector/);
 });
 
-test("Home graph fills leftover viewport with a 460px floor", async () => {
+test("Home is Recents, open tasks, and type folders — not the graph", async () => {
   const home = await src("pages/HomePage.tsx");
-  assert.match(home, /HOME_GRAPH_FRAME_CLASS/);
+  assert.doesNotMatch(home, /GraphCanvas/);
+  assert.doesNotMatch(home, /fetchGraph/);
+  assert.doesNotMatch(home, /HOME_GRAPH_FRAME_CLASS/);
   assert.match(home, /min-h-0 flex-1 overflow-y-auto/);
   assert.doesNotMatch(home, /100dvh-3rem/);
-  assert.match(home, /data-surface="graph"|GraphCanvas/);
-  assert.match(home, /fetchGraph/);
   assert.match(home, /View all/);
-  assert.match(home, /fetchRecents\(10\)/);
-  assert.match(home, /h-\[160px\]/);
-  assert.match(home, /h-\[256px\]/);
+  assert.match(home, /HOME_WIDGET_LIMIT/);
+  assert.match(home, /fetchRecents\(HOME_WIDGET_LIMIT\)/);
+  assert.match(home, /fetchTasks\(HOME_WIDGET_LIMIT\)/);
+  assert.match(home, /compareOpenTasks/);
+  assert.match(home, /compareRecentRows/);
   assert.match(home, /openCollection\("task"/);
   assert.match(home, /type\.count > 0/);
+  assert.doesNotMatch(home, /h-\[160px\]/);
+  assert.doesNotMatch(home, /h-\[256px\]/);
+  const format = await src("format.ts");
+  assert.match(format, /HOME_WIDGET_LIMIT = 5/);
   const canvas = await src("graph/GraphCanvas.tsx");
   assert.match(canvas, /min-h-\[460px\]/);
   assert.doesNotMatch(canvas, /flex-1/);
@@ -65,7 +71,7 @@ test("click from graph / Recents / collection / search opens a detail page", asy
   assert.match(home, /openDetail/);
   const recents = await src("pages/RecentsPage.tsx");
   assert.match(recents, /openDetail\(row\.id/);
-  assert.doesNotMatch(recents, /limit=\{10\}|fetchRecents\(10\)/);
+  assert.doesNotMatch(recents, /limit=\{10\}|fetchRecents\(10\)|fetchRecents\(5\)|HOME_WIDGET_LIMIT/);
   const search = await src("pages/SearchPage.tsx");
   assert.match(search, /openDetail\(hit\.id/);
   assert.match(search, /data-surface="search-overlay"/);

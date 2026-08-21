@@ -1,9 +1,9 @@
-/** Home graph fills leftover viewport under the view strip. Widgets sit below. */
+/** Graph canvas floor. Collection graph layout uses this; Home does not host the graph. */
 export const GRAPH_FLOOR_PX = 460;
 
 /**
- * Height is leftover (100% of the Home scrollport), never below 460px.
- * shrink-0 so Recents / open-tasks / folders cannot steal that band.
+ * Height is leftover viewport, never below 460px.
+ * shrink-0 so sibling chrome cannot steal that band.
  */
 export const HOME_GRAPH_FRAME_CLASS =
   "h-[max(460px,100%)] min-h-[460px] w-full shrink-0";

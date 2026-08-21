@@ -205,9 +205,11 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings
     }
   });
 
-  app.get(`${VIEW_PATH}/api/tasks`, gate, async (_req, res) => {
+  app.get(`${VIEW_PATH}/api/tasks`, gate, async (req, res) => {
     try {
-      res.json(await viewTasks(pool));
+      const limitRaw = queryString(req, "limit");
+      const limit = limitRaw ? Number(limitRaw) : undefined;
+      res.json(await viewTasks(pool, { limit: Number.isFinite(limit) ? limit : undefined }));
     } catch (error) {
       console.error("View tasks failed", error);
       res.status(500).json({ error: "Could not load." });
