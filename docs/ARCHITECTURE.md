@@ -6,7 +6,7 @@ When a change alters the graph or vault shape, update this file in the same PR.
 
 ## Glossary
 
-**Foundation** is the product. A **vault** is one instance (`FOUNDATION_DATA` + Postgres). The **graph** is the live network in that vault. The **ontology** is the vocabulary (types and relations). A **blob** is a file on a node. An **agent** is anything that can reach the vault MCP. The **user** is the human who runs Compose. Do not call the graph “the Vault.” A git clone is the product, not this vault — `compose up` elsewhere starts a different instance.
+**Foundation** is the product. A **vault** is one instance (`FOUNDATION_DATA` + Postgres). The **graph** is the live network in that vault. The **ontology** is the vocabulary (types and relations). A **blob** is a file on a node. An **agent** is anything that can reach the vault MCP. The **user** is the human who runs Compose. A **bot** is a named role that acts through an agent. Do not call the graph “the Vault.” A git clone is the product, not this vault — `compose up` elsewhere starts a different instance.
 
 ## Vault
 
@@ -56,10 +56,10 @@ flowchart LR
 
 ### Node
 
-A node has **type**, **title**, **status**, a **payload**, and **data**. Identity is UUID.
+A node is what is true now, short. History stays in activity. Identity is UUID. `get` returns that current picture: type, title, status, `payload`, `data`, metadata, timestamps, incident edges. It does not return activity rows.
 
-- **Payload** is either **inline** (`text/markdown`, `text/html`, `application/json`, `text/plain`) or a **blob** (file on the node).
-- **data** is structured JSON. The type’s `fields` compile to `json_schema` (`additionalProperties: true`). upsert validates the merged object against that document. Extra keys still write. `needed` on a field is a hint, not JSON Schema `required`. A `ref` field is a typed UUID pointer, not an edge. `data.origin` is an optional pointer, not a mirrored body. `data.due` is the seed date field (ISO `YYYY-MM-DD`; omit it and the node still writes; `due: null` clears) on `task`, `goal`, and `spend` (on `spend`, display is Date). `project` may hold optional `budget_amount` / `budget_currency`. `spend` holds `amount`, `currency`, `due`, `vendor` (string), and `stage` (`quoted` | `paid`). `data.aliases` is an optional string array of user-authored alternate names (any type; used by `lookup`). Stored on the JSONB `data` object, not a separate column. Seed apply fills missing seed fields and missing seed hue/glyph only; it does not overwrite a user edit.
+- **Payload** is the written picture: **inline** (`text/markdown`, `text/html`, `application/json`, `text/plain`) or a **blob** (file on the node). A rewrite passes a new `payload` and replaces that body. Omit `payload` and the body stays.
+- **data** is structured JSON. It is not the diary. The type’s `fields` compile to `json_schema` (`additionalProperties: true`). upsert validates the merged object against that document. Extra keys still write. `needed` on a field is a hint, not JSON Schema `required`. A `ref` field is a typed UUID pointer, not an edge. `data.origin` is an optional pointer, not a mirrored body. `data.due` is the seed date field (ISO `YYYY-MM-DD`; omit it and the node still writes; `due: null` clears) on `task`, `goal`, and `spend` (on `spend`, display is Date). `project` may hold optional `budget_amount` / `budget_currency`. `spend` holds `amount`, `currency`, `due`, `vendor` (string), and `stage` (`quoted` | `paid`). `data.aliases` is an optional string array of user-authored alternate names (any type; used by `lookup`). Stored on the JSONB `data` object, not a separate column. Seed apply fills missing seed fields and missing seed hue/glyph only; it does not overwrite a user edit.
 
 ```mermaid
 flowchart TB
@@ -147,8 +147,10 @@ A blob is a file on a node, stored at `$FOUNDATION_DATA/blobs/<uuid>`. `get` ret
 
 Writes go through the graph and leave **activity**. `undo` reverses a reversible row. This is lost-update protection and a receipt, not an ACL.
 
+- **Current picture:** a named bot rewrites one node on purpose: `get` → `list_activity` `{ target }` → keep what still matters, invent nothing → `upsert` the same id with a short `payload` and `base_updated_at`. One node at a time. Not a background job. The server does not invent the picture. A bad picture is rebuilt from the `before` / `after` snapshots already on activity. No new tool. Contract: [`SPEC.md`](./SPEC.md#current-picture).
 - **Compare-and-swap:** update and `link` are if-match. Pass `base_updated_at` (or endpoint timestamps) from `get`. Compared at millisecond precision so a never-updated node (including rows that still store leftover microseconds from `now()`) can be written when the caller passes `updated_at` from `get`. If the node moved, the vault refuses with stale (get and retry) — a CAS miss is never “node not found.”
 - **Batch link:** `link` accepts one edge or `edges[]` (1–20). The whole batch validates, then one graph transaction writes every edge or none. First error wins. One activity receipt per written edge (`links[]` in input order). Each edge carries both endpoint timestamps; a later edge does not inherit CAS from an earlier edge that named the same node. Several edges that share a node still use one agreed `updated_at`. Linking does not bump `node.updated_at`. `undo` inverts one receipt. This is a graph write (live nodes and edges), not an ontology change.
+- **payload replace:** update replaces `payload` when that field is passed. Omit it and the body stays.
 - **data merge:** update patches `data` (`JSONB ||`). A partial patch does not wipe other keys.
 - **Create idempotency:** `idempotency_key` on create. A retry returns the same node; it does not twin.
 - Optional `actor` / `actor_label` are stored on the activity row (who wrote), not a permission gate.
@@ -157,6 +159,7 @@ Writes go through the graph and leave **activity**. `undo` reverses a reversible
 ```mermaid
 flowchart LR
   write["Write"] --> cas["if-match"]
+  write --> payload_replace["payload replace"]
   write --> data_merge["data merge"]
   write --> idemp["create idempotency_key"]
   write --> activity["activity row"]
@@ -166,6 +169,8 @@ flowchart LR
   suggestions -.->|"user or agent accepts"| link_write["link"]
   batch_link --> activity
 ```
+
+`list_activity` `{ target: <node id> }` is the diary for that node. Newest first. Default limit 50, max 200. Page older rows with `since`. `get` does not include these rows.
 
 ## Search
 
@@ -181,11 +186,11 @@ flowchart LR
 - `due_on_or_before` / `due_on_or_after` — inclusive ISO date window on `data.due`
 - `data_equals` — one or a few top-level `data` keys equal a string value (JSONB `@>`, same family as `data.origin` / `data.due`; not a column per key). Example shape: `{ kind: "…", status: "…" }`. Seed `spend` filters `{ stage: "quoted" }` or `{ currency: "USD" }` this way; `amount` is a number and does not.
 
-Empty `{}` is an error (no `list_nodes` tool). Hits are lean and include `due` when `data.due` is set; `get` loads payload, `data.due`, and neighbor titles.
+Empty `{}` is an error (no `list_nodes` tool). Hits are lean and include `due` when `data.due` is set; `get` loads the current picture, `data.due`, and neighbor titles.
 
 `lookup` is a separate read-only tool: batch name resolution with a result per input. Unique folded title, unique user alias, or UUID may bind. Token and fuzzy matches are candidates that need user confirmation before a write. Each useful candidate includes `id`, `type`, canonical `title`, `updated_at`, `match`, and `confidence` plus the surrounding `candidates` list. `confidence` ranks; it is not a probability and does not authorize a write. Title folding uses generated `title_norm` / `title_compact` and trigram indexes. Aliases stay on `data.aliases` (JSONB unnest). Create-time `upsert` (no `id`) uses the same matcher: exact/alias hits refuse unless `allow_duplicate` is set; fuzzy hits warn. Not embeddings.
 
-`working_set` is a separate read-only tool over the same nodes and edges. Given one live id, it returns the actionable set around that root: open work, dues, and the parent chain when the type has `parent_types`. Walks use the live ontology (hierarchy kind and `parent_types`, associative about-targets, `start`/`end` date roles). The graph shape is unchanged. Caps and a due window keep a spine-root (`area`) from dumping a life. After `lookup` binds a name, this is the one agenda call. Parameters: [`MCP_TOOLS.md`](./MCP_TOOLS.md).
+`working_set` is a separate read-only tool over the same nodes and edges. Given one live id, it returns the actionable set around that root: open work, dues, and the parent chain when the type has `parent_types`. Walks use the live ontology (hierarchy kind and `parent_types`, associative about-targets, `start`/`end` date roles). The graph shape is unchanged. Caps and a due window keep a spine-root (`area`) from dumping a life. After `lookup` binds a name, this is the one agenda call. It is not the picture loop — `get` is the current picture, `list_activity` `{ target }` is the diary. Age-decay on this agenda is out of this amendment. Parameters: [`MCP_TOOLS.md`](./MCP_TOOLS.md).
 
 ```mermaid
 flowchart TB
@@ -220,7 +225,7 @@ Agents talk to the vault over MCP. That path is not the architecture — it is t
 
 `/mcp` with `Authorization: ApiKey <FOUNDATION_API_KEY>`. Streamable HTTP on this process. Named harnesses attach with that URL and key: [`HARNESS.md`](./HARNESS.md).
 
-Fourteen tools: `bootstrap`, `search`, `lookup`, `get`, `working_set`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`.
+Fourteen tools: `bootstrap`, `search`, `lookup`, `get`, `working_set`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`. `get` is the current picture. `list_activity` `{ target }` is the diary. `upsert` replaces `payload` when passed.
 
 An agent that can reach the vault MCP may read/write; one that cannot does not.
 
