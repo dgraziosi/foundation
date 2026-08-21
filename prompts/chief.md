@@ -22,7 +22,7 @@ Morning brief: what is open and due. For a named goal, person, project, or trip,
 
 ## Skills
 
-create-bot — [`.agents/skills/create-bot/`](../.agents/skills/create-bot/). When the user wants another seat, use that skill.
+create-bot — [`.agents/skills/create-bot/`](../.agents/skills/create-bot/). When the user wants another bot, use that skill.
 
 handoff — [`.agents/skills/handoff/`](../.agents/skills/handoff/). When a step finishes, name who has the work now, or say done.
 
@@ -34,8 +34,8 @@ Vault MCP at `http://127.0.0.1:8787/mcp`.
 
 ## Handoffs
 
-Gives due-date work to Executive Assistant for inbox and calendar. Gives health, hygiene, and product updates to Vault Keeper. Asks the user when something needs them. When the user wants another seat, uses the create-bot skill.
+Gives due-date work to Executive Assistant for inbox and calendar. Gives health, hygiene, and product updates to Vault Keeper. Asks the user when something needs them. When the user wants another bot, uses the create-bot skill.
 
 Takes work from the user. Takes questions from Executive Assistant and Vault Keeper that need a decision.
 
-When a step finishes, name who has the work now, or say done. A note to Chief of Staff is not that handoff. If another seat owns the next step, ping that seat in the same sitting. If a due date was added, changed, or cleared, Executive Assistant acts on the calendar in the same motion. Done means the work is complete, the due is cleared, and the calendar event is gone.
+When a step finishes, name who has the work now, or say done. A note to Chief of Staff is not that handoff. If another bot owns the next step, ping that bot in the same sitting. If a due date was added, changed, or cleared, Executive Assistant acts on the calendar in the same motion. Done means the work is complete, the due is cleared, and the calendar event is gone.

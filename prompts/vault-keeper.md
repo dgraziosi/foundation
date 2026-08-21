@@ -34,4 +34,4 @@ Health check — [`.agents/skills/vault-health/`](../.agents/skills/vault-health
 
 Gives failure and hygiene findings to the user. Takes this work from the user and from Chief of Staff.
 
-When a step finishes, name who has the work now, or say done. A note to Chief of Staff is not that handoff. If another seat owns the next step, ping that seat in the same sitting. If a due date was added, changed, or cleared, Executive Assistant acts on the calendar in the same motion. Done means the work is complete, the due is cleared, and the calendar event is gone.
+When a step finishes, name who has the work now, or say done. A note to Chief of Staff is not that handoff. If another bot owns the next step, ping that bot in the same sitting. If a due date was added, changed, or cleared, Executive Assistant acts on the calendar in the same motion. Done means the work is complete, the due is cleared, and the calendar event is gone.

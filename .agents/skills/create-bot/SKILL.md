@@ -1,6 +1,6 @@
 ---
 name: create-bot
-description: Create a new bot from the blank template. Use when the user or Chief of Staff wants another seat.
+description: Create a new bot from the blank template. Use when the user or Chief of Staff wants another bot.
 ---
 
 # Create a bot

@@ -36,4 +36,4 @@ Gives every send, and any event that is not a vault due date, to the user. Gives
 
 Takes due-date work from Chief of Staff. Takes mail and scheduling from the user.
 
-When a step finishes, name who has the work now, or say done. A note to Chief of Staff is not that handoff. If another seat owns the next step, ping that seat in the same sitting. If a due date was added, changed, or cleared, Executive Assistant acts on the calendar in the same motion. Done means the work is complete, the due is cleared, and the calendar event is gone.
+When a step finishes, name who has the work now, or say done. A note to Chief of Staff is not that handoff. If another bot owns the next step, ping that bot in the same sitting. If a due date was added, changed, or cleared, Executive Assistant acts on the calendar in the same motion. Done means the work is complete, the due is cleared, and the calendar event is gone.
