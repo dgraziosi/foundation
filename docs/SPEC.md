@@ -70,13 +70,13 @@ These names are the current surface. Full parameters: [`docs/MCP_TOOLS.md`](./MC
 
 ## Project spend
 
-`spend` — one recorded money line under a project (a bid or a payment). Artifact. `parent_types`: `["project"]`. Hue `teal`, glyph `Receipt`. Views: `list` (`default_view: "list"`). Enough for a clone’s Viewer to open the type. No Viewer visual program in this amendment.
+`spend` is a seed type: one recorded money line under a project (a bid or a payment). Artifact. `parent_types`: `["project"]`. Hue `teal`, glyph `Receipt`. Views: `list` (`default_view: "list"`). The Viewer opens it from that declared view. `inspect_ontology` and `bootstrap` list it.
 
-The project is the bounded effort, so v1 hangs spend there only — not under `area` or `goal`. Hierarchy verb is still `child_of` (child → parent; at most one). `upsert` the line, then `link` it to the project. `search` `{ type: "spend", under: <project uuid> }` lists the lines.
+It hangs under a `project` via `child_of` (child → parent; at most one). It does not hang under `area` or `goal`. `upsert` the line, then `link` it to the project. `search` `{ type: "spend", under: <project uuid> }` lists the lines.
 
 ### Fields
 
-`json_schema` is compiled from this template (`additionalProperties: true`; `needed` is a hint, not JSON Schema `required`). When a key is present, upsert validates it. `null` clears. Extra `data` keys still write.
+These fields are already on the type. `json_schema` is compiled from the template (`additionalProperties: true`; `needed` is a hint, not JSON Schema `required`). When a key is present, upsert validates it. `null` clears. Extra `data` keys still write. `search` and `get` treat them as real fields. `get` returns the validated `data` and does not return blob bytes for a spend line.
 
 - **`amount`** — `number`. Display Amount. `needed: true`. Example `12.50`. Typical line is positive; v1 does not constrain sign. `data_equals` accepts strings only, so it cannot filter this key.
 - **`currency`** — `string`. Display Currency. `needed: true`. ISO-4217 convention (`USD`). Not a closed enum.
@@ -90,15 +90,15 @@ The project is the bounded effort, so v1 hangs spend there only — not under `a
 
 ### Project budget
 
-`project` gains optional `budget_amount` (`number`) and `budget_currency` (`string`, same `USD` convention). The envelope lives on the project node. Remaining (budget minus paid lines) is follow-on math over those fields — not a stored key, not a rollup tool. Mixed-currency rollup is later work.
+`project` has optional `budget_amount` (`number`) and `budget_currency` (`string`, same `USD` convention). The envelope lives on the project node. Seed apply fills those fields only when missing; it does not overwrite an operator edit. Remaining is budget minus paid lines — an agent reads those fields. Not a stored key and not a rollup tool.
 
 ### Write and read
 
 1. `upsert` the project with `data.budget_amount` / `data.budget_currency` when there is an envelope.
 2. `upsert` a `spend`. Title is the short label; money lives in `data`.
 3. `link` `{ from_id: <spend>, to_id: <project>, relation_type: "child_of" }` with if-match timestamps from `get`.
-4. `search` `{ type: "spend", under: <project uuid> }` lists lines. `{ type: "spend", data_equals: { stage: "quoted" } }` lists bids. `{ type: "spend", due_on_or_before: "2026-08-20" }` uses the same date window as `task.due`. `get` returns the validated `data` fields.
-5. `working_set` on the project includes live `spend` children (open-only default). The date-role value appears as `due` on the item. Completing or archiving a paid line drops it from that default agenda. No `working_set` behavior change.
+4. `search` `{ type: "spend", under: <project uuid> }` lists lines. `{ type: "spend", data_equals: { stage: "quoted" } }` lists bids. `{ type: "spend", due_on_or_before: "2026-08-20" }` uses the same date window as `task.due`. `get` returns the validated `data` fields and no blob bytes.
+5. `working_set` on the project includes live `spend` children (open-only default). The date-role value appears as `due` on the item. Completing or archiving a paid line drops it from that default agenda.
 
 Fixture create (no personal amounts):
 
@@ -107,38 +107,9 @@ upsert type=spend title="Materials bid"
 data: { amount: 12.50, currency: "USD", due: "2026-08-20", vendor: "Fixture vendor", stage: "quoted" }
 ```
 
-### Seed / `manage_type` shape
-
-This amendment is the contract. The seed row, compiled-schema wiring, and tests land in a follow-on PR. An implementer (or an agent filling a vault that does not have the row yet) creates the type with `manage_type`:
-
-```text
-action: create
-slug: spend
-label: Spend
-kind: artifact
-parent_types: ["project"]
-fields:
-  { name: "amount", kind: "number", display: "Amount", needed: true }
-  { name: "currency", kind: "string", display: "Currency", needed: true }
-  { name: "due", kind: "date", display: "Date", needed: false, role: "date" }
-  { name: "vendor", kind: "string", display: "Vendor", needed: false }
-  { name: "stage", kind: "enum", display: "Stage", needed: true, enum_values: ["quoted", "paid"] }
-views: [{ id: "list" }]
-default_view: list
-hue: teal
-glyph: Receipt
-```
-
-`project` field patch (system types may edit `fields`; seed apply merges **missing** names only):
-
-```text
-{ name: "budget_amount", kind: "number", display: "Budget", needed: false }
-{ name: "budget_currency", kind: "string", display: "Budget currency", needed: false }
-```
-
 ### Why this is not a ledger
 
-One type, one line, one envelope on the project. Agents record validated fields instead of a note that cannot add up. Bank or card import, double-entry, accounts, a second ledger store, embeddings, and new MCP write verbs stay out. `get` / `search` already read these `data` keys; `working_set` already walks `child_of` children and the date-role field.
+One type, one line, one envelope on the project. Agents record validated fields instead of a note that cannot add up. Bank or card import, double-entry, accounts, a second ledger store, embeddings, and new MCP write verbs stay out. `get` / `search` read these `data` keys; `working_set` walks `child_of` children and the date-role field.
 
 ## Runtime
 
