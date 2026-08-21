@@ -592,6 +592,7 @@ export async function upsertGraphNode(
         if (stale) {
           return stale;
         }
+        await client.query("SAVEPOINT upsert_update");
         try {
           const node = await updateNode(client, input.id!, {
             type: input.type,
@@ -603,6 +604,7 @@ export async function upsertGraphNode(
             base_updated_at: input.base_updated_at,
           });
           if (!node) {
+            await client.query("RELEASE SAVEPOINT upsert_update");
             const current = await getNodeById(client, input.id!, { includeDeleted: true });
             if (!current) {
               return toolError(
@@ -621,6 +623,7 @@ export async function upsertGraphNode(
               LOST_UPDATE_SUGGESTION,
             );
           }
+          await client.query("RELEASE SAVEPOINT upsert_update");
           const activity = await insertActivity(client, {
             ...writer,
             action: "update",
@@ -632,6 +635,7 @@ export async function upsertGraphNode(
           return { node, activity_id: activity.id };
         } catch (error) {
           if (isUniqueViolation(error)) {
+            await client.query("ROLLBACK TO SAVEPOINT upsert_update");
             const pointerErr = await pointerUniqueError(client, nextData, existing.id);
             if (pointerErr) {
               return pointerErr;

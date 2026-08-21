@@ -171,6 +171,48 @@ test(
         }
       });
 
+      await t.test("update that collides on a live receipt returns the structured ToolError", async () => {
+        const held = await upsertGraphNode(pool, {
+          type: "task",
+          title: "Throwaway held receipt task",
+          data: { receipt: { system: "gmail", id: "msg-fixture-sent-update", kind: "sent" } },
+        });
+        assert.equal(isToolError(held), false);
+        if (isToolError(held)) {
+          return;
+        }
+
+        const other = await upsertGraphNode(pool, {
+          type: "task",
+          title: "Throwaway other receipt task",
+        });
+        assert.equal(isToolError(other), false);
+        if (isToolError(other)) {
+          return;
+        }
+
+        const collide = await upsertGraphNode(pool, {
+          id: other.node.id,
+          type: "task",
+          title: "Throwaway other receipt task",
+          data: { receipt: { system: "gmail", id: "msg-fixture-sent-update", kind: "sent" } },
+          base_updated_at: other.node.updated_at,
+        });
+        assert.equal(isToolError(collide), true);
+        if (!isToolError(collide)) {
+          return;
+        }
+        assert.match(collide.error, /gmail:msg-fixture-sent-update/);
+        assert.match(collide.error, new RegExp(held.node.id));
+        assert.match(collide.suggestion ?? "", /search with receipt/i);
+
+        const still = await getGraphNode(pool, other.node.id);
+        assert.equal(isToolError(still), false);
+        if (!isToolError(still)) {
+          assert.equal(still.node.data.receipt, undefined);
+        }
+      });
+
       await t.test("receipt null clears; merge keeps origin; padded id trims", async () => {
         const created = await upsertGraphNode(pool, {
           type: "task",
