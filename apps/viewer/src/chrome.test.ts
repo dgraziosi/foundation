@@ -46,6 +46,10 @@ test("Home is Recents, open tasks, and type folders — not the graph", async ()
   assert.match(home, /compareRecentRows/);
   assert.match(home, /openCollection\("task"/);
   assert.match(home, /type\.count > 0/);
+  assert.match(home, /No open tasks/);
+  assert.doesNotMatch(home, /status === "active"/);
+  assert.doesNotMatch(home, /status !== "completed"/);
+  assert.doesNotMatch(home, /Show completed|readShowCompleted|writeShowCompleted/);
   assert.doesNotMatch(home, /h-\[160px\]/);
   assert.doesNotMatch(home, /h-\[256px\]/);
   const format = await src("format.ts");
@@ -127,6 +131,8 @@ test("collection empty copy and board width", async () => {
   const typeView = await src("pages/TypeViewPage.tsx");
   assert.match(typeView, /Nothing yet\./);
   assert.match(typeView, /Nothing matches your filters\./);
+  assert.match(typeView, /count = activeView \? queried.length/);
+  assert.doesNotMatch(typeView, /const count = typeQuery.data\?\.nodes.length/);
 });
 
 test("chrome uses shadcn primitives, not homemade fields", async () => {

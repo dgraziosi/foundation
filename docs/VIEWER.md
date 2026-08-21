@@ -54,11 +54,11 @@ Home opens Recents, open tasks, and type folders. Search opens the search overla
 
 ## Home
 
-**Recents.** Last **5** objects that are not tasks, newest first. Grouped **Today / Yesterday / Earlier this week / Earlier**. Each row: type glyph, title, relative time. **View all** opens Recents. Empty: **Nothing yet.**
+**Recents.** Last **5** live objects that are not tasks, newest first. No status filter. Open and completed tasks both stay out — Recents is not an agenda. Grouped **Today / Yesterday / Earlier this week / Earlier**. Each row: type glyph, title, relative time. **View all** opens Recents. Empty: **Nothing yet.**
 
-**Open tasks.** The **5** most urgent open tasks, sorted overdue (oldest due first), today, upcoming (soonest first), then undated by title. Grouped **Overdue / Today / Upcoming / No date**. Each row: title and due date. **View all** opens the task collection. Empty: **No open tasks.**
+**Open tasks.** The `task` type's `default_view` filter, then the **5** most urgent of those, sorted overdue (oldest due first), today, upcoming (soonest first), then undated by title. Seed filter is `status = active`; completed and archived do not appear. Grouped **Overdue / Today / Upcoming / No date**. Each row: title and due date. **View all** opens the task collection (same type contract, no cap of 5). Empty: **No open tasks.** The widget reads the type. It does not invent a second filter.
 
-**Type folders.** One folder per type that has live objects, in type-order. Types with a zero count do not appear. Each folder: type glyph, type color, type name, count. Open: that type's collection.
+**Type folders.** One folder per type that has live objects, in type-order. Types with a zero count do not appear. Each folder: type glyph, type color, type name, count of live objects of that type. Open: that type's collection, which applies the type's `default_view`.
 
 ---
 
@@ -79,7 +79,7 @@ Node fill is the type's color. Node glyph is the type's icon. Hover shows the ti
 
 ## Collection
 
-Opened from a type folder, as a view in the content host. Page chrome: type glyph, type color, type name, count. Layout is the type's `default_view`, chosen from that type's `views`. If the type names more than one view, the switcher lists only those names.
+Opened from a type folder, as a view in the content host. Page chrome: type glyph, type color, type name, count of objects in the active view after that view's filter. Layout is the type's `default_view`, chosen from that type's `views`. Filter, sort, and group are that view's declarations. If the type names more than one view, the switcher lists only those names.
 
 Layouts the type may name: list, card, table, board, calendar, timeline, outline, graph.
 
@@ -99,6 +99,8 @@ Layouts the type may name: list, card, table, board, calendar, timeline, outline
 
 Empty collection: **Nothing yet.** Filtered to zero: **Nothing matches your filters.**
 
+**Show completed** is collection session chrome. It widens an active status filter for this window only. It does not write. It does not change Home, Recents, or Search.
+
 ---
 
 ## Detail
@@ -115,13 +117,38 @@ Closing the detail view activates the view to its left in the strip. Closing the
 
 ## Recents page
 
-Opened from the Recents widget's **View all**. Same recency groups as the widget. No cap of 5. Each row opens the detail page.
+Opened from the Recents widget's **View all**. Same recency groups as the widget. Same non-task set. No status filter. No cap of 5. Each row opens the detail page.
 
 ---
 
 ## Search
 
-Overlay from the rail. Query the vault. Results are objects. Click: detail page.
+Overlay from the rail. Query the vault. Optional type or status. No default filter. Results are objects. Click: detail page.
+
+---
+
+## Filters
+
+The type owns `views`, `default_view`, `filter`, `sort`, and `group`. The window reads that contract. It does not invent a type catalog, and it does not add a Home-only status hide.
+
+A view with no filter shows every live object of that type. A view that filters `status = active` hides completed and archived. Seed `task` and `goal` declare that filter on every view they name. Other seed types declare no status filter.
+
+Completed tasks on Home Open tasks, while seed `task` still declares `status = active`, is a bug: the widget ignored the type.
+
+| Surface | Default filter |
+| --- | --- |
+| Home Recents | Live objects that are not tasks. No status clause. Cap **5**, newest first. |
+| Home Open tasks | The `task` type's `default_view` filter, then urgency, then cap **5**. Seed: `status = active`. |
+| Home Type folders | Types with live objects. Count is live objects of that type. Open uses that type's `default_view`. |
+| Recents page | Same as Home Recents. No cap of 5. |
+| Tasks | Seed `default_view` is `board`. Views: board, list, calendar, timeline, outline. Each: filter `status = active`, sort date then title. Board groups by status. |
+| Goals | Seed `default_view` is `list`. Views: list, calendar, timeline, outline. Each: filter `status = active`, sort date then title. |
+| Trip | Seed `default_view` is `list`. Views: list, calendar, timeline. No status filter. Sort start then title. |
+| Area, project, habit, lesson, decision | Seed `default_view` is `list`. Views: list, outline. No status filter. Sort title. |
+| Person, place, company, journal, idea, note, spend | Seed `default_view` is `list`. One view: list. No status filter. Sort title. |
+| Authored types | The views that type declared. Empty views: **No views declared for this type.** |
+| Search | No default filter. The overlay may pass type or status. |
+| Detail | One object. Status displays. No list filter. |
 
 ---
 
@@ -129,7 +156,7 @@ Overlay from the rail. Query the vault. Results are objects. Click: detail page.
 
 The window does not hardcode a type's hue or glyph. Folders, graph nodes, collection rows, and the detail page show whatever types the ontology has.
 
-Seed and authored types carry hue and glyph on the type, same as they carry `views` and `default_view`. The window reads them.
+Seed and authored types carry hue and glyph on the type, same as they carry `views`, `default_view`, and each view's filter, sort, and group. The window reads them.
 
 If a type has no hue or glyph yet, the window uses a quiet fallback: neutral ink, a generic mark. It does not invent a special page.
 
