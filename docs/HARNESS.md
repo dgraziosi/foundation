@@ -1,6 +1,6 @@
 # Attach the vault MCP
 
-After Compose is up, the operator (the human who runs Compose) attaches a named harness on the same machine as Compose.
+After Compose is up, the user (the human who runs Compose) attaches a named harness on the same machine as Compose.
 
 ## Shared pattern
 
