@@ -64,6 +64,13 @@ export const ReceiptRefSchema = z.object({
 });
 export type ReceiptRef = z.infer<typeof ReceiptRefSchema>;
 
+/** Unique live receipt lookup — system and id only. Kind lives on the stored node. */
+export const ReceiptLookupSchema = z.object({
+  system: ReceiptSystemSchema,
+  id: z.string().trim().min(1),
+});
+export type ReceiptLookup = z.infer<typeof ReceiptLookupSchema>;
+
 export const NodeSchema = z.object({
   id: z.string().uuid(),
   type: z.string().min(1),

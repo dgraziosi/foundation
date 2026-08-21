@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { isToolError } from "./mcp-io.js";
-import { OriginRefSchema } from "./types.js";
+import { OriginRefSchema, ReceiptLookupSchema } from "./types.js";
 import {
   RECEIPT_KINDS,
   RECEIPT_SYSTEMS,
@@ -77,6 +77,12 @@ test("receiptFromData trims fields and refuses incomplete, unknown, or unpaired 
 
 test("receipt is a distinct pointer from origin: origin has no kind", () => {
   const keys = Object.keys(OriginRefSchema.shape);
+  assert.deepEqual(keys, ["system", "id"]);
+  assert.ok(!keys.includes("kind"));
+});
+
+test("search receipt lookup is system and id only", () => {
+  const keys = Object.keys(ReceiptLookupSchema.shape);
   assert.deepEqual(keys, ["system", "id"]);
   assert.ok(!keys.includes("kind"));
 });

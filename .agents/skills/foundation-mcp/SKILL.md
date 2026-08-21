@@ -18,8 +18,8 @@ Look up the live schema at call time (`bootstrap`, `inspect_ontology`, or the se
 - `get` — already have a UUID, need the current picture (not activity)
 - `list_activity` — already have a UUID, need the diary for that node (`target`)
 - `working_set` — already have a UUID, need the open work around it
-- `search` — list or find without a bound id
-- `upsert` — write or patch a node; passing `payload` replaces that body
+- `search` — list or find without a bound id. `search` `{ origin }` is identity. `search` `{ receipt }` looks up a sent-mail or cleared-event pointer, then `get`. Same tool, not a new verb.
+- `upsert` — write or patch a node; passing `payload` replaces that body. A bot writes `data.receipt` after send or clear. The server does not invent it.
 - `link` — accept a suggested edge or hang a child
 
 A node is what is true now, short. History stays in activity. To rewrite one node: `get` → `list_activity` `{ target }` → keep what still matters, invent nothing → `upsert` the same id with a short `payload` and `base_updated_at`. One node at a time. Not a background job. The server does not invent the picture.

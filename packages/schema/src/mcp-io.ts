@@ -18,6 +18,7 @@ import {
   NodeStatusSchema,
   NodeTypeSchema,
   OriginRefSchema,
+  ReceiptLookupSchema,
   PayloadStorageSchema,
   RelationKindSchema,
   RelationTypeSchema,
@@ -453,6 +454,8 @@ export const SearchInputSchema = z.object({
   since: z.string().min(1).optional(),
   /** Unique origin ref lookup (gmail | calendar | drive | github). */
   origin: OriginRefSchema.optional(),
+  /** Unique receipt lookup (gmail | calendar). Kind lives on the stored node. */
+  receipt: ReceiptLookupSchema.optional(),
   /** Due before today, or due today, in America/New_York. */
   due: SearchDueKindSchema.optional(),
   /** Inclusive ISO date YYYY-MM-DD on data.due. */
@@ -484,7 +487,7 @@ export const SEARCH_UUID_SUGGESTION =
   "This query is a node UUID. Prefer get when you already have an id.";
 
 export const SEARCH_NO_SELECTOR_SUGGESTION =
-  "Pass query for lexical recall, or type, status, under (child_of parent UUID), since, origin, due (overdue|today), due_on_or_before, due_on_or_after, or data_equals to list without a word. Do not add list_nodes.";
+  "Pass query for lexical recall, or type, status, under (child_of parent UUID), since, origin, receipt, due (overdue|today), due_on_or_before, due_on_or_after, or data_equals to list without a word. Do not add list_nodes.";
 
 export function searchHasSelector(input: {
   query?: string;
@@ -493,6 +496,7 @@ export function searchHasSelector(input: {
   under?: string;
   since?: string;
   origin?: unknown;
+  receipt?: unknown;
   due?: string;
   due_on_or_before?: string;
   due_on_or_after?: string;
@@ -505,6 +509,7 @@ export function searchHasSelector(input: {
       input.under ||
       input.since ||
       input.origin ||
+      input.receipt ||
       input.due ||
       input.due_on_or_before ||
       input.due_on_or_after ||
@@ -517,6 +522,12 @@ export const ORIGIN_MISS_SUGGESTION =
 
 export const ORIGIN_HIT_SUGGESTION =
   "This origin is unique on live nodes. Prefer get with that id. Do not upsert a twin.";
+
+export const RECEIPT_MISS_SUGGESTION =
+  "No live node has that receipt. You may upsert with data.receipt.system, data.receipt.id, and data.receipt.kind. Foundation stores the ref only — do not fetch or mirror Gmail or Calendar bodies.";
+
+export const RECEIPT_HIT_SUGGESTION =
+  "This receipt is unique on live nodes. Prefer get with that id. Do not upsert a twin.";
 
 export const SearchSuccessSchema = z.object({
   nodes: z.array(SearchHitSchema),

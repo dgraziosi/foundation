@@ -224,6 +224,22 @@ export async function getNodeByOrigin(
   return rows[0] ? mapNode(rows[0]) : undefined;
 }
 
+export async function getNodeByReceipt(
+  db: Queryable,
+  receipt: { system: string; id: string },
+): Promise<Node | undefined> {
+  const { rows } = await db.query<NodeRow>(
+    `SELECT id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at
+     FROM nodes
+     WHERE deleted_at IS NULL
+       AND data #>> '{receipt,system}' = $1
+       AND data #>> '{receipt,id}' = $2
+     LIMIT 1`,
+    [receipt.system, receipt.id],
+  );
+  return rows[0] ? mapNode(rows[0]) : undefined;
+}
+
 /** Live nodes whose title FTS-matches `title`. Skips self and already-linked pairs. */
 export async function searchTitleLinkCandidates(
   db: Queryable,
@@ -321,6 +337,8 @@ export async function searchNodes(
     since?: Date;
     originSystem?: string;
     originId?: string;
+    receiptSystem?: string;
+    receiptId?: string;
     dueOnOrAfter?: string;
     dueOnOrBefore?: string;
     dueBefore?: string;
@@ -369,6 +387,8 @@ export async function searchNodes(
        )
        AND ($6::text IS NULL OR data #>> '{origin,system}' = $6)
        AND ($7::text IS NULL OR data #>> '{origin,id}' = $7)
+       AND ($14::text IS NULL OR data #>> '{receipt,system}' = $14)
+       AND ($15::text IS NULL OR data #>> '{receipt,id}' = $15)
        AND ($8::text IS NULL OR foundation_iso_date(data #>> '{due}') >= $8)
        AND ($9::text IS NULL OR foundation_iso_date(data #>> '{due}') <= $9)
        AND ($10::text IS NULL OR foundation_iso_date(data #>> '{due}') < $10)
@@ -395,6 +415,8 @@ export async function searchNodes(
         ? JSON.stringify(input.dataEquals)
         : null,
       limit,
+      input.receiptSystem ?? null,
+      input.receiptId ?? null,
     ],
   );
   return rows.map((row) => ({

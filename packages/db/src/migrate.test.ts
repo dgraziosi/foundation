@@ -102,6 +102,11 @@ test(
          WHERE schemaname = current_schema() AND indexname = 'nodes_origin_live_uidx'`,
       );
       assert.equal(originIdx[0]?.indexname, "nodes_origin_live_uidx");
+      const { rows: receiptIdx } = await pool.query<{ indexname: string }>(
+        `SELECT indexname FROM pg_indexes
+         WHERE schemaname = current_schema() AND indexname = 'nodes_receipt_live_uidx'`,
+      );
+      assert.equal(receiptIdx[0]?.indexname, "nodes_receipt_live_uidx");
       const { rows: dueIdx } = await pool.query<{ indexname: string }>(
         `SELECT indexname FROM pg_indexes
          WHERE schemaname = current_schema() AND indexname = 'nodes_due_idx'`,

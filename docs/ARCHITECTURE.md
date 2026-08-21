@@ -59,7 +59,7 @@ flowchart LR
 A node is what is true now, short. History stays in activity. Identity is UUID. `get` returns that current picture: type, title, status, `payload`, `data`, metadata, timestamps, incident edges. It does not return activity rows.
 
 - **Payload** is the written picture: **inline** (`text/markdown`, `text/html`, `application/json`, `text/plain`) or a **blob** (file on the node). A rewrite passes a new `payload` and replaces that body. Omit `payload` and the body stays.
-- **data** is structured JSON. It is not the diary. The type’s `fields` compile to `json_schema` (`additionalProperties: true`). upsert validates the merged object against that document. Extra keys still write. `needed` on a field is a hint, not JSON Schema `required`. A `ref` field is a typed UUID pointer, not an edge. `data.origin` is an optional pointer, not a mirrored body. `data.due` is the seed date field (ISO `YYYY-MM-DD`; omit it and the node still writes; `due: null` clears) on `task`, `goal`, and `spend` (on `spend`, display is Date). `project` may hold optional `budget_amount` / `budget_currency`. `spend` holds `amount`, `currency`, `due`, `vendor` (string), and `stage` (`quoted` | `paid`). `data.aliases` is an optional string array of user-authored alternate names (any type; used by `lookup`). Stored on the JSONB `data` object, not a separate column. Seed apply fills missing seed fields and missing seed hue/glyph only; it does not overwrite a user edit.
+- **data** is structured JSON. It is not the diary. The type’s `fields` compile to `json_schema` (`additionalProperties: true`). upsert validates the merged object against that document. Extra keys still write. `needed` on a field is a hint, not JSON Schema `required`. A `ref` field is a typed UUID pointer, not an edge. `data.origin` is identity (`{ system, id }`), not a mirrored body. `data.receipt` is the current picture of done after a bot sends mail or clears a calendar event (`{ system, id, kind }`; `gmail`/`sent` or `calendar`/`cleared`). `receipt: null` clears. `data.due` is the seed date field (ISO `YYYY-MM-DD`; omit it and the node still writes; `due: null` clears) on `task`, `goal`, and `spend` (on `spend`, display is Date). `project` may hold optional `budget_amount` / `budget_currency`. `spend` holds `amount`, `currency`, `due`, `vendor` (string), and `stage` (`quoted` | `paid`). `data.aliases` is an optional string array of user-authored alternate names (any type; used by `lookup`). Stored on the JSONB `data` object, not a separate column. Seed apply fills missing seed fields and missing seed hue/glyph only; it does not overwrite a user edit.
 
 ```mermaid
 flowchart TB
@@ -75,6 +75,7 @@ flowchart TB
 
   node_data --> structured["structured fields"]
   node_data --> origin["origin ref"]
+  node_data --> receipt["receipt ref"]
   node_data --> due["date-role fields (due on task / goal / spend)"]
   node_data --> budget["budget_amount / budget_currency on project"]
   node_data --> aliases["data.aliases"]
@@ -181,7 +182,8 @@ flowchart LR
 - `type` / `status`
 - `under` — live `child_of` children of a parent UUID
 - `since` — updated after an ISO timestamp
-- `origin` — unique live `data.origin` ref
+- `origin` — unique live `data.origin` ref (identity)
+- `receipt` — unique live `data.receipt` ref (sent mail or cleared event)
 - `due` — `overdue` or `today` (`America/New_York`)
 - `due_on_or_before` / `due_on_or_after` — inclusive ISO date window on `data.due`
 - `data_equals` — one or a few top-level `data` keys equal a string value (JSONB `@>`, same family as `data.origin` / `data.due`; not a column per key). Example shape: `{ kind: "…", status: "…" }`. Seed `spend` filters `{ stage: "quoted" }` or `{ currency: "USD" }` this way; `amount` is a number and does not.
@@ -196,7 +198,7 @@ Empty `{}` is an error (no `list_nodes` tool). Hits are lean and include `due` w
 flowchart TB
   search_box["search"]
   search_box --> fts["full-text + accent-folding"]
-  search_box --> list_or_filter["or list by type / status / under / since / origin / due / data_equals"]
+  search_box --> list_or_filter["or list by type / status / under / since / origin / receipt / due / data_equals"]
   lookup_box["lookup"]
   lookup_box --> names["batch names → per-input outcome"]
   lookup_box --> title_idx["title_norm / trigram"]
@@ -208,7 +210,7 @@ flowchart TB
 
 ## Origin
 
-Gmail, Calendar, Drive, and GitHub stay the source of truth. The graph may hold `data.origin { system, id }` only. Live nodes are unique on that pair. Look up with `search { origin }`, then `get`. Do not fetch or mirror those systems’ bodies into the graph.
+Gmail, Calendar, Drive, and GitHub stay the source of truth. The graph may hold `data.origin { system, id }` only. That ref is identity. Live nodes are unique on that pair. Look up with `search { origin }`, then `get`. There is no `kind` on origin. Do not fetch or mirror those systems’ bodies into the graph.
 
 ```mermaid
 flowchart LR
@@ -217,6 +219,19 @@ flowchart LR
   holds_ref["Graph holds the ref only"]
   sot -.-> origin_ref
   origin_ref --> holds_ref
+```
+
+## Receipt
+
+When a bot sends mail or clears a calendar event, the node holds `data.receipt { system, id, kind }`. Pointer only. `system` is `gmail` | `calendar`. `kind` is `sent` | `cleared`. Pairing is closed. Live nodes are unique on `system`+`id`, independent of origin. Look up with `search { receipt }`, then `get`. The server does not invent the receipt. Gmail and Calendar stay the source of truth — no bodies in the vault.
+
+```mermaid
+flowchart LR
+  move["Bot sends mail or clears an event"]
+  receipt_ref["data.receipt system + id + kind"]
+  picture["get shows done"]
+  move --> receipt_ref
+  receipt_ref --> picture
 ```
 
 ## How agents reach the vault

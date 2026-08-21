@@ -26,6 +26,13 @@ test("search query is optional when a filter is set", () => {
   assert.equal(listed.status, "active");
   const origin = SearchInputSchema.parse({ origin: { system: "gmail", id: "msg-1" } });
   assert.equal(origin.origin?.system, "gmail");
+  const receipt = SearchInputSchema.parse({
+    receipt: { system: "gmail", id: "msg-fixture-sent-1" },
+  });
+  assert.equal(receipt.receipt?.system, "gmail");
+  assert.equal(receipt.receipt?.id, "msg-fixture-sent-1");
+  assert.equal(searchHasSelector({ receipt: { system: "gmail", id: "msg-fixture-sent-1" } }), true);
+  assert.throws(() => SearchInputSchema.parse({ receipt: { system: "github", id: "x" } }));
   SearchInputSchema.parse({ under: "11111111-1111-4111-8111-111111111111" });
   SearchInputSchema.parse({ since: "2026-08-13T00:00:00Z" });
   SearchInputSchema.parse({ due: "overdue" });
