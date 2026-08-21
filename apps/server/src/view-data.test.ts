@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { dueTone, recencyGroup, rootToParent, taskDueGroup } from "./view-data.js";
+import { compareOpenTasks, dueTone, recencyGroup, rootToParent, taskDueGroup } from "./view-data.js";
 
 test("dueTone marks overdue, today, and future", () => {
   assert.equal(dueTone("2026-08-01", "2026-08-19"), "overdue");
@@ -13,6 +13,22 @@ test("taskDueGroup is Overdue / Today / Upcoming / No date", () => {
   assert.equal(taskDueGroup("2026-08-01", "2026-08-19"), "Overdue");
   assert.equal(taskDueGroup("2026-08-19", "2026-08-19"), "Today");
   assert.equal(taskDueGroup("2026-08-20", "2026-08-19"), "Upcoming");
+});
+
+test("compareOpenTasks is overdue, today, upcoming, then undated", () => {
+  const today = "2026-08-21";
+  const tasks = [
+    { title: "Undated" },
+    { title: "Soon", due: "2026-08-28" },
+    { title: "Overdue new", due: "2026-08-10" },
+    { title: "Today", due: today },
+    { title: "Overdue old", due: "2026-08-01" },
+    { title: "Later", due: "2026-09-01" },
+  ];
+  assert.deepEqual(
+    [...tasks].sort((a, b) => compareOpenTasks(a, b, today)).map((task) => task.title),
+    ["Overdue old", "Overdue new", "Today", "Soon", "Later", "Undated"],
+  );
 });
 
 test("recencyGroup is Today / Yesterday / Earlier this week / Earlier", () => {

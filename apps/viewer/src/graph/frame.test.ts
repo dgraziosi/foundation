@@ -12,7 +12,7 @@ import {
 
 const root = dirname(fileURLToPath(import.meta.url));
 
-test("Home graph min-height / leftover-viewport contract (460px floor)", async () => {
+test("collection graph keeps a 460px floor; Home does not host the graph", async () => {
   assert.equal(GRAPH_FLOOR_PX, 460);
   assert.equal(HOME_GRAPH_FRAME_CLASS, "h-[max(460px,100%)] min-h-[460px] w-full shrink-0");
   assert.match(HOME_GRAPH_FRAME_CLASS, /max\(460px,100%\)/);
@@ -20,10 +20,11 @@ test("Home graph min-height / leftover-viewport contract (460px floor)", async (
   assert.match(HOME_GRAPH_FRAME_CLASS, /shrink-0/);
 
   const home = await readFile(join(root, "../pages/HomePage.tsx"), "utf8");
-  assert.match(home, /HOME_GRAPH_FRAME_CLASS/);
+  assert.doesNotMatch(home, /HOME_GRAPH_FRAME_CLASS/);
+  assert.doesNotMatch(home, /GraphCanvas/);
+  assert.doesNotMatch(home, /fetchGraph/);
   assert.match(home, /min-h-0 flex-1 overflow-y-auto/);
   assert.doesNotMatch(home, /100dvh-3rem/);
-  assert.doesNotMatch(home, /flex-1 flex-col[\s\S]*GraphCanvas/);
   assert.doesNotMatch(home, /ScrollArea/);
 
   const canvas = await readFile(join(root, "GraphCanvas.tsx"), "utf8");

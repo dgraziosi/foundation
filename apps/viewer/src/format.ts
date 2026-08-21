@@ -102,6 +102,43 @@ export function taskDueGroup(due: string | undefined, tone?: DueTone): TaskDueGr
 
 export const TASK_DUE_GROUPS: TaskDueGroup[] = ["Overdue", "Today", "Upcoming", "No date"];
 
+/** Home Recents and Open tasks widgets. Recents page and the task collection stay uncapped. */
+export const HOME_WIDGET_LIMIT = 5;
+
+const TASK_DUE_GROUP_RANK: Record<TaskDueGroup, number> = {
+  Overdue: 0,
+  Today: 1,
+  Upcoming: 2,
+  "No date": 3,
+};
+
+/** Overdue (oldest due first), today, upcoming (soonest first), then undated by title. */
+export function compareOpenTasks(
+  a: { title: string; due?: string; due_tone?: DueTone },
+  b: { title: string; due?: string; due_tone?: DueTone },
+): number {
+  const leftGroup = taskDueGroup(a.due, a.due_tone);
+  const rightGroup = taskDueGroup(b.due, b.due_tone);
+  if (leftGroup !== rightGroup) {
+    return TASK_DUE_GROUP_RANK[leftGroup] - TASK_DUE_GROUP_RANK[rightGroup];
+  }
+  if (a.due && b.due && a.due !== b.due) {
+    return a.due < b.due ? -1 : 1;
+  }
+  return a.title.localeCompare(b.title);
+}
+
+/** Newest `updated_at` first; title as a stable tie-break. */
+export function compareRecentRows(
+  a: { title: string; updated_at: string },
+  b: { title: string; updated_at: string },
+): number {
+  if (a.updated_at !== b.updated_at) {
+    return a.updated_at < b.updated_at ? 1 : -1;
+  }
+  return a.title.localeCompare(b.title);
+}
+
 export function truncate(value: string, max = 22): string {
   const trimmed = value.trim();
   if (trimmed.length <= max) {

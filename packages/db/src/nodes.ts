@@ -809,7 +809,7 @@ export async function listRecentLiveNodes(
      WHERE deleted_at IS NULL
        AND ($1::text IS NULL OR type = $1)
        AND ($2::text IS NULL OR type <> $2)
-     ORDER BY updated_at DESC
+     ORDER BY updated_at DESC, created_at DESC, title ASC
      LIMIT $3`,
     [options.type ?? null, options.excludeType ?? null, limit],
   );

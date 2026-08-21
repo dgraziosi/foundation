@@ -32,6 +32,7 @@ import {
 import { getGraphNode, inspectOntology, searchGraphNodes } from "./graph.js";
 
 const RECENTS_PAGE_LIMIT = 500;
+const TASKS_PAGE_LIMIT = 200;
 const HIERARCHY_RELATION = "child_of";
 
 export type ViewGraphNode = {
@@ -105,6 +106,30 @@ export function taskDueGroup(due: string | undefined, today = todayInNewYork()):
     return "Today";
   }
   return "Upcoming";
+}
+
+const TASK_DUE_GROUP_RANK: Record<TaskDueGroup, number> = {
+  Overdue: 0,
+  Today: 1,
+  Upcoming: 2,
+  "No date": 3,
+};
+
+/** Overdue (oldest due first), today, upcoming (soonest first), then undated by title. */
+export function compareOpenTasks(
+  a: { title: string; due?: string },
+  b: { title: string; due?: string },
+  today = todayInNewYork(),
+): number {
+  const leftGroup = taskDueGroup(a.due, today);
+  const rightGroup = taskDueGroup(b.due, today);
+  if (leftGroup !== rightGroup) {
+    return TASK_DUE_GROUP_RANK[leftGroup] - TASK_DUE_GROUP_RANK[rightGroup];
+  }
+  if (a.due && b.due && a.due !== b.due) {
+    return a.due < b.due ? -1 : 1;
+  }
+  return a.title.localeCompare(b.title);
 }
 
 export type DueTone = "overdue" | "today" | "future";
@@ -459,7 +484,10 @@ export async function viewRecents(
   };
 }
 
-export async function viewTasks(pool: Pool): Promise<{ tasks: ViewTaskCard[] }> {
+export async function viewTasks(
+  pool: Pool,
+  input: { limit?: number } = {},
+): Promise<{ tasks: ViewTaskCard[] }> {
   const today = todayInNewYork();
   const type = await getNodeType(pool, "task");
   const fields = type?.fields ?? [];
@@ -474,8 +502,8 @@ export async function viewTasks(pool: Pool): Promise<{ tasks: ViewTaskCard[] }> 
     fields,
   );
   const byId = new Map(rows.map((row) => [row.id, row]));
-  return {
-    tasks: queried.flatMap((item) => {
+  const tasks = queried
+    .flatMap((item) => {
       const row = byId.get(item.id);
       if (!row) {
         return [];
@@ -490,7 +518,12 @@ export async function viewTasks(pool: Pool): Promise<{ tasks: ViewTaskCard[] }> 
           ...(card.parent_title ? { parent_title: card.parent_title } : {}),
         },
       ];
-    }),
-  };
+    })
+    .sort((left, right) => compareOpenTasks(left, right, today));
+  const limit =
+    input.limit === undefined
+      ? undefined
+      : Math.min(Math.max(Math.floor(input.limit), 1), TASKS_PAGE_LIMIT);
+  return { tasks: limit ? tasks.slice(0, limit) : tasks };
 }
 

@@ -12,11 +12,11 @@ One chrome. A content host. Three surfaces. The ontology owns identity and which
 
 | Surface | What it is |
 | --- | --- |
-| Home | First paint is the graph, filling the remaining viewport. Recents, open tasks, and type folders sit below it on the same page. |
+| Home | Recents, open tasks, and type folders. |
 | Collection | One type's objects in the layout that type declared. |
 | Detail | One object, as a page in the content host. Title, body, structure, properties. |
 
-Search is chrome, not a fourth surface. Recents is a Home widget; **View all** opens the Recents page. The rail is Home and Search. Home is the graph page.
+Search is chrome, not a fourth surface. Recents is a Home widget; **View all** opens the Recents page. The rail is Home and Search.
 
 The window has no docked inspector. Properties live on the detail page.
 
@@ -44,7 +44,7 @@ Right-click a graph node: local graph, depth **1–4**, default **2**.
 
 **Left rail.** Logo, then Home, then Search. Collapse to icons. Width **56px** collapsed, **224px** expanded. Theme toggle lives here.
 
-Home is the graph homepage. Search opens the search overlay.
+Home opens Recents, open tasks, and type folders. Search opens the search overlay.
 
 **Content host.** View strip across the top of the main pane. Home is pinned. Opening a collection or a detail is a view in this strip. The active view fills the pane under the strip.
 
@@ -54,23 +54,17 @@ Home is the graph homepage. Search opens the search overlay.
 
 ## Home
 
-First paint is the graph. It fills the height left under the view strip. Floor **460px**. Find field on the graph. Type legend. Nodes and edges from live objects and live relations. Click a node: that object's detail page.
+**Recents.** Last **5** objects that are not tasks, newest first. Grouped **Today / Yesterday / Earlier this week / Earlier**. Each row: type glyph, title, relative time. **View all** opens Recents. Empty: **Nothing yet.**
 
-Below the graph, on the same page:
+**Open tasks.** The **5** most urgent open tasks, sorted overdue (oldest due first), today, upcoming (soonest first), then undated by title. Grouped **Overdue / Today / Upcoming / No date**. Each row: title and due date. **View all** opens the task collection. Empty: **No open tasks.**
 
-**Recents.** Last **10** objects that are not tasks, newest first. Body height **160px**; overflow scrolls inside the card. Grouped **Today / Yesterday / Earlier this week / Earlier**. Each row: type glyph, title, relative time. **View all** opens Recents. Empty: **Nothing yet.**
-
-**Open tasks.** Open tasks grouped **Overdue / Today / Upcoming / No date**. Body height **256px**; overflow scrolls inside the card. Each row: title and due date. **View all** opens the task collection. Empty: **No open tasks.**
-
-**Type folders.** One folder per type that has objects, in type-order. Each folder: type glyph, type color, type name, count. Open: that type's collection.
-
-The page scrolls under the graph. The graph keeps the remaining viewport.
+**Type folders.** One folder per type that has live objects, in type-order. Types with a zero count do not appear. Each folder: type glyph, type color, type name, count. Open: that type's collection.
 
 ---
 
 ## Graph
 
-Home's first paint. Directed force layout. Nodes are objects. Edges are relations.
+A collection layout when the type names `graph`. Directed force layout. Nodes are objects. Edges are relations.
 
 Two edge kinds, both drawn:
 
@@ -101,7 +95,7 @@ Layouts the type may name: list, card, table, board, calendar, timeline, outline
 
 **Outline.** Nested by the hierarchy relation. Open a row: detail page.
 
-**Graph.** Same directed graph as Home, scoped to this type. Click a node: detail page.
+**Graph.** Directed graph scoped to this type. Floor **460px**. Click a node: detail page.
 
 Empty collection: **Nothing yet.** Filtered to zero: **Nothing matches your filters.**
 
@@ -121,7 +115,7 @@ Closing the detail view activates the view to its left in the strip. Closing the
 
 ## Recents page
 
-Opened from the Recents widget's **View all**. Same recency groups as the widget. No cap of 10. Each row opens the detail page.
+Opened from the Recents widget's **View all**. Same recency groups as the widget. No cap of 5. Each row opens the detail page.
 
 ---
 
