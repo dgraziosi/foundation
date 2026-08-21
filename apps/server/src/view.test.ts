@@ -562,13 +562,30 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       await upsertGraphNode(pool, { type: "task", title: "Widget undated a" });
       await upsertGraphNode(pool, { type: "task", title: "Widget undated b" });
       await upsertGraphNode(pool, { type: "task", title: "Widget undated c" });
+      const completed = await upsertGraphNode(pool, {
+        type: "task",
+        title: "Widget completed overdue",
+        status: "completed",
+        data: { due: "2019-01-01" },
+      });
+      const archived = await upsertGraphNode(pool, {
+        type: "task",
+        title: "Widget archived overdue",
+        status: "archived",
+        data: { due: "2019-06-01" },
+      });
+      assert.equal(isToolError(completed), false);
+      assert.equal(isToolError(archived), false);
 
       const limited = await fetch(`${origin}/view/api/tasks?limit=5`, { headers: authHeader() });
       assert.equal(limited.status, 200);
       const limitedBody = (await limited.json()) as {
-        tasks: Array<{ title: string; due?: string }>;
+        tasks: Array<{ title: string; status?: string; due?: string }>;
       };
       assert.equal(limitedBody.tasks.length, 5);
+      assert.ok(limitedBody.tasks.every((item) => item.status === "active"));
+      assert.ok(!limitedBody.tasks.some((item) => item.title === "Widget completed overdue"));
+      assert.ok(!limitedBody.tasks.some((item) => item.title === "Widget archived overdue"));
       assert.deepEqual(
         limitedBody.tasks.map((item) => item.title),
         [
