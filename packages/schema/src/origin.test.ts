@@ -54,3 +54,11 @@ test("canonicalizeOriginInData persists trimmed system and id", () => {
   });
   assert.deepEqual(canonical.origin, { system: "gmail", id: "msg-9", extra: true });
 });
+
+test("origin identity ignores kind: parsed origin is system and id only", () => {
+  const parsed = originFromData({
+    origin: { system: "gmail", id: "msg-fixture-1", kind: "sent" },
+  });
+  assert.deepEqual(parsed, { system: "gmail", id: "msg-fixture-1" });
+  assert.ok(parsed && !("kind" in parsed));
+});

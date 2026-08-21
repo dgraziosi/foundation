@@ -20,7 +20,10 @@ const fixtureNode = {
   title: "Fixture note",
   status: "active" as const,
   payload: { media_type: "text/markdown", storage: "inline" as const, body: "Due Friday. Wait on the permit." },
-  data: { due: "2026-08-28" },
+  data: {
+    due: "2026-08-28",
+    receipt: { system: "gmail", id: "msg-fixture-sent-1", kind: "sent" },
+  },
   metadata: {},
   created_at: STAMP,
   updated_at: STAMP,
@@ -86,6 +89,11 @@ test("get returns the current node and no activity list", () => {
   NodeSchema.parse(parsed.node);
   assert.equal(parsed.node.payload.body, "Due Friday. Wait on the permit.");
   assert.equal(parsed.node.data.due, "2026-08-28");
+  assert.deepEqual(parsed.node.data.receipt, {
+    system: "gmail",
+    id: "msg-fixture-sent-1",
+    kind: "sent",
+  });
 });
 
 test("list_activity reads one node's writes by target", () => {

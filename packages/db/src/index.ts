@@ -39,6 +39,7 @@ export {
   getNodeById,
   getNodeByIdempotencyKey,
   getNodeByOrigin,
+  getNodeByReceipt,
   hasLiveChildOf,
   insertEdge,
   insertNode,
@@ -85,4 +86,10 @@ export {
   type BlobIngestResult,
   type BlobRuntime,
 } from "./blobs.js";
-export { isForeignKeyViolation, isUniqueViolation, withTransaction, type Queryable } from "./tx.js";
+export {
+  isForeignKeyViolation,
+  isUniqueViolation,
+  uniqueViolationConstraint,
+  withTransaction,
+  type Queryable,
+} from "./tx.js";

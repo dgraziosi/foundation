@@ -44,6 +44,17 @@ export function isUniqueViolation(error: unknown): boolean {
   );
 }
 
+export function uniqueViolationConstraint(error: unknown): string | undefined {
+  if (!isUniqueViolation(error)) {
+    return undefined;
+  }
+  if (typeof error === "object" && error !== null && "constraint" in error) {
+    const name = (error as { constraint?: unknown }).constraint;
+    return typeof name === "string" ? name : undefined;
+  }
+  return undefined;
+}
+
 export function isForeignKeyViolation(error: unknown): boolean {
   return (
     typeof error === "object" &&

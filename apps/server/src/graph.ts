@@ -7,6 +7,7 @@ import {
   getNodeById,
   getNodeByIdempotencyKey,
   getNodeByOrigin,
+  getNodeByReceipt,
   getNodeType,
   getRelationType,
   ingestBlobBytes,
@@ -72,6 +73,8 @@ import {
   createPreflightFromLookup,
   ORIGIN_HIT_SUGGESTION,
   ORIGIN_MISS_SUGGESTION,
+  RECEIPT_HIT_SUGGESTION,
+  RECEIPT_MISS_SUGGESTION,
   DUE_DATE_SUGGESTION,
   assertIfMatch,
   LOST_UPDATE_SUGGESTION,
@@ -79,6 +82,9 @@ import {
   originConflictError,
   originFromData,
   canonicalizeOriginInData,
+  receiptConflictError,
+  receiptFromData,
+  canonicalizeReceiptInData,
   canonicalizeDueInData,
   dueFromData,
   dueKeyIsInvalid,
@@ -143,6 +149,10 @@ function validateUpsertData(type: NodeType, data: Record<string, unknown>): Tool
   if (isToolError(origin)) {
     return origin;
   }
+  const receipt = receiptFromData(data);
+  if (isToolError(receipt)) {
+    return receipt;
+  }
   if (dueKeyIsInvalid(data)) {
     return toolError("data.due must be an ISO date YYYY-MM-DD", DUE_DATE_SUGGESTION);
   }
@@ -199,6 +209,30 @@ async function originUniqueError(
     return originConflictError(existing.id, origin);
   }
   return null;
+}
+
+async function receiptUniqueError(
+  db: Queryable,
+  data: Record<string, unknown>,
+  selfId?: string,
+): Promise<ToolError | null> {
+  const receipt = receiptFromData(data);
+  if (!receipt || isToolError(receipt)) {
+    return null;
+  }
+  const existing = await getNodeByReceipt(db, receipt);
+  if (existing && existing.id !== selfId) {
+    return receiptConflictError(existing.id, receipt);
+  }
+  return null;
+}
+
+async function pointerUniqueError(
+  db: Queryable,
+  data: Record<string, unknown>,
+  selfId?: string,
+): Promise<ToolError | null> {
+  return (await originUniqueError(db, data, selfId)) ?? (await receiptUniqueError(db, data, selfId));
 }
 
 async function createDuplicatePreflight(
@@ -531,7 +565,9 @@ export async function upsertGraphNode(
       }
 
       const merged = canonicalizeDueInData(
-        canonicalizeOriginInData(mergedNodeData(existing, input.data)),
+        canonicalizeReceiptInData(
+          canonicalizeOriginInData(mergedNodeData(existing, input.data)),
+        ),
       );
       const nextData = applyAliasesFromPatch(merged, input.data);
       if (isToolError(nextData)) {
@@ -556,6 +592,7 @@ export async function upsertGraphNode(
         if (stale) {
           return stale;
         }
+        await client.query("SAVEPOINT upsert_update");
         try {
           const node = await updateNode(client, input.id!, {
             type: input.type,
@@ -566,6 +603,7 @@ export async function upsertGraphNode(
             metadata: input.metadata,
             base_updated_at: input.base_updated_at,
           });
+          await client.query("RELEASE SAVEPOINT upsert_update");
           if (!node) {
             const current = await getNodeById(client, input.id!, { includeDeleted: true });
             if (!current) {
@@ -596,9 +634,10 @@ export async function upsertGraphNode(
           return { node, activity_id: activity.id };
         } catch (error) {
           if (isUniqueViolation(error)) {
-            const originErr = await originUniqueError(client, nextData, existing.id);
-            if (originErr) {
-              return originErr;
+            await client.query("ROLLBACK TO SAVEPOINT upsert_update");
+            const pointerErr = await pointerUniqueError(client, nextData, existing.id);
+            if (pointerErr) {
+              return pointerErr;
             }
           }
           throw error;
@@ -662,9 +701,9 @@ export async function upsertGraphNode(
               return replayIdempotentCreate(client, replay);
             }
           }
-          const originErr = await originUniqueError(client, nextData);
-          if (originErr) {
-            return originErr;
+          const pointerErr = await pointerUniqueError(client, nextData);
+          if (pointerErr) {
+            return pointerErr;
           }
         }
         throw error;
@@ -1413,6 +1452,17 @@ export async function searchGraphNodes(
         return { nodes: [], suggestion: ORIGIN_MISS_SUGGESTION };
       }
     }
+    if (input.receipt) {
+      const receipt = receiptFromData(node.data);
+      if (
+        isToolError(receipt) ||
+        !receipt ||
+        receipt.system !== input.receipt.system ||
+        receipt.id !== input.receipt.id
+      ) {
+        return { nodes: [], suggestion: RECEIPT_MISS_SUGGESTION };
+      }
+    }
     if (input.under && !(await isChildOfParent(pool, node.id, input.under))) {
       return { nodes: [], suggestion: SEARCH_MISS_SUGGESTION };
     }
@@ -1445,6 +1495,8 @@ export async function searchGraphNodes(
     since,
     originSystem: input.origin?.system,
     originId: input.origin?.id,
+    receiptSystem: input.receipt?.system,
+    receiptId: input.receipt?.id,
     dueOnOrAfter: input.due_on_or_after,
     dueOnOrBefore: input.due_on_or_before,
     dueBefore: input.due === "overdue" ? today : undefined,
@@ -1459,10 +1511,16 @@ export async function searchGraphNodes(
     if (input.origin) {
       return { nodes: [], suggestion: ORIGIN_MISS_SUGGESTION };
     }
+    if (input.receipt) {
+      return { nodes: [], suggestion: RECEIPT_MISS_SUGGESTION };
+    }
     return { nodes: [] };
   }
   if (input.origin) {
     return { nodes, suggestion: ORIGIN_HIT_SUGGESTION };
+  }
+  if (input.receipt) {
+    return { nodes, suggestion: RECEIPT_HIT_SUGGESTION };
   }
   return { nodes };
 }

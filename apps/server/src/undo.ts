@@ -22,6 +22,7 @@ import {
   withTransaction,
   isForeignKeyViolation,
   isUniqueViolation,
+  uniqueViolationConstraint,
   type Pool,
   type PoolClient,
 } from "@foundation/db";
@@ -168,6 +169,12 @@ async function invertUpdateNode(
     return { action: "update", before: current, after: restored };
   } catch (error) {
     if (isUniqueViolation(error)) {
+      if (uniqueViolationConstraint(error) === "nodes_receipt_live_uidx") {
+        return toolError(
+          "Cannot undo update: restoring this node would duplicate a live receipt (system, id)",
+          "Search receipt to find the live node. Change or delete the live receipt first.",
+        );
+      }
       return toolError(
         "Cannot undo update: restoring this node would duplicate a live origin (system, id)",
         "Search origin to find the live node. Do not twin people. Change or delete the live origin first.",
@@ -209,6 +216,12 @@ async function invertDeleteNode(
     return { action: "restore", before: current, after: restored };
   } catch (error) {
     if (isUniqueViolation(error)) {
+      if (uniqueViolationConstraint(error) === "nodes_receipt_live_uidx") {
+        return toolError(
+          "Cannot undo delete: restoring this node would duplicate a live receipt (system, id)",
+          "Search receipt to find the live node. Change or delete the live receipt first.",
+        );
+      }
       return toolError(
         "Cannot undo delete: restoring this node would duplicate a live origin (system, id)",
         "Search origin to find the live node. Do not twin people. Change or delete the live origin first.",
