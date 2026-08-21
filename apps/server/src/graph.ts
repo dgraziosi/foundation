@@ -603,8 +603,8 @@ export async function upsertGraphNode(
             metadata: input.metadata,
             base_updated_at: input.base_updated_at,
           });
+          await client.query("RELEASE SAVEPOINT upsert_update");
           if (!node) {
-            await client.query("RELEASE SAVEPOINT upsert_update");
             const current = await getNodeById(client, input.id!, { includeDeleted: true });
             if (!current) {
               return toolError(
@@ -623,7 +623,6 @@ export async function upsertGraphNode(
               LOST_UPDATE_SUGGESTION,
             );
           }
-          await client.query("RELEASE SAVEPOINT upsert_update");
           const activity = await insertActivity(client, {
             ...writer,
             action: "update",
