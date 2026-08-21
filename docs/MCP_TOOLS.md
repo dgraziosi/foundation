@@ -2,23 +2,23 @@
 
 Product contract: [`docs/SPEC.md`](./SPEC.md).
 
-v1 surface is **14 tools**. Destructive tools require `confirm: true` or they return `{ error, suggestion }`. Identity is UUID. If you already have a UUID and need the node (payload, edges, if-match), call `get`. If you already have a UUID and need the open work around it, call `working_set`. To resolve one or more entity names, call `lookup`, then `working_set` with that id. Ontology mutations apply immediately (activity log + `undo`; no proposal inbox).
+v1 surface is **14 tools**. Destructive tools require `confirm: true` or they return `{ error, suggestion }`. Identity is UUID. A node is what is true now, short. History stays in activity. If you already have a UUID and need the current picture (payload, data, edges, if-match), call `get`. `get` does not return activity. If you already have a UUID and need the diary for that node, call `list_activity` `{ target }`. If you already have a UUID and need the open work around it, call `working_set`. To resolve one or more entity names, call `lookup`, then `working_set` with that id. Ontology mutations apply immediately (activity log + `undo`; no proposal inbox). A named bot rewrites one node on purpose: `get` → `list_activity` `{ target }` → keep what still matters, invent nothing → `upsert` the same id with a short `payload` and `base_updated_at`. Not a background job. The server does not invent the picture. No rewrite tool. Contract: [`SPEC.md`](./SPEC.md#current-picture).
 
 | Tool | Purpose |
 | --- | --- |
 | `bootstrap` | Return starter ontology, how to extend it, and current type/relation inventory. Call first. |
 | `search` | Find nodes by text query and/or filters (`type`, `status`, `under`, `since`, `origin`, `due`, `due_on_or_before`, `due_on_or_after`, `data_equals`). Query is optional when a filter is set. Hits are id/type/title/snippet plus `due` when set. |
 | `lookup` | Resolve one or more names to live nodes. One result per input (`exact` / `alias` / `candidate` / `ambiguous` / `no_match`). Read-only. |
-| `get` | Fetch a node by id, including payload, incident edges with neighbor titles, and `suggested_links` from title FTS. Blob payloads return metadata, not bytes. |
+| `get` | Return the current picture of one node: payload, data, incident edges with neighbor titles, and `suggested_links` from title FTS. Does not return activity. Blob payloads return metadata, not bytes. |
 | `working_set` | Return the actionable working set around one live node: open work, dues, and the parent chain when the root hangs under something. |
-| `upsert` | Create or update a node (title, type, payload, data, status). Updates require `base_updated_at`. Create accepts `idempotency_key`. Create (no id) preflights duplicates via `lookup`. Blob ingest via `bytes_base64` or `source_path`. Returns `suggested_links` (proposals only). |
+| `upsert` | Create or update a node (title, type, payload, data, status). Passing `payload` replaces that body; omit it and the body stays. Updates require `base_updated_at`. Create accepts `idempotency_key`. Create (no id) preflights duplicates via `lookup`. Blob ingest via `bytes_base64` or `source_path`. Returns `suggested_links` (proposals only). |
 | `delete` | Soft-delete a node. Requires `confirm: true`. |
 | `link` | Create typed edges after validation. One edge or `edges[]` (1–20). Whole batch validates; one transaction writes all or none. Requires endpoint if-match. |
 | `unlink` | Remove a typed edge. Requires `confirm: true`. |
 | `inspect_ontology` | List type and relation registry rows (system + authored), including each type’s `fields`, view declarations, `default_view`, `hue`, and `glyph`. |
 | `manage_type` | Create, update, or retire a node type (including `fields`, view queries, hue, and glyph). Applies immediately. Retire requires `confirm: true`. |
 | `manage_relation` | Create or update a relation type. Applies immediately. |
-| `list_activity` | Read the activity log (filter by action, target, since). |
+| `list_activity` | Read the diary (filter by action, target, since). `{ target: <node id> }` is the write history for that node (`before` / `after`). |
 | `undo` | Reverse a reversible activity row by id. Requires `confirm: true`. Type-create undo with leftover deleted nodes needs `purge_deleted: true`. |
 
 Handler contract: each tool has one zod input schema and one output schema; JSON Schema on the wire is derived; invalid input never reaches the domain; domain errors are `{ error, suggestion? }`.
@@ -33,8 +33,11 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 
 ### `get`
 
+The current picture of one live node. History stays in activity.
+
 - **In:** `{ id, include_body? }`
 - **Out:** `{ node, edges: [{ id, from_id, to_id, relation_type, direction, metadata, created_at, neighbor: { id, title, type } }], blob?, suggested_links }` or `{ error, suggestion? }`
+- `node` is what is true now: type, title, status, `payload`, `data`, metadata, `created_at`, `updated_at`. It does not include activity rows. `list_activity` `{ target }` is the diary.
 - Each incident edge includes **neighbor title and type**, not UUID-only hops. Use those titles to `search` or `get` the other node. For the open work around this id (children, dues, parent chain), call `working_set` — `get` stays one node plus flags (`include_body`).
 - `suggested_links` is the same title-FTS list as `upsert` (skip self and already-linked; no second `child_of` parent; cap 5). Useful when a later `get` still has no edges. Empty → `[]`. Never writes an edge.
 - Inline payloads still return `payload.body`. Blob payloads return `{ storage: "blob", blob_id, media_type }` plus `blob: { id, sha256, media_type, byte_size, path }`. Bytes are **not** dumped into the JSON by default.
@@ -44,7 +47,7 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 
 Read-only agenda around one live node. New tool — not a `get` flag.
 
-**Why a new tool.** `get` is identity: one node, payload, incident edges, `suggested_links`, `updated_at` for if-match. A working set is a different payload: many lean rows, filtered to open work, sorted by due, walked from the ontology. A flag on `get` would either ship that agenda on every fetch or turn `get` into two tools behind a switch. `search` already lists vault-wide (`under`, `due`, `status`). This call is rooted: given one id, return the actionable set around it.
+**Why a new tool.** `get` is the current picture: one node, payload, data, incident edges, `suggested_links`, `updated_at` for if-match. A working set is a different return: many lean rows, filtered to open work, sorted by due, walked from the ontology. A flag on `get` would either ship that agenda on every fetch or turn `get` into two tools behind a switch. `search` already lists vault-wide (`under`, `due`, `status`). This call is rooted: given one id, return the actionable set around it. Age-decay on this agenda is out of this amendment.
 
 **Why `working_set`.** The return is the set of nodes an agent needs to act on around that root. `context` already means prompt stuffing and MCP session state; an agent would expect bodies and history. `agenda` reads as calendar-only and misses the parent chain on a task root.
 
@@ -82,13 +85,14 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 
 `walk.work: "none"` with `ancestors: true` is a leaf whose working set is the parent chain. `walk.work: "none"` and `ancestors: false` with `items: []` is a live isolate — still success.
 
-**Read-only.** Live edges only. The tool does not write, link, or turn `suggested_links` into edges. Call `get` when you need payload or if-match; call `link` when the user accepts a suggestion.
+**Read-only.** Live edges only. The tool does not write, link, or turn `suggested_links` into edges. Call `get` for the current picture or if-match; call `list_activity` `{ target }` for the diary; call `link` when the user accepts a suggestion.
 
 **How this sits next to `get` and `search`.**
 
 | Need | Call |
 | --- | --- |
-| One node’s payload, edges, `suggested_links`, `updated_at` | `get` |
+| One node’s current picture (`payload`, `data`, edges, `suggested_links`, `updated_at`) | `get` |
+| Diary of writes for one node (`before` / `after`) | `list_activity` `{ target }` |
 | Vault-wide list or lexical recall (`under`, `due`, `status`, text) | `search` |
 | Name → UUID | `lookup` |
 | Open work around one UUID | `working_set` |
@@ -102,7 +106,7 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 - **In:** `{ id?, type, title, payload?, data?, status?, metadata?, base_updated_at?, idempotency_key?, allow_duplicate?, actor?, actor_label? }`
 - **Out:** `{ node, activity_id, suggested_links, duplicate_warnings? }` or `{ error, suggestion?, outcome?, candidates? }`
 - **`suggested_links`:** Postgres FTS on the new title (create, and update when the title changes) — not embeddings. Each item is `{ kind, target: { id, type, title }, reason }`. `kind` is a seed relation: `child_of`, `about`, or `relates_to`. `target` is a **live** node that already exists. How they are chosen: spine types with `parent_types` → `child_of` a live allowed parent whose title matches; if the title looks like a person already in the graph → `about` that person; otherwise `relates_to` a close title match of any type. Skip self. Skip nodes already linked to this one. A node with a live `child_of` is not offered a second parent (`about` / `relates_to` may still appear). Cap 5. Empty graph or no match → `[]`. **Never creates an edge.** Never adds a type or relation. `link` is how an accepted suggestion becomes an edge. Show non-empty suggestions and ask before calling `link`.
-- `payload`: `{ media_type, storage: "inline"|"blob", body?, blob_id?, bytes_base64?, source_path? }`
+- `payload`: `{ media_type, storage: "inline"|"blob", body?, blob_id?, bytes_base64?, source_path? }`. On update, passing `payload` **replaces** that body (the written picture). Omit `payload` and the body stays. A named bot that rewrites the current picture passes the new short `payload` and `base_updated_at` from `get`.
 - Inline media types: `text/markdown`, `text/html`, `application/json`, `text/plain`.
 - **Blob ingest (no browser, no S3):** pass exactly one of:
   1. `bytes_base64` — MCP-native; good for small files. Size cap **20MB** (decoded). JSON body limit is 32MB so a 20MB file can round-trip.
@@ -173,9 +177,9 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 - `due: "overdue" | "today"` uses **America/New_York** for “today.” `due_on_or_before` / `due_on_or_after` are inclusive ISO dates (`YYYY-MM-DD`) against `data.due`. Nodes without `data.due` do not match a due filter. Seed `spend` uses the same `data.due` key, so those filters apply to a spend line the same way they apply to a task.
 - `data_equals` is JSONB containment (`data @> …`) on one or a few top-level keys (at most 8; lowercase identifiers). Not a column per key. Nodes missing those keys do not match. Combine with `type` / other filters. Values are strings — `{ stage: "paid" }` or `{ currency: "USD" }` on `spend` matches; `amount` is a number and does not.
 - `origin: { system, id }` looks up the unique live `data.origin` ref (`gmail` | `calendar` | `drive` | `github`).
-- Hits are lean (id/type/title/snippet, plus `due` when `data.due` is set). Call `get` to load payload and neighbor titles. Call `working_set` when the hit is a root and you want the open work around it.
+- Hits are lean (id/type/title/snippet, plus `due` when `data.due` is set). Call `get` for the current picture and neighbor titles. Call `list_activity` `{ target }` for the diary. Call `working_set` when the hit is a root and you want the open work around it.
 - If `query` is a UUID, search resolves it like `get` and returns `suggestion` to prefer `get` (or `working_set` for the agenda) next time.
-- **An empty lexical result is not a license to upsert a duplicate.** The `suggestion` says so. Try a shorter token or a type filter; only upsert if the entity is new. If you already have a UUID, call `get` for the node or `working_set` for the agenda. An origin miss means you may upsert with that `data.origin` (ref only). To resolve one or more entity names to UUIDs, call `lookup`.
+- **An empty lexical result is not a license to upsert a duplicate.** The `suggestion` says so. Try a shorter token or a type filter; only upsert if the entity is new. If you already have a UUID, call `get` for the current picture or `working_set` for the agenda. An origin miss means you may upsert with that `data.origin` (ref only). To resolve one or more entity names to UUIDs, call `lookup`.
 
 ### `lookup`
 
@@ -192,13 +196,14 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 - Candidates are `{ id, type, title, status, updated_at, confidence, match, matched_value, explanation }`. `title` is the canonical node title. `updated_at` is for a later if-match upsert or link. `confidence` is algorithmic rank, not a calibrated probability, and does not authorize a write. `match` is `title_exact` | `alias_exact` | `title_fuzzy` | `alias_fuzzy` | `title_token` | `uuid`. The surrounding list is `candidates` on that result.
 - Soft-deleted nodes are excluded. Title matching uses generated `title_norm` / `title_compact` plus trigram indexes. Aliases are unnested from JSONB (well-formed string arrays only).
 - Read-only. Never writes, merges, creates, or picks an ambiguous candidate. For `candidate` or `ambiguous`, ask the user to confirm a UUID before any mutation that depends on the identity. `get` is safe for inspection.
-- If you already have a UUID, call `get` for the node or `working_set` for the open work around it. Listing, origin refs, due filters, and payload search stay on `search`. Lexical recall only, not embeddings. No hidden nickname list. The usual path after a bound name is `working_set` with that id.
+- If you already have a UUID, call `get` for the current picture or `working_set` for the open work around it. Listing, origin refs, due filters, and payload search stay on `search`. Lexical recall only, not embeddings. No hidden nickname list. The usual path after a bound name is `working_set` with that id.
 
 ### `list_activity`
 
 - **In:** `{ action?, target?, since?, limit? }`
 - **Out:** `{ activities }`
-- `target` is `target_id` (node UUID, edge UUID, or type/relation slug). `since` is an ISO-8601 timestamp. Rows include `actor`, `actor_label`, `before` / `after`, `reversible`, `undo_token`, `token_expires_at`, and `undone_at`. `actor` / `actor_label` record who wrote; they are not a permission gate.
+- `target` is `target_id` (node UUID, edge UUID, or type/relation slug). `{ target: <node id> }` is the diary for that node. Newest first. Default limit 50, max 200. Page older rows with `since`. `get` does not include these rows.
+- `since` is an ISO-8601 timestamp. Rows include `actor`, `actor_label`, `before` / `after`, `reversible`, `undo_token`, `token_expires_at`, and `undone_at`. `actor` / `actor_label` record who wrote; they are not a permission gate. Node write rows store snapshots of `payload`, `data`, title, type, and status. A bad picture is rebuilt from those snapshots, then written with `upsert`.
 - Blob node snapshots store `payload.blob_id` plus `blob: { blob_id, sha256, byte_size, media_type }` — not PDF/file bytes.
 
 ### `undo`
