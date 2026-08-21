@@ -62,7 +62,16 @@ Read `.env` (or the user’s configured path). Default is `./data`. This directo
 
 - Path missing while Compose claims to be healthy
 - `$FOUNDATION_DATA/postgres` missing, empty, or with no `PG_VERSION` (not a Postgres cluster)
+- The host user who runs Compose cannot read `$FOUNDATION_DATA/postgres/PG_VERSION`
 - A second leftover Compose project / volume the user did not mean (wrong cwd, wrong project name, bind mount that isn’t the `.env` path)
+
+Do not create `$FOUNDATION_DATA/postgres` or `PG_VERSION` on that miss.
+
+**Host can read the live dir.** After a real cluster exists, the host user who runs Compose can read `$FOUNDATION_DATA/postgres/PG_VERSION` and `$FOUNDATION_DATA/blobs`. That is enough for a host copy or backup. A data dir that is only mode 0700 is invisible to host copy and backup. Postgres still starts. First `compose up` on an empty data dir still inits.
+
+The product grants that host user named POSIX ACL read on those paths after the cluster exists. It takes the uid from the owner of the clone, not a baked-in number. Unix mode stays 0700 or 0750, never world-writable.
+
+**Not a first-run over a miss.** If `$FOUNDATION_DATA/postgres` exists and `PG_VERSION` is missing, refuse. That is not an empty first `compose up`. Do not mkdir an empty live cluster over the miss.
 
 A **first-day empty graph** (seed types/relations, zero user nodes) is **not** a failure. That is a new clone’s vault. Only treat “empty” as failure when the user configured well-known nodes (check 3) or explicitly said this vault should already hold a graph.
 
@@ -90,7 +99,7 @@ Intent only — tool JSON schemas change; call `bootstrap` and use what the serv
 | Types still seeded | `bootstrap` or `inspect_ontology`. Seed-only is OK on day one. |
 | Canary nodes | `get` / `search` |
 | Recent writes (optional context, not a fail) | `list_activity` with a `since` window |
-| Data dir (the vault) | Host filesystem + `.env` `FOUNDATION_DATA` |
+| Data dir (the vault) | Host filesystem + `.env` `FOUNDATION_DATA`. Host-read check: `scripts/vault-data-dir.sh` (`foundation_vault_data_dir_health_pg_version`). Do not mkdir on a miss. |
 | Backup | Host filesystem at `BACKUP_ROOT` (skip only if the user unset it) |
 
 Auth for `/mcp`: `Authorization: ApiKey <FOUNDATION_API_KEY>` (Bearer equivalent). `/health` needs no key.
