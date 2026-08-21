@@ -18,14 +18,18 @@ const nodes: TypeViewNode[] = [
 ];
 
 test("show completed widens active filter and still hides archived", () => {
+  const filtered = applyViewQuery(nodes, activeList, [dueField]);
   assert.deepEqual(
-    applyViewQuery(nodes, activeList, [dueField]).map((node) => node.id),
+    filtered.map((node) => node.id),
     ["1"],
   );
+  assert.equal(filtered.length, 1);
+  const widened = applyViewQuery(nodes, activeList, [dueField], { showCompleted: true });
   assert.deepEqual(
-    applyViewQuery(nodes, activeList, [dueField], { showCompleted: true }).map((node) => node.id),
+    widened.map((node) => node.id),
     ["2", "1"],
   );
+  assert.equal(widened.length, 2);
   assert.deepEqual(boardColumnIds([dueField], activeList), ["active"]);
   assert.deepEqual(boardColumnIds([dueField], activeList, { showCompleted: true }), ["active", "completed"]);
 });

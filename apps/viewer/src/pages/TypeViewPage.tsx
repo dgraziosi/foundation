@@ -53,7 +53,7 @@ export function TypeViewPage({ slug: forcedSlug }: { slug?: string }) {
   const identity = typeQuery.data?.type;
   const Icon = typeIcon(identity);
   const colors = typeColors(identity, lane);
-  const count = typeQuery.data?.nodes.length ?? 0;
+  const count = activeView ? queried.length : unfiltered;
 
   useEffect(() => {
     const label = typeQuery.data?.type.label;
