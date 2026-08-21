@@ -22,7 +22,9 @@ Short analog: app / folder / links → Foundation / vault / graph.
 - **ontology** — the vocabulary (types and relations)
 - **blob** — a file on a node
 - **agent** — anything that can reach the vault MCP
-- **operator** — the human who runs Compose
+- **user** — the human who runs Compose
+- **bot** — a named role that acts through an agent
+- **operator** — same person as user (older lines in this file)
 
 Do not call the graph “the Vault.”
 
@@ -49,17 +51,17 @@ Agents can add types and relations over time. No approval inbox.
 
 ## Agent API (14 tools)
 
-These names are the current surface. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md). This amendment adds `working_set`. A further tool still needs a SPEC amendment.
+These names are the current surface. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md). The current-picture rule uses `get`, `upsert`, and `list_activity`. It does not add a tool. A further tool still needs a SPEC amendment.
 
 `bootstrap`, `search`, `lookup`, `get`, `working_set`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`.
 
 - Destructive tools (`delete`, `unlink`, `undo`, `manage_type` retire) require `confirm: true`
-- Identity is UUID. If you already have a UUID and need the node (payload, edges, if-match), call `get`. If you already have a UUID and need the open work around it, call `working_set`. `lookup` then `working_set` is the name → act path.
+- Identity is UUID. If you already have a UUID and need the current picture (payload, data, edges, if-match), call `get`. `get` does not return activity. If you already have a UUID and need the open work around it, call `working_set`. `lookup` then `working_set` is the name → act path. How a bot rewrites one node: [Current picture](#current-picture).
 - Updates (`upsert` with an existing id, `link`) are if-match: pass `base_updated_at` / endpoint timestamps from `get`. Compared at millisecond precision (same instant `get` returns). Mismatch → `{ error, suggestion }` (get and retry), never “node not found.” Not a write-ACL. `link` accepts one edge or a capped `edges[]` (1–20). The whole batch validates, then one transaction writes all edges or none. One activity receipt per written edge. Each edge carries both endpoint timestamps; a later edge does not inherit CAS from an earlier edge that named the same node. Shared endpoints still use one agreed timestamp; missing or disagreeing timestamps refuse the batch. Linking does not change `node.updated_at`.
 - `manage_type` can retire an unused authored type (`action: "retire"`, `confirm: true`). System seed types cannot be retired. Live nodes of that type refuse; leftover soft-deleted nodes follow type-create undo (`purge_deleted: true` or restore those deletes first). A type owns `fields` (the field template), view declarations (`id` plus optional `filter` / `sort` / `group`), `default_view`, `hue`, and `glyph`. `json_schema` is compiled from `fields` (`additionalProperties: true`; `needed` is not JSON Schema `required`). Seed types already declare views (`task` defaults to `board`) and first-paint hue/glyph. The Viewer reads that contract; it does not infer views or hardcode a type catalog. System seed types may edit description, `fields`, hue, glyph, and the query on views they already declare. Their slug, kind, parent_types, label, and ordered view **ids** stay locked. Authored types keep the wider patch, including the view id list. Seed apply fills **missing** seed fields and missing seed hue/glyph only; it does not overwrite an operator edit.
-- `upsert` **merges** `data` on update (partial patch does not wipe other keys). Create accepts `idempotency_key` so a retry does not twin a node. Create (no `id`) runs the same `lookup` matcher on the new title, type-scoped. Exact title or unique exact alias returns those write-ready candidates and does not write unless `allow_duplicate: true`. Token, fuzzy, and space-compacted matches warn (`duplicate_warnings`) and do not block. Same-name entities stay allowed with that override. Update/CAS behavior is unchanged. When a type has `json_schema`, upsert validates merged `data` and returns `{ error, suggestion }` on a miss.
+- `upsert` **replaces** `payload` when that field is passed (omit it and the body stays). It **merges** `data` on update (partial patch does not wipe other keys). Create accepts `idempotency_key` so a retry does not twin a node. Create (no `id`) runs the same `lookup` matcher on the new title, type-scoped. Exact title or unique exact alias returns those write-ready candidates and does not write unless `allow_duplicate: true`. Token, fuzzy, and space-compacted matches warn (`duplicate_warnings`) and do not block. Same-name entities stay allowed with that override. Update/CAS behavior is unchanged. When a type has `json_schema`, upsert validates merged `data` and returns `{ error, suggestion }` on a miss. A bot that rewrites the current picture passes the new short `payload` and `base_updated_at` from `get`.
 - `upsert` (create, and update when the title changes) returns `suggested_links` from Postgres FTS on the new title — not embeddings. Each item is `{ kind, target: { id, type, title }, reason }` where `kind` is a seed relation (`child_of`, `about`, or `relates_to`) and `target` is a live node that already exists. Spine types with `parent_types` get `child_of` an allowed parent whose title matches; a title that looks like a person already in the graph gets `about`; otherwise `relates_to` a close title match. Skip self and already-linked pairs. A node with a live `child_of` is not offered a second parent (`about` / `relates_to` may still appear). Cap 5. Empty graph or no match → `[]`. **Never creates an edge** and never adds a type or relation. `link` is how an accepted suggestion becomes an edge. `get` may return the same list for a node that still has no edges.
-- Activity stores optional `actor` / `actor_label` (who wrote). Not a permission gate.
+- Activity stores optional `actor` / `actor_label` (who wrote). Not a permission gate. Every node write leaves a row (`create` / `update` / `delete`) with `before` / `after` snapshots of that node (`payload`, `data`, title, type, status). Blob snapshots store `payload.blob_id` plus blob metadata, not file bytes. `list_activity` `{ target: <node id> }` is the diary for that node. Newest first. Default limit 50, max 200. Page older rows with `since`. `get` does not include these rows.
 - `search` is Postgres FTS (title + `data` + extracted inline payload text; Latin accents folded). `query` is optional when `type`, `status`, `under` (child_of parent), `since`, `origin`, `due` (`overdue` | `today` in America/New_York), `due_on_or_before`, `due_on_or_after`, or `data_equals` is set, so agents can list without a word. `data_equals` is JSONB equality on one or a few top-level `data` keys (not a column per key). Hits include `due` when `data.due` is set. Not embeddings. No `list_nodes`.
 - `lookup` resolves one or more names in one request and returns a result per input (`exact`, `alias`, `candidate`, `ambiguous`, `no_match`). Unique UUID, unique folded title (`name_norm`: case, accent, punctuation, whitespace), or unique operator-authored `data.aliases` entry may bind a UUID. Token and fuzzy matches are always `candidate`. Duplicate exact titles and alias/title collisions are `ambiguous`. Each useful candidate includes `id`, `type`, canonical `title`, `updated_at`, `match`, `confidence`, and sits on the surrounding `candidates` list so a later confirm/link/upsert can if-match. `confidence` ranks; it is not a calibrated probability and does not authorize a write. For `candidate` or `ambiguous`, ask the operator to confirm a UUID before any mutation that depends on the identity; `get` is safe for inspection. `lookup` never writes, merges, creates, or picks an ambiguous candidate. Compact/no-space equality is candidate-only. Matching is type-scoped when `type` is supplied. Not embeddings. No hidden nickname list. After a bound UUID, `working_set` is the one agenda read around that node.
 - `working_set` is a read-only rooted agenda. Given one live node id, it returns lean open work around that root (dues first), plus the parent chain when the type has `parent_types`. Walks follow the live ontology: hierarchy down (`child_of` and equivalent `kind: hierarchy` / `semantic_parent_slug` children) for types that can be parents (`goal`, `project`, `area`, and authored types in someone’s `parent_types`); `about` and `relates_to` for a person-like about-target (no invented `child_of`); hierarchy plus `relates_to` / `supports` for event-like types with `start`/`end` roles (`trip`). Defaults: open-only (`active`; pass `include_completed` for done), depth 1 (max 2), hard cap 40, America/New_York overdue, spine-root (`area`) bound by a 14-day due window. Honest empty is `{ items: [] }`. Several live edges to the same neighbor yield one row (`about` or `supports` over `relates_to`). Unknown or deleted id is `{ error, suggestion }` like `get`. No writes, no payload bodies, no `suggested_links`. `search` stays the vault-wide list. `get` stays one node.
@@ -67,6 +69,28 @@ These names are the current surface. Full parameters: [`docs/MCP_TOOLS.md`](./MC
 - `task`, `goal`, and `spend` accept optional `data.due` (`YYYY-MM-DD`) via the `due` date field (role `date`). On `spend`, display is Date — the calendar day of the line, not a task deadline. Compiled `json_schema` enforces the date when present; nodes without due still upsert. Extra `data` keys still write. `due: null` clears. A `ref` field stores a typed UUID pointer and does not create an edge.
 - Live nodes are unique on `data.origin.{system,id}` for `gmail` | `calendar` | `drive` | `github`. Look up with `search` `{ origin }` (then `get`). Store the ref only — do not fetch or mirror those systems’ bodies.
 - No `get_vault_health` / `run_maintenance` / `audit_links` tools — those jobs are instance routines the operator can run ([`VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md), [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/))
+- No rewrite or picture tool. `get` + `list_activity` + `upsert` is the loop. [Current picture](#current-picture).
+
+## Current picture
+
+A node is what is true now, short. History stays in activity.
+
+`get` returns that current picture: type, title, status, `payload`, `data`, metadata, `created_at`, `updated_at` for if-match, incident edges with neighbor titles, optional blob metadata, and `suggested_links`. It does not return activity rows. It does not grow a diary on the node.
+
+**`payload`** is the written picture. Inline body, or blob metadata when the file lives on disk. A rewrite passes a new `payload` and replaces that body. Omit `payload` and the body stays.
+
+**`data`** is the structured bag (due, origin, aliases, typed fields). An update merges keys. It is not the diary.
+
+A named **bot** rewrites the picture on purpose. One node at a time. Not a background job. The server does not invent the picture.
+
+1. `get` `{ id }` — the picture as it stands, plus `updated_at`.
+2. `list_activity` `{ target: <that id> }` — the writes (`before` / `after`). Raise `limit` or walk `since` when the default page is short.
+3. Keep what still matters. Invent nothing.
+4. `upsert` that same id with the new short `payload`, any `data` patch that still belongs, and `base_updated_at` from `get`. The write leaves a new activity row.
+
+A bad picture is rebuilt the same way. Activity already holds the snapshots. The bot reads them, writes a short picture, and `get` shows that picture. `undo` of the rewrite restores the previous picture while that row is reversible.
+
+`working_set` is not this loop. It stays the open-work agenda around one id. Age-decay on that agenda is **out** of this amendment. The walk already loads each neighbor as a full node, so `updated_at` is already in memory. A later stale bound would be the same cheap class as the spine-root 14-day due window: no new column, no new query, no new tool. This pass does not invent that window. The picture contract does not need it.
 
 ## Project spend
 
@@ -121,7 +145,7 @@ One type, one line, one envelope on the project. Agents record validated fields 
 
 ## Locked (do not reopen)
 
-- **14 tools** — names above. This amendment adds `working_set` (rooted agenda read). A further tool still needs a SPEC amendment
+- **14 tools** — names above. This amendment adds no tool. The current picture is `get` / `upsert` / `list_activity`. A further tool still needs a SPEC amendment
 - **FTS now** — embeddings/hybrid search is later optional work, not current search
 
 ## Non-goals (v1)
