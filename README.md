@@ -25,9 +25,9 @@ Out of the box: health check; nightly backup; backup freshness; periodic hygiene
 
 Executive Assistant — Inbox and calendar for due dates in the vault. Drafts email; sends when you approve that specific message. Puts vault due dates on the calendar.
 
-**Glossary (locked):** **Foundation** = the product. A **vault** = one instance (`FOUNDATION_DATA` + Postgres). The **graph** = the live network in that vault. A **blob** = a file on a node. An **agent** = anything that can reach the vault MCP. The **operator** = the human who runs Compose. Do not call the graph “the Vault.” Short analog: app / folder / links → Foundation / vault / graph. Ontology is the vocabulary (types and relations).
+**Glossary (locked):** **Foundation** = the product. A **vault** = one instance (`FOUNDATION_DATA` + Postgres). The **graph** = the live network in that vault. A **blob** = a file on a node. An **agent** = anything that can reach the vault MCP. The **user** = the human who runs Compose. Do not call the graph “the Vault.” Short analog: app / folder / links → Foundation / vault / graph. Ontology is the vocabulary (types and relations).
 
-Do not commit personal life data, documents, or secrets to this repository. Those belong in the operator’s vault, not in git.
+Do not commit personal life data, documents, or secrets to this repository. Those belong in the user’s vault, not in git.
 
 ## Docs
 
@@ -39,7 +39,7 @@ Do not commit personal life data, documents, or secrets to this repository. Thos
 - [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md) — weekday instance checkup
 - [`docs/BACKUP.md`](docs/BACKUP.md) — nightly backup script and throwaway restore
 - [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md) — weekly graph report
-- [`docs/VIEWER.md`](docs/VIEWER.md) — operator window contract: surfaces, shell, tokens, states
+- [`docs/VIEWER.md`](docs/VIEWER.md) — user window contract: surfaces, shell, tokens, states
 
 ## Install
 
@@ -68,7 +68,7 @@ Requires [Docker Compose](https://docs.docker.com/compose/) and a copy of this r
 
    `Authorization: Bearer <FOUNDATION_API_KEY>` is accepted as an equivalent.
 
-   After Compose is up, attach from Grok Bot, Hermes, OpenClaw, Claude Code, or Codex on this same machine. Put the URL and API key in that harness. Confirm it works: call `bootstrap` (step 4) or a simple `search`. What the operator does, plus the file snippet where the config differs: [`docs/HARNESS.md`](docs/HARNESS.md). The generic JSON shape (`url` + `headers`) is:
+   After Compose is up, attach from Grok Bot, Hermes, OpenClaw, Claude Code, or Codex on this same machine. Put the URL and API key in that harness. Confirm it works: call `bootstrap` (step 4) or a simple `search`. What the user does, plus the file snippet where the config differs: [`docs/HARNESS.md`](docs/HARNESS.md). The generic JSON shape (`url` + `headers`) is:
 
    ```json
    {
@@ -101,7 +101,7 @@ Requires [Docker Compose](https://docs.docker.com/compose/) and a copy of this r
 
    **Health** (no auth): `GET http://127.0.0.1:8787/health` — `{ ok, service, db }`.
 
-   **Window:** read-only operator window at `/view` (same API key as MCP). On this machine: `http://127.0.0.1:8788/view`. From another machine on this vault: `http://<this-host>:8788/view`. Unlock, then Home (Recents, open tasks, type folders), Collection, and Detail as a page. Search is a rail overlay. The window does not write.
+   **Window:** read-only user window at `/view` (same API key as MCP). On this machine: `http://127.0.0.1:8788/view`. From another machine on this vault: `http://<this-host>:8788/view`. Unlock, then Home (Recents, open tasks, type folders), Collection, and Detail as a page. Search is a rail overlay. The window does not write.
 
    **Blobs:** large files are `$FOUNDATION_DATA/blobs/<uuid>` (not git, not agent-data). Ingest with `upsert` (`payload.storage = "blob"` plus `bytes_base64`, or drop a file in `$FOUNDATION_DATA/uploads` and pass `source_path`). Cap 20MB. Fetch bytes: `GET /blobs/:id` with the API key. `get` returns blob metadata, not the file body.
 
@@ -164,7 +164,7 @@ trailer<</Root 1 0 R>>
      -o /tmp/sample.pdf
    ```
 
-   Operator drop-box (no base64): copy a file into `$FOUNDATION_DATA/uploads/` then `upsert` with `payload.source_path` set to the filename. The server moves it to `blobs/<uuid>`. Compose `db-init` creates `uploads/` mode 1777 (sticky) so the host user can write on a bind mount; `blobs/` stays 0700.
+   User drop-box (no base64): copy a file into `$FOUNDATION_DATA/uploads/` then `upsert` with `payload.source_path` set to the filename. The server moves it to `blobs/<uuid>`. Compose `db-init` creates `uploads/` mode 1777 (sticky) so the host user can write on a bind mount; `blobs/` stays 0700.
 
    If Postgres fails to start on a bind-mounted data dir, Compose already runs a `db-init` step that `chown`s `$FOUNDATION_DATA/postgres` to uid 999. `FOUNDATION_DATA` is the vault; keep that directory and leave Compose volumes intact.
 

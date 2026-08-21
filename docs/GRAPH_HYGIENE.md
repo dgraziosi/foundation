@@ -4,9 +4,9 @@ Weekly, report-only look at the **graph** in this vault. Quiet if green. Not vau
 
 ## Glossary
 
-Same locked terms as [`VAULT_HEALTH.md`](./VAULT_HEALTH.md): Foundation = the product; vault = one instance (`FOUNDATION_DATA` + Postgres); graph = the knowledge in that vault; blob = a file on a node; agent = anything that can reach the vault MCP; operator = the human who runs Compose. Do **not** call the graph “the Vault.”
+Same locked terms as [`VAULT_HEALTH.md`](./VAULT_HEALTH.md): Foundation = the product; vault = one instance (`FOUNDATION_DATA` + Postgres); graph = the knowledge in that vault; blob = a file on a node; agent = anything that can reach the vault MCP; user = the human who runs Compose. Do **not** call the graph “the Vault.”
 
-The operator can run this report, or attach it to Vault Keeper ([`AGENTS.md`](./AGENTS.md)). Skill: [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/).
+The user can run this report, or attach it to Vault Keeper ([`AGENTS.md`](./AGENTS.md)). Skill: [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/).
 
 ## What it is
 
@@ -16,7 +16,7 @@ A **quiet instance routine** (weekly, local time). It reports:
 - Nodes with zero edges
 - Type soup (authored types that fight the spine)
 
-When everything is fine, it stays silent. It pings the operator **only when it found something**. It does **not** mutate unless the operator asked for a repair **in that conversation**. Still not a new MCP tool.
+When everything is fine, it stays silent. It pings the user **only when it found something**. It does **not** mutate unless the user asked for a repair **in that conversation**. Still not a new MCP tool.
 
 Do not add `get_vault_health`, `run_maintenance`, `propose_reorganize`, `audit_links`, or `cleanup_dangling_links`. Do not add `list_nodes`.
 
@@ -69,4 +69,4 @@ Report slug, kind, parent_types. Do not `manage_type` on this routine.
 
 ## Failure / findings ping
 
-List what you found (duplicates, isolates, soup) with enough ids/titles for the operator to decide. Smallest next look — not a silent rewrite. If they ask to repair in this conversation, then you may mutate with the usual confirm gates. Ping in chat.
+List what you found (duplicates, isolates, soup) with enough ids/titles for the user to decide. Smallest next look — not a silent rewrite. If they ask to repair in this conversation, then you may mutate with the usual confirm gates. Ping in chat.
