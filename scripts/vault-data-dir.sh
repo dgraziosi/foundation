@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
-# Host-readable live vault data dir. Contract helper. Compose does not
-# call this yet.
+# Host-readable live vault data dir. Compose calls prepare from db-init
+# (before mkdir / initdb) and grant from db-host-read (after the official
+# image chmod 00700 on PGDATA). Health is the host-side check.
 #
 # After a real cluster exists, the host user who runs Compose can read
 # $FOUNDATION_DATA/postgres/PG_VERSION and $FOUNDATION_DATA/blobs.
 # Unix mode stays 0700 or 0750, never world-writable.
+#
+#   prepare <data-dir>  — refuse if postgres/ exists without PG_VERSION
+#   grant <data-dir>    — named POSIX ACL for the host user
+#   health <data-dir>   — fail if the host cannot read PG_VERSION
 #
 #   FOUNDATION_DATA           — the vault (default ./data)
 #   FOUNDATION_HOST_UID       — optional. Numeric uid of the host user
@@ -111,7 +116,22 @@ foundation_vault_data_dir_grant_host_read() {
   fi
 }
 
+foundation_vault_data_dir_usage() {
+  echo "vault-data-dir: prepare|grant|health <data-dir>" >&2
+  return 2
+}
+
+foundation_vault_data_dir_main() {
+  local cmd="${1:-}"
+  local data_dir="${2:-${FOUNDATION_DATA:-./data}}"
+  case "${cmd}" in
+    prepare) foundation_vault_data_dir_prepare "${data_dir}" ;;
+    grant) foundation_vault_data_dir_grant_host_read "${data_dir}" ;;
+    health) foundation_vault_data_dir_health_pg_version "${data_dir}" ;;
+    *) foundation_vault_data_dir_usage ;;
+  esac
+}
+
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  echo "vault-data-dir: source this file; Compose does not call it yet" >&2
-  exit 2
+  foundation_vault_data_dir_main "$@"
 fi

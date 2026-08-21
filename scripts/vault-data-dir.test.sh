@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Contract fixtures for a host-readable live vault data dir.
-# No live vault. Does not change Compose.
+# No live vault. Locks Compose wiring to the helper.
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -33,7 +33,9 @@ for needle in \
   'First `compose up` on an empty data dir still inits' \
   'named POSIX ACL' \
   'not a baked-in number' \
-  'never world-writable'
+  'never world-writable' \
+  'db-init` calls `scripts/vault-data-dir.sh prepare' \
+  'db-host-read` calls `grant'
 do
   if ! grep -Fq -- "${needle}" "${health_doc}"; then
     fail "VAULT_HEALTH.md is missing the contract sentence: ${needle}"
@@ -54,6 +56,34 @@ fi
 if grep -Eq -- 'chown.*\b1000\b|user:[[:space:]]*"?1000' "${compose_file}"; then
   fail "compose must not hardcode host uid 1000"
 fi
+if ! grep -Fq -- 'bash /vault-data-dir.sh prepare /data' "${compose_file}"; then
+  fail "compose db-init must call vault-data-dir.sh prepare"
+fi
+if ! grep -Fq -- 'bash /vault-data-dir.sh grant /data' "${compose_file}"; then
+  fail "compose db-host-read must call vault-data-dir.sh grant"
+fi
+if ! grep -Fq -- 'FOUNDATION_HOST_UID_PROBE: /host-uid-probe' "${compose_file}"; then
+  fail "compose grant must take host uid from the clone probe, not a baked-in 1000"
+fi
+if ! awk '
+  $0 ~ /db-host-read:/ { in_grant=1 }
+  in_grant && /depends_on:/ { in_deps=1 }
+  in_grant && in_deps && $0 ~ /^[[:space:]]+db:/ { saw_db=1 }
+  in_grant && saw_db && /service_healthy/ { found=1; exit }
+  in_grant && /^  [a-z]/ && $0 !~ /db-host-read:/ { in_grant=0; in_deps=0; saw_db=0 }
+  END { exit found ? 0 : 1 }
+' "${compose_file}"; then
+  fail "compose db-host-read must wait until db is healthy (after official chmod 00700)"
+fi
+if ! awk '
+  $0 ~ /db-host-read:/ { in_grant=1 }
+  in_grant && /depends_on:/ { in_deps=1 }
+  in_grant && in_deps && /restart: true/ { found=1; exit }
+  in_grant && /^  [a-z]/ && $0 !~ /db-host-read:/ { in_grant=0; in_deps=0 }
+  END { exit found ? 0 : 1 }
+' "${compose_file}"; then
+  fail "compose db-host-read must re-run when db restarts (re-grant after official chmod)"
+fi
 
 tmp="$(mktemp -d)"
 cleanup() {
@@ -62,6 +92,28 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
+
+# CLI is what Compose calls.
+if ! bash "${helper}" prepare "${tmp}/cli-first"; then
+  fail "CLI prepare must allow a first-run empty dir"
+fi
+if [[ -e "${tmp}/cli-first/postgres" ]]; then
+  fail "CLI prepare must not mkdir postgres/"
+fi
+mkdir -p "${tmp}/cli-miss/postgres"
+if bash "${helper}" prepare "${tmp}/cli-miss"; then
+  fail "CLI prepare must refuse postgres/ without PG_VERSION"
+fi
+mkdir -p "${tmp}/cli-health/postgres"
+printf '%s\n' '16' >"${tmp}/cli-health/postgres/PG_VERSION"
+if ! bash "${helper}" health "${tmp}/cli-health"; then
+  fail "CLI health must pass when PG_VERSION is readable"
+fi
+chmod 000 -- "${tmp}/cli-health/postgres/PG_VERSION"
+if bash "${helper}" health "${tmp}/cli-health"; then
+  fail "CLI health must fail when the host cannot read PG_VERSION"
+fi
+chmod 600 -- "${tmp}/cli-health/postgres/PG_VERSION"
 
 # First-run: empty data dir. Prepare allows init. Does not mkdir postgres/.
 first_run="${tmp}/first-run"

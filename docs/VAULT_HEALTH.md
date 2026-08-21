@@ -69,7 +69,7 @@ Do not create `$FOUNDATION_DATA/postgres` or `PG_VERSION` on that miss.
 
 **Host can read the live dir.** After a real cluster exists, the host user who runs Compose can read `$FOUNDATION_DATA/postgres/PG_VERSION` and `$FOUNDATION_DATA/blobs`. That is enough for a host copy or backup. A data dir that is only mode 0700 is invisible to host copy and backup. Postgres still starts. First `compose up` on an empty data dir still inits.
 
-The product grants that host user named POSIX ACL read on those paths after the cluster exists. It takes the uid from the owner of the clone, not a baked-in number. Unix mode stays 0700 or 0750, never world-writable.
+The product grants that host user named POSIX ACL read on those paths after the cluster exists. Compose `db-init` calls `scripts/vault-data-dir.sh prepare` before mkdir. After the official image `chmod 00700` on `PGDATA`, `db-host-read` calls `grant`. It takes the uid from the owner of the clone, or `FOUNDATION_HOST_UID`, not a baked-in number. Unix mode stays 0700 or 0750, never world-writable.
 
 **Not a first-run over a miss.** If `$FOUNDATION_DATA/postgres` exists and `PG_VERSION` is missing, refuse. That is not an empty first `compose up`. Do not mkdir an empty live cluster over the miss.
 

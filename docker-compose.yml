@@ -1,14 +1,19 @@
 services:
   # Postgres data is uid 999. blobs/ stays 0700 for the server user (not world-writable).
   # uploads/ is 1777 (sticky drop-box) so a host user can write on typical Linux bind mounts.
+  # After a real cluster exists, db-host-read grants the host user named POSIX ACL read.
   db-init:
     image: pgvector/pgvector:pg16
     user: "0"
     volumes:
       - ${FOUNDATION_DATA:-./data}:/data
+      - ./scripts/vault-data-dir.sh:/vault-data-dir.sh:ro
     entrypoint: ["/bin/bash", "-c"]
     command:
-      - mkdir -p /data/postgres /data/blobs /data/uploads && chown -R 999:999 /data/postgres && chmod 0700 /data/blobs && chmod 1777 /data/uploads
+      - |
+        set -euo pipefail
+        bash /vault-data-dir.sh prepare /data
+        mkdir -p /data/postgres /data/blobs /data/uploads && chown -R 999:999 /data/postgres && chmod 0700 /data/blobs && chmod 1777 /data/uploads
     restart: "no"
 
   db:
@@ -31,11 +36,34 @@ services:
       timeout: 5s
       retries: 10
 
+  # After the official image chmod 00700 on PGDATA (that call zeros the ACL
+  # mask). Host uid is the clone owner or FOUNDATION_HOST_UID, never 1000.
+  db-host-read:
+    image: alpine:3.21
+    user: "0"
+    environment:
+      FOUNDATION_HOST_UID: ${FOUNDATION_HOST_UID:-}
+      FOUNDATION_HOST_UID_PROBE: /host-uid-probe
+    volumes:
+      - ${FOUNDATION_DATA:-./data}:/data
+      - ./scripts/vault-data-dir.sh:/vault-data-dir.sh:ro
+      - ./docker-compose.yml:/host-uid-probe:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - apk add --no-cache acl bash >/dev/null && bash /vault-data-dir.sh grant /data
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: true
+
   foundation:
     build: .
     depends_on:
       db:
         condition: service_healthy
+      db-host-read:
+        condition: service_completed_successfully
     environment:
       FOUNDATION_API_KEY: ${FOUNDATION_API_KEY:?Set FOUNDATION_API_KEY in .env (see .env.example)}
       DATABASE_URL: postgres://foundation:foundation@db:5432/foundation
