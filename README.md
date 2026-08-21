@@ -18,7 +18,7 @@ Recommended structure: Area → project → goal → task. The point is to break
 The bots help you take action on what is in your vault. Three starter recipes ship with the repo. You can add more later using your platform of choice. Paste them from [`docs/AGENTS.md`](docs/AGENTS.md).
 
 Chief of Staff — The bot you talk to. You think out loud, dump what is on your mind, and work through decisions together. It files what matters in the vault, keeps you current on what is open and due, and hands work to the right bot. It asks you when something needs you. It also looks for recurring work in your day and suggests another bot when one would help.
-Out of the box: morning brief; capture (what you dump lands in the vault). When you want another seat, it uses [`.agents/skills/create-bot/`](.agents/skills/create-bot/) and the blank template in that folder.
+Out of the box: morning brief; capture (what you dump lands in the vault). When you want another bot, it uses [`.agents/skills/create-bot/`](.agents/skills/create-bot/) and the blank template in that folder.
 
 Vault Keeper — Keeps the vault healthy and organized. Checks that it is up. Runs the backup (`scripts/backup-vault.sh`). Reports obvious mess; cleans it only when you ask. Applies product updates on the machine that runs Compose. Keeps `FOUNDATION_DATA` in place and leaves Compose volumes intact.
 Out of the box: health check; nightly backup; backup freshness; periodic hygiene; product updates.
