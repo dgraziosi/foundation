@@ -2,6 +2,7 @@ services:
   # Postgres data is uid 999. blobs/ stays 0700 for the server user (not world-writable).
   # uploads/ is 1777 (sticky drop-box) so a host user can write on typical Linux bind mounts.
   # After a real cluster exists, db-host-read grants the host user named POSIX ACL read.
+  # Host-read is backup convenience: the app does not wait on that oneshot.
   db-init:
     image: pgvector/pgvector:pg16
     user: "0"
@@ -38,6 +39,7 @@ services:
 
   # After the official image chmod 00700 on PGDATA (that call zeros the ACL
   # mask). Host uid is the clone owner or FOUNDATION_HOST_UID, never 1000.
+  # Grant soft-skips when the data dir cannot take a named ACL.
   db-host-read:
     image: alpine:3.21
     user: "0"
@@ -62,18 +64,21 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      db-host-read:
-        condition: service_completed_successfully
     environment:
       FOUNDATION_API_KEY: ${FOUNDATION_API_KEY:?Set FOUNDATION_API_KEY in .env (see .env.example)}
       DATABASE_URL: postgres://foundation:foundation@db:5432/foundation
       FOUNDATION_DATA: /data
+      FOUNDATION_HOST_UID: ${FOUNDATION_HOST_UID:-}
+      FOUNDATION_HOST_UID_PROBE: /host-uid-probe
+      FOUNDATION_VAULT_DATA_DIR_HELPER: /vault-data-dir.sh
       PORT: "8787"
       HOST: "0.0.0.0"
       VIEW_PORT: "8788"
       VIEW_HOST: "0.0.0.0"
     volumes:
       - ${FOUNDATION_DATA:-./data}:/data
+      - ./scripts/vault-data-dir.sh:/vault-data-dir.sh:ro
+      - ./docker-compose.yml:/host-uid-probe:ro
     # MCP + health + agent blobs: host-only. Documented attach is 127.0.0.1:8787.
     # /view is a separate publish so another machine on this vault can open the window.
     ports:

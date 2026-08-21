@@ -35,7 +35,10 @@ for needle in \
   'not a baked-in number' \
   'never world-writable' \
   'db-init` calls `scripts/vault-data-dir.sh prepare' \
-  'db-host-read` calls `grant'
+  'db-host-read` calls `grant' \
+  'The server calls `grant` again after it `chmod`s `blobs/`' \
+  'If the data dir cannot take a named ACL, Compose still starts' \
+  'Host-side health fails while the host cannot read'
 do
   if ! grep -Fq -- "${needle}" "${health_doc}"; then
     fail "VAULT_HEALTH.md is missing the contract sentence: ${needle}"
@@ -83,6 +86,49 @@ if ! awk '
   END { exit found ? 0 : 1 }
 ' "${compose_file}"; then
   fail "compose db-host-read must re-run when db restarts (re-grant after official chmod)"
+fi
+if awk '
+  $0 ~ /^  foundation:/ { in_app=1; next }
+  in_app && $0 ~ /^  [a-zA-Z]/ { in_app=0 }
+  in_app && $0 ~ /db-host-read/ { found=1 }
+  END { exit found ? 0 : 1 }
+' "${compose_file}"; then
+  fail "compose foundation must not wait on db-host-read (host-read must not take the app down)"
+fi
+if ! awk '
+  $0 ~ /^  foundation:/ { in_app=1; next }
+  in_app && $0 ~ /^  [a-zA-Z]/ { in_app=0 }
+  in_app && $0 ~ /vault-data-dir.sh:\/vault-data-dir.sh/ { found=1 }
+  END { exit found ? 0 : 1 }
+' "${compose_file}"; then
+  fail "compose foundation must mount vault-data-dir.sh so grant can run after blobs chmod"
+fi
+if ! awk '
+  $0 ~ /^  foundation:/ { in_app=1; next }
+  in_app && $0 ~ /^  [a-zA-Z]/ { in_app=0 }
+  in_app && $0 ~ /FOUNDATION_HOST_UID_PROBE: \/host-uid-probe/ { found=1 }
+  END { exit found ? 0 : 1 }
+' "${compose_file}"; then
+  fail "compose foundation must take host uid from the clone probe, not a baked-in 1000"
+fi
+
+dockerfile="${repo_root}/Dockerfile"
+if [[ ! -f "${dockerfile}" ]]; then
+  fail "missing ${dockerfile}"
+fi
+if ! grep -Eq -- '(^|[[:space:]])acl([[:space:]]|$)' "${dockerfile}"; then
+  fail "foundation image must include acl so grant can run after blobs chmod"
+fi
+if ! grep -Fq -- 'COPY scripts/vault-data-dir.sh /vault-data-dir.sh' "${dockerfile}"; then
+  fail "foundation image must ship vault-data-dir.sh for grant after blobs chmod"
+fi
+
+blobs_ts="${repo_root}/packages/db/src/blobs.ts"
+if [[ ! -f "${blobs_ts}" ]]; then
+  fail "missing ${blobs_ts}"
+fi
+if ! grep -Fq -- 'FOUNDATION_VAULT_DATA_DIR_HELPER' "${blobs_ts}"; then
+  fail "blobs.ts must re-run grant after chmod"
 fi
 
 tmp="$(mktemp -d)"
@@ -203,6 +249,25 @@ if FOUNDATION_HOST_UID=not-a-uid foundation_vault_data_dir_host_uid >/dev/null 2
   fail "FOUNDATION_HOST_UID must reject a non-numeric value"
 fi
 
+# ACL unsupported: setfacl present but fails. Soft-skip so the app starts.
+# Leftover miss still refuses. FOUNDATION_GRANT_REQUIRED=1 keeps a hard fail.
+fakebin="${tmp}/fake-setfacl"
+mkdir -p "${fakebin}"
+printf '%s\n' '#!/bin/sh' 'echo "setfacl: Operation not supported" >&2' 'exit 1' >"${fakebin}/setfacl"
+chmod +x "${fakebin}/setfacl"
+acl_skip="${tmp}/acl-skip"
+mkdir -p "${acl_skip}/postgres" "${acl_skip}/blobs"
+printf '%s\n' '16' >"${acl_skip}/postgres/PG_VERSION"
+if ! PATH="${fakebin}:${PATH}" FOUNDATION_HOST_UID="$(id -u)" bash "${helper}" grant "${acl_skip}"; then
+  fail "grant must soft-skip when setfacl is unsupported"
+fi
+if PATH="${fakebin}:${PATH}" FOUNDATION_HOST_UID="$(id -u)" FOUNDATION_GRANT_REQUIRED=1 bash "${helper}" grant "${acl_skip}"; then
+  fail "FOUNDATION_GRANT_REQUIRED=1 must still fail when setfacl is unsupported"
+fi
+if [[ -e "${acl_skip}/postgres/PG_VERSION.extra" ]]; then
+  fail "soft-skip must not create extra live-cluster files"
+fi
+
 # Named POSIX ACL on a 0700 dir owned by another uid. Re-apply after
 # chmod 00700 (the official image does this on every start).
 if command -v setfacl >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
@@ -264,6 +329,27 @@ if command -v setfacl >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
   postgres_mode="$(stat -c '%a' -- "${live}/postgres")"
   if [[ "${postgres_mode}" != 700 && "${postgres_mode}" != 750 ]]; then
     fail "after re-grant postgres/ mode must stay 0700 or 0750, got ${postgres_mode}"
+  fi
+
+  # Server chmod 0700 on blobs/ zeros the ACL mask the same way.
+  sudo -n chmod 0700 -- "${live}/blobs"
+  if cat -- "${live}/blobs/fixture" >/dev/null 2>&1; then
+    fail "after blobs chmod 0700 the host must not see a stale grant"
+  fi
+  if ! sudo -n --preserve-env=FOUNDATION_HOST_UID bash -c "
+    set -euo pipefail
+    # shellcheck source=vault-data-dir.sh
+    source \"${helper}\"
+    foundation_vault_data_dir_grant_host_read \"${live}\"
+  "; then
+    fail "grant must re-apply after blobs chmod 0700"
+  fi
+  if [[ "$(cat -- "${live}/blobs/fixture")" != "fixture-blob" ]]; then
+    fail "after blobs chmod the host must read blobs after re-grant"
+  fi
+  blobs_mode="$(stat -c '%a' -- "${live}/blobs")"
+  if [[ "${blobs_mode}" != 700 && "${blobs_mode}" != 750 ]]; then
+    fail "after blobs re-grant mode must stay 0700 or 0750, got ${blobs_mode}"
   fi
   unset FOUNDATION_HOST_UID
 else

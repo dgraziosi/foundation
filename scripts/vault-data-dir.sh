@@ -1,21 +1,25 @@
 #!/usr/bin/env bash
 # Host-readable live vault data dir. Compose calls prepare from db-init
 # (before mkdir / initdb) and grant from db-host-read (after the official
-# image chmod 00700 on PGDATA). Health is the host-side check.
+# image chmod 00700 on PGDATA). The server calls grant again after it
+# chmod 0700 blobs/. Health is the host-side check.
 #
 # After a real cluster exists, the host user who runs Compose can read
 # $FOUNDATION_DATA/postgres/PG_VERSION and $FOUNDATION_DATA/blobs.
-# Unix mode stays 0700 or 0750, never world-writable.
+# Unix mode stays 0700 or 0750, never world-writable. Host-read is
+# backup convenience: an unsupported ACL does not take the app down.
 #
 #   prepare <data-dir>  — refuse if postgres/ exists without PG_VERSION
 #   grant <data-dir>    — named POSIX ACL for the host user
 #   health <data-dir>   — fail if the host cannot read PG_VERSION
 #
-#   FOUNDATION_DATA           — the vault (default ./data)
-#   FOUNDATION_HOST_UID       — optional. Numeric uid of the host user
-#                               who runs Compose. Never a baked-in 1000.
-#   FOUNDATION_HOST_UID_PROBE — optional. File whose owner is that user
-#                               (default: docker-compose.yml in the clone)
+#   FOUNDATION_DATA            — the vault (default ./data)
+#   FOUNDATION_HOST_UID        — optional. Numeric uid of the host user
+#                                who runs Compose. Never a baked-in 1000.
+#   FOUNDATION_HOST_UID_PROBE  — optional. File whose owner is that user
+#                                (default: docker-compose.yml in the clone)
+#   FOUNDATION_GRANT_REQUIRED  — set to 1 to fail when setfacl cannot run.
+#                                Default is soft-skip (Compose still starts).
 set -euo pipefail
 
 foundation_vault_data_dir_repo_root() {
@@ -85,9 +89,24 @@ foundation_vault_data_dir_health_pg_version() {
   return 0
 }
 
+# Host-read grant is backup convenience. Leftover miss still refuses.
+# Missing setfacl / unsupported ACL soft-skips unless required.
+foundation_vault_data_dir_grant_required() {
+  [[ "${FOUNDATION_GRANT_REQUIRED:-0}" == "1" ]]
+}
+
+foundation_vault_data_dir_grant_skip() {
+  echo "vault-data-dir: $*" >&2
+  if foundation_vault_data_dir_grant_required; then
+    return 1
+  fi
+  return 0
+}
+
 # Named POSIX ACL read for the host user after a real cluster exists.
-# Re-apply after the official image chmod 00700 on PGDATA (that call
-# zeros the ACL mask). Does not mkdir a missing live path.
+# Re-apply after the official image chmod 00700 on PGDATA and after the
+# server chmod 0700 on blobs/ (those calls zero the ACL mask). Does not
+# mkdir a missing live path.
 foundation_vault_data_dir_grant_host_read() {
   local data_dir="$1"
   local postgres blobs pg_version uid
@@ -102,17 +121,26 @@ foundation_vault_data_dir_grant_host_read() {
     return 1
   fi
   if ! command -v setfacl >/dev/null 2>&1; then
-    echo "vault-data-dir: setfacl is required to grant host read" >&2
-    return 1
+    foundation_vault_data_dir_grant_skip "setfacl is missing; skip host-read grant"
+    return $?
   fi
 
-  uid="$(foundation_vault_data_dir_host_uid)" || return 1
+  if ! uid="$(foundation_vault_data_dir_host_uid)"; then
+    foundation_vault_data_dir_grant_skip "host uid unavailable; skip host-read grant"
+    return $?
+  fi
 
-  setfacl -m "u:${uid}:rX" -- "${postgres}"
-  setfacl -m "u:${uid}:r" -- "${pg_version}"
+  if ! setfacl -m "u:${uid}:rX" -- "${postgres}" \
+    || ! setfacl -m "u:${uid}:r" -- "${pg_version}"; then
+    foundation_vault_data_dir_grant_skip "named ACL is unsupported on this data dir; skip host-read grant"
+    return $?
+  fi
   if [[ -d "${blobs}" ]]; then
-    setfacl -R -m "u:${uid}:rX" -- "${blobs}"
-    setfacl -d -m "u:${uid}:rX" -- "${blobs}"
+    if ! setfacl -R -m "u:${uid}:rX" -- "${blobs}" \
+      || ! setfacl -d -m "u:${uid}:rX" -- "${blobs}"; then
+      foundation_vault_data_dir_grant_skip "named ACL is unsupported on this data dir; skip host-read grant"
+      return $?
+    fi
   fi
 }
 
