@@ -586,6 +586,24 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
         const created = await upsertGraphNode(pool, { type: "note", title: `Widget recent ${i}` });
         assert.equal(isToolError(created), false);
       }
+      // Insert alpha first so created_at DESC would put zebra first; title ASC puts alpha first.
+      const olderTie = await upsertGraphNode(pool, { type: "note", title: "Recents tie alpha" });
+      assert.equal(isToolError(olderTie), false);
+      if (isToolError(olderTie)) {
+        return;
+      }
+      const newerTie = await upsertGraphNode(pool, { type: "note", title: "Recents tie zebra" });
+      assert.equal(isToolError(newerTie), false);
+      if (isToolError(newerTie)) {
+        return;
+      }
+      await pool.query(
+        `UPDATE nodes
+         SET updated_at = date_trunc('milliseconds', timestamptz '2099-01-01 00:00:00+00')
+         WHERE id = ANY($1::uuid[])`,
+        [[olderTie.node.id, newerTie.node.id]],
+      );
+
       const res = await fetch(`${origin}/view/api/recents?limit=5`, { headers: authHeader() });
       assert.equal(res.status, 200);
       const body = (await res.json()) as {
@@ -593,6 +611,11 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       };
       assert.equal(body.rows.length, 5);
       assert.ok(body.rows.every((row) => row.type !== "task"));
+      assert.equal(body.rows[0]?.updated_at, body.rows[1]?.updated_at);
+      assert.deepEqual(
+        body.rows.slice(0, 2).map((row) => row.title),
+        ["Recents tie alpha", "Recents tie zebra"],
+      );
       assert.ok(body.rows.some((row) => row.title.startsWith("Widget recent")));
       for (let i = 1; i < body.rows.length; i += 1) {
         assert.ok(body.rows[i - 1]!.updated_at >= body.rows[i]!.updated_at);
