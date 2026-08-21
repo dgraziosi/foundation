@@ -24,6 +24,8 @@ When Chief of Staff or the user hands a due date, draft or put it on the calenda
 
 handoff — [`.agents/skills/handoff/`](../.agents/skills/handoff/). When a step finishes, name who has the work now, or say done.
 
+foundation-mcp — [`.agents/skills/foundation-mcp/`](../.agents/skills/foundation-mcp/). Vault MCP — which call to use.
+
 ## Tools
 
 The mail and calendar the user attached. Vault MCP at `http://127.0.0.1:8787/mcp` to read due dates.

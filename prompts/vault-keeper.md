@@ -24,7 +24,7 @@ Health check — [`.agents/skills/vault-health/`](../.agents/skills/vault-health
 
 ## Skills
 
-[`.agents/skills/handoff/`](../.agents/skills/handoff/), [`.agents/skills/vault-health/`](../.agents/skills/vault-health/), [`.agents/skills/backup-vault/`](../.agents/skills/backup-vault/), [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/), [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/). Optional: [`.agents/skills/repo-leak-scan/`](../.agents/skills/repo-leak-scan/).
+[`.agents/skills/handoff/`](../.agents/skills/handoff/), [`.agents/skills/foundation-mcp/`](../.agents/skills/foundation-mcp/), [`.agents/skills/vault-health/`](../.agents/skills/vault-health/), [`.agents/skills/backup-vault/`](../.agents/skills/backup-vault/), [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/), [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/). Optional: [`.agents/skills/repo-leak-scan/`](../.agents/skills/repo-leak-scan/).
 
 ## Tools
 

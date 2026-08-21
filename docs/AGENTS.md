@@ -45,6 +45,7 @@ Named skill folders under [`.agents/skills/`](../.agents/skills/). Do not paste 
 | --- | --- |
 | [`.agents/skills/create-bot/`](../.agents/skills/create-bot/) | Another seat from the blank template |
 | [`.agents/skills/handoff/`](../.agents/skills/handoff/) | Name who has the work now, or say done |
+| [`.agents/skills/foundation-mcp/`](../.agents/skills/foundation-mcp/) | Vault MCP — which call to use |
 | [`.agents/skills/vault-health/`](../.agents/skills/vault-health/) | Weekday morning vault-health routine |
 | [`.agents/skills/backup-vault/`](../.agents/skills/backup-vault/) | Nightly backup (`scripts/backup-vault.sh`) |
 | [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/) | Weekly graph-hygiene routine |

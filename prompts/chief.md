@@ -26,6 +26,8 @@ create-bot — [`.agents/skills/create-bot/`](../.agents/skills/create-bot/). Wh
 
 handoff — [`.agents/skills/handoff/`](../.agents/skills/handoff/). When a step finishes, name who has the work now, or say done.
 
+foundation-mcp — [`.agents/skills/foundation-mcp/`](../.agents/skills/foundation-mcp/). Vault MCP — which call to use.
+
 ## Tools
 
 Vault MCP at `http://127.0.0.1:8787/mcp`.
