@@ -23,10 +23,10 @@ Weekdays, late morning local time. If the clone is already up to date and /healt
 
 ## Steps
 
-1. In the Foundation clone: `git fetch origin`.
-2. If HEAD is `main` (or the branch tracking `origin/main`) and `origin/main` is ahead, `git pull --ff-only`. Fast-forward only.
-3. If you pulled: `docker compose up --build -d`. Wait until GET /health returns { ok: true, service: "foundation", db: "up" }.
-4. If you pulled and `.agents/skills/` changed versus the previous HEAD, update the harness copies of those skills (whatever the named harness imports from that tree). Ping Chief of Staff with the changed folder names. Do not stay quiet on a skill-only change.
+1. Record the current HEAD SHA (`git rev-parse HEAD`). Do this before fetch or pull. After a pull you may also use `ORIG_HEAD`.
+2. In the Foundation clone: `git fetch origin`.
+3. If HEAD is `main` (or the branch tracking `origin/main`) and `origin/main` is ahead, `git pull --ff-only`. Fast-forward only.
+4. If you pulled: `docker compose up --build -d`. Wait until GET /health returns { ok: true, service: "foundation", db: "up" }. Then diff `.agents/skills/` against the SHA you recorded (or `ORIG_HEAD`). If that tree changed, ping Chief of Staff with the changed folder names. Do not stay quiet on a skill-only change. A harness that points at `.agents/skills/` already sees those files. One tree. Do not copy `.agents/skills/` into a harness skill library.
 5. If you did not pull and /health is green: stay quiet.
 
 ## Stop and ping
