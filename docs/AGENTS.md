@@ -19,7 +19,7 @@ Paste [`prompts/vault-keeper.md`](../prompts/vault-keeper.md). Same machine, sam
 3. Graph hygiene — [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/). Read [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md).
 4. Product updates — [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/). On the machine that runs Compose: `git fetch` / `git pull --ff-only` on main, `docker compose up --build -d`, wait for `/health`.
 
-Fill in the operator config (data dir, optional well-known nodes, `BACKUP_ROOT`, clone path). Vault Keeper keeps `FOUNDATION_DATA` in place and leaves Compose volumes intact.
+Fill in the user config (data dir, optional well-known nodes, `BACKUP_ROOT`, clone path). Vault Keeper keeps `FOUNDATION_DATA` in place and leaves Compose volumes intact.
 
 ## Executive Assistant
 
@@ -27,7 +27,7 @@ Paste [`prompts/executive-assistant.md`](../prompts/executive-assistant.md). Giv
 
 ## Another bot
 
-Chief of Staff uses [`.agents/skills/create-bot/`](../.agents/skills/create-bot/), fills the seven headings on the blank template in that folder, and pastes the result into the operator’s harness.
+Chief of Staff uses [`.agents/skills/create-bot/`](../.agents/skills/create-bot/), fills the seven headings on the blank template in that folder, and pastes the result into the user’s harness.
 
 ## Where seats live
 

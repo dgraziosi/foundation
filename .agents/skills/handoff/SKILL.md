@@ -5,7 +5,7 @@ description: Name who has the work now when a step finishes, or say done. Use wh
 
 # Handoff
 
-You are closing a finished step. Every pasted bot follows this. The operator is the human who runs Compose.
+You are closing a finished step. Every pasted bot follows this. The user is the human who runs Compose.
 
 ## Close the step
 
