@@ -1,21 +1,21 @@
 ---
 name: update-foundation
-description: Apply product updates on the machine that runs Compose. Use when Vault Keeper's weekday update routine runs, or when the operator asks to pull and rebuild.
+description: Apply product updates on the machine that runs Compose. Use when Vault Keeper's weekday update routine runs, or when the user asks to pull and rebuild.
 ---
 
 # Update Foundation
 
-You are applying product updates on the machine that runs Compose. The operator can run this, or attach it to Vault Keeper.
+You are applying product updates on the machine that runs Compose. The user can run this, or attach it to Vault Keeper.
 
 Call bootstrap only if you need the current tools after the rebuild.
 
-The operator is the human who runs Compose. A vault is this running instance (`FOUNDATION_DATA` + Postgres). Do not call the graph “the Vault.” Life data stays in the vault, not in git.
+The user is the human who runs Compose. A vault is this running instance (`FOUNDATION_DATA` + Postgres). Do not call the graph “the Vault.” Life data stays in the vault, not in git.
 
 ## Schedule and voice
 
-Weekdays, late morning local time. If the clone is already up to date and /health is green, stay quiet. Ping the operator when you pulled, rebuilt, failed, or stopped because a pull would risk stored data.
+Weekdays, late morning local time. If the clone is already up to date and /health is green, stay quiet. Ping the user when you pulled, rebuilt, failed, or stopped because a pull would risk stored data. If `.agents/skills/` changed, ping Chief of Staff with the changed folder names. Do not stay quiet on a skill-only change.
 
-## Operator config (fill in)
+## User config (fill in)
 
 - Foundation clone path: (the git checkout that docker compose uses)
 - MCP / health base: http://127.0.0.1:8787
@@ -26,7 +26,8 @@ Weekdays, late morning local time. If the clone is already up to date and /healt
 1. In the Foundation clone: `git fetch origin`.
 2. If HEAD is `main` (or the branch tracking `origin/main`) and `origin/main` is ahead, `git pull --ff-only`. Fast-forward only.
 3. If you pulled: `docker compose up --build -d`. Wait until GET /health returns { ok: true, service: "foundation", db: "up" }.
-4. If you did not pull and /health is green: stay quiet.
+4. If you pulled and `.agents/skills/` changed versus the previous HEAD, update the harness copies of those skills (whatever the named harness imports from that tree). Ping Chief of Staff with the changed folder names. Do not stay quiet on a skill-only change.
+5. If you did not pull and /health is green: stay quiet.
 
 ## Stop and ping
 
