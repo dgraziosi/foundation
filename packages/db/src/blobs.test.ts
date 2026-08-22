@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { constants as fsConstants } from "node:fs";
-import { access, mkdtemp, mkdir, readFile, readdir, realpath, stat, writeFile } from "node:fs/promises";
+import { access, chmod, mkdtemp, mkdir, readFile, readdir, realpath, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -74,6 +74,59 @@ test("ensureBlobLayout uses 0700 on blobs and 1777 sticky on uploads", async () 
   const uploads = await stat(join(root, "uploads"));
   assert.equal(blobs.mode & 0o777, BLOB_DIR_MODE);
   assert.equal(uploads.mode & 0o7777, UPLOAD_DIR_MODE);
+});
+
+test("ensureBlobLayout re-runs grant after chmod when a helper is configured", async () => {
+  const root = await mkdtemp(join(tmpdir(), "foundation-blob-grant-"));
+  const helperDir = await mkdtemp(join(tmpdir(), "foundation-blob-helper-"));
+  const helper = join(helperDir, "vault-data-dir.sh");
+  const stamp = join(helperDir, "called");
+  await writeFile(
+    helper,
+    `#!/bin/bash
+printf '%s %s\\n' "$1" "$2" >> "${stamp}"
+exit 0
+`,
+    { mode: 0o755 },
+  );
+  await chmod(helper, 0o755);
+  const prev = process.env.FOUNDATION_VAULT_DATA_DIR_HELPER;
+  process.env.FOUNDATION_VAULT_DATA_DIR_HELPER = helper;
+  try {
+    await ensureBlobLayout(root);
+    const log = await readFile(stamp, "utf8");
+    assert.match(log, /^grant /);
+    assert.equal(log.includes(root), true);
+  } finally {
+    if (prev === undefined) {
+      delete process.env.FOUNDATION_VAULT_DATA_DIR_HELPER;
+    } else {
+      process.env.FOUNDATION_VAULT_DATA_DIR_HELPER = prev;
+    }
+  }
+});
+
+test("ensureBlobLayout still finishes when grant exits non-zero", async () => {
+  const root = await mkdtemp(join(tmpdir(), "foundation-blob-grant-fail-"));
+  const helperDir = await mkdtemp(join(tmpdir(), "foundation-blob-helper-fail-"));
+  const helper = join(helperDir, "vault-data-dir.sh");
+  await writeFile(helper, "#!/bin/bash\nexit 1\n", { mode: 0o755 });
+  await chmod(helper, 0o755);
+  const prev = process.env.FOUNDATION_VAULT_DATA_DIR_HELPER;
+  process.env.FOUNDATION_VAULT_DATA_DIR_HELPER = helper;
+  try {
+    await ensureBlobLayout(root);
+    const blobs = await stat(join(root, "blobs"));
+    const uploads = await stat(join(root, "uploads"));
+    assert.equal(blobs.mode & 0o777, BLOB_DIR_MODE);
+    assert.equal(uploads.mode & 0o7777, UPLOAD_DIR_MODE);
+  } finally {
+    if (prev === undefined) {
+      delete process.env.FOUNDATION_VAULT_DATA_DIR_HELPER;
+    } else {
+      process.env.FOUNDATION_VAULT_DATA_DIR_HELPER = prev;
+    }
+  }
 });
 
 test("blob ingest round-trip, sha256 dedup, and path constraints", { skip: !databaseUrl }, async (t) => {

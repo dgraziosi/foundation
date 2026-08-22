@@ -1,6 +1,9 @@
 FROM node:22-bookworm-slim
 
-RUN corepack enable
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends acl \
+  && rm -rf /var/lib/apt/lists/* \
+  && corepack enable
 
 WORKDIR /app
 
@@ -16,6 +19,7 @@ COPY packages/schema packages/schema
 COPY packages/db packages/db
 COPY apps/server apps/server
 COPY apps/viewer apps/viewer
+COPY scripts/vault-data-dir.sh /vault-data-dir.sh
 RUN pnpm --filter @foundation/viewer build
 
 ENV NODE_ENV=production

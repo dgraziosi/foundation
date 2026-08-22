@@ -26,7 +26,7 @@ Weekdays, morning local time. If every check passes, stay quiet. Ping the operat
 ## Checks (in order)
 
 1. GET /health — HTTP 200 and { ok: true, service: "foundation", db: "up" }.
-2. FOUNDATION_DATA is the real vault: not an agent profile or memory directory, and not an empty leftover Postgres cluster (missing/empty postgres dir, no PG_VERSION, wrong Compose project). A first-day graph with seed types and zero user nodes is healthy unless well-known nodes were configured.
+2. FOUNDATION_DATA is the real vault: not an agent profile or memory directory, and not an empty leftover Postgres cluster (missing/empty postgres dir, no PG_VERSION, host cannot read PG_VERSION, wrong Compose project). Do not mkdir the live path on that miss. A first-day graph with seed types and zero user nodes is healthy unless well-known nodes were configured.
 3. If well-known nodes are configured, get/search them and confirm they exist (not soft-deleted). If none configured, skip.
 4. Backup path defaults to BACKUP_ROOT. Skip only if the operator unset it. If set, the path is present and the newest artifact is newer than 48 hours. Health checks; it does not dump.
 
