@@ -17,6 +17,8 @@ import {
   NodeSchema,
   NodeStatusSchema,
   NodeTypeSchema,
+  CodeRefSchema,
+  LivingRefSchema,
   OriginRefSchema,
   ReceiptLookupSchema,
   PayloadStorageSchema,
@@ -452,7 +454,10 @@ export const SearchInputSchema = z.object({
   under: z.string().uuid().optional(),
   /** ISO-8601 timestamp; live nodes with updated_at >= since. */
   since: z.string().min(1).optional(),
-  /** Unique origin ref lookup (gmail | calendar | drive | github). */
+  /** Unique living ref lookup (gmail | calendar | drive). */
+  living: LivingRefSchema.optional(),
+  /** Unique code ref lookup (github). */
+  code: CodeRefSchema.optional(),
   origin: OriginRefSchema.optional(),
   /** Unique receipt lookup (gmail | calendar). Kind lives on the stored node. */
   receipt: ReceiptLookupSchema.optional(),
@@ -487,7 +492,7 @@ export const SEARCH_UUID_SUGGESTION =
   "This query is a node UUID. Prefer get when you already have an id.";
 
 export const SEARCH_NO_SELECTOR_SUGGESTION =
-  "Pass query for lexical recall, or type, status, under (child_of parent UUID), since, origin, receipt, due (overdue|today), due_on_or_before, due_on_or_after, or data_equals to list without a word. Do not add list_nodes.";
+  "Pass query for lexical recall, or type, status, under (child_of parent UUID), since, living, code, receipt, due (overdue|today), due_on_or_before, due_on_or_after, or data_equals to list without a word. Do not add list_nodes.";
 
 export function searchHasSelector(input: {
   query?: string;
@@ -495,6 +500,8 @@ export function searchHasSelector(input: {
   status?: string;
   under?: string;
   since?: string;
+  living?: unknown;
+  code?: unknown;
   origin?: unknown;
   receipt?: unknown;
   due?: string;
@@ -508,6 +515,8 @@ export function searchHasSelector(input: {
       input.status ||
       input.under ||
       input.since ||
+      input.living ||
+      input.code ||
       input.origin ||
       input.receipt ||
       input.due ||
@@ -517,11 +526,23 @@ export function searchHasSelector(input: {
   );
 }
 
+export const LIVING_MISS_SUGGESTION =
+  "No live node has that living ref. You may upsert with data.living.system and data.living.id. Foundation stores the ref only — do not fetch or mirror Gmail, Calendar, or Drive bodies.";
+
+export const LIVING_HIT_SUGGESTION =
+  "This living ref is unique on live nodes. Prefer get with that id. Do not upsert a twin.";
+
+export const CODE_MISS_SUGGESTION =
+  "No live node has that code ref. You may upsert with data.code.system and data.code.id. Foundation stores the ref only — do not fetch or mirror GitHub bodies.";
+
+export const CODE_HIT_SUGGESTION =
+  "This code ref is unique on live nodes. Prefer get with that id. Do not upsert a twin.";
+
 export const ORIGIN_MISS_SUGGESTION =
-  "No live node has that origin. You may upsert with data.origin.system and data.origin.id. Foundation stores the ref only — do not fetch or mirror Gmail, Calendar, Drive, or GitHub bodies.";
+  "No live node has that living pointer. You may upsert with data.living.system and data.living.id. Foundation stores the ref only — do not fetch or mirror Gmail, Calendar, Drive, or GitHub bodies.";
 
 export const ORIGIN_HIT_SUGGESTION =
-  "This origin is unique on live nodes. Prefer get with that id. Do not upsert a twin.";
+  "This living pointer is unique on live nodes. Prefer get with that id. Do not upsert a twin.";
 
 export const RECEIPT_MISS_SUGGESTION =
   "No live node has that receipt. You may upsert with data.receipt.system, data.receipt.id, and data.receipt.kind. Foundation stores the ref only — do not fetch or mirror Gmail or Calendar bodies.";

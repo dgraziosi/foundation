@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { isToolError } from "./mcp-io.js";
-import { originFromData } from "./origin.js";
+import { livingFromData } from "./living.js";
 import {
   URL_FIXTURE,
   URL_MAX_LEN,
@@ -90,18 +90,18 @@ test("openableUrlFromData is Viewer Open: well-formed https only", () => {
   assert.equal(openableUrlFromData(undefined), undefined);
 });
 
-test("url is a sibling of origin: origin still reads system and id only", () => {
+test("url is a sibling of living: living still reads system and id only", () => {
   const data = {
-    origin: { system: "drive", id: "file-fixture-1", url: URL_FIXTURE },
+    living: { system: "drive", id: "file-fixture-1", url: URL_FIXTURE },
     url: URL_FIXTURE,
   };
-  assert.deepEqual(originFromData(data), { system: "drive", id: "file-fixture-1" });
+  assert.deepEqual(livingFromData(data), { system: "drive", id: "file-fixture-1" });
   assert.equal(urlFromData(data), URL_FIXTURE);
-  const originOnly = originFromData({
-    origin: { system: "drive", id: "file-fixture-1", url: URL_FIXTURE },
+  const livingOnly = livingFromData({
+    living: { system: "drive", id: "file-fixture-1", url: URL_FIXTURE },
   });
-  assert.deepEqual(originOnly, { system: "drive", id: "file-fixture-1" });
-  assert.ok(originOnly && !("url" in originOnly) && !("kind" in originOnly));
+  assert.deepEqual(livingOnly, { system: "drive", id: "file-fixture-1" });
+  assert.ok(livingOnly && !("url" in livingOnly) && !("kind" in livingOnly));
 });
 
 test("url is not a second identity: schema does not unique it", () => {
