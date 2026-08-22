@@ -48,6 +48,28 @@ export const OriginRefSchema = z.object({
 });
 export type OriginRef = z.infer<typeof OriginRefSchema>;
 
+/** Living outside systems that stay source of truth. Not GitHub. Not a blob. */
+export const LIVING_SYSTEMS = ["gmail", "calendar", "drive"] as const;
+export type LivingSystem = (typeof LIVING_SYSTEMS)[number];
+
+export const LivingSystemSchema = z.enum(LIVING_SYSTEMS);
+export const LivingRefSchema = z.object({
+  system: LivingSystemSchema,
+  id: z.string().trim().min(1),
+});
+export type LivingRef = z.infer<typeof LivingRefSchema>;
+
+/** Code on GitHub. Not a living Drive/Sheet. Not Cursor Origin the product. */
+export const CODE_SYSTEMS = ["github"] as const;
+export type CodeSystem = (typeof CODE_SYSTEMS)[number];
+
+export const CodeSystemSchema = z.enum(CODE_SYSTEMS);
+export const CodeRefSchema = z.object({
+  system: CodeSystemSchema,
+  id: z.string().trim().min(1),
+});
+export type CodeRef = z.infer<typeof CodeRefSchema>;
+
 /** Mail sent or calendar event gone. Pointer only — never fetch or mirror bodies. */
 export const RECEIPT_SYSTEMS = ["gmail", "calendar"] as const;
 export type ReceiptSystem = (typeof RECEIPT_SYSTEMS)[number];

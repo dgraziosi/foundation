@@ -24,8 +24,14 @@ test("search query is optional when a filter is set", () => {
   assert.equal(listed.query, undefined);
   assert.equal(listed.type, "task");
   assert.equal(listed.status, "active");
-  const origin = SearchInputSchema.parse({ origin: { system: "gmail", id: "msg-1" } });
-  assert.equal(origin.origin?.system, "gmail");
+  const living = SearchInputSchema.parse({ living: { system: "gmail", id: "msg-1" } });
+  assert.equal(living.living?.system, "gmail");
+  assert.equal(searchHasSelector({ living: { system: "gmail", id: "msg-1" } }), true);
+  const code = SearchInputSchema.parse({ code: { system: "github", id: "repo-fixture-1" } });
+  assert.equal(code.code?.system, "github");
+  assert.equal(searchHasSelector({ code: { system: "github", id: "repo-fixture-1" } }), true);
+  assert.throws(() => SearchInputSchema.parse({ living: { system: "github", id: "repo-fixture-1" } }));
+  assert.throws(() => SearchInputSchema.parse({ code: { system: "drive", id: "file-fixture-1" } }));
   const receipt = SearchInputSchema.parse({
     receipt: { system: "gmail", id: "msg-fixture-sent-1" },
   });
@@ -49,6 +55,8 @@ test("search query is optional when a filter is set", () => {
   });
   assert.equal("url" in noUrlFilter, false);
   assert.equal(searchHasSelector(noUrlFilter), false);
+  assert.ok("living" in SearchInputSchema.shape);
+  assert.ok("code" in SearchInputSchema.shape);
   assert.throws(() => SearchInputSchema.parse({ due_on_or_before: "2026-08-27T00:00:00Z" }));
   assert.throws(() => SearchInputSchema.parse({ due: "soon" }));
   assert.throws(() => SearchInputSchema.parse({ data_equals: { "Kind": "x" } }));
