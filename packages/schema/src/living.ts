@@ -71,6 +71,11 @@ export function livingFromData(data: Record<string, unknown>): LivingRef | ToolE
 
 /** Persist the trimmed living ref so uniqueness and search match lookups. */
 export function canonicalizeLivingInData(data: Record<string, unknown>): Record<string, unknown> {
+  if (Object.prototype.hasOwnProperty.call(data, "living") && data.living === null) {
+    const next = { ...data };
+    delete next.living;
+    return next;
+  }
   const living = livingFromData(data);
   if (!living || isToolErrorLiving(living)) {
     return data;

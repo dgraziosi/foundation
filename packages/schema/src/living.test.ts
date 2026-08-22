@@ -74,6 +74,11 @@ test("canonicalizeLivingInData persists trimmed system and id", () => {
   assert.deepEqual(canonical.living, { system: "gmail", id: "msg-9", extra: true });
 });
 
+test("canonicalizeLivingInData drops living: null", () => {
+  const cleared = canonicalizeLivingInData({ url: "https://example.test/drive/file-fixture-1", living: null });
+  assert.deepEqual(cleared, { url: "https://example.test/drive/file-fixture-1" });
+});
+
 test("living reads system and id only: no kind, no url", () => {
   const parsed = livingFromData({
     living: {
