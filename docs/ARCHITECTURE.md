@@ -59,7 +59,7 @@ flowchart LR
 A node is what is true now, short. History stays in activity. Identity is UUID. `get` returns that current picture: type, title, status, `payload`, `data`, metadata, timestamps, incident edges. It does not return activity rows.
 
 - **Payload** is the written picture: **inline** (`text/markdown`, `text/html`, `application/json`, `text/plain`) or a **blob** (file on the node). A rewrite passes a new `payload` and replaces that body. Omit `payload` and the body stays.
-- **data** is structured JSON. It is not the diary. The type’s `fields` compile to `json_schema` (`additionalProperties: true`). upsert validates the merged object against that document. Extra keys still write. `needed` on a field is a hint, not JSON Schema `required`. A `ref` field is a typed UUID pointer, not an edge. `data.origin` is identity (`{ system, id }`), not a mirrored body. `data.receipt` is the current picture of done after a bot sends mail or clears a calendar event (`{ system, id, kind }`; `gmail`/`sent` or `calendar`/`cleared`). `receipt: null` clears. `data.due` is the seed date field (ISO `YYYY-MM-DD`; omit it and the node still writes; `due: null` clears) on `task`, `goal`, and `spend` (on `spend`, display is Date). `project` may hold optional `budget_amount` / `budget_currency`. `spend` holds `amount`, `currency`, `due`, `vendor` (string), and `stage` (`quoted` | `paid`). `data.aliases` is an optional string array of user-authored alternate names (any type; used by `lookup`). Stored on the JSONB `data` object, not a separate column. Seed apply fills missing seed fields and missing seed hue/glyph only; it does not overwrite a user edit.
+- **data** is structured JSON. It is not the diary. The type’s `fields` compile to `json_schema` (`additionalProperties: true`). upsert validates the merged object against that document. Extra keys still write. `needed` on a field is a hint, not JSON Schema `required`. A `ref` field is a typed UUID pointer, not an edge. `data.origin` is identity (`{ system, id }`), not a mirrored body. `data.url` is an optional https href (any type) so the Viewer can open a living file that stays the source of truth — a sibling of origin, not a key on origin, and not unique. `url: null` clears. `data.receipt` is the current picture of done after a bot sends mail or clears a calendar event (`{ system, id, kind }`; `gmail`/`sent` or `calendar`/`cleared`). `receipt: null` clears. `data.due` is the seed date field (ISO `YYYY-MM-DD`; omit it and the node still writes; `due: null` clears) on `task`, `goal`, and `spend` (on `spend`, display is Date). `project` may hold optional `budget_amount` / `budget_currency`. `spend` holds `amount`, `currency`, `due`, `vendor` (string), and `stage` (`quoted` | `paid`). `data.aliases` is an optional string array of user-authored alternate names (any type; used by `lookup`). Stored on the JSONB `data` object, not a separate column. Seed apply fills missing seed fields and missing seed hue/glyph only; it does not overwrite a user edit.
 
 ```mermaid
 flowchart TB
@@ -75,6 +75,7 @@ flowchart TB
 
   node_data --> structured["structured fields"]
   node_data --> origin["origin ref"]
+  node_data --> url["data.url https href"]
   node_data --> receipt["receipt ref"]
   node_data --> due["date-role fields (due on task / goal / spend)"]
   node_data --> budget["budget_amount / budget_currency on project"]
@@ -210,15 +211,17 @@ flowchart TB
 
 ## Origin
 
-Gmail, Calendar, Drive, and GitHub stay the source of truth. The graph may hold `data.origin { system, id }` only. That ref is identity. Live nodes are unique on that pair. Look up with `search { origin }`, then `get`. There is no `kind` on origin. Do not fetch or mirror those systems’ bodies into the graph.
+Gmail, Calendar, Drive, and GitHub stay the source of truth. The graph may hold `data.origin { system, id }` as identity and optional `data.url` as the https href the Viewer opens. Live nodes are unique on the origin pair. Look up with `search { origin }`, then `get`. There is no `kind` on origin. There is no `url` on origin. Do not fetch or mirror those systems’ bodies into the graph.
 
 ```mermaid
 flowchart LR
   sot["Gmail / Calendar / Drive / GitHub<br/>stay source of truth"]
   origin_ref["data.origin system + id"]
-  holds_ref["Graph holds the ref only"]
+  url_ref["data.url https href"]
+  holds_ref["Graph holds the pointer only"]
   sot -.-> origin_ref
   origin_ref --> holds_ref
+  url_ref --> holds_ref
 ```
 
 ## Receipt

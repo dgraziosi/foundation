@@ -41,6 +41,14 @@ test("search query is optional when a filter is set", () => {
   SearchInputSchema.parse({ due_on_or_after: "2026-08-01", due_on_or_before: "2026-08-27" });
   SearchInputSchema.parse({ data_equals: { kind: "fixture_alpha" } });
   SearchInputSchema.parse({ data_equals: { kind: "fixture_alpha", status: "potential" } });
+  SearchInputSchema.parse({
+    data_equals: { url: "https://example.test/drive/file-fixture-1" },
+  });
+  const noUrlFilter = SearchInputSchema.parse({
+    url: "https://example.test/drive/file-fixture-1",
+  });
+  assert.equal("url" in noUrlFilter, false);
+  assert.equal(searchHasSelector(noUrlFilter), false);
   assert.throws(() => SearchInputSchema.parse({ due_on_or_before: "2026-08-27T00:00:00Z" }));
   assert.throws(() => SearchInputSchema.parse({ due: "soon" }));
   assert.throws(() => SearchInputSchema.parse({ data_equals: { "Kind": "x" } }));

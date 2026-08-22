@@ -242,6 +242,17 @@ export {
   receiptFromData,
   canonicalizeReceiptInData,
 } from "./receipt.js";
+export {
+  URL_FIXTURE,
+  URL_MAX_LEN,
+  URL_SUGGESTION,
+  applyUrlFromPatch,
+  canonicalizeUrlInData,
+  isToolErrorUrl,
+  openableUrlFromData,
+  patchHasUrl,
+  urlFromData,
+} from "./url.js";
 export { validateDataAgainstJsonSchema } from "./json-schema.js";
 export {
   ALIASES_MAX,

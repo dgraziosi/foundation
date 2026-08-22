@@ -62,3 +62,15 @@ test("origin identity ignores kind: parsed origin is system and id only", () => 
   assert.deepEqual(parsed, { system: "gmail", id: "msg-fixture-1" });
   assert.ok(parsed && !("kind" in parsed));
 });
+
+test("origin identity ignores url hung on the origin object", () => {
+  const parsed = originFromData({
+    origin: {
+      system: "drive",
+      id: "file-fixture-1",
+      url: "https://example.test/drive/file-fixture-1",
+    },
+  });
+  assert.deepEqual(parsed, { system: "drive", id: "file-fixture-1" });
+  assert.ok(parsed && !("url" in parsed));
+});
