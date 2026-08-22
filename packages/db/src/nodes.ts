@@ -208,18 +208,34 @@ export async function restoreNodeSnapshot(
   return rows[0] ? mapNode(rows[0]) : undefined;
 }
 
-export async function getNodeByOrigin(
+export async function getNodeByLiving(
   db: Queryable,
-  origin: { system: string; id: string },
+  living: { system: string; id: string },
 ): Promise<Node | undefined> {
   const { rows } = await db.query<NodeRow>(
     `SELECT id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at
      FROM nodes
      WHERE deleted_at IS NULL
-       AND data #>> '{origin,system}' = $1
-       AND data #>> '{origin,id}' = $2
+       AND data #>> '{living,system}' = $1
+       AND data #>> '{living,id}' = $2
      LIMIT 1`,
-    [origin.system, origin.id],
+    [living.system, living.id],
+  );
+  return rows[0] ? mapNode(rows[0]) : undefined;
+}
+
+export async function getNodeByCode(
+  db: Queryable,
+  code: { system: string; id: string },
+): Promise<Node | undefined> {
+  const { rows } = await db.query<NodeRow>(
+    `SELECT id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at
+     FROM nodes
+     WHERE deleted_at IS NULL
+       AND data #>> '{code,system}' = $1
+       AND data #>> '{code,id}' = $2
+     LIMIT 1`,
+    [code.system, code.id],
   );
   return rows[0] ? mapNode(rows[0]) : undefined;
 }
@@ -335,8 +351,10 @@ export async function searchNodes(
     status?: Node["status"];
     under?: string;
     since?: Date;
-    originSystem?: string;
-    originId?: string;
+    livingSystem?: string;
+    livingId?: string;
+    codeSystem?: string;
+    codeId?: string;
     receiptSystem?: string;
     receiptId?: string;
     dueOnOrAfter?: string;
@@ -385,10 +403,12 @@ export async function searchNodes(
              AND parent.deleted_at IS NULL
          )
        )
-       AND ($6::text IS NULL OR data #>> '{origin,system}' = $6)
-       AND ($7::text IS NULL OR data #>> '{origin,id}' = $7)
+       AND ($6::text IS NULL OR data #>> '{living,system}' = $6)
+       AND ($7::text IS NULL OR data #>> '{living,id}' = $7)
        AND ($14::text IS NULL OR data #>> '{receipt,system}' = $14)
        AND ($15::text IS NULL OR data #>> '{receipt,id}' = $15)
+       AND ($16::text IS NULL OR data #>> '{code,system}' = $16)
+       AND ($17::text IS NULL OR data #>> '{code,id}' = $17)
        AND ($8::text IS NULL OR foundation_iso_date(data #>> '{due}') >= $8)
        AND ($9::text IS NULL OR foundation_iso_date(data #>> '{due}') <= $9)
        AND ($10::text IS NULL OR foundation_iso_date(data #>> '{due}') < $10)
@@ -405,8 +425,8 @@ export async function searchNodes(
       input.status ?? null,
       input.since ?? null,
       input.under ?? null,
-      input.originSystem ?? null,
-      input.originId ?? null,
+      input.livingSystem ?? null,
+      input.livingId ?? null,
       input.dueOnOrAfter ?? null,
       input.dueOnOrBefore ?? null,
       input.dueBefore ?? null,
@@ -417,6 +437,8 @@ export async function searchNodes(
       limit,
       input.receiptSystem ?? null,
       input.receiptId ?? null,
+      input.codeSystem ?? null,
+      input.codeId ?? null,
     ],
   );
   return rows.map((row) => ({

@@ -41,4 +41,11 @@ test("empty data_equals is not a selector; missing keys do not match", () => {
     ),
     true,
   );
+  assert.equal(
+    matchesDataEquals(
+      { url: "https://example.test/drive/file-fixture-1" },
+      { url: "https://example.test/drive/file-fixture-1" },
+    ),
+    true,
+  );
 });

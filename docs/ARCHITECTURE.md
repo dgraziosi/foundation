@@ -6,7 +6,7 @@ When a change alters the graph or vault shape, update this file in the same PR.
 
 ## Glossary
 
-**Foundation** is the product. A **vault** is one instance (`FOUNDATION_DATA` + Postgres). The **graph** is the live network in that vault. The **ontology** is the vocabulary (types and relations). A **blob** is a file on a node. An **agent** is anything that can reach the vault MCP. The **user** is the human who runs Compose. A **bot** is a named role that acts through an agent. Do not call the graph “the Vault.” A git clone is the product, not this vault — `compose up` elsewhere starts a different instance.
+**Foundation** is the product. A **vault** is one instance (`FOUNDATION_DATA` + Postgres). The **graph** is the live network in that vault. The **ontology** is the vocabulary (types and relations). A **blob** is bytes on a node. A **pointer** is a typed fact that names something without copying it (living, href, receipt, code, blob, ref). An **agent** is anything that can reach the vault MCP. The **user** is the human who runs Compose. A **bot** is a named role that acts through an agent. Do not call the graph “the Vault.” A git clone is the product, not this vault — `compose up` elsewhere starts a different instance. Do not use “origin” as a Foundation key; Cursor Origin is source control.
 
 ## Vault
 
@@ -59,7 +59,7 @@ flowchart LR
 A node is what is true now, short. History stays in activity. Identity is UUID. `get` returns that current picture: type, title, status, `payload`, `data`, metadata, timestamps, incident edges. It does not return activity rows.
 
 - **Payload** is the written picture: **inline** (`text/markdown`, `text/html`, `application/json`, `text/plain`) or a **blob** (file on the node). A rewrite passes a new `payload` and replaces that body. Omit `payload` and the body stays.
-- **data** is structured JSON. It is not the diary. The type’s `fields` compile to `json_schema` (`additionalProperties: true`). upsert validates the merged object against that document. Extra keys still write. `needed` on a field is a hint, not JSON Schema `required`. A `ref` field is a typed UUID pointer, not an edge. `data.origin` is identity (`{ system, id }`), not a mirrored body. `data.receipt` is the current picture of done after a bot sends mail or clears a calendar event (`{ system, id, kind }`; `gmail`/`sent` or `calendar`/`cleared`). `receipt: null` clears. `data.due` is the seed date field (ISO `YYYY-MM-DD`; omit it and the node still writes; `due: null` clears) on `task`, `goal`, and `spend` (on `spend`, display is Date). `project` may hold optional `budget_amount` / `budget_currency`. `spend` holds `amount`, `currency`, `due`, `vendor` (string), and `stage` (`quoted` | `paid`). `data.aliases` is an optional string array of user-authored alternate names (any type; used by `lookup`). Stored on the JSONB `data` object, not a separate column. Seed apply fills missing seed fields and missing seed hue/glyph only; it does not overwrite a user edit.
+- **data** is structured JSON. It is not the diary. The type’s `fields` compile to `json_schema` (`additionalProperties: true`). upsert validates the merged object against that document. Extra keys still write. `needed` on a field is a hint, not JSON Schema `required`. A `ref` field is a typed UUID pointer, not an edge. `data.living` is which Gmail, Calendar, or Drive object (`{ system, id }`), not a mirrored body. `data.code` is which GitHub object (`{ system, id }`). `data.url` is an optional https href (any type) so the Viewer can open a living file that stays the source of truth — a sibling of living, not a key on living, and not unique. `url: null` clears. `data.receipt` is the current picture of done after a bot sends mail or clears a calendar event (`{ system, id, kind }`; `gmail`/`sent` or `calendar`/`cleared`). `receipt: null` clears. `data.due` is the seed date field (ISO `YYYY-MM-DD`; omit it and the node still writes; `due: null` clears) on `task`, `goal`, and `spend` (on `spend`, display is Date). `project` may hold optional `budget_amount` / `budget_currency`. `spend` holds `amount`, `currency`, `due`, `vendor` (string), and `stage` (`quoted` | `paid`). `data.aliases` is an optional string array of user-authored alternate names (any type; used by `lookup`). Stored on the JSONB `data` object, not a separate column. Seed apply fills missing seed fields and missing seed hue/glyph only; it does not overwrite a user edit.
 
 ```mermaid
 flowchart TB
@@ -74,7 +74,9 @@ flowchart TB
   node_payload --> blob_on_node["blob: file on the node"]
 
   node_data --> structured["structured fields"]
-  node_data --> origin["origin ref"]
+  node_data --> living["data.living system + id"]
+  node_data --> code["data.code system + id"]
+  node_data --> url["data.url https href"]
   node_data --> receipt["receipt ref"]
   node_data --> due["date-role fields (due on task / goal / spend)"]
   node_data --> budget["budget_amount / budget_currency on project"]
@@ -182,11 +184,12 @@ flowchart LR
 - `type` / `status`
 - `under` — live `child_of` children of a parent UUID
 - `since` — updated after an ISO timestamp
-- `origin` — unique live `data.origin` ref (identity)
+- `living` — unique live `data.living` ref (Gmail, Calendar, Drive)
+- `code` — unique live `data.code` ref (GitHub)
 - `receipt` — unique live `data.receipt` ref (sent mail or cleared event)
 - `due` — `overdue` or `today` (`America/New_York`)
 - `due_on_or_before` / `due_on_or_after` — inclusive ISO date window on `data.due`
-- `data_equals` — one or a few top-level `data` keys equal a string value (JSONB `@>`, same family as `data.origin` / `data.due`; not a column per key). Example shape: `{ kind: "…", status: "…" }`. Seed `spend` filters `{ stage: "quoted" }` or `{ currency: "USD" }` this way; `amount` is a number and does not.
+- `data_equals` — one or a few top-level `data` keys equal a string value (JSONB `@>`, same family as `data.living` / `data.due`; not a column per key). Example shape: `{ kind: "…", status: "…" }`. Seed `spend` filters `{ stage: "quoted" }` or `{ currency: "USD" }` this way; `amount` is a number and does not.
 
 Empty `{}` is an error (no `list_nodes` tool). Hits are lean and include `due` when `data.due` is set; `get` loads the current picture, `data.due`, and neighbor titles.
 
@@ -198,7 +201,7 @@ Empty `{}` is an error (no `list_nodes` tool). Hits are lean and include `due` w
 flowchart TB
   search_box["search"]
   search_box --> fts["full-text + accent-folding"]
-  search_box --> list_or_filter["or list by type / status / under / since / origin / receipt / due / data_equals"]
+  search_box --> list_or_filter["or list by type / status / under / since / living / code / receipt / due / data_equals"]
   lookup_box["lookup"]
   lookup_box --> names["batch names → per-input outcome"]
   lookup_box --> title_idx["title_norm / trigram"]
@@ -208,22 +211,32 @@ flowchart TB
   working_set_box --> ontology_walk["ontology: hierarchy / about / date roles"]
 ```
 
-## Origin
+## Living and code
 
-Gmail, Calendar, Drive, and GitHub stay the source of truth. The graph may hold `data.origin { system, id }` only. That ref is identity. Live nodes are unique on that pair. Look up with `search { origin }`, then `get`. There is no `kind` on origin. Do not fetch or mirror those systems’ bodies into the graph.
+Gmail, Calendar, and Drive stay the source of truth for living objects. The graph holds `data.living { system, id }` and optional `data.url` as the https href the Viewer opens. Live nodes are unique on the living pair. Look up with `search { living }`, then `get`. There is no `kind` on living. There is no `url` on living.
+
+GitHub stays the source of truth for code objects. The graph holds `data.code { system, id }`. Live nodes are unique on that pair. Look up with `search { code }`, then `get`. Code is not living.
+
+Do not fetch or mirror those systems’ bodies into the graph.
 
 ```mermaid
 flowchart LR
-  sot["Gmail / Calendar / Drive / GitHub<br/>stay source of truth"]
-  origin_ref["data.origin system + id"]
-  holds_ref["Graph holds the ref only"]
-  sot -.-> origin_ref
-  origin_ref --> holds_ref
+  sot["Gmail / Calendar / Drive stay SoT"]
+  living_ref["data.living system + id"]
+  url_ref["data.url https href"]
+  code_sot["GitHub stays SoT"]
+  code_ref["data.code system + id"]
+  holds_ref["Graph holds the pointer only"]
+  sot -.-> living_ref
+  living_ref --> holds_ref
+  url_ref --> holds_ref
+  code_sot -.-> code_ref
+  code_ref --> holds_ref
 ```
 
 ## Receipt
 
-When a bot sends mail or clears a calendar event, the node holds `data.receipt { system, id, kind }`. Pointer only. `system` is `gmail` | `calendar`. `kind` is `sent` | `cleared`. Pairing is closed. Live nodes are unique on `system`+`id`, independent of origin. Look up with `search { receipt }`, then `get`. The server does not invent the receipt. Gmail and Calendar stay the source of truth — no bodies in the vault.
+When a bot sends mail or clears a calendar event, the node holds `data.receipt { system, id, kind }`. Pointer only. `system` is `gmail` | `calendar`. `kind` is `sent` | `cleared`. Pairing is closed. Live nodes are unique on `system`+`id`, independent of living. Look up with `search { receipt }`, then `get`. The server does not invent the receipt. Gmail and Calendar stay the source of truth — no bodies in the vault.
 
 ```mermaid
 flowchart LR
