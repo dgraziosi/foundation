@@ -67,6 +67,7 @@ These names are the current surface. Full parameters: [`docs/MCP_TOOLS.md`](./MC
 - `data.aliases` is an optional string array on any node. `upsert` validates it only when the incoming `data` patch includes `aliases` (`[]` clears; malformed patch refuses, including values that fold empty after `name_norm`). A successful aliases write leaves a well-formed non-empty array, or `[]`. Unrelated updates leave legacy values alone. `lookup` ignores malformed legacy aliases. Alias dedupe uses the same `name_norm` as SQL lookup.
 - `task`, `goal`, and `spend` accept optional `data.due` (`YYYY-MM-DD`) via the `due` date field (role `date`). On `spend`, display is Date — the calendar day of the line, not a task deadline. Compiled `json_schema` enforces the date when present; nodes without due still upsert. Extra `data` keys still write. `due: null` clears. A `ref` field stores a typed UUID pointer and does not create an edge.
 - Live nodes are unique on `data.origin.{system,id}` for `gmail` | `calendar` | `drive` | `github`. That ref is identity (which person or object). It is not sent mail and not a cleared event. Look up with `search` `{ origin }` (then `get`). Store the ref only — do not fetch or mirror those systems’ bodies.
+- `data.url` is an optional https href on any type. It is how the Viewer opens a living file that stays the source of truth. It is a sibling of origin, not a key on origin, and not a second identity. [Living source-of-truth link](#living-source-of-truth-link).
 - After a bot sends mail or clears a calendar event, the same node holds `data.receipt` `{ system, id, kind }`. That pointer is the current picture of done. [Mail and calendar receipt](#mail-and-calendar-receipt).
 - No `get_vault_health` / `run_maintenance` / `audit_links` tools — those jobs are instance routines the user can run ([`VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md), [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/))
 - No rewrite or picture tool. `get` + `list_activity` + `upsert` is the loop. [Current picture](#current-picture).
@@ -79,7 +80,7 @@ A node is what is true now, short. History stays in activity.
 
 **`payload`** is the written picture. Inline body, or blob metadata when the file lives on disk. A rewrite passes a new `payload` and replaces that body. Omit `payload` and the body stays.
 
-**`data`** is the structured bag (due, origin, receipt, aliases, typed fields). An update merges keys. It is not the diary.
+**`data`** is the structured bag (due, origin, url, receipt, aliases, typed fields). An update merges keys. It is not the diary.
 
 A named **bot** rewrites the picture on purpose. One node at a time. Not a background job. The server does not invent the picture.
 
@@ -162,6 +163,74 @@ FTS already walks string values in `data`, so a query of that id or kind can hit
 
 No new MCP tool. No new store. No mail or event bodies in the vault. No `kind` on `data.origin`. No embeddings.
 
+## Living source-of-truth link
+
+A living Drive file or Sheet stays the source of truth. The graph holds a pointer, not a copy. Gmail and Calendar use the same shape later.
+
+The user is the human who runs Compose. Named roles are bots. An agent is anything that can reach the vault.
+
+Drive, Sheets, Gmail, and Calendar stay the source of truth. The vault does not hold file, message, or event bodies. Do not write a blob for this.
+
+### Origin is identity; url is how to open
+
+`data.origin` `{ system, id }` is identity. Live nodes are unique on that pair for `gmail` | `calendar` | `drive` | `github`. `search` `{ origin }` finds that node. Extra keys on the origin object are not a contract. Origin reads as `system` and `id` only. There is no `kind` on origin. There is no `url` on origin.
+
+Origin cannot derive the open href. A Drive id is a Sheet, a Doc, or a generic file; those systems use different URL prefixes. Origin has no `kind`, so the Viewer cannot invent the URL. Hang the href as a sibling.
+
+`data.receipt` is done after send or clear. That is not this.
+
+### Shape
+
+One optional key on `data`, same JSONB bag as origin, receipt, and aliases. Not a column. Not a table. Not a type field. Not a new MCP tool. Any type may carry it.
+
+```text
+data.origin: { system, id }
+data.url: https://…
+```
+
+- **`origin`** — which living object (existing identity). `drive` for a Sheet or Drive file. Same systems as today.
+- **`url`** — the https href the Viewer opens. Trimmed. No credentials. Max 2048 characters.
+
+Missing url is allowed. `url: null` clears. Omit the key and url stays. Incomplete, non-https, credentialed, or non-string values refuse. Validation runs when the incoming `data` patch includes `url`. Unrelated patches leave a legacy value alone. The Viewer opens only a well-formed https href.
+
+Url is not unique. Identity uniqueness stays on `data.origin.{system,id}`. Do not invent a second identity system. Two nodes may hold the same href; `search` `{ origin }` is how an agent finds the living object.
+
+Url without origin is a relevant link the Viewer can open. It is not identity. A living file that stays source of truth is origin plus url.
+
+Store the href only. Do not fetch or mirror the file body into `payload` or `data`. Do not ingest a blob for this.
+
+### Write the pointer
+
+A named bot writes origin and url. One node at a time. The server does not invent the href.
+
+1. `search` `{ origin: { system, id } }` — if a live node already holds that identity, `get` that id. Do not twin.
+2. `get` `{ id }` when updating — current picture and `updated_at`.
+3. `upsert` with `data.origin` `{ system, id }` and `data.url` (https). Merge keeps due, receipt, aliases, and other keys. Omit `payload` unless the written picture also changes.
+4. The write leaves an activity row. That row is the diary of the patch, not the living file. `undo` of the upsert restores the previous `data` while the row is reversible. It does not change the file in Drive.
+
+Fixture write (no personal ids, no live sheet ids, no bodies):
+
+```text
+upsert type=note title="Fixture sheet"
+data: { origin: { system: "drive", id: "file-fixture-1" }, url: "https://example.test/drive/file-fixture-1" }
+```
+
+### How get and search see the pointer
+
+`get` returns `node.data.origin` and `node.data.url`. A well-formed url is the open href on the current picture.
+
+`search` `{ origin }` looks up the unique live identity, then `get`. Same tool as today. No new search key. No `list_nodes`. An origin miss means that identity is free to write.
+
+FTS already walks string values in `data`, so a query of that href can hit. `data_equals: { url: "https://…" }` matches the top-level string. Hits stay id / type / title / snippet / `due`. They do not grow a `url` field.
+
+### Viewer
+
+When `data.url` is a well-formed https URL, Detail properties offer Open. That click leaves the window for the living file. It does not write. Contract: [`VIEWER.md`](./VIEWER.md).
+
+### Out
+
+No new MCP tool. No new store. No file, mail, or event bodies in the vault. No blob for this. No `kind` on `data.origin`. No `url` on origin. No uniqueness on url. No new search filter. No embeddings.
+
 ## Project spend
 
 `spend` is a seed type: one recorded money line under a project (a bid or a payment). Artifact. `parent_types`: `["project"]`. Hue `teal`, glyph `Receipt`. Views: `list` (`default_view: "list"`). The Viewer opens it from that declared view. `inspect_ontology` and `bootstrap` list it.
@@ -226,7 +295,7 @@ One type, one line, one envelope on the project. Agents record validated fields 
 - Proposal/approve inbox for ontology changes
 - Write-ACL / default-deny (the API key is the gate)
 - Bank / card import, a second ledger, double-entry accounting, a rollup tool, or stored remaining on `project`
-- Mail or calendar bodies in the vault (Gmail and Calendar stay source of truth; the graph holds `data.origin` and `data.receipt` refs only)
+- Mail, calendar, or Drive bodies in the vault (those systems stay source of truth; the graph holds `data.origin`, `data.url`, and `data.receipt` refs only)
 
 ## Contributor checklist
 

@@ -102,6 +102,18 @@ test("seed node types parse and include spine plus artifacts", () => {
     "budget_amount",
     "budget_currency",
   ]);
+  for (const type of SEED_NODE_TYPES) {
+    assert.equal(
+      type.fields?.some((field) => field.name === "url"),
+      false,
+      `${type.slug} must not declare a url field; data.url is a shared key`,
+    );
+    assert.equal(
+      type.fields?.some((field) => field.name === "origin"),
+      false,
+      `${type.slug} must not declare origin as a type field`,
+    );
+  }
 });
 
 test("seed relations include child_of and associative verbs", () => {
