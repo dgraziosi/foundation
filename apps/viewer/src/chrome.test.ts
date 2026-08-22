@@ -92,7 +92,7 @@ test("click from graph / Recents / collection / search opens a detail page", asy
   assert.match(detail, /data-ancestors="root-to-parent"/);
   assert.doesNotMatch(detail, /ancestors\.reverse/);
   assert.match(detail, /openableUrl/);
-  assert.match(detail, />Open</);
+  assert.match(detail, />\s*Open\s*</);
   assert.match(detail, /target="_blank"/);
   assert.match(detail, /rel="noreferrer"/);
 });
