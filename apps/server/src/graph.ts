@@ -6,7 +6,8 @@ import {
   getCreateActivityForNode,
   getNodeById,
   getNodeByIdempotencyKey,
-  getNodeByOrigin,
+  getNodeByLiving,
+  getNodeByCode,
   getNodeByReceipt,
   getNodeType,
   getRelationType,
@@ -69,19 +70,26 @@ import {
   LOOKUP_NO_SELECTOR_SUGGESTION,
   LOOKUP_CANDIDATE_DEFAULT,
   applyAliasesFromPatch,
+  applyUrlFromPatch,
   classifyLookupResult,
   createPreflightFromLookup,
-  ORIGIN_HIT_SUGGESTION,
-  ORIGIN_MISS_SUGGESTION,
+  CODE_HIT_SUGGESTION,
+  CODE_MISS_SUGGESTION,
+  LIVING_HIT_SUGGESTION,
+  LIVING_MISS_SUGGESTION,
+  ORIGIN_KEY_REFUSED_SUGGESTION,
   RECEIPT_HIT_SUGGESTION,
   RECEIPT_MISS_SUGGESTION,
   DUE_DATE_SUGGESTION,
   assertIfMatch,
   LOST_UPDATE_SUGGESTION,
   isToolError,
-  originConflictError,
-  originFromData,
-  canonicalizeOriginInData,
+  livingConflictError,
+  livingFromData,
+  canonicalizeLivingInData,
+  codeConflictError,
+  codeFromData,
+  canonicalizeCodeInData,
   receiptConflictError,
   receiptFromData,
   canonicalizeReceiptInData,
@@ -144,10 +152,21 @@ function mergedNodeData(
   return { ...(existing?.data ?? {}), ...patch };
 }
 
+function refuseOriginKey(patch: Record<string, unknown> | undefined): ToolError | null {
+  if (patch && Object.prototype.hasOwnProperty.call(patch, "origin")) {
+    return toolError("data.origin is not a Foundation key", ORIGIN_KEY_REFUSED_SUGGESTION);
+  }
+  return null;
+}
+
 function validateUpsertData(type: NodeType, data: Record<string, unknown>): ToolError | null {
-  const origin = originFromData(data);
-  if (isToolError(origin)) {
-    return origin;
+  const living = livingFromData(data);
+  if (isToolError(living)) {
+    return living;
+  }
+  const code = codeFromData(data);
+  if (isToolError(code)) {
+    return code;
   }
   const receipt = receiptFromData(data);
   if (isToolError(receipt)) {
@@ -195,18 +214,34 @@ async function validateRefFields(
   return null;
 }
 
-async function originUniqueError(
+async function livingUniqueError(
   db: Queryable,
   data: Record<string, unknown>,
   selfId?: string,
 ): Promise<ToolError | null> {
-  const origin = originFromData(data);
-  if (!origin || isToolError(origin)) {
+  const living = livingFromData(data);
+  if (!living || isToolError(living)) {
     return null;
   }
-  const existing = await getNodeByOrigin(db, origin);
+  const existing = await getNodeByLiving(db, living);
   if (existing && existing.id !== selfId) {
-    return originConflictError(existing.id, origin);
+    return livingConflictError(existing.id, living);
+  }
+  return null;
+}
+
+async function codeUniqueError(
+  db: Queryable,
+  data: Record<string, unknown>,
+  selfId?: string,
+): Promise<ToolError | null> {
+  const code = codeFromData(data);
+  if (!code || isToolError(code)) {
+    return null;
+  }
+  const existing = await getNodeByCode(db, code);
+  if (existing && existing.id !== selfId) {
+    return codeConflictError(existing.id, code);
   }
   return null;
 }
@@ -232,7 +267,11 @@ async function pointerUniqueError(
   data: Record<string, unknown>,
   selfId?: string,
 ): Promise<ToolError | null> {
-  return (await originUniqueError(db, data, selfId)) ?? (await receiptUniqueError(db, data, selfId));
+  return (
+    (await livingUniqueError(db, data, selfId)) ??
+    (await codeUniqueError(db, data, selfId)) ??
+    (await receiptUniqueError(db, data, selfId))
+  );
 }
 
 async function createDuplicatePreflight(
@@ -564,12 +603,20 @@ export async function upsertGraphNode(
         }
       }
 
+      const originErr = refuseOriginKey(input.data);
+      if (originErr) {
+        return originErr;
+      }
       const merged = canonicalizeDueInData(
         canonicalizeReceiptInData(
-          canonicalizeOriginInData(mergedNodeData(existing, input.data)),
+          canonicalizeCodeInData(canonicalizeLivingInData(mergedNodeData(existing, input.data))),
         ),
       );
-      const nextData = applyAliasesFromPatch(merged, input.data);
+      const aliased = applyAliasesFromPatch(merged, input.data);
+      if (isToolError(aliased)) {
+        return aliased;
+      }
+      const nextData = applyUrlFromPatch(aliased, input.data);
       if (isToolError(nextData)) {
         return nextData;
       }
@@ -1441,15 +1488,26 @@ export async function searchGraphNodes(
     if (since && Date.parse(node.updated_at) < since.getTime()) {
       return { nodes: [], suggestion: SEARCH_MISS_SUGGESTION };
     }
-    if (input.origin) {
-      const origin = originFromData(node.data);
+    if (input.living) {
+      const living = livingFromData(node.data);
       if (
-        isToolError(origin) ||
-        !origin ||
-        origin.system !== input.origin.system ||
-        origin.id !== input.origin.id
+        isToolError(living) ||
+        !living ||
+        living.system !== input.living.system ||
+        living.id !== input.living.id
       ) {
-        return { nodes: [], suggestion: ORIGIN_MISS_SUGGESTION };
+        return { nodes: [], suggestion: LIVING_MISS_SUGGESTION };
+      }
+    }
+    if (input.code) {
+      const code = codeFromData(node.data);
+      if (
+        isToolError(code) ||
+        !code ||
+        code.system !== input.code.system ||
+        code.id !== input.code.id
+      ) {
+        return { nodes: [], suggestion: CODE_MISS_SUGGESTION };
       }
     }
     if (input.receipt) {
@@ -1493,8 +1551,10 @@ export async function searchGraphNodes(
     status: input.status,
     under: input.under,
     since,
-    originSystem: input.origin?.system,
-    originId: input.origin?.id,
+    livingSystem: input.living?.system,
+    livingId: input.living?.id,
+    codeSystem: input.code?.system,
+    codeId: input.code?.id,
     receiptSystem: input.receipt?.system,
     receiptId: input.receipt?.id,
     dueOnOrAfter: input.due_on_or_after,
@@ -1508,16 +1568,22 @@ export async function searchGraphNodes(
     if (query) {
       return { nodes: [], suggestion: SEARCH_MISS_SUGGESTION };
     }
-    if (input.origin) {
-      return { nodes: [], suggestion: ORIGIN_MISS_SUGGESTION };
+    if (input.living) {
+      return { nodes: [], suggestion: LIVING_MISS_SUGGESTION };
+    }
+    if (input.code) {
+      return { nodes: [], suggestion: CODE_MISS_SUGGESTION };
     }
     if (input.receipt) {
       return { nodes: [], suggestion: RECEIPT_MISS_SUGGESTION };
     }
     return { nodes: [] };
   }
-  if (input.origin) {
-    return { nodes, suggestion: ORIGIN_HIT_SUGGESTION };
+  if (input.living) {
+    return { nodes, suggestion: LIVING_HIT_SUGGESTION };
+  }
+  if (input.code) {
+    return { nodes, suggestion: CODE_HIT_SUGGESTION };
   }
   if (input.receipt) {
     return { nodes, suggestion: RECEIPT_HIT_SUGGESTION };

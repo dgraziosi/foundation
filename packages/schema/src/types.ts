@@ -37,17 +37,6 @@ export type Payload = z.infer<typeof PayloadSchema>;
 export const JsonObjectSchema = z.record(z.unknown());
 export type JsonObject = z.infer<typeof JsonObjectSchema>;
 
-/** External systems Foundation may point at. Store the ref only — never fetch or mirror bodies. */
-export const ORIGIN_SYSTEMS = ["gmail", "calendar", "drive", "github"] as const;
-export type OriginSystem = (typeof ORIGIN_SYSTEMS)[number];
-
-export const OriginSystemSchema = z.enum(ORIGIN_SYSTEMS);
-export const OriginRefSchema = z.object({
-  system: OriginSystemSchema,
-  id: z.string().trim().min(1),
-});
-export type OriginRef = z.infer<typeof OriginRefSchema>;
-
 /** Living outside systems that stay source of truth. Not GitHub. Not a blob. */
 export const LIVING_SYSTEMS = ["gmail", "calendar", "drive"] as const;
 export type LivingSystem = (typeof LIVING_SYSTEMS)[number];

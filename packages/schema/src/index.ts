@@ -151,8 +151,7 @@ export {
   CODE_MISS_SUGGESTION,
   LIVING_HIT_SUGGESTION,
   LIVING_MISS_SUGGESTION,
-  ORIGIN_HIT_SUGGESTION,
-  ORIGIN_MISS_SUGGESTION,
+  ORIGIN_KEY_REFUSED_SUGGESTION,
   RECEIPT_HIT_SUGGESTION,
   RECEIPT_MISS_SUGGESTION,
   SEARCH_MISS_SUGGESTION,
@@ -229,14 +228,6 @@ export {
   type SuggestedLinkKind,
   type SuggestedLinkTarget,
 } from "./suggested-links.js";
-export {
-  ORIGIN_INCOMPLETE_SUGGESTION,
-  ORIGIN_UNKNOWN_SYSTEM_SUGGESTION,
-  isToolErrorOrigin,
-  originConflictError,
-  originFromData,
-  canonicalizeOriginInData,
-} from "./origin.js";
 export {
   LIVING_INCOMPLETE_SUGGESTION,
   LIVING_UNKNOWN_SYSTEM_SUGGESTION,
@@ -395,9 +386,6 @@ export {
   LIVING_SYSTEMS,
   LivingRefSchema,
   LivingSystemSchema,
-  ORIGIN_SYSTEMS,
-  OriginRefSchema,
-  OriginSystemSchema,
   RECEIPT_KINDS,
   RECEIPT_SYSTEMS,
   ReceiptKindSchema,
@@ -421,8 +409,6 @@ export {
   type CodeSystem,
   type LivingRef,
   type LivingSystem,
-  type OriginRef,
-  type OriginSystem,
   type ReceiptKind,
   type ReceiptLookup,
   type ReceiptRef,
