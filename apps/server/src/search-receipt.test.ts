@@ -105,7 +105,7 @@ test(
         });
 
         const byOrigin = await searchGraphNodes(pool, {
-          origin: { system: "calendar", id: "evt-fixture-1" },
+          living: { system: "calendar", id: "evt-fixture-1" },
         });
         const byReceipt = await searchGraphNodes(pool, {
           receipt: { system: "calendar", id: "evt-fixture-1" },
@@ -131,7 +131,7 @@ test(
         assert.equal(miss.suggestion, RECEIPT_MISS_SUGGESTION);
 
         const originMiss = await searchGraphNodes(pool, {
-          origin: { system: "gmail", id: "msg-fixture-sent-1" },
+          living: { system: "gmail", id: "msg-fixture-sent-1" },
         });
         assert.equal(isToolError(originMiss), false);
         if (!isToolError(originMiss)) {

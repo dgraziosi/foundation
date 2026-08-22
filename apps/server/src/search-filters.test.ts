@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createPool, migrate, seedSystemOntology, type Pool } from "@foundation/db";
 import {
-  ORIGIN_HIT_SUGGESTION,
-  ORIGIN_MISS_SUGGESTION,
+  CODE_HIT_SUGGESTION,
+  CODE_MISS_SUGGESTION,
+  LIVING_HIT_SUGGESTION,
   SEARCH_NO_SELECTOR_SUGGESTION,
   isToolError,
 } from "@foundation/schema";
@@ -198,7 +199,7 @@ test(
         assert.match(twin.suggestion ?? "", /do not create a twin/i);
 
         const hit = await searchGraphNodes(pool, {
-          origin: { system: "gmail", id: "msg-fixture-1" },
+          living: { system: "gmail", id: "msg-fixture-1" },
         });
         assert.equal(isToolError(hit), false);
         if (isToolError(hit)) {
@@ -206,17 +207,17 @@ test(
         }
         assert.equal(hit.nodes.length, 1);
         assert.equal(hit.nodes[0]?.id, person.node.id);
-        assert.equal(hit.suggestion, ORIGIN_HIT_SUGGESTION);
+        assert.equal(hit.suggestion, LIVING_HIT_SUGGESTION);
 
         const miss = await searchGraphNodes(pool, {
-          origin: { system: "github", id: "no-such-ref" },
+          code: { system: "github", id: "no-such-ref" },
         });
         assert.equal(isToolError(miss), false);
         if (isToolError(miss)) {
           return;
         }
         assert.deepEqual(miss.nodes, []);
-        assert.equal(miss.suggestion, ORIGIN_MISS_SUGGESTION);
+        assert.equal(miss.suggestion, CODE_MISS_SUGGESTION);
 
         const badSystem = await upsertGraphNode(pool, {
           type: "person",
@@ -240,7 +241,7 @@ test(
         }
         assert.deepEqual(padded.node.data.origin, { system: "calendar", id: "evt-fixture-1" });
         const paddedHit = await searchGraphNodes(pool, {
-          origin: { system: "calendar", id: "evt-fixture-1" },
+          living: { system: "calendar", id: "evt-fixture-1" },
         });
         assert.equal(isToolError(paddedHit), false);
         if (!isToolError(paddedHit)) {
@@ -266,6 +267,44 @@ test(
         assert.equal(isToolError(replay), false);
         if (!isToolError(replay)) {
           assert.equal(replay.node.id, keyed.node.id);
+        }
+
+        const livingOnly = await upsertGraphNode(pool, {
+          type: "person",
+          title: "Throwaway living person",
+          data: { living: { system: "gmail", id: "msg-fixture-living-1" } },
+        });
+        assert.equal(isToolError(livingOnly), false);
+        if (isToolError(livingOnly)) {
+          return;
+        }
+        const livingHit = await searchGraphNodes(pool, {
+          living: { system: "gmail", id: "msg-fixture-living-1" },
+        });
+        assert.equal(isToolError(livingHit), false);
+        if (!isToolError(livingHit)) {
+          assert.equal(livingHit.nodes.length, 1);
+          assert.equal(livingHit.nodes[0]?.id, livingOnly.node.id);
+          assert.equal(livingHit.suggestion, LIVING_HIT_SUGGESTION);
+        }
+
+        const codeOnly = await upsertGraphNode(pool, {
+          type: "note",
+          title: "Throwaway code note",
+          data: { code: { system: "github", id: "repo-fixture-1" } },
+        });
+        assert.equal(isToolError(codeOnly), false);
+        if (isToolError(codeOnly)) {
+          return;
+        }
+        const codeHit = await searchGraphNodes(pool, {
+          code: { system: "github", id: "repo-fixture-1" },
+        });
+        assert.equal(isToolError(codeHit), false);
+        if (!isToolError(codeHit)) {
+          assert.equal(codeHit.nodes.length, 1);
+          assert.equal(codeHit.nodes[0]?.id, codeOnly.node.id);
+          assert.equal(codeHit.suggestion, CODE_HIT_SUGGESTION);
         }
       });
 

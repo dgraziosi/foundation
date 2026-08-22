@@ -71,8 +71,10 @@ import {
   applyAliasesFromPatch,
   classifyLookupResult,
   createPreflightFromLookup,
-  ORIGIN_HIT_SUGGESTION,
-  ORIGIN_MISS_SUGGESTION,
+  CODE_HIT_SUGGESTION,
+  CODE_MISS_SUGGESTION,
+  LIVING_HIT_SUGGESTION,
+  LIVING_MISS_SUGGESTION,
   RECEIPT_HIT_SUGGESTION,
   RECEIPT_MISS_SUGGESTION,
   DUE_DATE_SUGGESTION,
@@ -82,6 +84,8 @@ import {
   originConflictError,
   originFromData,
   canonicalizeOriginInData,
+  livingFromData,
+  codeFromData,
   receiptConflictError,
   receiptFromData,
   canonicalizeReceiptInData,
@@ -123,6 +127,34 @@ import { suggestLinksForNode } from "./suggested-links.js";
 import { undoGraphActivity } from "./undo.js";
 
 export { undoGraphActivity };
+
+function pointerMatches(
+  stored: { system: string; id: string } | ToolError | undefined,
+  wanted: { system: string; id: string },
+): boolean {
+  return Boolean(
+    stored &&
+      !isToolError(stored) &&
+      stored.system === wanted.system &&
+      stored.id === wanted.id,
+  );
+}
+
+/** Living lookup also matches a leftover data.origin identity. */
+function nodeHasLiving(
+  data: Record<string, unknown>,
+  wanted: { system: string; id: string },
+): boolean {
+  return pointerMatches(livingFromData(data), wanted) || pointerMatches(originFromData(data), wanted);
+}
+
+/** Code lookup also matches a leftover data.origin GitHub identity. */
+function nodeHasCode(
+  data: Record<string, unknown>,
+  wanted: { system: string; id: string },
+): boolean {
+  return pointerMatches(codeFromData(data), wanted) || pointerMatches(originFromData(data), wanted);
+}
 
 function writerOf(input: { actor?: Activity["actor"]; actor_label?: string }): {
   actor: Activity["actor"];
@@ -1441,16 +1473,11 @@ export async function searchGraphNodes(
     if (since && Date.parse(node.updated_at) < since.getTime()) {
       return { nodes: [], suggestion: SEARCH_MISS_SUGGESTION };
     }
-    if (input.origin) {
-      const origin = originFromData(node.data);
-      if (
-        isToolError(origin) ||
-        !origin ||
-        origin.system !== input.origin.system ||
-        origin.id !== input.origin.id
-      ) {
-        return { nodes: [], suggestion: ORIGIN_MISS_SUGGESTION };
-      }
+    if (input.living && !nodeHasLiving(node.data, input.living)) {
+      return { nodes: [], suggestion: LIVING_MISS_SUGGESTION };
+    }
+    if (input.code && !nodeHasCode(node.data, input.code)) {
+      return { nodes: [], suggestion: CODE_MISS_SUGGESTION };
     }
     if (input.receipt) {
       const receipt = receiptFromData(node.data);
@@ -1493,8 +1520,10 @@ export async function searchGraphNodes(
     status: input.status,
     under: input.under,
     since,
-    originSystem: input.origin?.system,
-    originId: input.origin?.id,
+    livingSystem: input.living?.system,
+    livingId: input.living?.id,
+    codeSystem: input.code?.system,
+    codeId: input.code?.id,
     receiptSystem: input.receipt?.system,
     receiptId: input.receipt?.id,
     dueOnOrAfter: input.due_on_or_after,
@@ -1508,16 +1537,22 @@ export async function searchGraphNodes(
     if (query) {
       return { nodes: [], suggestion: SEARCH_MISS_SUGGESTION };
     }
-    if (input.origin) {
-      return { nodes: [], suggestion: ORIGIN_MISS_SUGGESTION };
+    if (input.living) {
+      return { nodes: [], suggestion: LIVING_MISS_SUGGESTION };
+    }
+    if (input.code) {
+      return { nodes: [], suggestion: CODE_MISS_SUGGESTION };
     }
     if (input.receipt) {
       return { nodes: [], suggestion: RECEIPT_MISS_SUGGESTION };
     }
     return { nodes: [] };
   }
-  if (input.origin) {
-    return { nodes, suggestion: ORIGIN_HIT_SUGGESTION };
+  if (input.living) {
+    return { nodes, suggestion: LIVING_HIT_SUGGESTION };
+  }
+  if (input.code) {
+    return { nodes, suggestion: CODE_HIT_SUGGESTION };
   }
   if (input.receipt) {
     return { nodes, suggestion: RECEIPT_HIT_SUGGESTION };

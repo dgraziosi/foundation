@@ -335,8 +335,10 @@ export async function searchNodes(
     status?: Node["status"];
     under?: string;
     since?: Date;
-    originSystem?: string;
-    originId?: string;
+    livingSystem?: string;
+    livingId?: string;
+    codeSystem?: string;
+    codeId?: string;
     receiptSystem?: string;
     receiptId?: string;
     dueOnOrAfter?: string;
@@ -385,8 +387,18 @@ export async function searchNodes(
              AND parent.deleted_at IS NULL
          )
        )
-       AND ($6::text IS NULL OR data #>> '{origin,system}' = $6)
-       AND ($7::text IS NULL OR data #>> '{origin,id}' = $7)
+       AND (
+         $6::text IS NULL OR (
+           (data #>> '{living,system}' = $6 AND data #>> '{living,id}' = $7)
+           OR (data #>> '{origin,system}' = $6 AND data #>> '{origin,id}' = $7)
+         )
+       )
+       AND (
+         $16::text IS NULL OR (
+           (data #>> '{code,system}' = $16 AND data #>> '{code,id}' = $17)
+           OR (data #>> '{origin,system}' = $16 AND data #>> '{origin,id}' = $17)
+         )
+       )
        AND ($14::text IS NULL OR data #>> '{receipt,system}' = $14)
        AND ($15::text IS NULL OR data #>> '{receipt,id}' = $15)
        AND ($8::text IS NULL OR foundation_iso_date(data #>> '{due}') >= $8)
@@ -405,8 +417,8 @@ export async function searchNodes(
       input.status ?? null,
       input.since ?? null,
       input.under ?? null,
-      input.originSystem ?? null,
-      input.originId ?? null,
+      input.livingSystem ?? null,
+      input.livingId ?? null,
       input.dueOnOrAfter ?? null,
       input.dueOnOrBefore ?? null,
       input.dueBefore ?? null,
@@ -417,6 +429,8 @@ export async function searchNodes(
       limit,
       input.receiptSystem ?? null,
       input.receiptId ?? null,
+      input.codeSystem ?? null,
+      input.codeId ?? null,
     ],
   );
   return rows.map((row) => ({

@@ -19,7 +19,6 @@ import {
   NodeTypeSchema,
   CodeRefSchema,
   LivingRefSchema,
-  OriginRefSchema,
   ReceiptLookupSchema,
   PayloadStorageSchema,
   RelationKindSchema,
@@ -458,7 +457,6 @@ export const SearchInputSchema = z.object({
   living: LivingRefSchema.optional(),
   /** Unique code ref lookup (github). */
   code: CodeRefSchema.optional(),
-  origin: OriginRefSchema.optional(),
   /** Unique receipt lookup (gmail | calendar). Kind lives on the stored node. */
   receipt: ReceiptLookupSchema.optional(),
   /** Due before today, or due today, in America/New_York. */
@@ -502,7 +500,6 @@ export function searchHasSelector(input: {
   since?: string;
   living?: unknown;
   code?: unknown;
-  origin?: unknown;
   receipt?: unknown;
   due?: string;
   due_on_or_before?: string;
@@ -517,7 +514,6 @@ export function searchHasSelector(input: {
       input.since ||
       input.living ||
       input.code ||
-      input.origin ||
       input.receipt ||
       input.due ||
       input.due_on_or_before ||
@@ -539,10 +535,10 @@ export const CODE_HIT_SUGGESTION =
   "This code ref is unique on live nodes. Prefer get with that id. Do not upsert a twin.";
 
 export const ORIGIN_MISS_SUGGESTION =
-  "No live node has that living pointer. You may upsert with data.living.system and data.living.id. Foundation stores the ref only — do not fetch or mirror Gmail, Calendar, Drive, or GitHub bodies.";
+  "No live node has that origin. You may upsert with data.origin.system and data.origin.id. Foundation stores the ref only — do not fetch or mirror Gmail, Calendar, Drive, or GitHub bodies.";
 
 export const ORIGIN_HIT_SUGGESTION =
-  "This living pointer is unique on live nodes. Prefer get with that id. Do not upsert a twin.";
+  "This origin is unique on live nodes. Prefer get with that id. Do not upsert a twin.";
 
 export const RECEIPT_MISS_SUGGESTION =
   "No live node has that receipt. You may upsert with data.receipt.system, data.receipt.id, and data.receipt.kind. Foundation stores the ref only — do not fetch or mirror Gmail or Calendar bodies.";

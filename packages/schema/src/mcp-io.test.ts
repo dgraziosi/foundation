@@ -57,6 +57,12 @@ test("search query is optional when a filter is set", () => {
   assert.equal(searchHasSelector(noUrlFilter), false);
   assert.ok("living" in SearchInputSchema.shape);
   assert.ok("code" in SearchInputSchema.shape);
+  assert.equal("origin" in SearchInputSchema.shape, false);
+  const noOriginFilter = SearchInputSchema.parse({
+    origin: { system: "gmail", id: "msg-1" },
+  });
+  assert.equal("origin" in noOriginFilter, false);
+  assert.equal(searchHasSelector(noOriginFilter), false);
   assert.throws(() => SearchInputSchema.parse({ due_on_or_before: "2026-08-27T00:00:00Z" }));
   assert.throws(() => SearchInputSchema.parse({ due: "soon" }));
   assert.throws(() => SearchInputSchema.parse({ data_equals: { "Kind": "x" } }));
