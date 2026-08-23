@@ -221,6 +221,7 @@ test(
         const badSystem = await upsertGraphNode(pool, {
           type: "person",
           title: "Throwaway slack url",
+          // @ts-expect-error slack is not a url.system
           url: { system: "slack", id: "x" },
         });
         assert.equal(isToolError(badSystem), true);

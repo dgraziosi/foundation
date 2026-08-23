@@ -141,6 +141,7 @@ test(
         const urlGithub = await upsertGraphNode(pool, {
           type: "note",
           title: "Throwaway url github",
+          // @ts-expect-error github is data.repo, not url
           url: { system: "github", id: "repo-fixture-1" },
         });
         assert.equal(isToolError(urlGithub), true);
