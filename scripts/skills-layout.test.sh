@@ -147,6 +147,10 @@ fi
 if ! grep -Fq -- 'target_kind' "${dream_skill}"; then
   fail "Dream skill does not filter list_activity by target_kind"
 fi
+target_kind_hits="$(grep -o -- 'target_kind' "${dream_skill}" | wc -l)"
+if ((target_kind_hits < 2)); then
+  fail "Dream skill must name target_kind for both node and edge rows"
+fi
 if ! grep -Fq -- 'target_id' "${dream_skill}"; then
   fail "Dream skill does not take target_id for node activity"
 fi
