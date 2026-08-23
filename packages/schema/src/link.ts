@@ -13,10 +13,10 @@ export {
   type LinkSystem,
 } from "./types.js";
 
-export const LINK_INCOMPLETE_SUGGESTION =
+export const LINK_REF_INCOMPLETE_SUGGESTION =
   "Set data.link.system to gmail | calendar | drive and data.link.id to that system's stable id. Foundation stores the ref only — do not fetch or mirror those systems' bodies.";
 
-export const LINK_UNKNOWN_SYSTEM_SUGGESTION =
+export const LINK_REF_UNKNOWN_SYSTEM_SUGGESTION =
   "Use gmail, calendar, or drive. GitHub is data.repo, not data.link. Foundation stores the ref only — do not fetch or mirror those systems' bodies.";
 
 export function linkConflictError(existingId: string, link: LinkRef): ToolError {
@@ -41,7 +41,7 @@ export function linkFromData(data: Record<string, unknown>): LinkRef | ToolError
   }
   const raw = data.link;
   if (typeof raw !== "object" || Array.isArray(raw)) {
-    return toolError("data.link must be an object with system and id", LINK_INCOMPLETE_SUGGESTION);
+    return toolError("data.link must be an object with system and id", LINK_REF_INCOMPLETE_SUGGESTION);
   }
   const rec = raw as Record<string, unknown>;
   const systemBlank = isBlank(rec.system);
@@ -50,21 +50,21 @@ export function linkFromData(data: Record<string, unknown>): LinkRef | ToolError
     return undefined;
   }
   if (systemBlank || idBlank) {
-    return toolError("data.link requires system and id", LINK_INCOMPLETE_SUGGESTION);
+    return toolError("data.link requires system and id", LINK_REF_INCOMPLETE_SUGGESTION);
   }
   if (typeof rec.system !== "string") {
-    return toolError("data.link.system must be a string", LINK_UNKNOWN_SYSTEM_SUGGESTION);
+    return toolError("data.link.system must be a string", LINK_REF_UNKNOWN_SYSTEM_SUGGESTION);
   }
   const system = rec.system.trim();
   if (!LINK_SYSTEMS.includes(system as LinkSystem)) {
-    return toolError(`Unknown link.system "${rec.system.trim()}"`, LINK_UNKNOWN_SYSTEM_SUGGESTION);
+    return toolError(`Unknown link.system "${rec.system.trim()}"`, LINK_REF_UNKNOWN_SYSTEM_SUGGESTION);
   }
   if (typeof rec.id !== "string") {
-    return toolError("data.link.id must be a string", LINK_INCOMPLETE_SUGGESTION);
+    return toolError("data.link.id must be a string", LINK_REF_INCOMPLETE_SUGGESTION);
   }
   const id = rec.id.trim();
   if (!id) {
-    return toolError("data.link requires system and id", LINK_INCOMPLETE_SUGGESTION);
+    return toolError("data.link requires system and id", LINK_REF_INCOMPLETE_SUGGESTION);
   }
   return { system: system as LinkSystem, id };
 }

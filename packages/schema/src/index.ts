@@ -231,8 +231,8 @@ export {
   type SuggestedLinkTarget,
 } from "./suggested-links.js";
 export {
-  LINK_INCOMPLETE_SUGGESTION,
-  LINK_UNKNOWN_SYSTEM_SUGGESTION,
+  LINK_REF_INCOMPLETE_SUGGESTION,
+  LINK_REF_UNKNOWN_SYSTEM_SUGGESTION,
   canonicalizeLinkInData,
   isToolErrorLink,
   linkConflictError,
