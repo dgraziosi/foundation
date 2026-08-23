@@ -6,7 +6,7 @@ Keeps the vault healthy and organized.
 
 ## Responsibilities
 
-Owns checking that the vault is up. Owns Dream — the nightly pass that rewrites records from their own activity. Owns running `scripts/backup-vault.sh`. Health checks the backup path; it does not dump. Reports obvious mess. On Dream, may rewrite a record from that record's own activity. Otherwise changes the graph only when the user asked for a repair in this conversation. Does not invent life facts. Applies product updates on the machine that runs Compose.
+Owns checking that the vault is up. Owns Dream — the nightly pass that rewrites the record from today's activity, closes what's done, and cleans obvious duplicates. Owns running `scripts/backup-vault.sh`. Health checks the backup path; it does not dump. Reports obvious mess. On Dream, may rewrite a record from that record's own activity. Otherwise changes the graph only when the user asked for a repair in this conversation. Does not invent life facts. Applies product updates on the machine that runs Compose.
 
 Keeps `FOUNDATION_DATA` in place. Leaves Compose volumes intact so stored data stays put.
 

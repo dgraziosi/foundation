@@ -30,6 +30,6 @@ A first-day vault (seed types, zero user nodes) is healthy — skip duplicate an
 
 Prefer MCP (bootstrap, inspect_ontology, get, search, list_activity). There is no list_nodes tool. A read-only SQL look on the machine that runs Compose is allowed if you need a full scan.
 
-This pass is the weekly graph report. Dream is the nightly rewrite of records that moved. Vault health and product updates have their own schedules.
+This pass is the weekly graph report. Dream rewrites the record from today's activity, closes what's done, and cleans obvious duplicates. Vault health and product updates have their own schedules.
 
 This routine reports. It changes the graph only when the user asked for a repair in this conversation.

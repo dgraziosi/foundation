@@ -23,7 +23,7 @@ Do not add `get_vault_health`, `run_maintenance`, `propose_reorganize`, `audit_l
 ## What it is not
 
 - **Not vault health.** Process, `FOUNDATION_DATA`, canaries, and backup freshness are [`VAULT_HEALTH.md`](./VAULT_HEALTH.md).
-- **Not Dream.** Nightly rewrite of records that moved is [`.agents/skills/dream/`](../.agents/skills/dream/). This weekly report stays report-only.
+- **Not Dream.** Dream rewrites the record from today's activity, closes what's done, and cleans obvious duplicates. Skill: [`.agents/skills/dream/`](../.agents/skills/dream/). This weekly report stays report-only.
 - **Not applying product updates.** Git pull + compose rebuild is [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/).
 - **Not a mutation pass.** No `upsert` / `delete` / `unlink` / `undo` / `manage_type` on the quiet run.
 - **Not email.** No digest. Ping only when there is something to report.

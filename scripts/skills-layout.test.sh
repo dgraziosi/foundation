@@ -132,6 +132,25 @@ fi
 if grep -Eiq -- 'current picture' "${dream_skill}"; then
   fail "Dream skill must not write current picture"
 fi
+# Do not mint these as Dream product words. The graph-hygiene folder path may stay.
+if grep -Eiq -- '(^|[^[:alnum:]./_-])(replay|reconcile|hygiene|living|code|present|pointer)([^[:alnum:]./_-]|$)' "${dream_skill}"; then
+  fail "Dream skill must not mint Replay, Reconcile, Hygiene, Living, Code, Present, or Pointer"
+fi
+if ! grep -Fq -- "rewrites the record from today's activity" "${dream_skill}"; then
+  fail "Dream skill does not say it rewrites the record from today's activity"
+fi
+if ! grep -Fq -- "closes what's done" "${dream_skill}"; then
+  fail "Dream skill does not say it closes what's done"
+fi
+if ! grep -Fq -- 'cleans obvious duplicates' "${dream_skill}"; then
+  fail "Dream skill does not say it cleans obvious duplicates"
+fi
+if ! grep -Fq -- 'system of record' "${dream_skill}"; then
+  fail "Dream skill does not say record is the system of record"
+fi
+if ! grep -Fq -- 'audit log' "${dream_skill}"; then
+  fail "Dream skill does not say activity is the audit log"
+fi
 if ! grep -Fq -- 'start of yesterday' "${dream_skill}"; then
   fail "Dream skill does not set search since to the start of yesterday"
 fi
