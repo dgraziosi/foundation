@@ -12,6 +12,8 @@ What it owns. What it does not own.
 
 How it decides. What it must ask before doing.
 
+Write everyday English. Tester fails a new glossary word that is not a feature name. Feature brands only: Dream, Vault. Url, repo, and link are ordinary words. Record is the node. Activity is the audit log. User, not operator. Bot, not seat. Do not mint Replay, Reconcile, Hygiene, Living, Code, Present, Current picture, or Pointer.
+
 ## Routines
 
 Scheduled work, or none.
