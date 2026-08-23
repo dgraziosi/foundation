@@ -244,8 +244,14 @@ fi
 if ! grep -Fq -- 'Feature brands only: Dream, Vault' "${agents_doc}"; then
   fail "docs/AGENTS.md does not lock Dream and Vault as feature brands"
 fi
-if ! grep -Fq -- 'Url, repo, and link are ordinary words' "${agents_doc}"; then
-  fail "docs/AGENTS.md does not say url, repo, and link are ordinary words"
+if ! grep -Fq -- 'Url and repo are ordinary words' "${agents_doc}"; then
+  fail "docs/AGENTS.md does not say url and repo are ordinary words"
+fi
+if ! grep -Fq -- 'Link is the edge verb' "${agents_doc}"; then
+  fail "docs/AGENTS.md does not say link is the edge verb"
+fi
+if ! grep -Fq -- 'every skill that cites the vault ships in the same PR' "${agents_doc}"; then
+  fail "docs/AGENTS.md does not lock the same-PR skill rule"
 fi
 if ! grep -Fq -- $'**record** — the node' "${agents_doc}"; then
   fail "docs/AGENTS.md does not say record is the node"
@@ -275,14 +281,14 @@ fi
 if ! grep -Fq -- '.agents/skills/dream/' <<<"${chief_skills}"; then
   fail "Chief of Staff Skills does not cite .agents/skills/dream/"
 fi
-if grep -Eq -- 'search `living`|data\.living|data\.code|search `code`' "${chief}"; then
-  fail "Chief of Staff still uses leftover living/code keys"
+if grep -Eq -- 'search `living`|data\.living|data\.code|search `code`|search `link`|data\.link' "${chief}"; then
+  fail "Chief of Staff still uses leftover living/code/link keys"
 fi
-if ! grep -Fq -- 'search `link`' "${chief}"; then
-  fail "Chief of Staff does not search link before upsert"
+if ! grep -Fq -- 'search `url`' "${chief}"; then
+  fail "Chief of Staff does not search url before upsert"
 fi
-if ! grep -Fq -- 'data.link.{system,id}' "${chief}"; then
-  fail "Chief of Staff does not store data.link.{system,id}"
+if ! grep -Fq -- 'Pass `url` `{ system, id }`' "${chief}"; then
+  fail "Chief of Staff does not pass url { system, id } on upsert"
 fi
 if ! grep -Fq -- 'data.repo' "${chief}"; then
   fail "Chief of Staff does not name data.repo for GitHub"
@@ -293,6 +299,45 @@ fi
 if grep -Eiq -- 'wait until|#54|living/code pointer PR' "${dream_skill}"; then
   fail "Dream skill still defers Chief of Staff lines"
 fi
+
+foundation_mcp="${skills_root}/foundation-mcp/SKILL.md"
+if [[ ! -f "${foundation_mcp}" ]]; then
+  fail "missing ${foundation_mcp}"
+fi
+if ! grep -Fq -- '`search` `{ url }`' "${foundation_mcp}"; then
+  fail "foundation-mcp does not search { url } for Gmail, Calendar, Drive"
+fi
+if ! grep -Fq -- '`search` `{ repo }`' "${foundation_mcp}"; then
+  fail "foundation-mcp does not search { repo } for GitHub"
+fi
+if grep -Eq -- 'search `\{ link \}`|data\.link|search `\{ living \}`|data\.living|search `\{ code \}`|data\.code|current picture' "${foundation_mcp}"; then
+  fail "foundation-mcp still uses a retired identity word"
+fi
+
+retired_word_hits() {
+  local file="$1"
+  grep -En -- \
+    'data\.link|search `\{ link \}`|search `{ link }`|data\.living|search `\{ living \}`|data\.code|search `\{ code \}`|data\.origin|search `\{ origin \}`|current picture' \
+    "${file}" || true
+}
+
+retired_fixture="${repo_root}/scripts/retired-words-fixture.md"
+if [[ ! -f "${retired_fixture}" ]]; then
+  fail "missing ${retired_fixture}"
+fi
+if [[ -z "$(retired_word_hits "${retired_fixture}")" ]]; then
+  fail "retired-words fixture must still show living/code/link-as-search so the grep has a lock"
+fi
+if [[ -n "$(retired_word_hits "${foundation_mcp}")" ]]; then
+  fail "foundation-mcp still has a retired identity line"
+fi
+while IFS= read -r skill_md; do
+  [[ -n "${skill_md}" ]] || continue
+  hits="$(retired_word_hits "${skill_md}")"
+  if [[ -n "${hits}" ]]; then
+    fail "${skill_md} still uses a retired identity word"
+  fi
+done < <(find "${skills_root}" -mindepth 2 -maxdepth 3 -type f -name '*.md' | LC_ALL=C sort)
 
 if [[ ! -d "${prompts_root}" ]]; then
   fail "missing ${prompts_root}"
