@@ -2,7 +2,8 @@
 # Assert the product skills tree: folder name matches SKILL.md frontmatter
 # name, handoff exists, Dream exists, Vault Keeper procedure routines cite
 # .agents/skills/<name>/ including dream, Dream and Vault Keeper Routines
-# recommend 02:00, prompts/ is the three starter bots only, the
+# recommend 02:00, product files this PR touches must not write
+# operator or seat, prompts/ is the three starter bots only, the
 # blank bot template lives under create-bot, and starters plus the
 # template use Job, Responsibilities, Standards, Routines, Skills,
 # Tools, Handoffs with Skills vs Tools split.
@@ -131,9 +132,24 @@ fi
 if grep -Eiq -- 'current picture' "${dream_skill}"; then
   fail "Dream skill must not write current picture"
 fi
-if grep -Eiq -- '(^|[^[:alnum:]])(operator|seat)([^[:alnum:]]|$)' "${dream_skill}"; then
-  fail "Dream skill must not write operator or seat"
-fi
+
+# Product files this Dream PR touches. Do not scan this test file:
+# the assertion itself names the locked words.
+pr_copy_files=(
+  "${dream_skill}"
+  "${skills_root}/graph-hygiene/SKILL.md"
+  "${repo_root}/docs/AGENTS.md"
+  "${repo_root}/docs/GRAPH_HYGIENE.md"
+  "${vault_keeper}"
+)
+for copy in "${pr_copy_files[@]}"; do
+  if [[ ! -f "${copy}" ]]; then
+    fail "missing ${copy}"
+  fi
+  if grep -Eiq -- '(^|[^[:alnum:]])(operator|seat)([^[:alnum:]]|$)' "${copy}"; then
+    fail "${copy} must not write operator or seat"
+  fi
+done
 
 if [[ ! -f "${vault_keeper}" ]]; then
   fail "missing ${vault_keeper}"
