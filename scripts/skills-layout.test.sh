@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Assert the product skills tree: folder name matches SKILL.md frontmatter
-# name, handoff exists, Vault Keeper procedure routines cite
-# .agents/skills/<name>/, prompts/ is the three starter bots only, the
+# name, handoff exists, Dream exists, Vault Keeper procedure routines cite
+# .agents/skills/<name>/ including dream, Dream and Vault Keeper Routines
+# recommend 02:00, product files this PR touches must not write
+# operator or seat, prompts/ is the three starter bots only, the
 # blank bot template lives under create-bot, and starters plus the
 # template use Job, Responsibilities, Standards, Routines, Skills,
 # Tools, Handoffs with Skills vs Tools split.
@@ -114,6 +116,92 @@ if [[ ! -f "${skills_root}/handoff/SKILL.md" ]]; then
   fail "missing ${skills_root}/handoff/SKILL.md"
 fi
 
+dream_skill="${skills_root}/dream/SKILL.md"
+if [[ ! -f "${dream_skill}" ]]; then
+  fail "missing ${dream_skill}"
+fi
+if ! grep -Fq -- '02:00' "${dream_skill}"; then
+  fail "Dream skill does not recommend 02:00"
+fi
+if ! grep -Fq -- '.agents/skills/foundation-mcp/' "${dream_skill}"; then
+  fail "Dream skill does not cite .agents/skills/foundation-mcp/"
+fi
+if ! grep -Fq -- '.agents/skills/handoff/' "${dream_skill}" && ! grep -Fq -- '../handoff/' "${dream_skill}"; then
+  fail "Dream skill does not cite handoff"
+fi
+if grep -Eiq -- 'current picture' "${dream_skill}"; then
+  fail "Dream skill must not write current picture"
+fi
+# Do not mint these as Dream product words. The graph-hygiene folder path may stay.
+if grep -Eiq -- '(^|[^[:alnum:]./_-])(replay|reconcile|hygiene|living|code|present|pointer)([^[:alnum:]./_-]|$)' "${dream_skill}"; then
+  fail "Dream skill must not mint Replay, Reconcile, Hygiene, Living, Code, Present, or Pointer"
+fi
+if ! grep -Fq -- "rewrites the record from today's activity" "${dream_skill}"; then
+  fail "Dream skill does not say it rewrites the record from today's activity"
+fi
+if ! grep -Fq -- "closes what's done" "${dream_skill}"; then
+  fail "Dream skill does not say it closes what's done"
+fi
+if ! grep -Fq -- 'cleans obvious duplicates' "${dream_skill}"; then
+  fail "Dream skill does not say it cleans obvious duplicates"
+fi
+if ! grep -Fq -- 'system of record' "${dream_skill}"; then
+  fail "Dream skill does not say record is the system of record"
+fi
+if ! grep -Fq -- 'audit log' "${dream_skill}"; then
+  fail "Dream skill does not say activity is the audit log"
+fi
+if ! grep -Fq -- 'start of yesterday' "${dream_skill}"; then
+  fail "Dream skill does not set search since to the start of yesterday"
+fi
+if grep -Eiq -- 'start of today' "${dream_skill}"; then
+  fail "Dream skill still sets search since to the start of today"
+fi
+if ! grep -Fq -- 'due `today` filter' "${dream_skill}"; then
+  fail "Dream skill does not warn off the due today filter"
+fi
+if ! grep -Fq -- 'last waking day' "${dream_skill}"; then
+  fail "Dream skill does not name the last waking day"
+fi
+if ! grep -Fq -- 'target_kind' "${dream_skill}"; then
+  fail "Dream skill does not filter list_activity by target_kind"
+fi
+target_kind_hits="$(grep -o -- 'target_kind' "${dream_skill}" | wc -l)"
+if ((target_kind_hits < 2)); then
+  fail "Dream skill must name target_kind for both node and edge rows"
+fi
+if ! grep -Fq -- 'target_id' "${dream_skill}"; then
+  fail "Dream skill does not take target_id for node activity"
+fi
+if ! grep -Fq -- 'from_id' "${dream_skill}"; then
+  fail "Dream skill does not take from_id from edge activity"
+fi
+if ! grep -Fq -- 'to_id' "${dream_skill}"; then
+  fail "Dream skill does not take to_id from edge activity"
+fi
+if ! grep -Fq -- 'Skip `type` and `relation`' "${dream_skill}"; then
+  fail "Dream skill does not skip type and relation activity rows"
+fi
+
+# Product files this Dream PR touches. Do not scan this test file:
+# the assertion itself names the locked words.
+pr_copy_files=(
+  "${dream_skill}"
+  "${skills_root}/graph-hygiene/SKILL.md"
+  "${repo_root}/docs/AGENTS.md"
+  "${repo_root}/docs/GRAPH_HYGIENE.md"
+  "${vault_keeper}"
+  "${prompts_root}/chief.md"
+)
+for copy in "${pr_copy_files[@]}"; do
+  if [[ ! -f "${copy}" ]]; then
+    fail "missing ${copy}"
+  fi
+  if grep -Eiq -- '(^|[^[:alnum:]])(operator|seat)([^[:alnum:]]|$)' "${copy}"; then
+    fail "${copy} must not write operator or seat"
+  fi
+done
+
 if [[ ! -f "${vault_keeper}" ]]; then
   fail "missing ${vault_keeper}"
 fi
@@ -123,18 +211,87 @@ if [[ -z "${routines}" ]]; then
   fail "Vault Keeper Routines section is empty or missing"
 fi
 
-for folder in vault-health backup-vault graph-hygiene update-foundation; do
+for folder in dream vault-health backup-vault graph-hygiene update-foundation; do
   if ! grep -Fq -- ".agents/skills/${folder}/" <<<"${routines}"; then
     fail "Vault Keeper Routines does not cite .agents/skills/${folder}/"
   fi
 done
+if ! grep -Fq -- '02:00' <<<"${routines}"; then
+  fail "Vault Keeper Routines does not recommend Dream at 02:00"
+fi
 
-if grep -E -q -- '(^|[^[:alnum:]._/])skills/(vault-health|backup-vault|graph-hygiene|update-foundation)/' <<<"${routines}"; then
+if grep -E -q -- '(^|[^[:alnum:]._/])skills/(dream|vault-health|backup-vault|graph-hygiene|update-foundation)/' <<<"${routines}"; then
   fail "Vault Keeper Routines still cites repo-root skills/ instead of .agents/skills/"
 fi
 
 if grep -E -q -- 'prompts/(vault-health|graph-hygiene|update-foundation|repo-leak-scan|bot-template)\.md' <<<"${routines}"; then
   fail "Vault Keeper Routines still cites a moved prompts/ skill form"
+fi
+
+agents_doc="${repo_root}/docs/AGENTS.md"
+if [[ ! -f "${agents_doc}" ]]; then
+  fail "missing ${agents_doc}"
+fi
+if ! grep -Fq -- '.agents/skills/dream/' "${agents_doc}"; then
+  fail "docs/AGENTS.md does not list .agents/skills/dream/"
+fi
+if ! grep -Fq -- '02:00' "${agents_doc}"; then
+  fail "docs/AGENTS.md does not recommend Dream at 02:00"
+fi
+if ! grep -Fq -- '## Everyday words' "${agents_doc}"; then
+  fail "docs/AGENTS.md is missing Everyday words"
+fi
+if ! grep -Fq -- 'Feature brands only: Dream, Vault' "${agents_doc}"; then
+  fail "docs/AGENTS.md does not lock Dream and Vault as feature brands"
+fi
+if ! grep -Fq -- 'Url, repo, and link are ordinary words' "${agents_doc}"; then
+  fail "docs/AGENTS.md does not say url, repo, and link are ordinary words"
+fi
+if ! grep -Fq -- $'**record** — the node' "${agents_doc}"; then
+  fail "docs/AGENTS.md does not say record is the node"
+fi
+if ! grep -Fq -- $'**activity** — the audit log' "${agents_doc}"; then
+  fail "docs/AGENTS.md does not say activity is the audit log"
+fi
+
+chief="${prompts_root}/chief.md"
+if [[ ! -f "${chief}" ]]; then
+  fail "missing ${chief}"
+fi
+chief_routines="$(extract_section "${chief}" "Routines")"
+chief_skills="$(extract_section "${chief}" "Skills")"
+if [[ -z "${chief_routines}" ]]; then
+  fail "Chief of Staff Routines section is empty or missing"
+fi
+if ! grep -Fq -- '.agents/skills/dream/' <<<"${chief_routines}"; then
+  fail "Chief of Staff Routines does not cite .agents/skills/dream/"
+fi
+if ! grep -Fq -- '02:00' <<<"${chief_routines}"; then
+  fail "Chief of Staff Routines does not say Vault Keeper runs Dream at 02:00"
+fi
+if ! grep -Fq -- '08:00' <<<"${chief_routines}"; then
+  fail "Chief of Staff Routines does not set the morning brief at 08:00"
+fi
+if ! grep -Fq -- '.agents/skills/dream/' <<<"${chief_skills}"; then
+  fail "Chief of Staff Skills does not cite .agents/skills/dream/"
+fi
+if grep -Eq -- 'search `living`|data\.living|data\.code|search `code`' "${chief}"; then
+  fail "Chief of Staff still uses leftover living/code keys"
+fi
+if ! grep -Fq -- 'search `link`' "${chief}"; then
+  fail "Chief of Staff does not search link before upsert"
+fi
+if ! grep -Fq -- 'data.link.{system,id}' "${chief}"; then
+  fail "Chief of Staff does not store data.link.{system,id}"
+fi
+if ! grep -Fq -- 'data.repo' "${chief}"; then
+  fail "Chief of Staff does not name data.repo for GitHub"
+fi
+if ! grep -Fq -- 'search `repo`' "${chief}"; then
+  fail "Chief of Staff does not search repo before upsert"
+fi
+if grep -Eiq -- 'wait until|#54|living/code pointer PR' "${dream_skill}"; then
+  fail "Dream skill still defers Chief of Staff lines"
 fi
 
 if [[ ! -d "${prompts_root}" ]]; then
