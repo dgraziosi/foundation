@@ -175,9 +175,15 @@ async function invertUpdateNode(
           "Search receipt to find the live node. Change or delete the live receipt first.",
         );
       }
+      if (uniqueViolationConstraint(error) === "nodes_code_live_uidx") {
+        return toolError(
+          "Cannot undo update: restoring this node would duplicate a live code ref (system, id)",
+          "Search code to find the live node. Do not twin. Change or delete the live code ref first.",
+        );
+      }
       return toolError(
-        "Cannot undo update: restoring this node would duplicate a live origin (system, id)",
-        "Search origin to find the live node. Do not twin people. Change or delete the live origin first.",
+        "Cannot undo update: restoring this node would duplicate a live living ref (system, id)",
+        "Search living to find the live node. Do not twin. Change or delete the live living ref first.",
       );
     }
     if (isForeignKeyViolation(error)) {
@@ -222,9 +228,15 @@ async function invertDeleteNode(
           "Search receipt to find the live node. Change or delete the live receipt first.",
         );
       }
+      if (uniqueViolationConstraint(error) === "nodes_code_live_uidx") {
+        return toolError(
+          "Cannot undo delete: restoring this node would duplicate a live code ref (system, id)",
+          "Search code to find the live node. Do not twin. Change or delete the live code ref first.",
+        );
+      }
       return toolError(
-        "Cannot undo delete: restoring this node would duplicate a live origin (system, id)",
-        "Search origin to find the live node. Do not twin people. Change or delete the live origin first.",
+        "Cannot undo delete: restoring this node would duplicate a live living ref (system, id)",
+        "Search living to find the live node. Do not twin. Change or delete the live living ref first.",
       );
     }
     throw error;

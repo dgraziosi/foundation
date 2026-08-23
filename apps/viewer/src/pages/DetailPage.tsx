@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { ApiError, fetchNode, fetchOntology, type NodeDetail } from "../api";
 import { isUuid, relativeTime } from "../format";
+import { openableUrl } from "../url";
 import { MarkdownBody } from "../markdown";
 import { useShell } from "../shell/context";
 import { useThemeLane } from "../theme";
@@ -89,6 +90,7 @@ export function DetailPage() {
   const Icon = typeIcon(identity);
   const colors = typeColors(identity, lane);
   const fields = detail.type?.fields ?? [];
+  const href = openableUrl(detail.node.data);
   const related = detail.related ?? detail.edges.map((edge) => ({
     relation_type: edge.relation_type,
     direction: edge.direction,
@@ -192,6 +194,13 @@ export function DetailPage() {
                   </div>
                 );
               })}
+              {href ? (
+                <Button asChild variant="link" className="h-auto p-0">
+                  <a href={href} target="_blank" rel="noreferrer">
+                    Open
+                  </a>
+                </Button>
+              ) : null}
               <Separator />
               {[...byRelation.entries()].map(([relation, rows]) => (
                 <div key={relation}>
