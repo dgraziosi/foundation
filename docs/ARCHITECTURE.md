@@ -6,7 +6,7 @@ When a change alters the graph or vault shape, update this file in the same PR.
 
 ## Glossary
 
-**Foundation** is the product. A **vault** is one instance (`FOUNDATION_DATA` + Postgres). The **graph** is the live network in that vault. The **ontology** is the vocabulary (types and relations). A **blob** is bytes on a node. A **pointer** is a typed fact that names something without copying it (living, href, receipt, code, blob, ref). An **agent** is anything that can reach the vault MCP. The **user** is the human who runs Compose. A **bot** is a named role that acts through an agent. Do not call the graph “the Vault.” A git clone is the product, not this vault — `compose up` elsewhere starts a different instance. Do not use “origin” as a Foundation key; Cursor Origin is source control.
+**Foundation** is the product. A **vault** is one instance (`FOUNDATION_DATA` + Postgres). The **graph** is the live network in that vault. The **ontology** is the vocabulary (types and relations). A **blob** is bytes on a node. A **pointer** is a typed fact that names something without copying it (living, href, receipt, code, blob, ref). An **agent** is anything that can reach the vault MCP. The **user** is the human who runs Compose. A **bot** is a named role that acts through an agent. Do not call the graph “the Vault.” A git clone is the product, not this vault — `compose up` elsewhere starts a different instance. Do not use “origin” as a Foundation key; Cursor Origin is source control. Pointer search rename (design, not yet the live keys): [`SPEC.md`](./SPEC.md#pointer-search-rename-design).
 
 ## Vault
 
