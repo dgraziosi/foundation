@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** Top-level `data` keys only. Same family as `data.link` / `data.due` — not a column per key. */
+/** Top-level `data` keys only. Same family as `data.url` / `data.due` — not a column per key. */
 export const DATA_EQUALS_KEY_RE = /^[a-z][a-z0-9_]*$/;
 export const DATA_EQUALS_MAX_KEYS = 8;
 

@@ -97,11 +97,11 @@ test(
       );
       assert.match(tsDefault[0]?.column_default ?? "", /date_trunc/);
       assert.match(tsDefault[0]?.column_default ?? "", /milliseconds/);
-      const { rows: linkIdx } = await pool.query<{ indexname: string }>(
+      const { rows: urlIdx } = await pool.query<{ indexname: string }>(
         `SELECT indexname FROM pg_indexes
-         WHERE schemaname = current_schema() AND indexname = 'nodes_link_live_uidx'`,
+         WHERE schemaname = current_schema() AND indexname = 'nodes_url_live_uidx'`,
       );
-      assert.equal(linkIdx[0]?.indexname, "nodes_link_live_uidx");
+      assert.equal(urlIdx[0]?.indexname, "nodes_url_live_uidx");
       const { rows: repoIdx } = await pool.query<{ indexname: string }>(
         `SELECT indexname FROM pg_indexes
          WHERE schemaname = current_schema() AND indexname = 'nodes_repo_live_uidx'`,
@@ -122,6 +122,11 @@ test(
          WHERE schemaname = current_schema() AND indexname = 'nodes_origin_live_uidx'`,
       );
       assert.equal(leftoverOriginIdx.length, 0);
+      const { rows: leftoverLinkIdx } = await pool.query<{ indexname: string }>(
+        `SELECT indexname FROM pg_indexes
+         WHERE schemaname = current_schema() AND indexname = 'nodes_link_live_uidx'`,
+      );
+      assert.equal(leftoverLinkIdx.length, 0);
       const { rows: receiptIdx } = await pool.query<{ indexname: string }>(
         `SELECT indexname FROM pg_indexes
          WHERE schemaname = current_schema() AND indexname = 'nodes_receipt_live_uidx'`,

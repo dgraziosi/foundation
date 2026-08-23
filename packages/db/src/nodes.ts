@@ -208,18 +208,18 @@ export async function restoreNodeSnapshot(
   return rows[0] ? mapNode(rows[0]) : undefined;
 }
 
-export async function getNodeByLink(
+export async function getNodeByUrl(
   db: Queryable,
-  link: { system: string; id: string },
+  url: { system: string; id: string },
 ): Promise<Node | undefined> {
   const { rows } = await db.query<NodeRow>(
     `SELECT id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at
      FROM nodes
      WHERE deleted_at IS NULL
-       AND data #>> '{link,system}' = $1
-       AND data #>> '{link,id}' = $2
+       AND metadata #>> '{url,system}' = $1
+       AND metadata #>> '{url,id}' = $2
      LIMIT 1`,
-    [link.system, link.id],
+    [url.system, url.id],
   );
   return rows[0] ? mapNode(rows[0]) : undefined;
 }
@@ -351,8 +351,8 @@ export async function searchNodes(
     status?: Node["status"];
     under?: string;
     since?: Date;
-    linkSystem?: string;
-    linkId?: string;
+    urlSystem?: string;
+    urlId?: string;
     repoSystem?: string;
     repoId?: string;
     receiptSystem?: string;
@@ -403,8 +403,8 @@ export async function searchNodes(
              AND parent.deleted_at IS NULL
          )
        )
-       AND ($6::text IS NULL OR data #>> '{link,system}' = $6)
-       AND ($7::text IS NULL OR data #>> '{link,id}' = $7)
+       AND ($6::text IS NULL OR metadata #>> '{url,system}' = $6)
+       AND ($7::text IS NULL OR metadata #>> '{url,id}' = $7)
        AND ($14::text IS NULL OR data #>> '{receipt,system}' = $14)
        AND ($15::text IS NULL OR data #>> '{receipt,id}' = $15)
        AND ($16::text IS NULL OR data #>> '{repo,system}' = $16)
@@ -425,8 +425,8 @@ export async function searchNodes(
       input.status ?? null,
       input.since ?? null,
       input.under ?? null,
-      input.linkSystem ?? null,
-      input.linkId ?? null,
+      input.urlSystem ?? null,
+      input.urlId ?? null,
       input.dueOnOrAfter ?? null,
       input.dueOnOrBefore ?? null,
       input.dueBefore ?? null,

@@ -17,7 +17,7 @@ import {
   NodeSchema,
   NodeStatusSchema,
   NodeTypeSchema,
-  LinkRefSchema,
+  UrlIdentitySchema,
   ReceiptLookupSchema,
   RepoRefSchema,
   PayloadStorageSchema,
@@ -232,6 +232,11 @@ export const UpsertInputSchema = z.object({
   allow_duplicate: z.boolean().optional(),
   actor: ActivityActorSchema.optional(),
   actor_label: z.string().trim().min(1).max(200).optional(),
+  /**
+   * Unique Drive / Gmail / Calendar identity `{ system, id }`. Not data.url
+   * (that key is the https address). `url: null` clears uniqueness.
+   */
+  url: UrlIdentitySchema.nullable().optional(),
 });
 export type UpsertInput = z.infer<typeof UpsertInputSchema>;
 
@@ -453,8 +458,16 @@ export const SearchInputSchema = z.object({
   under: z.string().uuid().optional(),
   /** ISO-8601 timestamp; live nodes with updated_at >= since. */
   since: z.string().min(1).optional(),
-  /** Unique Drive / Gmail / Calendar lookup. */
-  link: LinkRefSchema.optional(),
+  /**
+   * Unique Drive / Gmail / Calendar lookup `{ system, id }`.
+   * A https string is not a selector — that is data.url / data_equals.
+   */
+  url: z.preprocess((value) => {
+    if (typeof value === "string") {
+      return undefined;
+    }
+    return value;
+  }, UrlIdentitySchema.optional()),
   /** Unique GitHub lookup. */
   repo: RepoRefSchema.optional(),
   /** Unique receipt lookup (gmail | calendar). Kind lives on the stored node. */
@@ -490,7 +503,7 @@ export const SEARCH_UUID_SUGGESTION =
   "This query is a node UUID. Prefer get when you already have an id.";
 
 export const SEARCH_NO_SELECTOR_SUGGESTION =
-  "Pass query for lexical recall, or type, status, under (child_of parent UUID), since, link, repo, receipt, due (overdue|today), due_on_or_before, due_on_or_after, or data_equals to list without a word. Do not add list_nodes.";
+  "Pass query for lexical recall, or type, status, under (child_of parent UUID), since, url, repo, receipt, due (overdue|today), due_on_or_before, due_on_or_after, or data_equals to list without a word. Do not add list_nodes.";
 
 export function searchHasSelector(input: {
   query?: string;
@@ -498,7 +511,7 @@ export function searchHasSelector(input: {
   status?: string;
   under?: string;
   since?: string;
-  link?: unknown;
+  url?: unknown;
   repo?: unknown;
   receipt?: unknown;
   due?: string;
@@ -512,7 +525,7 @@ export function searchHasSelector(input: {
       input.status ||
       input.under ||
       input.since ||
-      input.link ||
+      input.url ||
       input.repo ||
       input.receipt ||
       input.due ||
@@ -523,19 +536,22 @@ export function searchHasSelector(input: {
 }
 
 export const ORIGIN_KEY_REFUSED_SUGGESTION =
-  "Use data.link { system, id } for Gmail, Calendar, or Drive. Use data.repo { system, id } for GitHub. There is no origin. Cursor Origin is not a vault word.";
+  "Search { url } for Gmail, Calendar, or Drive. Use data.repo { system, id } for GitHub. There is no origin. Cursor Origin is not a vault word.";
 
 export const LIVING_KEY_REFUSED_SUGGESTION =
-  "Use data.link { system, id } for Gmail, Calendar, or Drive. There is no living.";
+  "Search { url } for Gmail, Calendar, or Drive. There is no living.";
 
 export const CODE_KEY_REFUSED_SUGGESTION =
   "Use data.repo { system, id } for GitHub. There is no code.";
 
-export const LINK_MISS_SUGGESTION =
-  "No live node has that link. You may upsert with data.link.system and data.link.id. Foundation stores the ref only — do not fetch or mirror Gmail, Calendar, or Drive bodies.";
+export const LINK_KEY_REFUSED_SUGGESTION =
+  "Link is the edge tool. Search { url } for Gmail, Calendar, or Drive. There is no data.link.";
 
-export const LINK_HIT_SUGGESTION =
-  "This link is unique on live nodes. Prefer get with that id. Do not upsert a twin.";
+export const URL_MISS_SUGGESTION =
+  "No live node has that url. You may upsert with url.system and url.id. data.url is the https address the Viewer opens. Foundation stores the ref only — do not fetch or mirror Gmail, Calendar, or Drive bodies.";
+
+export const URL_HIT_SUGGESTION =
+  "This url is unique on live nodes. Prefer get with that id. Do not upsert a twin.";
 
 export const REPO_MISS_SUGGESTION =
   "No live node has that repo. You may upsert with data.repo.system and data.repo.id. Foundation stores the ref only — do not fetch or mirror GitHub bodies.";
@@ -559,7 +575,7 @@ export const LOOKUP_NAME_MAX = 200;
 export const LOOKUP_CANDIDATE_MAX = 10;
 
 export const LOOKUP_NO_SELECTOR_SUGGESTION =
-  "Pass one or more inputs with name (max 20). Optional type narrows people, places, companies, or other types. Do not use lookup for listing, link, repo, receipt, or payload search — those stay on search.";
+  "Pass one or more inputs with name (max 20). Optional type narrows people, places, companies, or other types. Do not use lookup for listing, url, repo, receipt, or payload search — those stay on search.";
 
 export const LookupMatchSchema = z.enum([
   "title_exact",

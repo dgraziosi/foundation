@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { isToolError } from "./mcp-io.js";
-import { linkFromData } from "./link.js";
+import { urlIdentityFromValue } from "./url-identity.js";
 import {
   URL_FIXTURE,
   URL_MAX_LEN,
@@ -90,18 +90,20 @@ test("openableUrlFromData is Viewer Open: well-formed https only", () => {
   assert.equal(openableUrlFromData(undefined), undefined);
 });
 
-test("url is a sibling of link: link still reads system and id only", () => {
+test("data.url https is not the Drive / Gmail / Calendar url", () => {
   const data = {
-    link: { system: "drive", id: "file-fixture-1", url: URL_FIXTURE },
     url: URL_FIXTURE,
   };
-  assert.deepEqual(linkFromData(data), { system: "drive", id: "file-fixture-1" });
   assert.equal(urlFromData(data), URL_FIXTURE);
-  const linkOnly = linkFromData({
-    link: { system: "drive", id: "file-fixture-1", url: URL_FIXTURE },
+  const identity = urlIdentityFromValue({
+    system: "drive",
+    id: "file-fixture-1",
+    url: URL_FIXTURE,
   });
-  assert.deepEqual(linkOnly, { system: "drive", id: "file-fixture-1" });
-  assert.ok(linkOnly && !("url" in linkOnly) && !("kind" in linkOnly));
+  assert.deepEqual(identity, { system: "drive", id: "file-fixture-1" });
+  assert.ok(identity && !("url" in identity) && !("kind" in identity));
+  const objectUrl = urlFromData({ url: { system: "drive", id: "file-fixture-1" } });
+  assert.equal(typeof objectUrl, "object");
 });
 
 test("url is not a second identity: schema does not unique it", () => {

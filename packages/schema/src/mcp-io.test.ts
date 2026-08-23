@@ -24,13 +24,13 @@ test("search query is optional when a filter is set", () => {
   assert.equal(listed.query, undefined);
   assert.equal(listed.type, "task");
   assert.equal(listed.status, "active");
-  const link = SearchInputSchema.parse({ link: { system: "gmail", id: "msg-1" } });
-  assert.equal(link.link?.system, "gmail");
-  assert.equal(searchHasSelector({ link: { system: "gmail", id: "msg-1" } }), true);
+  const url = SearchInputSchema.parse({ url: { system: "gmail", id: "msg-1" } });
+  assert.equal(url.url?.system, "gmail");
+  assert.equal(searchHasSelector({ url: { system: "gmail", id: "msg-1" } }), true);
   const repo = SearchInputSchema.parse({ repo: { system: "github", id: "repo-fixture-1" } });
   assert.equal(repo.repo?.system, "github");
   assert.equal(searchHasSelector({ repo: { system: "github", id: "repo-fixture-1" } }), true);
-  assert.throws(() => SearchInputSchema.parse({ link: { system: "github", id: "repo-fixture-1" } }));
+  assert.throws(() => SearchInputSchema.parse({ url: { system: "github", id: "repo-fixture-1" } }));
   assert.throws(() => SearchInputSchema.parse({ repo: { system: "drive", id: "file-fixture-1" } }));
   const receipt = SearchInputSchema.parse({
     receipt: { system: "gmail", id: "msg-fixture-sent-1" },
@@ -53,13 +53,19 @@ test("search query is optional when a filter is set", () => {
   const noUrlFilter = SearchInputSchema.parse({
     url: "https://example.test/drive/file-fixture-1",
   });
-  assert.equal("url" in noUrlFilter, false);
+  assert.equal(noUrlFilter.url, undefined);
   assert.equal(searchHasSelector(noUrlFilter), false);
-  assert.ok("link" in SearchInputSchema.shape);
+  assert.ok("url" in SearchInputSchema.shape);
   assert.ok("repo" in SearchInputSchema.shape);
+  assert.equal("link" in SearchInputSchema.shape, false);
   assert.equal("living" in SearchInputSchema.shape, false);
   assert.equal("code" in SearchInputSchema.shape, false);
   assert.equal("origin" in SearchInputSchema.shape, false);
+  const leftoverLink = SearchInputSchema.parse({
+    link: { system: "gmail", id: "msg-fixture-1" },
+  });
+  assert.equal("link" in leftoverLink, false);
+  assert.equal(searchHasSelector(leftoverLink), false);
   const leftoverOrigin = SearchInputSchema.parse({
     origin: { system: "gmail", id: "msg-fixture-1" },
   });

@@ -41,26 +41,30 @@ Starter recipes: [`AGENTS.md`](./AGENTS.md).
 
 ## Url, repo, and link
 
-Viewer Open stays `data.url` (https string, not unique). `search { url }` is not which Drive / Gmail / Calendar object. That identity is `data.link { system, id }` and `search { link }`. `system` is `gmail` | `calendar` | `drive`. Refuses `github`. Unique on live records. No `kind`. `link: null` clears. Search key equals data key.
+Drive / Gmail / Calendar identity is `search { url }` `{ system, id }`. `system` is `gmail` | `calendar` | `drive`. Refuses `github`. Unique on live records. No `kind`. `url: null` on upsert clears uniqueness. Link is the edge tool. It is not a pointer key, not a search selector, and not a data identity bag.
+
+Because `data.url` is already the https string, that object is not stored as `data.url`. Persist uses a dedicated unique index, parse, and refuse (same family as leftover living). `url.ts` stays the https helper.
+
+Viewer Open stays `data.url` (https string, not unique). That string is not which Drive / Gmail / Calendar object. `search { url }` is not `data_equals` on the https string.
 
 GitHub is `data.repo { system, id }` and `search { repo }`. `system` is `github`. Refuses gmail / calendar / drive. Unique on live records. `repo: null` clears. Cursor Origin is not a vault key and not a `repo.system` value.
 
 Receipt is unchanged: `data.receipt { system, id, kind }` and `search { receipt }`.
 
-Hard cut. No dual-read of leftover `living` / `code` / `origin`. `search { living }`, `search { code }`, and `search { origin }` are gone. Leftover `data.living` and `data.code` writes refuse, same family as leftover `data.origin`.
+Hard cut. No dual-read of leftover `living` / `code` / `origin` / `link`. `search { living }`, `search { code }`, `search { origin }`, and `search { link }` are gone. Leftover `data.living`, `data.code`, `data.origin`, and `data.link` writes refuse.
 
 | Bag | Key | What it is | How an agent finds it |
 | --- | --- | --- | --- |
-| Drive / Gmail / Calendar | `data.link { system, id }` | This record is that Drive, Gmail, or Calendar object. Unique on live records. No `kind`. | `search { link }` then `get` |
+| Drive / Gmail / Calendar | upsert `url { system, id }` | This record is that Drive, Gmail, or Calendar object. Unique on live records. No `kind`. | `search { url }` then `get` |
 | Viewer Open | `data.url` | https address. Any type. Not unique. | `get`. FTS and `data_equals: { url }` |
 | GitHub | `data.repo { system, id }` | This record is that GitHub object. Unique on live records. No `kind`. | `search { repo }` then `get` |
 | Receipt | `data.receipt { system, id, kind }` | Done after send or clear. Unique on live `system`+`id`. | `search { receipt }` then `get` |
 
-`data.url` is trimmed, https, no credentials, max 2048. `url: null` clears. Missing is allowed. Not unique. Not which Drive / Gmail / Calendar object. Open leaves the window for that file.
+`data.url` is trimmed, https, no credentials, max 2048. `data.url: null` clears the https address. Missing is allowed. Not unique. Not which Drive / Gmail / Calendar object. Open leaves the window for that file.
 
 Store the ref only. A Drive id cannot derive the https address (no `kind`; Docs, Sheets, and files use different prefixes). Hang the href as `data.url`. A later git slug is out.
 
-Indexes: `nodes_link_live_uidx`, `nodes_repo_live_uidx`. Leftover `nodes_living_live_uidx`, `nodes_code_live_uidx`, and `nodes_origin_live_uidx` are gone.
+Indexes: `nodes_url_live_uidx`, `nodes_repo_live_uidx`. Leftover `nodes_living_live_uidx`, `nodes_code_live_uidx`, `nodes_link_live_uidx`, and `nodes_origin_live_uidx` are gone.
 
 Fixtures only: `file-fixture-1`, `repo-fixture-1`, `https://example.test/drive/file-fixture-1`. No file, mail, event, or repository bodies. No new MCP tool. No new store.
 
@@ -68,18 +72,19 @@ Write (fixture ids only):
 
 ```text
 upsert type=note title="Fixture sheet"
-data: { link: { system: "drive", id: "file-fixture-1" }, url: "https://example.test/drive/file-fixture-1" }
+url: { system: "drive", id: "file-fixture-1" }
+data: { url: "https://example.test/drive/file-fixture-1" }
 ```
 
-1. `search { link: { system, id } }` — if a live record already holds that object, `get` that id. Do not twin.
+1. `search { url: { system, id } }` — if a live record already holds that object, `get` that id. Do not twin.
 2. `get { id }` when updating.
-3. `upsert` with `data.link` and `data.url`. Merge keeps due, receipt, aliases, and other keys.
+3. `upsert` with `url` and `data.url`. Merge keeps due, receipt, aliases, and other keys.
 
-`get` returns `node.data.link` and `node.data.url`. Hits stay id / type / title / snippet / `due`. They do not grow a `url` field.
+`get` is the record. Hits stay id / type / title / snippet / `due`. They do not grow a `url` field.
 
 When `data.url` is a well-formed https URL, Detail properties offer Open. That click leaves the window for that file. It does not write. Contract: [`VIEWER.md`](./VIEWER.md).
 
-Url without link is a relevant address the Viewer can open. It is not which object. A Drive file that stays source of truth is link plus url.
+`data.url` without a Drive / Gmail / Calendar url is a relevant address the Viewer can open. It is not which object.
 
 GitHub write: `{ system: "github", id: "repo-fixture-1" }`. `search { repo }` then `get`.
 
@@ -128,14 +133,14 @@ These names are the current surface. Full parameters: [`docs/MCP_TOOLS.md`](./MC
 - `upsert` **replaces** `payload` when that field is passed (omit it and the body stays). It **merges** `data` on update (partial patch does not wipe other keys). Create accepts `idempotency_key` so a retry does not twin a node. Create (no `id`) runs the same `lookup` matcher on the new title, type-scoped. Exact title or unique exact alias returns those write-ready candidates and does not write unless `allow_duplicate: true`. Token, fuzzy, and space-compacted matches warn (`duplicate_warnings`) and do not block. Same-name entities stay allowed with that override. Update/CAS behavior is unchanged. When a type has `json_schema`, upsert validates merged `data` and returns `{ error, suggestion }` on a miss. A bot that rewrites a record passes the new short `payload` and `base_updated_at` from `get`.
 - `upsert` (create, and update when the title changes) returns `suggested_links` from Postgres FTS on the new title — not embeddings. Each item is `{ kind, target: { id, type, title }, reason }` where `kind` is a seed relation (`child_of`, `about`, or `relates_to`) and `target` is a live node that already exists. Spine types with `parent_types` get `child_of` an allowed parent whose title matches; a title that looks like a person already in the graph gets `about`; otherwise `relates_to` a close title match. Skip self and already-linked pairs. A node with a live `child_of` is not offered a second parent (`about` / `relates_to` may still appear). Cap 5. Empty graph or no match → `[]`. **Never creates an edge** and never adds a type or relation. `link` is how an accepted suggestion becomes an edge. `get` may return the same list for a node that still has no edges.
 - Activity stores optional `actor` / `actor_label` (who wrote). Not a permission gate. Every node write leaves a row (`create` / `update` / `delete`) with `before` / `after` snapshots of that node (`payload`, `data`, title, type, status). Blob snapshots store `payload.blob_id` plus blob metadata, not file bytes. `list_activity` `{ target: <node id> }` is the diary for that node. Newest first. Default limit 50, max 200. Page older rows with `since`. `get` does not include these rows.
-- `search` is Postgres FTS (title + `data` + extracted inline payload text; Latin accents folded). `query` is optional when `type`, `status`, `under` (child_of parent), `since`, `link`, `repo`, `receipt`, `due` (`overdue` | `today` in America/New_York), `due_on_or_before`, `due_on_or_after`, or `data_equals` is set, so agents can list without a word. `data_equals` is JSONB equality on one or a few top-level `data` keys (not a column per key). Hits include `due` when `data.due` is set. Not embeddings. No `list_nodes`.
+- `search` is Postgres FTS (title + `data` + extracted inline payload text; Latin accents folded). `query` is optional when `type`, `status`, `under` (child_of parent), `since`, `url`, `repo`, `receipt`, `due` (`overdue` | `today` in America/New_York), `due_on_or_before`, `due_on_or_after`, or `data_equals` is set, so agents can list without a word. `data_equals` is JSONB equality on one or a few top-level `data` keys (not a column per key). Hits include `due` when `data.due` is set. Not embeddings. No `list_nodes`.
 - `lookup` resolves one or more names in one request and returns a result per input (`exact`, `alias`, `candidate`, `ambiguous`, `no_match`). Unique UUID, unique folded title (`name_norm`: case, accent, punctuation, whitespace), or unique user-authored `data.aliases` entry may bind a UUID. Token and fuzzy matches are always `candidate`. Duplicate exact titles and alias/title collisions are `ambiguous`. Each useful candidate includes `id`, `type`, canonical `title`, `updated_at`, `match`, `confidence`, and sits on the surrounding `candidates` list so a later confirm/link/upsert can if-match. `confidence` ranks; it is not a calibrated probability and does not authorize a write. For `candidate` or `ambiguous`, ask the user to confirm a UUID before any mutation that depends on the identity; `get` is safe for inspection. `lookup` never writes, merges, creates, or picks an ambiguous candidate. Compact/no-space equality is candidate-only. Matching is type-scoped when `type` is supplied. Not embeddings. No hidden nickname list. After a bound UUID, `working_set` is the one agenda read around that node.
 - `working_set` is a read-only rooted agenda. Given one live node id, it returns lean open work around that root (dues first), plus the parent chain when the type has `parent_types`. Walks follow the live ontology: hierarchy down (`child_of` and equivalent `kind: hierarchy` / `semantic_parent_slug` children) for types that can be parents (`goal`, `project`, `area`, and authored types in someone’s `parent_types`); `about` and `relates_to` for a person-like about-target (no invented `child_of`); hierarchy plus `relates_to` / `supports` for event-like types with `start`/`end` roles (`trip`). Defaults: open-only (`active`; pass `include_completed` for done), depth 1 (max 2), hard cap 40, America/New_York overdue, spine-root (`area`) bound by a 14-day due window. Honest empty is `{ items: [] }`. Several live edges to the same neighbor yield one row (`about` or `supports` over `relates_to`). Unknown or deleted id is `{ error, suggestion }` like `get`. No writes, no payload bodies, no `suggested_links`. `search` stays the vault-wide list. `get` stays one node.
 - `data.aliases` is an optional string array on any node. `upsert` validates it only when the incoming `data` patch includes `aliases` (`[]` clears; malformed patch refuses, including values that fold empty after `name_norm`). A successful aliases write leaves a well-formed non-empty array, or `[]`. Unrelated updates leave legacy values alone. `lookup` ignores malformed legacy aliases. Alias dedupe uses the same `name_norm` as SQL lookup.
 - `task`, `goal`, and `spend` accept optional `data.due` (`YYYY-MM-DD`) via the `due` date field (role `date`). On `spend`, display is Date — the calendar day of the line, not a task deadline. Compiled `json_schema` enforces the date when present; nodes without due still upsert. Extra `data` keys still write. `due: null` clears. A `ref` field stores a typed UUID and does not create an edge.
-- Live records are unique on `data.link.{system,id}` for `gmail` | `calendar` | `drive`. That ref is which Drive, Gmail, or Calendar object. Look up with `search` `{ link }` (then `get`). Store the ref only — do not fetch or mirror those systems’ bodies.
+- Live records are unique on upsert `url { system, id }` for `gmail` | `calendar` | `drive`. That ref is which Drive, Gmail, or Calendar object. Look up with `search` `{ url }` (then `get`). Store the ref only — do not fetch or mirror those systems’ bodies.
 - Live records are unique on `data.repo.{system,id}` for `github`. That ref is which GitHub object. Look up with `search` `{ repo }` (then `get`). Store the ref only. GitHub is not a Drive/Sheet. [Url, repo, and link](#url-repo-and-link).
-- `data.url` is an optional https address on any type. It is how the Viewer opens a file that stays the source of truth. It is a sibling of link (and of repo), not a key on those objects, and not a second identity.
+- `data.url` is an optional https address on any type. It is how the Viewer opens a file that stays the source of truth. It is not the Drive / Gmail / Calendar url, and not a second identity.
 - After a bot sends mail or clears a calendar event, the same record holds `data.receipt` `{ system, id, kind }`. That is done after send or clear. [Mail and calendar receipt](#mail-and-calendar-receipt).
 - No `get_vault_health` / `run_maintenance` / `audit_links` tools — those jobs are instance routines the user can run ([`VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md), [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/))
 - No rewrite tool. `get` + `list_activity` + `upsert` is the loop. [Rewrite one record](#rewrite-one-record).
@@ -169,19 +174,19 @@ The user is the human who runs Compose. Named roles are bots. An agent is anythi
 
 Gmail and Calendar stay the source of truth. The vault does not hold message or event bodies.
 
-### Link is not this fact
+### Url is not this fact
 
-`data.link` `{ system, id }` is which Drive, Gmail, or Calendar object. Live records are unique on that pair for `gmail` | `calendar` | `drive`. `link: null` clears. `search` `{ link }` finds that record. Extra keys on the link object are not a contract. Link reads as `system` and `id` only. There is no `kind` on link.
+`url` `{ system, id }` is which Drive, Gmail, or Calendar object. Live records are unique on that pair for `gmail` | `calendar` | `drive`. `url: null` on upsert clears uniqueness. `search` `{ url }` finds that record. Extra keys on that object are not a contract. The url reads as `system` and `id` only. There is no `kind` on that url. Link is the edge tool.
 
-Activity is the diary of vault writes (`before` / `after` on `create` / `update` / `delete`). `get` does not return those rows. A snapshot that happens to contain a link is not sent mail and not a cleared event.
+Activity is the diary of vault writes (`before` / `after` on `create` / `update` / `delete`). `get` does not return those rows. A snapshot that happens to contain a url is not sent mail and not a cleared event.
 
 `status: "completed"` is vault work state. It is not a mail or calendar receipt.
 
-Link plus activity do not make done. Do not hang `kind` on link. Do not treat an activity row as done.
+Url plus activity do not make done. Do not hang `kind` on url. Do not treat an activity row as done.
 
 ### Shape
 
-One optional key on `data`, same JSONB bag as link and due. Not a column. Not a table. Not a new MCP tool.
+One optional key on `data`, same JSONB bag as due. Not a column. Not a table. Not a new MCP tool.
 
 ```text
 data.receipt: { system, id, kind }
@@ -193,7 +198,7 @@ data.receipt: { system, id, kind }
 
 Pairing is closed: `sent` goes with `gmail`. `cleared` goes with `calendar`. One receipt object on the record. The latest receipt is done; earlier receipts stay in activity. `receipt: null` clears. Missing receipt is allowed. Incomplete or unknown values refuse.
 
-Live records are unique on `data.receipt.{system,id}`. That uniqueness is independent of `data.link`. The same calendar id may be link on a record (this task is that event) and later receipt `cleared` on the same record (the event is gone).
+Live records are unique on `data.receipt.{system,id}`. That uniqueness is independent of url. The same calendar id may be url on a record (this task is that event) and later receipt `cleared` on the same record (the event is gone).
 
 Store the ref only. Do not fetch or mirror Gmail or Calendar bodies into `payload` or `data`.
 
@@ -221,15 +226,15 @@ data: { receipt: { system: "calendar", id: "evt-fixture-1", kind: "cleared" } }
 
 `get` returns `node.data.receipt`. A well-formed receipt is done on the record.
 
-`search` `{ receipt: { system, id } }` looks up the unique live receipt, then `get`. Same tool as link lookup. No `list_nodes`. A miss means that receipt is free to write.
+`search` `{ receipt: { system, id } }` looks up the unique live receipt, then `get`. Same tool as url lookup. No `list_nodes`. A miss means that receipt is free to write.
 
-`search` `{ link }` is which Drive, Gmail, or Calendar object, not done. `search` `{ repo }` is which GitHub object, not done.
+`search` `{ url }` is which Drive, Gmail, or Calendar object, not done. `search` `{ repo }` is which GitHub object, not done.
 
 FTS already walks string values in `data`, so a query of that id or kind can hit. Hits stay id / type / title / snippet / `due`. They do not grow a `receipt` field. `data_equals` matches top-level string keys only and does not match the receipt object.
 
 ### Out
 
-No new MCP tool. No new store. No mail or event bodies in the vault. No `kind` on `data.link`. No embeddings.
+No new MCP tool. No new store. No mail or event bodies in the vault. No `kind` on url. No embeddings.
 
 ## Project spend
 
@@ -295,7 +300,7 @@ One type, one line, one envelope on the project. Agents record validated fields 
 - Proposal/approve inbox for ontology changes
 - Write-ACL / default-deny (the API key is the gate)
 - Bank / card import, a second ledger, double-entry accounting, a rollup tool, or stored remaining on `project`
-- Mail, calendar, Drive, or GitHub bodies in the vault (those systems stay source of truth; the graph holds `data.link`, `data.repo`, `data.url`, and `data.receipt` refs only)
+- Mail, calendar, Drive, or GitHub bodies in the vault (those systems stay source of truth; the graph holds url, `data.repo`, `data.url`, and `data.receipt` refs only)
 
 ## Contributor checklist
 

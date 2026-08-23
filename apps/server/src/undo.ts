@@ -182,8 +182,8 @@ async function invertUpdateNode(
         );
       }
       return toolError(
-        "Cannot undo update: restoring this node would duplicate a live link (system, id)",
-        "Search link to find the live node. Do not twin. Change or delete the live link first.",
+        "Cannot undo update: restoring this node would duplicate a live url (system, id)",
+        "Search url to find the live node. Do not twin. Change or delete the live url first.",
       );
     }
     if (isForeignKeyViolation(error)) {
@@ -235,8 +235,8 @@ async function invertDeleteNode(
         );
       }
       return toolError(
-        "Cannot undo delete: restoring this node would duplicate a live link (system, id)",
-        "Search link to find the live node. Do not twin. Change or delete the live link first.",
+        "Cannot undo delete: restoring this node would duplicate a live url (system, id)",
+        "Search url to find the live node. Do not twin. Change or delete the live url first.",
       );
     }
     throw error;

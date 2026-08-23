@@ -29,7 +29,7 @@ test("repoFromData accepts github and refuses gmail / calendar / drive", () => {
     const refused = repoFromData({ repo: { system, id: "ext-1" } });
     assert.equal(isToolError(refused), true, `expected refuse for ${system}`);
     if (isToolError(refused)) {
-      assert.match(refused.suggestion ?? "", /data\.link/i);
+      assert.match(refused.suggestion ?? "", /search \{ url \}/i);
     }
   }
 });

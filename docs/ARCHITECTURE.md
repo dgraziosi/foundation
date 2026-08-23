@@ -59,7 +59,7 @@ flowchart LR
 A record is what is true now, short. History stays in activity. Identity is UUID. `get` returns that record: type, title, status, `payload`, `data`, metadata, timestamps, incident edges. It does not return activity rows.
 
 - **Payload** is the written body: **inline** (`text/markdown`, `text/html`, `application/json`, `text/plain`) or a **blob** (file on the node). A rewrite passes a new `payload` and replaces that body. Omit `payload` and the body stays.
-- **data** is structured JSON. It is not the diary. The type’s `fields` compile to `json_schema` (`additionalProperties: true`). upsert validates the merged object against that document. Extra keys still write. `needed` on a field is a hint, not JSON Schema `required`. A `ref` field is a typed UUID, not an edge. `data.link` is which Gmail, Calendar, or Drive object (`{ system, id }`), not a mirrored body. `link: null` clears. `data.repo` is which GitHub object (`{ system, id }`). `repo: null` clears. `data.url` is an optional https address (any type) so the Viewer can open a file that stays the source of truth — a sibling of link, not a key on link, and not unique. `url: null` clears. `data.receipt` is done after a bot sends mail or clears a calendar event (`{ system, id, kind }`; `gmail`/`sent` or `calendar`/`cleared`). `receipt: null` clears. `data.due` is the seed date field (ISO `YYYY-MM-DD`; omit it and the node still writes; `due: null` clears) on `task`, `goal`, and `spend` (on `spend`, display is Date). `project` may hold optional `budget_amount` / `budget_currency`. `spend` holds `amount`, `currency`, `due`, `vendor` (string), and `stage` (`quoted` | `paid`). `data.aliases` is an optional string array of user-authored alternate names (any type; used by `lookup`). Stored on the JSONB `data` object, not a separate column. Seed apply fills missing seed fields and missing seed hue/glyph only; it does not overwrite a user edit.
+- **data** is structured JSON. It is not the diary. The type’s `fields` compile to `json_schema` (`additionalProperties: true`). upsert validates the merged object against that document. Extra keys still write. `needed` on a field is a hint, not JSON Schema `required`. A `ref` field is a typed UUID, not an edge. Upsert `url { system, id }` is which Gmail, Calendar, or Drive object, not a mirrored body. `url: null` clears uniqueness. `data.repo` is which GitHub object (`{ system, id }`). `repo: null` clears. `data.url` is an optional https address (any type) so the Viewer can open a file that stays the source of truth — not the Drive / Gmail / Calendar url, and not unique. `data.url: null` clears the https address. `data.receipt` is done after a bot sends mail or clears a calendar event (`{ system, id, kind }`; `gmail`/`sent` or `calendar`/`cleared`). `receipt: null` clears. `data.due` is the seed date field (ISO `YYYY-MM-DD`; omit it and the node still writes; `due: null` clears) on `task`, `goal`, and `spend` (on `spend`, display is Date). `project` may hold optional `budget_amount` / `budget_currency`. `spend` holds `amount`, `currency`, `due`, `vendor` (string), and `stage` (`quoted` | `paid`). `data.aliases` is an optional string array of user-authored alternate names (any type; used by `lookup`). Stored on the JSONB `data` object, not a separate column. Seed apply fills missing seed fields and missing seed hue/glyph only; it does not overwrite a user edit.
 
 ```mermaid
 flowchart TB
@@ -73,10 +73,10 @@ flowchart TB
   node_payload --> inline["inline: markdown / html / json"]
   node_payload --> blob_on_node["blob: file on the node"]
 
+  node_box --> url_id["url system + id"]
   node_data --> structured["structured fields"]
-  node_data --> link["data.link system + id"]
   node_data --> repo["data.repo system + id"]
-  node_data --> url["data.url https address"]
+  node_data --> url_href["data.url https address"]
   node_data --> receipt["receipt ref"]
   node_data --> due["date-role fields (due on task / goal / spend)"]
   node_data --> budget["budget_amount / budget_currency on project"]
@@ -184,12 +184,12 @@ flowchart LR
 - `type` / `status`
 - `under` — live `child_of` children of a parent UUID
 - `since` — updated after an ISO timestamp
-- `link` — unique live `data.link` (Gmail, Calendar, Drive)
+- `url` — unique live Drive / Gmail / Calendar `{ system, id }`
 - `repo` — unique live `data.repo` (GitHub)
 - `receipt` — unique live `data.receipt` ref (sent mail or cleared event)
 - `due` — `overdue` or `today` (`America/New_York`)
 - `due_on_or_before` / `due_on_or_after` — inclusive ISO date window on `data.due`
-- `data_equals` — one or a few top-level `data` keys equal a string value (JSONB `@>`, same family as `data.link` / `data.due`; not a column per key). Example shape: `{ kind: "…", status: "…" }`. Seed `spend` filters `{ stage: "quoted" }` or `{ currency: "USD" }` this way; `amount` is a number and does not.
+- `data_equals` — one or a few top-level `data` keys equal a string value (JSONB `@>`, same family as `data.url` / `data.due`; not a column per key). Example shape: `{ kind: "…", status: "…" }`. Seed `spend` filters `{ stage: "quoted" }` or `{ currency: "USD" }` this way; `amount` is a number and does not.
 
 Empty `{}` is an error (no `list_nodes` tool). Hits are lean and include `due` when `data.due` is set; `get` loads the record, `data.due`, and neighbor titles.
 
@@ -201,7 +201,7 @@ Empty `{}` is an error (no `list_nodes` tool). Hits are lean and include `due` w
 flowchart TB
   search_box["search"]
   search_box --> fts["full-text + accent-folding"]
-  search_box --> list_or_filter["or list by type / status / under / since / link / repo / receipt / due / data_equals"]
+  search_box --> list_or_filter["or list by type / status / under / since / url / repo / receipt / due / data_equals"]
   lookup_box["lookup"]
   lookup_box --> names["batch names → per-input outcome"]
   lookup_box --> title_idx["title_norm / trigram"]
@@ -213,7 +213,7 @@ flowchart TB
 
 ## Url, repo, and link
 
-Gmail, Calendar, and Drive stay the source of truth. The graph holds `data.link { system, id }` and optional `data.url` as the https address the Viewer opens. Live records are unique on the link pair. Look up with `search { link }`, then `get`. There is no `kind` on link. There is no `url` on link. Open leaves the window for that file.
+Gmail, Calendar, and Drive stay the source of truth. The graph holds upsert `url { system, id }` and optional `data.url` as the https address the Viewer opens. Live records are unique on that pair. Look up with `search { url }`, then `get`. There is no `kind` on that url. Link is the edge tool. Open leaves the window for that file.
 
 GitHub stays the source of truth. The graph holds `data.repo { system, id }`. Live records are unique on that pair. Look up with `search { repo }`, then `get`. GitHub is not a Drive/Sheet. Cursor Origin is not a vault key and not a `repo.system` value.
 
@@ -222,13 +222,13 @@ Do not fetch or mirror those systems’ bodies into the graph.
 ```mermaid
 flowchart LR
   sot["Gmail / Calendar / Drive stay SoT"]
-  link_ref["data.link system + id"]
+  url_ref_id["url system + id"]
   url_ref["data.url https address"]
   repo_sot["GitHub stays SoT"]
   repo_ref["data.repo system + id"]
   holds_ref["Graph holds the ref only"]
-  sot -.-> link_ref
-  link_ref --> holds_ref
+  sot -.-> url_ref_id
+  url_ref_id --> holds_ref
   url_ref --> holds_ref
   repo_sot -.-> repo_ref
   repo_ref --> holds_ref
@@ -236,7 +236,7 @@ flowchart LR
 
 ## Receipt
 
-When a bot sends mail or clears a calendar event, the record holds `data.receipt { system, id, kind }`. Store the ref only. `system` is `gmail` | `calendar`. `kind` is `sent` | `cleared`. Pairing is closed. Live records are unique on `system`+`id`, independent of link. Look up with `search { receipt }`, then `get`. The server does not invent the receipt. Gmail and Calendar stay the source of truth — no bodies in the vault.
+When a bot sends mail or clears a calendar event, the record holds `data.receipt { system, id, kind }`. Store the ref only. `system` is `gmail` | `calendar`. `kind` is `sent` | `cleared`. Pairing is closed. Live records are unique on `system`+`id`, independent of url. Look up with `search { receipt }`, then `get`. The server does not invent the receipt. Gmail and Calendar stay the source of truth — no bodies in the vault.
 
 ```mermaid
 flowchart LR

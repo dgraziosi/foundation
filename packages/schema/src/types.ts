@@ -37,16 +37,16 @@ export type Payload = z.infer<typeof PayloadSchema>;
 export const JsonObjectSchema = z.record(z.unknown());
 export type JsonObject = z.infer<typeof JsonObjectSchema>;
 
-/** Drive, Gmail, or Calendar object. Not GitHub. Not a blob. */
-export const LINK_SYSTEMS = ["gmail", "calendar", "drive"] as const;
-export type LinkSystem = (typeof LINK_SYSTEMS)[number];
+/** Drive, Gmail, or Calendar object. Not GitHub. Not a blob. Search `{ url }`. */
+export const URL_IDENTITY_SYSTEMS = ["gmail", "calendar", "drive"] as const;
+export type UrlIdentitySystem = (typeof URL_IDENTITY_SYSTEMS)[number];
 
-export const LinkSystemSchema = z.enum(LINK_SYSTEMS);
-export const LinkRefSchema = z.object({
-  system: LinkSystemSchema,
+export const UrlIdentitySystemSchema = z.enum(URL_IDENTITY_SYSTEMS);
+export const UrlIdentitySchema = z.object({
+  system: UrlIdentitySystemSchema,
   id: z.string().trim().min(1),
 });
-export type LinkRef = z.infer<typeof LinkRefSchema>;
+export type UrlIdentity = z.infer<typeof UrlIdentitySchema>;
 
 /** GitHub object. Not Gmail, Calendar, or Drive. Not Cursor Origin. */
 export const REPO_SYSTEMS = ["github"] as const;

@@ -38,7 +38,7 @@ export {
   getEdgeById,
   getNodeById,
   getNodeByIdempotencyKey,
-  getNodeByLink,
+  getNodeByUrl,
   getNodeByRepo,
   getNodeByReceipt,
   hasLiveChildOf,

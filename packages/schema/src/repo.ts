@@ -13,7 +13,7 @@ export const REPO_INCOMPLETE_SUGGESTION =
   "Set data.repo.system to github and data.repo.id to that system's stable id. Foundation stores the ref only — do not fetch or mirror the repository body.";
 
 export const REPO_UNKNOWN_SYSTEM_SUGGESTION =
-  "Use github. Gmail, Calendar, and Drive are data.link, not data.repo. Foundation stores the ref only — do not fetch or mirror the repository body.";
+  "Use github. Gmail, Calendar, and Drive are search { url }, not data.repo. Foundation stores the ref only — do not fetch or mirror the repository body.";
 
 export function repoConflictError(existingId: string, repo: RepoRef): ToolError {
   return toolError(
