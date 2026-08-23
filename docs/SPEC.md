@@ -37,62 +37,72 @@ Do not use “origin” as a Foundation key, search filter, or shape name. Curso
 
 Starter recipes: [`AGENTS.md`](./AGENTS.md).
 
-## Pointer search rename (design)
+## Url and repo (design)
 
-Design only. Schema, search, and upsert wait for review. Live pointers on this commit stay [`Pointers`](#pointers) (`data.living`, `data.code`, `data.url` the href). This section is the hard cut that replaces them.
+Design only. Schema, search, and upsert wait for review. Today’s leftover keys on this commit stay under [today’s bags](#pointers) (`data.living`, `data.code`, `data.url` the https address). This section is the hard cut that replaces them. Keep this language lock in the copy on implement.
+
+### Language lock
+
+Dream and Vault are feature brands. Url and repo are ordinary words, not brands. Drive / Gmail / Calendar is a url. GitHub is a repo. Viewer Open stays `data.url`.
+
+**Record** is the node (system of record). **Activity** is the audit log.
+
+Do not mint these as product words: Replay, Reconcile, Hygiene, Living, Code, Present, Current picture, Pointer.
+
+Tester fails a new glossary word that is not a feature name, same as OPERATIONS voice.
 
 ### Verified on main (`c66a81c`)
 
 | Bag | Key | Type | Unique | How an agent finds it |
 | --- | --- | --- | --- | --- |
-| Gmail / Calendar / Drive identity | `data.living { system, id }` | object | yes (`gmail` \| `calendar` \| `drive`) | `search { living }` then `get` |
-| GitHub identity | `data.code { system, id }` | object | yes (`github`) | `search { code }` then `get` |
-| Open href | `data.url` | https string | no | `get`. FTS and `data_equals: { url }` |
+| Drive / Gmail / Calendar (a url) | leftover `data.living { system, id }` | object | yes (`gmail` \| `calendar` \| `drive`) | leftover `search { living }` then `get` |
+| GitHub (a repo) | leftover `data.code { system, id }` | object | yes (`github`) | leftover `search { code }` then `get` |
+| Viewer Open | `data.url` | https string | no | `get`. FTS and `data_equals: { url }` |
 | Receipt | `data.receipt { system, id, kind }` | object | yes | `search { receipt }` then `get` |
 
-Search selectors match data keys (`living`, `code`, `receipt`, `due`). Leftover `origin` already refuses. A Drive id cannot derive the open href (no `kind` on living; Docs, Sheets, and files use different prefixes). Indexes: `nodes_living_live_uidx`, `nodes_code_live_uidx`. `nodes_origin_live_uidx` is gone.
+Search selectors match data keys. Leftover `origin` already refuses. A Drive id cannot derive the https address (no `kind` on that leftover object; Docs, Sheets, and files use different prefixes). Indexes: `nodes_living_live_uidx`, `nodes_code_live_uidx`. `nodes_origin_live_uidx` is gone.
 
 ### Collision
 
-`search { url }` as `{ system, id }` identity and `data.url` the https href smash.
+`search { url }` as `{ system, id }` identity and `data.url` the https address smash.
 
 1. One key cannot be an object and a string.
-2. `data_equals: { url }` already matches the href string.
+2. `data_equals: { url }` already matches the https string.
 3. Search selectors match data keys. `search { url }` would mean `data.url`.
-4. “Search by url” reads as the https link. That link is not unique, so it is not identity lookup.
+4. “Search by url” reads as the https link. That link is not unique, so it is not which Drive / Gmail / Calendar object.
 
-The href and the Drive / Gmail / Calendar identity stay two bags. Do not mint `living` or `code` again. Do not use `origin` as a Foundation key, filter, or `system` value. Cursor Origin is source control.
+The https address and the Drive / Gmail / Calendar identity stay two bags. Do not use `origin` as a Foundation key, filter, or `system` value. Cursor Origin is source control.
 
 ### Proposed wire
 
 Search key equals data key. Hard cut. No dual-read of leftover `living` / `code` / `origin`. `search { living }` and `search { code }` are gone. `search { origin }` stays gone.
 
-| Shape | Key | What it is | How an agent finds it |
+| Bag | Key | What it is | How an agent finds it |
 | --- | --- | --- | --- |
-| **url** (identity) | `{ system, id }` — JSON key is the [review lock](#review-lock) | This record is that Gmail, Calendar, or Drive object. Unique on live nodes. No `kind`. `system` is `gmail` \| `calendar` \| `drive`. Refuses `github`. | matching `search` then `get` |
-| **href** | `data.url` | https open address. Any type. Not unique. | `get`. FTS and `data_equals: { url }` |
-| **repo** | `data.repo { system, id }` | This record is that GitHub object. Unique on live nodes. No `kind`. `system` is `github`. Refuses gmail / calendar / drive. | `search { repo }` then `get` |
-| **receipt** | `data.receipt { system, id, kind }` | Unchanged. Independent of the url identity. | `search { receipt }` then `get` |
+| url (Drive / Gmail / Calendar) | `{ system, id }` — JSON key is the [review lock](#review-lock) | This record is that Drive, Gmail, or Calendar object. Unique on live records. No `kind`. `system` is `gmail` \| `calendar` \| `drive`. Refuses `github`. | matching `search` then `get` |
+| Viewer Open | `data.url` | https address. Any type. Not unique. | `get`. FTS and `data_equals: { url }` |
+| repo | `data.repo { system, id }` | This record is that GitHub object. Unique on live records. No `kind`. `system` is `github`. Refuses gmail / calendar / drive. | `search { repo }` then `get` |
+| receipt | `data.receipt { system, id, kind }` | Unchanged. Independent of the Drive / Gmail / Calendar url. | `search { receipt }` then `get` |
 
-`data.url` stays the https href. Viewer Open stays that key. Trimmed, https, no credentials, max 2048. `url: null` clears. Missing is allowed. Not unique. Not identity. Href contract does not change, so Open copy does not restyle. Incremental Open copy only drops the word living: Open leaves the window for that file.
+`data.url` stays the https address. Viewer Open stays that key. Trimmed, https, no credentials, max 2048. `url: null` clears. Missing is allowed. Not unique. Not which Drive / Gmail / Calendar object. The Open key does not change, so Open copy does not restyle. Open leaves the window for that file.
 
-`data.repo` is today’s `data.code` renamed. `repo: null` clears. Store the ref only. A later git slug is out. Cursor Origin is not a vault key and not a `repo.system` value.
+`data.repo` is today’s leftover `data.code` renamed. `repo: null` clears. Store the ref only. A later git slug is out. Cursor Origin is not a vault key and not a `repo.system` value.
 
 Receipt, uniqueness family, leftover refuse, and fixture ids stay the same family as today (`file-fixture-1`, `repo-fixture-1`, `https://example.test/drive/file-fixture-1`). No file, mail, event, or repository bodies. No new MCP tool. No new store.
 
 ### Review lock
 
-The JSON and search key for Gmail / Calendar / Drive identity.
+The JSON and search key for the Drive / Gmail / Calendar url.
 
-It cannot be `url` (the href owns `data.url`). It cannot be `living`, `code`, or `origin`. It cannot be `href` (that is the Open shape). It cannot be `receipt` or `record` (record is the node). Do not mint `url_id` or `url_ref`.
+It cannot be `url` (`data.url` is the https address Open uses). It cannot be a minted product word from the language lock. It cannot be `receipt` or `record` (record is the node). Do not mint `url_id` or `url_ref`.
 
 Two complete options:
 
-**A.** Identity is the word url on the wire: `data.url { system, id }` and `search { url }`. The href moves to `data.href`. Viewer Open reads `data.href`. Incremental Open copy. This breaks “Viewer Open stays `data.url`.”
+**A.** The Drive / Gmail / Calendar url is `data.url { system, id }` and `search { url }`. The https address moves off `data.url`. Viewer Open reads the new https key. This breaks “Viewer Open stays `data.url`.”
 
-**B.** Viewer Open stays `data.url`. `search { url }` is not identity. GitHub is `search { repo }`. Identity stays `{ system, id }` under one everyday word the review names. Search key equals that data key.
+**B.** Viewer Open stays `data.url`. `search { url }` is not which Drive / Gmail / Calendar object. GitHub is `search { repo }`. That url identity stays `{ system, id }` under one ordinary word the review names. Search key equals that data key.
 
-This design picks **B**. The review names that everyday word before implement.
+This design picks **B**. The review names that ordinary word before implement.
 
 ### Everyday words (clone)
 
@@ -100,13 +110,12 @@ A clone does not land insider words. Not a speech to a person.
 
 - **record** — the node (system of record)
 - **activity** — the audit log
-- Do not write current picture
 - **user** — the human who runs Compose
 - **bot** — a named role
-- A new term is allowed only when it is a feature brand (Dream, Vault)
-- Do not land `living` / current picture / seat / origin-as-pointer
+- Feature brands only: Dream, Vault. Url and repo are ordinary words.
+- Tester fails a new glossary word that is not a feature name, same as OPERATIONS voice.
 
-Fail an invented glossary the same way you fail OPERATIONS voice. Do not put this bar in Vault Keeper. Do not add a bot for it.
+Do not put this bar in Vault Keeper. Do not add a bot for it.
 
 ### Out
 

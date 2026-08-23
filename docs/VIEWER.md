@@ -109,7 +109,7 @@ A page in the content host. Not a docked inspector. Two columns fill the pane un
 
 **Document column.** Title. Body, rendered: headings, lists, quotes, code, callouts, dividers. Callout kinds: note, info, tip, warning, danger. Then Structure, when the object has children (or an ancestor chain, when the type asks for that): an embedded collection, height at most half the viewport, only when there is something to show. Opening a child or ancestor opens that object's detail page.
 
-**Properties column.** Belongs to this page. Floor **240px**. Collapsible. Type glyph, type hue, type name. Status. The type's fields, displayed. When `data.url` is a well-formed https URL, Open leaves the window for that living file. Related objects, grouped by relation; each row is a title; click opens that object's detail page. Location: the ancestor chain. Timestamps. Incoming and outgoing both show. Values display; they do not edit. Pointer search rename (design, Open key stays `data.url`): [`SPEC.md`](./SPEC.md#pointer-search-rename-design).
+**Properties column.** Belongs to this page. Floor **240px**. Collapsible. Type glyph, type hue, type name. Status. The type's fields, displayed. When `data.url` is a well-formed https URL, Open leaves the window for that file. Related objects, grouped by relation; each row is a title; click opens that object's detail page. Location: the ancestor chain. Timestamps. Incoming and outgoing both show. Values display; they do not edit. Url and repo (design, Open stays `data.url`): [`SPEC.md`](./SPEC.md#url-and-repo-design).
 
 Closing the detail view activates the view to its left in the strip. Closing the last one returns to Home.
 

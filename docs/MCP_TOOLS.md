@@ -1,6 +1,6 @@
 # Foundation MCP tools
 
-Product contract: [`docs/SPEC.md`](./SPEC.md). Pointer search rename (design, not yet the live keys): [`SPEC.md`](./SPEC.md#pointer-search-rename-design).
+Product contract: [`docs/SPEC.md`](./SPEC.md). Url and repo (design, not yet the live keys): [`SPEC.md`](./SPEC.md#url-and-repo-design).
 
 v1 surface is **14 tools**. Destructive tools require `confirm: true` or they return `{ error, suggestion }`. Identity is UUID. A node is what is true now, short. History stays in activity. If you already have a UUID and need the current picture (payload, data, edges, if-match), call `get`. `get` does not return activity. If you already have a UUID and need the diary for that node, call `list_activity` `{ target }`. If you already have a UUID and need the open work around it, call `working_set`. To resolve one or more entity names, call `lookup`, then `working_set` with that id. Ontology mutations apply immediately (activity log + `undo`; no proposal inbox). A named bot rewrites one node on purpose: `get` → `list_activity` `{ target }` → keep what still matters, invent nothing → `upsert` the same id with a short `payload` and `base_updated_at`. Not a background job. The server does not invent the picture. No rewrite tool. Contract: [`SPEC.md`](./SPEC.md#current-picture).
 
