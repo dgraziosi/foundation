@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Assert the product skills tree: folder name matches SKILL.md frontmatter
-# name, handoff exists, Vault Keeper procedure routines cite
-# .agents/skills/<name>/, prompts/ is the three starter bots only, the
+# name, handoff exists, Dream exists, Vault Keeper procedure routines cite
+# .agents/skills/<name>/ including dream, Dream and Vault Keeper Routines
+# recommend 02:00, prompts/ is the three starter bots only, the
 # blank bot template lives under create-bot, and starters plus the
 # template use Job, Responsibilities, Standards, Routines, Skills,
 # Tools, Handoffs with Skills vs Tools split.
@@ -114,6 +115,26 @@ if [[ ! -f "${skills_root}/handoff/SKILL.md" ]]; then
   fail "missing ${skills_root}/handoff/SKILL.md"
 fi
 
+dream_skill="${skills_root}/dream/SKILL.md"
+if [[ ! -f "${dream_skill}" ]]; then
+  fail "missing ${dream_skill}"
+fi
+if ! grep -Fq -- '02:00' "${dream_skill}"; then
+  fail "Dream skill does not recommend 02:00"
+fi
+if ! grep -Fq -- '.agents/skills/foundation-mcp/' "${dream_skill}"; then
+  fail "Dream skill does not cite .agents/skills/foundation-mcp/"
+fi
+if ! grep -Fq -- '.agents/skills/handoff/' "${dream_skill}" && ! grep -Fq -- '../handoff/' "${dream_skill}"; then
+  fail "Dream skill does not cite handoff"
+fi
+if grep -Eiq -- 'current picture' "${dream_skill}"; then
+  fail "Dream skill must not write current picture"
+fi
+if grep -Eiq -- '(^|[^[:alnum:]])(operator|seat)([^[:alnum:]]|$)' "${dream_skill}"; then
+  fail "Dream skill must not write operator or seat"
+fi
+
 if [[ ! -f "${vault_keeper}" ]]; then
   fail "missing ${vault_keeper}"
 fi
@@ -123,18 +144,32 @@ if [[ -z "${routines}" ]]; then
   fail "Vault Keeper Routines section is empty or missing"
 fi
 
-for folder in vault-health backup-vault graph-hygiene update-foundation; do
+for folder in dream vault-health backup-vault graph-hygiene update-foundation; do
   if ! grep -Fq -- ".agents/skills/${folder}/" <<<"${routines}"; then
     fail "Vault Keeper Routines does not cite .agents/skills/${folder}/"
   fi
 done
+if ! grep -Fq -- '02:00' <<<"${routines}"; then
+  fail "Vault Keeper Routines does not recommend Dream at 02:00"
+fi
 
-if grep -E -q -- '(^|[^[:alnum:]._/])skills/(vault-health|backup-vault|graph-hygiene|update-foundation)/' <<<"${routines}"; then
+if grep -E -q -- '(^|[^[:alnum:]._/])skills/(dream|vault-health|backup-vault|graph-hygiene|update-foundation)/' <<<"${routines}"; then
   fail "Vault Keeper Routines still cites repo-root skills/ instead of .agents/skills/"
 fi
 
 if grep -E -q -- 'prompts/(vault-health|graph-hygiene|update-foundation|repo-leak-scan|bot-template)\.md' <<<"${routines}"; then
   fail "Vault Keeper Routines still cites a moved prompts/ skill form"
+fi
+
+agents_doc="${repo_root}/docs/AGENTS.md"
+if [[ ! -f "${agents_doc}" ]]; then
+  fail "missing ${agents_doc}"
+fi
+if ! grep -Fq -- '.agents/skills/dream/' "${agents_doc}"; then
+  fail "docs/AGENTS.md does not list .agents/skills/dream/"
+fi
+if ! grep -Fq -- '02:00' "${agents_doc}"; then
+  fail "docs/AGENTS.md does not recommend Dream at 02:00"
 fi
 
 if [[ ! -d "${prompts_root}" ]]; then

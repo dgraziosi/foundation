@@ -23,6 +23,7 @@ Do not add `get_vault_health`, `run_maintenance`, `propose_reorganize`, `audit_l
 ## What it is not
 
 - **Not vault health.** Process, `FOUNDATION_DATA`, canaries, and backup freshness are [`VAULT_HEALTH.md`](./VAULT_HEALTH.md).
+- **Not Dream.** Nightly rewrite of records that moved is [`.agents/skills/dream/`](../.agents/skills/dream/). This weekly report stays report-only.
 - **Not applying product updates.** Git pull + compose rebuild is [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/).
 - **Not a mutation pass.** No `upsert` / `delete` / `unlink` / `undo` / `manage_type` on the quiet run.
 - **Not email.** No digest. Ping only when there is something to report.
@@ -55,7 +56,7 @@ Report slug, kind, parent_types. Do not `manage_type` on this routine.
 
 ### Mention only (do not tool)
 
-`get` / `link` already ignore edges whose endpoints are deleted. A future pass can look at orphans. Not `audit_links` / `cleanup_dangling_links` on the wire.
+`get` / `link` already ignore edges whose endpoints are deleted. Dream may close an obvious orphan it meets on the nightly pass. This weekly report still does not delete. Not `audit_links` / `cleanup_dangling_links` on the wire.
 
 ## How to check (existing surface)
 
