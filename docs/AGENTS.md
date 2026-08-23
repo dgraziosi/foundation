@@ -15,9 +15,10 @@ Paste [`prompts/chief.md`](../prompts/chief.md). This is the bot you talk to. It
 Paste [`prompts/vault-keeper.md`](../prompts/vault-keeper.md). Same machine, same vault MCP. Its routines cite:
 
 1. Vault health — [`.agents/skills/vault-health/`](../.agents/skills/vault-health/). Read [`VAULT_HEALTH.md`](./VAULT_HEALTH.md). Health checks `BACKUP_ROOT`; it does not create a dump.
-2. Nightly backup — [`.agents/skills/backup-vault/`](../.agents/skills/backup-vault/). Runs `scripts/backup-vault.sh`.
-3. Graph hygiene — [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/). Read [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md).
-4. Product updates — [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/). On the machine that runs Compose: `git fetch` / `git pull --ff-only` on main, `docker compose up --build -d`, wait for `/health`.
+2. Dream — [`.agents/skills/dream/`](../.agents/skills/dream/). Nightly vault pass at 02:00 user-local, all 7 nights. Run before backup when both exist. Rewrites the record from today's activity, closes what's done, and cleans obvious duplicates. Invents nothing.
+3. Nightly backup — [`.agents/skills/backup-vault/`](../.agents/skills/backup-vault/). Runs `scripts/backup-vault.sh`.
+4. Graph hygiene — [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/). Read [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md).
+5. Product updates — [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/). On the machine that runs Compose: `git fetch` / `git pull --ff-only` on main, `docker compose up --build -d`, wait for `/health`.
 
 Fill in the user config (data dir, optional well-known nodes, `BACKUP_ROOT`, clone path). Vault Keeper keeps `FOUNDATION_DATA` in place and leaves Compose volumes intact.
 
@@ -47,6 +48,7 @@ Named skill folders under [`.agents/skills/`](../.agents/skills/). Do not paste 
 | [`.agents/skills/handoff/`](../.agents/skills/handoff/) | Name who has the work now, or say done |
 | [`.agents/skills/foundation-mcp/`](../.agents/skills/foundation-mcp/) | Vault MCP — which call to use |
 | [`.agents/skills/vault-health/`](../.agents/skills/vault-health/) | Weekday morning vault-health routine |
+| [`.agents/skills/dream/`](../.agents/skills/dream/) | Nightly Dream pass (02:00 user-local) |
 | [`.agents/skills/backup-vault/`](../.agents/skills/backup-vault/) | Nightly backup (`scripts/backup-vault.sh`) |
 | [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/) | Weekly graph-hygiene routine |
 | [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/) | Weekday product-update routine |
