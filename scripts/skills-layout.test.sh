@@ -328,6 +328,12 @@ fi
 if [[ -z "$(retired_word_hits "${retired_fixture}")" ]]; then
   fail "retired-words fixture must still show living/code/link-as-search so the grep has a lock"
 fi
+if ! grep -Fq -- 'data.origin' "${retired_fixture}"; then
+  fail "retired-words fixture must still show origin as a Foundation key"
+fi
+if ! grep -Eiq -- '(^|[^[:alnum:]])operator([^[:alnum:]]|$)' "${retired_fixture}"; then
+  fail "retired-words fixture must still show operator"
+fi
 if [[ -n "$(retired_word_hits "${foundation_mcp}")" ]]; then
   fail "foundation-mcp still has a retired identity line"
 fi
@@ -338,6 +344,20 @@ while IFS= read -r skill_md; do
     fail "${skill_md} still uses a retired identity word"
   fi
 done < <(find "${skills_root}" -mindepth 2 -maxdepth 3 -type f -name '*.md' | LC_ALL=C sort)
+
+# Operator on MCP / glossary skills only. Do not grep the whole tree.
+for glossary_skill in \
+  "${foundation_mcp}" \
+  "${skills_root}/create-bot/SKILL.md" \
+  "${skills_root}/create-bot/bot-template.md"
+do
+  if [[ ! -f "${glossary_skill}" ]]; then
+    fail "missing ${glossary_skill}"
+  fi
+  if grep -Eiq -- '(^|[^[:alnum:]])operator([^[:alnum:]]|$)' "${glossary_skill}"; then
+    fail "${glossary_skill} must not write operator"
+  fi
+done
 
 if [[ ! -d "${prompts_root}" ]]; then
   fail "missing ${prompts_root}"
