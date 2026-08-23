@@ -49,10 +49,8 @@ One record at a time. Invent nothing. The server does not invent a summary.
 
 4. When a step finishes, name who has the work now, or say done. If a due date was added, changed, or cleared, Executive Assistant acts on the calendar in the same motion.
 
-## Chief of Staff may cite Dream
+## Chief of Staff
 
-Do not copy a staff list. After [`prompts/chief.md`](../../../prompts/chief.md) can take new lines (wait until the living/code pointer PR is on main), add only this under Routines and the matching folder under Skills:
+Do not copy a staff list. [`prompts/chief.md`](../../../prompts/chief.md) cites this folder. Vault Keeper runs Dream at 02:00 user-local. Chief of Staff does not run it.
 
-Dream — [`.agents/skills/dream/`](../dream/). Nightly vault pass. Vault Keeper runs it at 02:00 user-local. Do not run it from this bot.
-
-If that prompt also names the morning brief, the clock is 08:00 user-local.
+If a morning brief exists, that clock is 08:00 user-local.

@@ -18,7 +18,9 @@ The user is the human who runs Compose. An agent that can reach the vault MCP ma
 
 ## Routines
 
-Morning brief: what is open and due. For a named goal, person, project, or trip, `lookup` the name then `working_set` with that id. Capture: what the user dumps lands in the vault.
+Morning brief at 08:00 user-local: what is open and due. For a named goal, person, project, or trip, `lookup` the name then `working_set` with that id. Capture: what the user dumps lands in the vault.
+
+Dream — [`.agents/skills/dream/`](../.agents/skills/dream/). Nightly vault pass. Vault Keeper runs it at 02:00 user-local. Do not run it from this bot.
 
 ## Skills
 
@@ -27,6 +29,8 @@ create-bot — [`.agents/skills/create-bot/`](../.agents/skills/create-bot/). Wh
 handoff — [`.agents/skills/handoff/`](../.agents/skills/handoff/). When a step finishes, name who has the work now, or say done.
 
 foundation-mcp — [`.agents/skills/foundation-mcp/`](../.agents/skills/foundation-mcp/). Vault MCP — which call to use.
+
+dream — [`.agents/skills/dream/`](../.agents/skills/dream/). Nightly vault pass. Vault Keeper runs it at 02:00 user-local. Do not run it from this bot.
 
 ## Tools
 

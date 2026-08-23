@@ -141,6 +141,7 @@ pr_copy_files=(
   "${repo_root}/docs/AGENTS.md"
   "${repo_root}/docs/GRAPH_HYGIENE.md"
   "${vault_keeper}"
+  "${prompts_root}/chief.md"
 )
 for copy in "${pr_copy_files[@]}"; do
   if [[ ! -f "${copy}" ]]; then
@@ -186,6 +187,31 @@ if ! grep -Fq -- '.agents/skills/dream/' "${agents_doc}"; then
 fi
 if ! grep -Fq -- '02:00' "${agents_doc}"; then
   fail "docs/AGENTS.md does not recommend Dream at 02:00"
+fi
+
+chief="${prompts_root}/chief.md"
+if [[ ! -f "${chief}" ]]; then
+  fail "missing ${chief}"
+fi
+chief_routines="$(extract_section "${chief}" "Routines")"
+chief_skills="$(extract_section "${chief}" "Skills")"
+if [[ -z "${chief_routines}" ]]; then
+  fail "Chief of Staff Routines section is empty or missing"
+fi
+if ! grep -Fq -- '.agents/skills/dream/' <<<"${chief_routines}"; then
+  fail "Chief of Staff Routines does not cite .agents/skills/dream/"
+fi
+if ! grep -Fq -- '02:00' <<<"${chief_routines}"; then
+  fail "Chief of Staff Routines does not say Vault Keeper runs Dream at 02:00"
+fi
+if ! grep -Fq -- '08:00' <<<"${chief_routines}"; then
+  fail "Chief of Staff Routines does not set the morning brief at 08:00"
+fi
+if ! grep -Fq -- '.agents/skills/dream/' <<<"${chief_skills}"; then
+  fail "Chief of Staff Skills does not cite .agents/skills/dream/"
+fi
+if grep -Eiq -- 'wait until|#54|living/code pointer PR' "${dream_skill}"; then
+  fail "Dream skill still defers Chief of Staff lines"
 fi
 
 if [[ ! -d "${prompts_root}" ]]; then
