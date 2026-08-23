@@ -112,7 +112,7 @@ Gmail and Calendar stay the source of truth. The vault does not hold message or 
 
 ### Living is not this fact
 
-`data.living` `{ system, id }` is which living object. Live nodes are unique on that pair for `gmail` | `calendar` | `drive`. `search` `{ living }` finds that node. Extra keys on the living object are not a contract. Living reads as `system` and `id` only. There is no `kind` on living.
+`data.living` `{ system, id }` is which living object. Live nodes are unique on that pair for `gmail` | `calendar` | `drive`. `living: null` clears. `search` `{ living }` finds that node. Extra keys on the living object are not a contract. Living reads as `system` and `id` only. There is no `kind` on living.
 
 Activity is the diary of vault writes (`before` / `after` on `create` / `update` / `delete`). `get` does not return those rows. A snapshot that happens to contain living is not sent mail and not a cleared event.
 
@@ -234,7 +234,7 @@ When `data.url` is a well-formed https URL, Detail properties offer Open. That c
 
 ### Code
 
-GitHub stays the source of truth for that object. The graph holds `data.code { system, id }` with `system: "github"`. Unique on live nodes. `search { code }` then `get`. Store the ref only. Do not fetch or mirror the repository body.
+GitHub stays the source of truth for that object. The graph holds `data.code { system, id }` with `system: "github"`. Unique on live nodes. `code: null` clears. `search { code }` then `get`. Store the ref only. Do not fetch or mirror the repository body.
 
 Code is not living. A later git slug is not this amendment. Cursor Origin stays a product name, not a vault key and not a `code.system` value.
 

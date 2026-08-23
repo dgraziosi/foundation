@@ -74,6 +74,11 @@ test("canonicalizeLivingInData persists trimmed system and id", () => {
   assert.deepEqual(canonical.living, { system: "gmail", id: "msg-9", extra: true });
 });
 
+test("canonicalizeLivingInData drops living: null", () => {
+  const cleared = canonicalizeLivingInData({ due: "2026-08-21", living: null });
+  assert.deepEqual(cleared, { due: "2026-08-21" });
+});
+
 test("living reads system and id only: no kind, no url", () => {
   const parsed = livingFromData({
     living: {

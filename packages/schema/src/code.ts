@@ -67,6 +67,11 @@ export function codeFromData(data: Record<string, unknown>): CodeRef | ToolError
 
 /** Persist the trimmed code ref so uniqueness and search match lookups. */
 export function canonicalizeCodeInData(data: Record<string, unknown>): Record<string, unknown> {
+  if (Object.prototype.hasOwnProperty.call(data, "code") && data.code === null) {
+    const next = { ...data };
+    delete next.code;
+    return next;
+  }
   const code = codeFromData(data);
   if (!code || isToolErrorCode(code)) {
     return data;

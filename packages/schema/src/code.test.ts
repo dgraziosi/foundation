@@ -57,6 +57,11 @@ test("canonicalizeCodeInData persists trimmed system and id", () => {
   assert.deepEqual(canonical.code, { system: "github", id: "repo-fixture-1", extra: true });
 });
 
+test("canonicalizeCodeInData drops code: null", () => {
+  const cleared = canonicalizeCodeInData({ due: "2026-08-21", code: null });
+  assert.deepEqual(cleared, { due: "2026-08-21" });
+});
+
 test("code reads system and id only: no kind, no url", () => {
   const parsed = codeFromData({
     code: {
