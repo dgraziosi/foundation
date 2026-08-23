@@ -132,6 +132,33 @@ fi
 if grep -Eiq -- 'current picture' "${dream_skill}"; then
   fail "Dream skill must not write current picture"
 fi
+if ! grep -Fq -- 'start of yesterday' "${dream_skill}"; then
+  fail "Dream skill does not set search since to the start of yesterday"
+fi
+if grep -Eiq -- 'start of today' "${dream_skill}"; then
+  fail "Dream skill still sets search since to the start of today"
+fi
+if ! grep -Fq -- 'due `today` filter' "${dream_skill}"; then
+  fail "Dream skill does not warn off the due today filter"
+fi
+if ! grep -Fq -- 'last waking day' "${dream_skill}"; then
+  fail "Dream skill does not name the last waking day"
+fi
+if ! grep -Fq -- 'target_kind' "${dream_skill}"; then
+  fail "Dream skill does not filter list_activity by target_kind"
+fi
+if ! grep -Fq -- 'target_id' "${dream_skill}"; then
+  fail "Dream skill does not take target_id for node activity"
+fi
+if ! grep -Fq -- 'from_id' "${dream_skill}"; then
+  fail "Dream skill does not take from_id from edge activity"
+fi
+if ! grep -Fq -- 'to_id' "${dream_skill}"; then
+  fail "Dream skill does not take to_id from edge activity"
+fi
+if ! grep -Fq -- 'Skip `type` and `relation`' "${dream_skill}"; then
+  fail "Dream skill does not skip type and relation activity rows"
+fi
 
 # Product files this Dream PR touches. Do not scan this test file:
 # the assertion itself names the locked words.

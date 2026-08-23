@@ -36,7 +36,7 @@ This pass rewrites records that moved. Vault health, nightly backup, weekly grap
 
 One record at a time. Invent nothing. The server does not invent a summary.
 
-1. Find records that moved today. `search` `{ since }` lists live records whose `updated_at` is on or after that stamp. Use the start of today in the user's local zone as ISO-8601. This is not the due `today` filter (that clock is America/New_York). Raise `limit` if the live schema allows; if you hit the cap, stop a full dump — there is no `list_nodes`. `list_activity` `{ since }` (no target) lists today's writes when you need the diary first; then take each record id. Linking does not bump a record's `updated_at`. Cite foundation-mcp for which call.
+1. Find records that moved on the last waking day. A 02:00 pass is already on the next calendar day, so `search` `{ since }` must use the start of yesterday in the user's local zone as ISO-8601. That lists live records whose `updated_at` is on or after that stamp. This is not the due `today` filter (that clock is America/New_York). Raise `limit` if the live schema allows; if you hit the cap, stop a full dump — there is no `list_nodes`. `list_activity` `{ since }` (no target) lists last waking day's writes when you need the diary first. Take record ids only: when `target_kind` is `node`, take `target_id`; when `target_kind` is `edge`, take `from_id` and `to_id` from `before` / `after`. Skip `type` and `relation` rows — `get` will not load those ids. Linking does not bump a record's `updated_at`. Cite foundation-mcp for which call.
 
 2. For each record, in order:
    1. `get` that id — the record as it stands, plus `updated_at`.
@@ -45,7 +45,7 @@ One record at a time. Invent nothing. The server does not invent a summary.
    4. If the record is still true, leave it. If it is not, `upsert` the same id with a short `payload` that is still true, any `data` patch that still belongs, and `base_updated_at` from `get`. Omit `payload` when only `data` or `status` changes.
    5. Close or supersede what is actually done. `status: "completed"` is vault work state. Clear `data.due` when the work is done. Do not invent a `receipt`. Do not create a new record to hold a summary.
 
-3. Hygiene only on obvious orphans and duplicates you meet on this pass (today's moved records). Do not merge. Do not delete an isolate because it has no edges. A first-day vault (seed types, zero user records) is healthy — skip. If you cannot confirm a destructive call, skip and ping the user.
+3. Hygiene only on obvious orphans and duplicates you meet on this pass (last waking day's moved records). Do not merge. Do not delete an isolate because it has no edges. A first-day vault (seed types, zero user records) is healthy — skip. If you cannot confirm a destructive call, skip and ping the user.
 
 4. When a step finishes, name who has the work now, or say done. If a due date was added, changed, or cleared, Executive Assistant acts on the calendar in the same motion.
 
