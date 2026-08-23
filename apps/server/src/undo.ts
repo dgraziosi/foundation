@@ -175,15 +175,15 @@ async function invertUpdateNode(
           "Search receipt to find the live node. Change or delete the live receipt first.",
         );
       }
-      if (uniqueViolationConstraint(error) === "nodes_code_live_uidx") {
+      if (uniqueViolationConstraint(error) === "nodes_repo_live_uidx") {
         return toolError(
-          "Cannot undo update: restoring this node would duplicate a live code ref (system, id)",
-          "Search code to find the live node. Do not twin. Change or delete the live code ref first.",
+          "Cannot undo update: restoring this node would duplicate a live repo (system, id)",
+          "Search repo to find the live node. Do not twin. Change or delete the live repo first.",
         );
       }
       return toolError(
-        "Cannot undo update: restoring this node would duplicate a live living ref (system, id)",
-        "Search living to find the live node. Do not twin. Change or delete the live living ref first.",
+        "Cannot undo update: restoring this node would duplicate a live link (system, id)",
+        "Search link to find the live node. Do not twin. Change or delete the live link first.",
       );
     }
     if (isForeignKeyViolation(error)) {
@@ -228,15 +228,15 @@ async function invertDeleteNode(
           "Search receipt to find the live node. Change or delete the live receipt first.",
         );
       }
-      if (uniqueViolationConstraint(error) === "nodes_code_live_uidx") {
+      if (uniqueViolationConstraint(error) === "nodes_repo_live_uidx") {
         return toolError(
-          "Cannot undo delete: restoring this node would duplicate a live code ref (system, id)",
-          "Search code to find the live node. Do not twin. Change or delete the live code ref first.",
+          "Cannot undo delete: restoring this node would duplicate a live repo (system, id)",
+          "Search repo to find the live node. Do not twin. Change or delete the live repo first.",
         );
       }
       return toolError(
-        "Cannot undo delete: restoring this node would duplicate a live living ref (system, id)",
-        "Search living to find the live node. Do not twin. Change or delete the live living ref first.",
+        "Cannot undo delete: restoring this node would duplicate a live link (system, id)",
+        "Search link to find the live node. Do not twin. Change or delete the live link first.",
       );
     }
     throw error;

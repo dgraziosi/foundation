@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createPool, migrate, seedSystemOntology, type Pool } from "@foundation/db";
 import {
-  LIVING_HIT_SUGGESTION,
-  LIVING_MISS_SUGGESTION,
+  LINK_HIT_SUGGESTION,
+  LINK_MISS_SUGGESTION,
   SEARCH_NO_SELECTOR_SUGGESTION,
   isToolError,
 } from "@foundation/schema";
@@ -31,13 +31,13 @@ async function poolForSchema(schema: string): Promise<Pool> {
 }
 
 test(
-  "search listing, living uniqueness, schema miss, company/decision seeds",
+  "search listing, link uniqueness, schema miss, company/decision seeds",
   { skip: !databaseUrl },
   async (t) => {
     if (!databaseUrl) {
       return;
     }
-    const pool = await poolForSchema("search_filters_living");
+    const pool = await poolForSchema("search_filters_link");
     try {
       const ontology = await inspectOntology(pool, "types");
       const slugs = ontology.types.map((type) => type.slug);
@@ -173,11 +173,11 @@ test(
         assert.deepEqual(future.nodes, []);
       });
 
-      await t.test("living uniqueness and lookup", async () => {
+      await t.test("link uniqueness and lookup", async () => {
         const person = await upsertGraphNode(pool, {
           type: "person",
-          title: "Throwaway living person",
-          data: { living: { system: "gmail", id: "msg-fixture-1" } },
+          title: "Throwaway link person",
+          data: { link: { system: "gmail", id: "msg-fixture-1" } },
         });
         assert.equal(isToolError(person), false);
         if (isToolError(person)) {
@@ -187,7 +187,7 @@ test(
         const twin = await upsertGraphNode(pool, {
           type: "person",
           title: "Throwaway twin person",
-          data: { living: { system: "gmail", id: "msg-fixture-1" } },
+          data: { link: { system: "gmail", id: "msg-fixture-1" } },
         });
         assert.equal(isToolError(twin), true);
         if (!isToolError(twin)) {
@@ -198,7 +198,7 @@ test(
         assert.match(twin.suggestion ?? "", /do not create a twin/i);
 
         const hit = await searchGraphNodes(pool, {
-          living: { system: "gmail", id: "msg-fixture-1" },
+          link: { system: "gmail", id: "msg-fixture-1" },
         });
         assert.equal(isToolError(hit), false);
         if (isToolError(hit)) {
@@ -206,41 +206,41 @@ test(
         }
         assert.equal(hit.nodes.length, 1);
         assert.equal(hit.nodes[0]?.id, person.node.id);
-        assert.equal(hit.suggestion, LIVING_HIT_SUGGESTION);
+        assert.equal(hit.suggestion, LINK_HIT_SUGGESTION);
 
         const miss = await searchGraphNodes(pool, {
-          living: { system: "drive", id: "no-such-ref" },
+          link: { system: "drive", id: "no-such-ref" },
         });
         assert.equal(isToolError(miss), false);
         if (isToolError(miss)) {
           return;
         }
         assert.deepEqual(miss.nodes, []);
-        assert.equal(miss.suggestion, LIVING_MISS_SUGGESTION);
+        assert.equal(miss.suggestion, LINK_MISS_SUGGESTION);
 
         const badSystem = await upsertGraphNode(pool, {
           type: "person",
-          title: "Throwaway slack living",
-          data: { living: { system: "slack", id: "x" } },
+          title: "Throwaway slack link",
+          data: { link: { system: "slack", id: "x" } },
         });
         assert.equal(isToolError(badSystem), true);
         if (isToolError(badSystem)) {
-          assert.match(badSystem.error, /Unknown living.system/);
+          assert.match(badSystem.error, /Unknown link.system/);
           assert.match(badSystem.suggestion ?? "", /do not fetch or mirror/i);
         }
 
         const padded = await upsertGraphNode(pool, {
           type: "person",
-          title: "Throwaway padded living",
-          data: { living: { system: "calendar", id: "  evt-fixture-1  " } },
+          title: "Throwaway padded link",
+          data: { link: { system: "calendar", id: "  evt-fixture-1  " } },
         });
         assert.equal(isToolError(padded), false);
         if (isToolError(padded)) {
           return;
         }
-        assert.deepEqual(padded.node.data.living, { system: "calendar", id: "evt-fixture-1" });
+        assert.deepEqual(padded.node.data.link, { system: "calendar", id: "evt-fixture-1" });
         const paddedHit = await searchGraphNodes(pool, {
-          living: { system: "calendar", id: "evt-fixture-1" },
+          link: { system: "calendar", id: "evt-fixture-1" },
         });
         assert.equal(isToolError(paddedHit), false);
         if (!isToolError(paddedHit)) {
@@ -249,23 +249,23 @@ test(
 
         const keyed = await upsertGraphNode(pool, {
           type: "person",
-          title: "Throwaway keyed living",
-          data: { living: { system: "drive", id: "file-fixture-1" } },
-          idempotency_key: "living-idem-fixture",
+          title: "Throwaway keyed link",
+          data: { link: { system: "drive", id: "file-fixture-1" } },
+          idempotency_key: "link-idem-fixture",
         });
         assert.equal(isToolError(keyed), false);
         if (isToolError(keyed)) {
           return;
         }
-        const replay = await upsertGraphNode(pool, {
+        const retry = await upsertGraphNode(pool, {
           type: "person",
-          title: "Throwaway keyed living retry",
-          data: { living: { system: "drive", id: "file-fixture-1" } },
-          idempotency_key: "living-idem-fixture",
+          title: "Throwaway keyed link retry",
+          data: { link: { system: "drive", id: "file-fixture-1" } },
+          idempotency_key: "link-idem-fixture",
         });
-        assert.equal(isToolError(replay), false);
-        if (!isToolError(replay)) {
-          assert.equal(replay.node.id, keyed.node.id);
+        assert.equal(isToolError(retry), false);
+        if (!isToolError(retry)) {
+          assert.equal(retry.node.id, keyed.node.id);
         }
       });
 

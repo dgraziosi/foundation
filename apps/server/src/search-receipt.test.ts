@@ -84,12 +84,12 @@ test(
         assert.match(twin.suggestion ?? "", /search with receipt/i);
       });
 
-      await t.test("cleared receipt is independent of living on the same node", async () => {
+      await t.test("cleared receipt is independent of link on the same node", async () => {
         const task = await upsertGraphNode(pool, {
           type: "task",
           title: "Throwaway calendar receipt task",
           data: {
-            living: { system: "calendar", id: "evt-fixture-1" },
+            link: { system: "calendar", id: "evt-fixture-1" },
             receipt: { system: "calendar", id: "evt-fixture-1", kind: "cleared" },
           },
         });
@@ -97,29 +97,29 @@ test(
         if (isToolError(task)) {
           return;
         }
-        assert.deepEqual(task.node.data.living, { system: "calendar", id: "evt-fixture-1" });
+        assert.deepEqual(task.node.data.link, { system: "calendar", id: "evt-fixture-1" });
         assert.deepEqual(task.node.data.receipt, {
           system: "calendar",
           id: "evt-fixture-1",
           kind: "cleared",
         });
 
-        const byLiving = await searchGraphNodes(pool, {
-          living: { system: "calendar", id: "evt-fixture-1" },
+        const byLink = await searchGraphNodes(pool, {
+          link: { system: "calendar", id: "evt-fixture-1" },
         });
         const byReceipt = await searchGraphNodes(pool, {
           receipt: { system: "calendar", id: "evt-fixture-1" },
         });
-        assert.equal(isToolError(byLiving), false);
+        assert.equal(isToolError(byLink), false);
         assert.equal(isToolError(byReceipt), false);
-        if (isToolError(byLiving) || isToolError(byReceipt)) {
+        if (isToolError(byLink) || isToolError(byReceipt)) {
           return;
         }
-        assert.ok(byLiving.nodes.some((node) => node.id === task.node.id));
+        assert.ok(byLink.nodes.some((node) => node.id === task.node.id));
         assert.ok(byReceipt.nodes.some((node) => node.id === task.node.id));
       });
 
-      await t.test("search receipt misses, living search does not see a receipt-only node", async () => {
+      await t.test("search receipt misses, link search does not see a receipt-only node", async () => {
         const miss = await searchGraphNodes(pool, {
           receipt: { system: "gmail", id: "no-such-receipt" },
         });
@@ -130,12 +130,12 @@ test(
         assert.deepEqual(miss.nodes, []);
         assert.equal(miss.suggestion, RECEIPT_MISS_SUGGESTION);
 
-        const livingMiss = await searchGraphNodes(pool, {
-          living: { system: "gmail", id: "msg-fixture-sent-1" },
+        const linkMiss = await searchGraphNodes(pool, {
+          link: { system: "gmail", id: "msg-fixture-sent-1" },
         });
-        assert.equal(isToolError(livingMiss), false);
-        if (!isToolError(livingMiss)) {
-          assert.deepEqual(livingMiss.nodes, []);
+        assert.equal(isToolError(linkMiss), false);
+        if (!isToolError(linkMiss)) {
+          assert.deepEqual(linkMiss.nodes, []);
         }
       });
 
@@ -213,12 +213,12 @@ test(
         }
       });
 
-      await t.test("receipt null clears; merge keeps living; padded id trims", async () => {
+      await t.test("receipt null clears; merge keeps link; padded id trims", async () => {
         const created = await upsertGraphNode(pool, {
           type: "task",
           title: "Throwaway clear receipt task",
           data: {
-            living: { system: "gmail", id: "msg-fixture-1" },
+            link: { system: "gmail", id: "msg-fixture-1" },
             receipt: { system: "gmail", id: "  msg-fixture-sent-clear  ", kind: "sent" },
           },
         });
@@ -244,7 +244,7 @@ test(
           return;
         }
         assert.equal(cleared.node.data.receipt, undefined);
-        assert.deepEqual(cleared.node.data.living, { system: "gmail", id: "msg-fixture-1" });
+        assert.deepEqual(cleared.node.data.link, { system: "gmail", id: "msg-fixture-1" });
 
         const afterClear = await searchGraphNodes(pool, {
           receipt: { system: "gmail", id: "msg-fixture-sent-clear" },
@@ -259,7 +259,7 @@ test(
         assert.equal(isToolError(got), false);
         if (!isToolError(got)) {
           assert.equal(got.node.data.receipt, undefined);
-          assert.deepEqual(got.node.data.living, { system: "gmail", id: "msg-fixture-1" });
+          assert.deepEqual(got.node.data.link, { system: "gmail", id: "msg-fixture-1" });
         }
       });
     } finally {

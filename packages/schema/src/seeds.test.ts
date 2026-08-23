@@ -103,7 +103,7 @@ test("seed node types parse and include spine plus artifacts", () => {
     "budget_currency",
   ]);
   for (const type of SEED_NODE_TYPES) {
-    for (const name of ["url", "living", "code", "receipt", "aliases"]) {
+    for (const name of ["url", "link", "repo", "receipt", "aliases"]) {
       assert.equal(
         type.fields?.some((field) => field.name === name),
         false,

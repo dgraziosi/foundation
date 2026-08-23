@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { isToolError } from "./mcp-io.js";
-import { LivingRefSchema, ReceiptLookupSchema } from "./types.js";
+import { LinkRefSchema, ReceiptLookupSchema } from "./types.js";
 import {
   RECEIPT_KINDS,
   RECEIPT_SYSTEMS,
@@ -75,8 +75,8 @@ test("receiptFromData trims fields and refuses incomplete, unknown, or unpaired 
   assert.equal(isToolError(notObject), true);
 });
 
-test("receipt is a distinct pointer from living: living has no kind", () => {
-  const keys = Object.keys(LivingRefSchema.shape);
+test("receipt is distinct from link: link has no kind", () => {
+  const keys = Object.keys(LinkRefSchema.shape);
   assert.deepEqual(keys, ["system", "id"]);
   assert.ok(!keys.includes("kind"));
 });
