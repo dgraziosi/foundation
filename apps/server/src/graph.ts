@@ -6,8 +6,8 @@ import {
   getCreateActivityForNode,
   getNodeById,
   getNodeByIdempotencyKey,
-  getNodeByLiving,
-  getNodeByCode,
+  getNodeByUrl,
+  getNodeByRepo,
   getNodeByReceipt,
   getNodeType,
   getRelationType,
@@ -73,23 +73,26 @@ import {
   applyUrlFromPatch,
   classifyLookupResult,
   createPreflightFromLookup,
-  CODE_HIT_SUGGESTION,
-  CODE_MISS_SUGGESTION,
-  LIVING_HIT_SUGGESTION,
-  LIVING_MISS_SUGGESTION,
+  CODE_KEY_REFUSED_SUGGESTION,
+  LINK_KEY_REFUSED_SUGGESTION,
+  LIVING_KEY_REFUSED_SUGGESTION,
   ORIGIN_KEY_REFUSED_SUGGESTION,
+  REPO_HIT_SUGGESTION,
+  REPO_MISS_SUGGESTION,
   RECEIPT_HIT_SUGGESTION,
   RECEIPT_MISS_SUGGESTION,
+  URL_HIT_SUGGESTION,
+  URL_MISS_SUGGESTION,
   DUE_DATE_SUGGESTION,
   assertIfMatch,
   LOST_UPDATE_SUGGESTION,
   isToolError,
-  livingConflictError,
-  livingFromData,
-  canonicalizeLivingInData,
-  codeConflictError,
-  codeFromData,
-  canonicalizeCodeInData,
+  urlIdentityConflictError,
+  urlIdentityFromMetadata,
+  applyUrlIdentityFromUpsert,
+  repoConflictError,
+  repoFromData,
+  canonicalizeRepoInData,
   receiptConflictError,
   receiptFromData,
   canonicalizeReceiptInData,
@@ -152,21 +155,29 @@ function mergedNodeData(
   return { ...(existing?.data ?? {}), ...patch };
 }
 
-function refuseOriginKey(patch: Record<string, unknown> | undefined): ToolError | null {
-  if (patch && Object.prototype.hasOwnProperty.call(patch, "origin")) {
+function refuseLeftoverKeys(patch: Record<string, unknown> | undefined): ToolError | null {
+  if (!patch) {
+    return null;
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "origin")) {
     return toolError("data.origin is not a Foundation key", ORIGIN_KEY_REFUSED_SUGGESTION);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "living")) {
+    return toolError("data.living is not a Foundation key", LIVING_KEY_REFUSED_SUGGESTION);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "code")) {
+    return toolError("data.code is not a Foundation key", CODE_KEY_REFUSED_SUGGESTION);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "link")) {
+    return toolError("data.link is not a Foundation key", LINK_KEY_REFUSED_SUGGESTION);
   }
   return null;
 }
 
 function validateUpsertData(type: NodeType, data: Record<string, unknown>): ToolError | null {
-  const living = livingFromData(data);
-  if (isToolError(living)) {
-    return living;
-  }
-  const code = codeFromData(data);
-  if (isToolError(code)) {
-    return code;
+  const repo = repoFromData(data);
+  if (isToolError(repo)) {
+    return repo;
   }
   const receipt = receiptFromData(data);
   if (isToolError(receipt)) {
@@ -214,34 +225,34 @@ async function validateRefFields(
   return null;
 }
 
-async function livingUniqueError(
+async function urlUniqueError(
   db: Queryable,
-  data: Record<string, unknown>,
+  metadata: Record<string, unknown>,
   selfId?: string,
 ): Promise<ToolError | null> {
-  const living = livingFromData(data);
-  if (!living || isToolError(living)) {
+  const url = urlIdentityFromMetadata(metadata);
+  if (!url || isToolError(url)) {
     return null;
   }
-  const existing = await getNodeByLiving(db, living);
+  const existing = await getNodeByUrl(db, url);
   if (existing && existing.id !== selfId) {
-    return livingConflictError(existing.id, living);
+    return urlIdentityConflictError(existing.id, url);
   }
   return null;
 }
 
-async function codeUniqueError(
+async function repoUniqueError(
   db: Queryable,
   data: Record<string, unknown>,
   selfId?: string,
 ): Promise<ToolError | null> {
-  const code = codeFromData(data);
-  if (!code || isToolError(code)) {
+  const repo = repoFromData(data);
+  if (!repo || isToolError(repo)) {
     return null;
   }
-  const existing = await getNodeByCode(db, code);
+  const existing = await getNodeByRepo(db, repo);
   if (existing && existing.id !== selfId) {
-    return codeConflictError(existing.id, code);
+    return repoConflictError(existing.id, repo);
   }
   return null;
 }
@@ -262,14 +273,15 @@ async function receiptUniqueError(
   return null;
 }
 
-async function pointerUniqueError(
+async function uniqueDataError(
   db: Queryable,
   data: Record<string, unknown>,
+  metadata: Record<string, unknown>,
   selfId?: string,
 ): Promise<ToolError | null> {
   return (
-    (await livingUniqueError(db, data, selfId)) ??
-    (await codeUniqueError(db, data, selfId)) ??
+    (await urlUniqueError(db, metadata, selfId)) ??
+    (await repoUniqueError(db, data, selfId)) ??
     (await receiptUniqueError(db, data, selfId))
   );
 }
@@ -603,13 +615,13 @@ export async function upsertGraphNode(
         }
       }
 
-      const originErr = refuseOriginKey(input.data);
-      if (originErr) {
-        return originErr;
+      const leftoverErr = refuseLeftoverKeys(input.data);
+      if (leftoverErr) {
+        return leftoverErr;
       }
       const merged = canonicalizeDueInData(
         canonicalizeReceiptInData(
-          canonicalizeCodeInData(canonicalizeLivingInData(mergedNodeData(existing, input.data))),
+          canonicalizeRepoInData(mergedNodeData(existing, input.data)),
         ),
       );
       const aliased = applyAliasesFromPatch(merged, input.data);
@@ -619,6 +631,14 @@ export async function upsertGraphNode(
       const nextData = applyUrlFromPatch(aliased, input.data);
       if (isToolError(nextData)) {
         return nextData;
+      }
+      const nextMeta = applyUrlIdentityFromUpsert(
+        existing?.metadata,
+        input.metadata,
+        input.url,
+      );
+      if (isToolError(nextMeta)) {
+        return nextMeta;
       }
       const dataErr = validateUpsertData(type, nextData);
       if (dataErr) {
@@ -647,7 +667,8 @@ export async function upsertGraphNode(
             status: input.status,
             payload: resolved.payload,
             data: input.data === undefined ? undefined : nextData,
-            metadata: input.metadata,
+            metadata:
+              input.metadata === undefined && input.url === undefined ? undefined : nextMeta,
             base_updated_at: input.base_updated_at,
           });
           await client.query("RELEASE SAVEPOINT upsert_update");
@@ -682,7 +703,7 @@ export async function upsertGraphNode(
         } catch (error) {
           if (isUniqueViolation(error)) {
             await client.query("ROLLBACK TO SAVEPOINT upsert_update");
-            const pointerErr = await pointerUniqueError(client, nextData, existing.id);
+            const pointerErr = await uniqueDataError(client, nextData, nextMeta, existing.id);
             if (pointerErr) {
               return pointerErr;
             }
@@ -718,7 +739,7 @@ export async function upsertGraphNode(
           status: input.status ?? "active",
           payload: resolved.payload ?? DEFAULT_PAYLOAD,
           data: nextData,
-          metadata: input.metadata ?? {},
+          metadata: nextMeta,
           idempotency_key: input.idempotency_key ?? null,
         });
         await client.query("RELEASE SAVEPOINT upsert_insert");
@@ -748,7 +769,7 @@ export async function upsertGraphNode(
               return replayIdempotentCreate(client, replay);
             }
           }
-          const pointerErr = await pointerUniqueError(client, nextData);
+          const pointerErr = await uniqueDataError(client, nextData, nextMeta);
           if (pointerErr) {
             return pointerErr;
           }
@@ -1488,26 +1509,26 @@ export async function searchGraphNodes(
     if (since && Date.parse(node.updated_at) < since.getTime()) {
       return { nodes: [], suggestion: SEARCH_MISS_SUGGESTION };
     }
-    if (input.living) {
-      const living = livingFromData(node.data);
+    if (input.url) {
+      const url = urlIdentityFromMetadata(node.metadata);
       if (
-        isToolError(living) ||
-        !living ||
-        living.system !== input.living.system ||
-        living.id !== input.living.id
+        isToolError(url) ||
+        !url ||
+        url.system !== input.url.system ||
+        url.id !== input.url.id
       ) {
-        return { nodes: [], suggestion: LIVING_MISS_SUGGESTION };
+        return { nodes: [], suggestion: URL_MISS_SUGGESTION };
       }
     }
-    if (input.code) {
-      const code = codeFromData(node.data);
+    if (input.repo) {
+      const repo = repoFromData(node.data);
       if (
-        isToolError(code) ||
-        !code ||
-        code.system !== input.code.system ||
-        code.id !== input.code.id
+        isToolError(repo) ||
+        !repo ||
+        repo.system !== input.repo.system ||
+        repo.id !== input.repo.id
       ) {
-        return { nodes: [], suggestion: CODE_MISS_SUGGESTION };
+        return { nodes: [], suggestion: REPO_MISS_SUGGESTION };
       }
     }
     if (input.receipt) {
@@ -1551,10 +1572,10 @@ export async function searchGraphNodes(
     status: input.status,
     under: input.under,
     since,
-    livingSystem: input.living?.system,
-    livingId: input.living?.id,
-    codeSystem: input.code?.system,
-    codeId: input.code?.id,
+    urlSystem: input.url?.system,
+    urlId: input.url?.id,
+    repoSystem: input.repo?.system,
+    repoId: input.repo?.id,
     receiptSystem: input.receipt?.system,
     receiptId: input.receipt?.id,
     dueOnOrAfter: input.due_on_or_after,
@@ -1568,22 +1589,22 @@ export async function searchGraphNodes(
     if (query) {
       return { nodes: [], suggestion: SEARCH_MISS_SUGGESTION };
     }
-    if (input.living) {
-      return { nodes: [], suggestion: LIVING_MISS_SUGGESTION };
+    if (input.url) {
+      return { nodes: [], suggestion: URL_MISS_SUGGESTION };
     }
-    if (input.code) {
-      return { nodes: [], suggestion: CODE_MISS_SUGGESTION };
+    if (input.repo) {
+      return { nodes: [], suggestion: REPO_MISS_SUGGESTION };
     }
     if (input.receipt) {
       return { nodes: [], suggestion: RECEIPT_MISS_SUGGESTION };
     }
     return { nodes: [] };
   }
-  if (input.living) {
-    return { nodes, suggestion: LIVING_HIT_SUGGESTION };
+  if (input.url) {
+    return { nodes, suggestion: URL_HIT_SUGGESTION };
   }
-  if (input.code) {
-    return { nodes, suggestion: CODE_HIT_SUGGESTION };
+  if (input.repo) {
+    return { nodes, suggestion: REPO_HIT_SUGGESTION };
   }
   if (input.receipt) {
     return { nodes, suggestion: RECEIPT_HIT_SUGGESTION };

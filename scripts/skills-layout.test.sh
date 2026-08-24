@@ -238,6 +238,27 @@ fi
 if ! grep -Fq -- '02:00' "${agents_doc}"; then
   fail "docs/AGENTS.md does not recommend Dream at 02:00"
 fi
+if ! grep -Fq -- '## Everyday words' "${agents_doc}"; then
+  fail "docs/AGENTS.md is missing Everyday words"
+fi
+if ! grep -Fq -- 'Feature brands only: Dream, Vault' "${agents_doc}"; then
+  fail "docs/AGENTS.md does not lock Dream and Vault as feature brands"
+fi
+if ! grep -Fq -- 'Url and repo are ordinary words' "${agents_doc}"; then
+  fail "docs/AGENTS.md does not say url and repo are ordinary words"
+fi
+if ! grep -Fq -- 'Link is the edge verb' "${agents_doc}"; then
+  fail "docs/AGENTS.md does not say link is the edge verb"
+fi
+if ! grep -Fq -- 'every skill that cites the vault ships in the same PR' "${agents_doc}"; then
+  fail "docs/AGENTS.md does not lock the same-PR skill rule"
+fi
+if ! grep -Fq -- $'**record** — the node' "${agents_doc}"; then
+  fail "docs/AGENTS.md does not say record is the node"
+fi
+if ! grep -Fq -- $'**activity** — the audit log' "${agents_doc}"; then
+  fail "docs/AGENTS.md does not say activity is the audit log"
+fi
 
 chief="${prompts_root}/chief.md"
 if [[ ! -f "${chief}" ]]; then
@@ -260,9 +281,110 @@ fi
 if ! grep -Fq -- '.agents/skills/dream/' <<<"${chief_skills}"; then
   fail "Chief of Staff Skills does not cite .agents/skills/dream/"
 fi
+if grep -Eq -- 'search `living`|data\.living|data\.code|search `code`|search `link`|data\.link' "${chief}"; then
+  fail "Chief of Staff still uses leftover living/code/link keys"
+fi
+if ! grep -Fq -- 'search `url`' "${chief}"; then
+  fail "Chief of Staff does not search url before upsert"
+fi
+if ! grep -Fq -- 'Pass `url` `{ system, id }`' "${chief}"; then
+  fail "Chief of Staff does not pass url { system, id } on upsert"
+fi
+if ! grep -Fq -- 'data.repo' "${chief}"; then
+  fail "Chief of Staff does not name data.repo for GitHub"
+fi
+if ! grep -Fq -- 'search `repo`' "${chief}"; then
+  fail "Chief of Staff does not search repo before upsert"
+fi
 if grep -Eiq -- 'wait until|#54|living/code pointer PR' "${dream_skill}"; then
   fail "Dream skill still defers Chief of Staff lines"
 fi
+
+spec_doc="${repo_root}/docs/SPEC.md"
+mcp_tools_doc="${repo_root}/docs/MCP_TOOLS.md"
+if [[ ! -f "${spec_doc}" ]]; then
+  fail "missing ${spec_doc}"
+fi
+if grep -Fq -- 'due, link, repo' "${spec_doc}"; then
+  fail "docs/SPEC.md rewrite bag still lists link as a data key"
+fi
+if ! grep -Fq -- 'due, repo, url (https), receipt' "${spec_doc}"; then
+  fail "docs/SPEC.md rewrite bag does not keep due, repo, url (https), receipt"
+fi
+if grep -Fq -- 'Merge keeps link' "${spec_doc}"; then
+  fail "docs/SPEC.md receipt write still says merge keeps link"
+fi
+if ! grep -Fq -- 'Merge keeps due and the other live keys' "${spec_doc}"; then
+  fail "docs/SPEC.md receipt write does not say merge keeps due and the other live keys"
+fi
+if [[ ! -f "${mcp_tools_doc}" ]]; then
+  fail "missing ${mcp_tools_doc}"
+fi
+if ! grep -Fq -- 'payload?, data?, url?, status?, metadata?' "${mcp_tools_doc}"; then
+  fail "docs/MCP_TOOLS.md upsert In omits top-level url?"
+fi
+if grep -Fq -- 'payload?, data?, status?, metadata?, base_updated_at?' "${mcp_tools_doc}"; then
+  fail "docs/MCP_TOOLS.md upsert In still omits url?"
+fi
+
+foundation_mcp="${skills_root}/foundation-mcp/SKILL.md"
+if [[ ! -f "${foundation_mcp}" ]]; then
+  fail "missing ${foundation_mcp}"
+fi
+if ! grep -Fq -- '`search` `{ url }`' "${foundation_mcp}"; then
+  fail "foundation-mcp does not search { url } for Gmail, Calendar, Drive"
+fi
+if ! grep -Fq -- '`search` `{ repo }`' "${foundation_mcp}"; then
+  fail "foundation-mcp does not search { repo } for GitHub"
+fi
+if grep -Eq -- 'search `\{ link \}`|data\.link|search `\{ living \}`|data\.living|search `\{ code \}`|data\.code|current picture' "${foundation_mcp}"; then
+  fail "foundation-mcp still uses a retired identity word"
+fi
+
+retired_word_hits() {
+  local file="$1"
+  grep -En -- \
+    'data\.link|search `\{ link \}`|search `{ link }`|data\.living|search `\{ living \}`|data\.code|search `\{ code \}`|data\.origin|search `\{ origin \}`|current picture' \
+    "${file}" || true
+}
+
+retired_fixture="${repo_root}/scripts/retired-words-fixture.md"
+if [[ ! -f "${retired_fixture}" ]]; then
+  fail "missing ${retired_fixture}"
+fi
+if [[ -z "$(retired_word_hits "${retired_fixture}")" ]]; then
+  fail "retired-words fixture must still show living/code/link-as-search so the grep has a lock"
+fi
+if ! grep -Fq -- 'data.origin' "${retired_fixture}"; then
+  fail "retired-words fixture must still show origin as a Foundation key"
+fi
+if ! grep -Eiq -- '(^|[^[:alnum:]])operator([^[:alnum:]]|$)' "${retired_fixture}"; then
+  fail "retired-words fixture must still show operator"
+fi
+if [[ -n "$(retired_word_hits "${foundation_mcp}")" ]]; then
+  fail "foundation-mcp still has a retired identity line"
+fi
+while IFS= read -r skill_md; do
+  [[ -n "${skill_md}" ]] || continue
+  hits="$(retired_word_hits "${skill_md}")"
+  if [[ -n "${hits}" ]]; then
+    fail "${skill_md} still uses a retired identity word"
+  fi
+done < <(find "${skills_root}" -mindepth 2 -maxdepth 3 -type f -name '*.md' | LC_ALL=C sort)
+
+# Operator on MCP / glossary skills only. Do not grep the whole tree.
+for glossary_skill in \
+  "${foundation_mcp}" \
+  "${skills_root}/create-bot/SKILL.md" \
+  "${skills_root}/create-bot/bot-template.md"
+do
+  if [[ ! -f "${glossary_skill}" ]]; then
+    fail "missing ${glossary_skill}"
+  fi
+  if grep -Eiq -- '(^|[^[:alnum:]])operator([^[:alnum:]]|$)' "${glossary_skill}"; then
+    fail "${glossary_skill} must not write operator"
+  fi
+done
 
 if [[ ! -d "${prompts_root}" ]]; then
   fail "missing ${prompts_root}"

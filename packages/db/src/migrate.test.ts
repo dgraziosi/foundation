@@ -97,21 +97,36 @@ test(
       );
       assert.match(tsDefault[0]?.column_default ?? "", /date_trunc/);
       assert.match(tsDefault[0]?.column_default ?? "", /milliseconds/);
-      const { rows: livingIdx } = await pool.query<{ indexname: string }>(
+      const { rows: urlIdx } = await pool.query<{ indexname: string }>(
+        `SELECT indexname FROM pg_indexes
+         WHERE schemaname = current_schema() AND indexname = 'nodes_url_live_uidx'`,
+      );
+      assert.equal(urlIdx[0]?.indexname, "nodes_url_live_uidx");
+      const { rows: repoIdx } = await pool.query<{ indexname: string }>(
+        `SELECT indexname FROM pg_indexes
+         WHERE schemaname = current_schema() AND indexname = 'nodes_repo_live_uidx'`,
+      );
+      assert.equal(repoIdx[0]?.indexname, "nodes_repo_live_uidx");
+      const { rows: leftoverLivingIdx } = await pool.query<{ indexname: string }>(
         `SELECT indexname FROM pg_indexes
          WHERE schemaname = current_schema() AND indexname = 'nodes_living_live_uidx'`,
       );
-      assert.equal(livingIdx[0]?.indexname, "nodes_living_live_uidx");
-      const { rows: codeIdx } = await pool.query<{ indexname: string }>(
+      assert.equal(leftoverLivingIdx.length, 0);
+      const { rows: leftoverCodeIdx } = await pool.query<{ indexname: string }>(
         `SELECT indexname FROM pg_indexes
          WHERE schemaname = current_schema() AND indexname = 'nodes_code_live_uidx'`,
       );
-      assert.equal(codeIdx[0]?.indexname, "nodes_code_live_uidx");
+      assert.equal(leftoverCodeIdx.length, 0);
       const { rows: leftoverOriginIdx } = await pool.query<{ indexname: string }>(
         `SELECT indexname FROM pg_indexes
          WHERE schemaname = current_schema() AND indexname = 'nodes_origin_live_uidx'`,
       );
       assert.equal(leftoverOriginIdx.length, 0);
+      const { rows: leftoverLinkIdx } = await pool.query<{ indexname: string }>(
+        `SELECT indexname FROM pg_indexes
+         WHERE schemaname = current_schema() AND indexname = 'nodes_link_live_uidx'`,
+      );
+      assert.equal(leftoverLinkIdx.length, 0);
       const { rows: receiptIdx } = await pool.query<{ indexname: string }>(
         `SELECT indexname FROM pg_indexes
          WHERE schemaname = current_schema() AND indexname = 'nodes_receipt_live_uidx'`,

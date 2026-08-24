@@ -37,29 +37,29 @@ export type Payload = z.infer<typeof PayloadSchema>;
 export const JsonObjectSchema = z.record(z.unknown());
 export type JsonObject = z.infer<typeof JsonObjectSchema>;
 
-/** Living outside systems that stay source of truth. Not GitHub. Not a blob. */
-export const LIVING_SYSTEMS = ["gmail", "calendar", "drive"] as const;
-export type LivingSystem = (typeof LIVING_SYSTEMS)[number];
+/** Drive, Gmail, or Calendar object. Not GitHub. Not a blob. Search `{ url }`. */
+export const URL_IDENTITY_SYSTEMS = ["gmail", "calendar", "drive"] as const;
+export type UrlIdentitySystem = (typeof URL_IDENTITY_SYSTEMS)[number];
 
-export const LivingSystemSchema = z.enum(LIVING_SYSTEMS);
-export const LivingRefSchema = z.object({
-  system: LivingSystemSchema,
+export const UrlIdentitySystemSchema = z.enum(URL_IDENTITY_SYSTEMS);
+export const UrlIdentitySchema = z.object({
+  system: UrlIdentitySystemSchema,
   id: z.string().trim().min(1),
 });
-export type LivingRef = z.infer<typeof LivingRefSchema>;
+export type UrlIdentity = z.infer<typeof UrlIdentitySchema>;
 
-/** Code on GitHub. Not a living Drive/Sheet. Not Cursor Origin the product. */
-export const CODE_SYSTEMS = ["github"] as const;
-export type CodeSystem = (typeof CODE_SYSTEMS)[number];
+/** GitHub object. Not Gmail, Calendar, or Drive. Not Cursor Origin. */
+export const REPO_SYSTEMS = ["github"] as const;
+export type RepoSystem = (typeof REPO_SYSTEMS)[number];
 
-export const CodeSystemSchema = z.enum(CODE_SYSTEMS);
-export const CodeRefSchema = z.object({
-  system: CodeSystemSchema,
+export const RepoSystemSchema = z.enum(REPO_SYSTEMS);
+export const RepoRefSchema = z.object({
+  system: RepoSystemSchema,
   id: z.string().trim().min(1),
 });
-export type CodeRef = z.infer<typeof CodeRefSchema>;
+export type RepoRef = z.infer<typeof RepoRefSchema>;
 
-/** Mail sent or calendar event gone. Pointer only — never fetch or mirror bodies. */
+/** Mail sent or calendar event gone. Store the ref only — never fetch or mirror bodies. */
 export const RECEIPT_SYSTEMS = ["gmail", "calendar"] as const;
 export type ReceiptSystem = (typeof RECEIPT_SYSTEMS)[number];
 

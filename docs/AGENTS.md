@@ -53,3 +53,16 @@ Named skill folders under [`.agents/skills/`](../.agents/skills/). Do not paste 
 | [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/) | Weekly graph-hygiene routine |
 | [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/) | Weekday product-update routine |
 | [`.agents/skills/repo-leak-scan/`](../.agents/skills/repo-leak-scan/) | Optional git-tree scan for secrets (no vault key) |
+
+## Everyday words
+
+Write everyday English. Tester fails a new glossary word that is not a feature name, same as OPERATIONS voice. Feature brands only: Dream, Vault. Url and repo are ordinary words. Link is the edge verb.
+
+- **record** — the node
+- **activity** — the audit log
+- **user** — the human who runs Compose
+- **bot** — a named role
+
+Do not mint Replay, Reconcile, Hygiene, Living, Code, Present, Current picture, or Pointer.
+
+If you touch MCP or these words, every skill that cites the vault ships in the same PR. Tester fails a skill that still uses a retired word, same as OPERATIONS voice.

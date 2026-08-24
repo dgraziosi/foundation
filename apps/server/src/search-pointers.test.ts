@@ -2,13 +2,16 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createPool, migrate, seedSystemOntology, type Pool } from "@foundation/db";
 import {
-  CODE_HIT_SUGGESTION,
-  CODE_MISS_SUGGESTION,
-  LIVING_HIT_SUGGESTION,
+  CODE_KEY_REFUSED_SUGGESTION,
+  LINK_KEY_REFUSED_SUGGESTION,
+  LIVING_KEY_REFUSED_SUGGESTION,
   ORIGIN_KEY_REFUSED_SUGGESTION,
+  REPO_HIT_SUGGESTION,
+  REPO_MISS_SUGGESTION,
   SEARCH_NO_SELECTOR_SUGGESTION,
   SearchInputSchema,
   URL_FIXTURE,
+  URL_HIT_SUGGESTION,
   isToolError,
 } from "@foundation/schema";
 import { getGraphNode, searchGraphNodes, upsertGraphNode } from "./graph.js";
@@ -29,20 +32,20 @@ async function poolForSchema(schema: string): Promise<Pool> {
 }
 
 test(
-  "living, code, and url write / get / search / twin-refuse / url-not-identity",
+  "url, repo, and data.url write / get / search / twin-refuse / https-not-identity",
   { skip: !databaseUrl },
   async (t) => {
     if (!databaseUrl) {
       return;
     }
-    const pool = await poolForSchema("search_filters_pointers");
+    const pool = await poolForSchema("search_filters_url_repo");
     try {
-      await t.test("living plus url writes, get returns both, search living hits", async () => {
+      await t.test("url plus data.url writes, get returns both, search url hits", async () => {
         const sheet = await upsertGraphNode(pool, {
           type: "note",
-          title: "Throwaway living sheet",
+          title: "Throwaway url sheet",
+          url: { system: "drive", id: "file-fixture-1" },
           data: {
-            living: { system: "drive", id: "file-fixture-1" },
             url: URL_FIXTURE,
           },
         });
@@ -50,19 +53,34 @@ test(
         if (isToolError(sheet)) {
           return;
         }
-        assert.deepEqual(sheet.node.data.living, { system: "drive", id: "file-fixture-1" });
+        assert.deepEqual(sheet.node.metadata.url, { system: "drive", id: "file-fixture-1" });
         assert.equal(sheet.node.data.url, URL_FIXTURE);
+        assert.equal(sheet.node.data.link, undefined);
+
+        const smashed = await upsertGraphNode(pool, {
+          id: sheet.node.id,
+          type: "note",
+          title: "Throwaway url sheet",
+          metadata: { url: { system: "gmail", id: "msg-fixture-smash" } },
+          base_updated_at: sheet.node.updated_at,
+        });
+        assert.equal(isToolError(smashed), false);
+        if (isToolError(smashed)) {
+          return;
+        }
+        assert.deepEqual(smashed.node.metadata.url, { system: "drive", id: "file-fixture-1" });
+        assert.equal(smashed.node.data.url, URL_FIXTURE);
 
         const got = await getGraphNode(pool, sheet.node.id);
         assert.equal(isToolError(got), false);
         if (isToolError(got)) {
           return;
         }
-        assert.deepEqual(got.node.data.living, { system: "drive", id: "file-fixture-1" });
+        assert.deepEqual(got.node.metadata.url, { system: "drive", id: "file-fixture-1" });
         assert.equal(got.node.data.url, URL_FIXTURE);
 
         const hit = await searchGraphNodes(pool, {
-          living: { system: "drive", id: "file-fixture-1" },
+          url: { system: "drive", id: "file-fixture-1" },
         });
         assert.equal(isToolError(hit), false);
         if (isToolError(hit)) {
@@ -70,23 +88,23 @@ test(
         }
         assert.equal(hit.nodes.length, 1);
         assert.equal(hit.nodes[0]?.id, sheet.node.id);
-        assert.equal(hit.suggestion, LIVING_HIT_SUGGESTION);
+        assert.equal(hit.suggestion, URL_HIT_SUGGESTION);
       });
 
-      await t.test("code writes, search code hits, twins refuse", async () => {
+      await t.test("repo writes, search repo hits, twins refuse", async () => {
         const repo = await upsertGraphNode(pool, {
           type: "note",
           title: "Throwaway github object",
-          data: { code: { system: "github", id: "repo-fixture-1" } },
+          data: { repo: { system: "github", id: "repo-fixture-1" } },
         });
         assert.equal(isToolError(repo), false);
         if (isToolError(repo)) {
           return;
         }
-        assert.deepEqual(repo.node.data.code, { system: "github", id: "repo-fixture-1" });
+        assert.deepEqual(repo.node.data.repo, { system: "github", id: "repo-fixture-1" });
 
         const hit = await searchGraphNodes(pool, {
-          code: { system: "github", id: "repo-fixture-1" },
+          repo: { system: "github", id: "repo-fixture-1" },
         });
         assert.equal(isToolError(hit), false);
         if (isToolError(hit)) {
@@ -94,12 +112,12 @@ test(
         }
         assert.equal(hit.nodes.length, 1);
         assert.equal(hit.nodes[0]?.id, repo.node.id);
-        assert.equal(hit.suggestion, CODE_HIT_SUGGESTION);
+        assert.equal(hit.suggestion, REPO_HIT_SUGGESTION);
 
         const twin = await upsertGraphNode(pool, {
           type: "note",
           title: "Throwaway github twin",
-          data: { code: { system: "github", id: "repo-fixture-1" } },
+          data: { repo: { system: "github", id: "repo-fixture-1" } },
         });
         assert.equal(isToolError(twin), true);
         if (!isToolError(twin)) {
@@ -110,40 +128,41 @@ test(
         assert.match(twin.suggestion ?? "", /do not create a twin/i);
 
         const miss = await searchGraphNodes(pool, {
-          code: { system: "github", id: "no-such-repo" },
+          repo: { system: "github", id: "no-such-repo" },
         });
         assert.equal(isToolError(miss), false);
         if (!isToolError(miss)) {
           assert.deepEqual(miss.nodes, []);
-          assert.equal(miss.suggestion, CODE_MISS_SUGGESTION);
+          assert.equal(miss.suggestion, REPO_MISS_SUGGESTION);
         }
       });
 
-      await t.test("living refuses github; code refuses drive", async () => {
-        const livingGithub = await upsertGraphNode(pool, {
+      await t.test("url refuses github; repo refuses drive", async () => {
+        const urlGithub = await upsertGraphNode(pool, {
           type: "note",
-          title: "Throwaway living github",
-          data: { living: { system: "github", id: "repo-fixture-1" } },
+          title: "Throwaway url github",
+          // @ts-expect-error github is data.repo, not url
+          url: { system: "github", id: "repo-fixture-1" },
         });
-        assert.equal(isToolError(livingGithub), true);
-        if (isToolError(livingGithub)) {
-          assert.match(livingGithub.error, /Unknown living.system "github"/);
-          assert.match(livingGithub.suggestion ?? "", /data.code/i);
+        assert.equal(isToolError(urlGithub), true);
+        if (isToolError(urlGithub)) {
+          assert.match(urlGithub.error, /Unknown url.system "github"/);
+          assert.match(urlGithub.suggestion ?? "", /data.repo/i);
         }
 
-        const codeDrive = await upsertGraphNode(pool, {
+        const repoDrive = await upsertGraphNode(pool, {
           type: "note",
-          title: "Throwaway code drive",
-          data: { code: { system: "drive", id: "file-fixture-1" } },
+          title: "Throwaway repo drive",
+          data: { repo: { system: "drive", id: "file-fixture-1" } },
         });
-        assert.equal(isToolError(codeDrive), true);
-        if (isToolError(codeDrive)) {
-          assert.match(codeDrive.error, /Unknown code.system "drive"/);
-          assert.match(codeDrive.suggestion ?? "", /data.living/i);
+        assert.equal(isToolError(repoDrive), true);
+        if (isToolError(repoDrive)) {
+          assert.match(repoDrive.error, /Unknown repo.system "drive"/);
+          assert.match(repoDrive.suggestion ?? "", /search \{ url \}/i);
         }
       });
 
-      await t.test("url is not unique and not identity; null clears; bad hrefs refuse", async () => {
+      await t.test("data.url is not unique and not identity; null clears; bad hrefs refuse", async () => {
         const first = await upsertGraphNode(pool, {
           type: "note",
           title: "Throwaway url first",
@@ -163,12 +182,12 @@ test(
         assert.equal(second.node.data.url, URL_FIXTURE);
         assert.notEqual(first.node.id, second.node.id);
 
-        const livingMiss = await searchGraphNodes(pool, {
-          living: { system: "drive", id: "file-fixture-url-only" },
+        const urlMiss = await searchGraphNodes(pool, {
+          url: { system: "drive", id: "file-fixture-url-only" },
         });
-        assert.equal(isToolError(livingMiss), false);
-        if (!isToolError(livingMiss)) {
-          assert.deepEqual(livingMiss.nodes, []);
+        assert.equal(isToolError(urlMiss), false);
+        if (!isToolError(urlMiss)) {
+          assert.deepEqual(urlMiss.nodes, []);
         }
 
         for (const bad of [
@@ -184,6 +203,13 @@ test(
           assert.equal(isToolError(refused), true, `expected refuse for ${bad}`);
         }
 
+        const objectUrl = await upsertGraphNode(pool, {
+          type: "note",
+          title: "Throwaway object data.url",
+          data: { url: { system: "drive", id: "file-fixture-1" } },
+        });
+        assert.equal(isToolError(objectUrl), true);
+
         const cleared = await upsertGraphNode(pool, {
           id: first.node.id,
           type: "note",
@@ -197,27 +223,77 @@ test(
         }
       });
 
-      await t.test("leftover origin write refuses; search origin is not a selector", async () => {
-        const leftover = await upsertGraphNode(pool, {
+      await t.test("leftover living / code / origin / link writes refuse; leftover search is not a selector", async () => {
+        const leftoverOrigin = await upsertGraphNode(pool, {
           type: "note",
           title: "Throwaway leftover origin",
           data: { origin: { system: "drive", id: "file-fixture-1" } },
         });
-        assert.equal(isToolError(leftover), true);
-        if (isToolError(leftover)) {
-          assert.match(leftover.error, /data.origin is not a Foundation key/);
-          assert.equal(leftover.suggestion, ORIGIN_KEY_REFUSED_SUGGESTION);
+        assert.equal(isToolError(leftoverOrigin), true);
+        if (isToolError(leftoverOrigin)) {
+          assert.match(leftoverOrigin.error, /data.origin is not a Foundation key/);
+          assert.equal(leftoverOrigin.suggestion, ORIGIN_KEY_REFUSED_SUGGESTION);
         }
 
-        const parsed = SearchInputSchema.parse({
-          origin: { system: "gmail", id: "msg-fixture-1" },
+        const leftoverLiving = await upsertGraphNode(pool, {
+          type: "note",
+          title: "Throwaway leftover living",
+          data: { living: { system: "drive", id: "file-fixture-1" } },
         });
-        assert.equal("origin" in parsed, false);
-        const noSelector = await searchGraphNodes(pool, parsed);
-        assert.equal(isToolError(noSelector), true);
-        if (isToolError(noSelector)) {
-          assert.match(noSelector.error, /query or a filter/);
-          assert.equal(noSelector.suggestion, SEARCH_NO_SELECTOR_SUGGESTION);
+        assert.equal(isToolError(leftoverLiving), true);
+        if (isToolError(leftoverLiving)) {
+          assert.match(leftoverLiving.error, /data.living is not a Foundation key/);
+          assert.equal(leftoverLiving.suggestion, LIVING_KEY_REFUSED_SUGGESTION);
+        }
+
+        const leftoverCode = await upsertGraphNode(pool, {
+          type: "note",
+          title: "Throwaway leftover code",
+          data: { code: { system: "github", id: "repo-fixture-1" } },
+        });
+        assert.equal(isToolError(leftoverCode), true);
+        if (isToolError(leftoverCode)) {
+          assert.match(leftoverCode.error, /data.code is not a Foundation key/);
+          assert.equal(leftoverCode.suggestion, CODE_KEY_REFUSED_SUGGESTION);
+        }
+
+        const leftoverLink = await upsertGraphNode(pool, {
+          type: "note",
+          title: "Throwaway leftover link",
+          data: { link: { system: "drive", id: "file-fixture-1" } },
+        });
+        assert.equal(isToolError(leftoverLink), true);
+        if (isToolError(leftoverLink)) {
+          assert.match(leftoverLink.error, /data.link is not a Foundation key/);
+          assert.equal(leftoverLink.suggestion, LINK_KEY_REFUSED_SUGGESTION);
+        }
+
+        const hrefOnly = SearchInputSchema.parse({ url: URL_FIXTURE });
+        assert.equal(hrefOnly.url, undefined);
+        const hrefSearch = await searchGraphNodes(pool, hrefOnly);
+        assert.equal(isToolError(hrefSearch), true);
+        if (isToolError(hrefSearch)) {
+          assert.match(hrefSearch.error, /query or a filter/);
+          assert.equal(hrefSearch.suggestion, SEARCH_NO_SELECTOR_SUGGESTION);
+        }
+
+        for (const leftover of [
+          { origin: { system: "gmail", id: "msg-fixture-1" } },
+          { living: { system: "gmail", id: "msg-fixture-1" } },
+          { code: { system: "github", id: "repo-fixture-1" } },
+          { link: { system: "gmail", id: "msg-fixture-1" } },
+        ]) {
+          const parsed = SearchInputSchema.parse(leftover);
+          assert.equal("origin" in parsed, false);
+          assert.equal("living" in parsed, false);
+          assert.equal("code" in parsed, false);
+          assert.equal("link" in parsed, false);
+          const noSelector = await searchGraphNodes(pool, parsed);
+          assert.equal(isToolError(noSelector), true);
+          if (isToolError(noSelector)) {
+            assert.match(noSelector.error, /query or a filter/);
+            assert.equal(noSelector.suggestion, SEARCH_NO_SELECTOR_SUGGESTION);
+          }
         }
       });
     } finally {

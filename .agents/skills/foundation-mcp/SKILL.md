@@ -15,14 +15,14 @@ Look up the live schema at call time (`bootstrap`, `inspect_ontology`, or the se
 
 - `bootstrap` — first attach / what tools and spine exist
 - `lookup` — a name, not a UUID yet
-- `get` — already have a UUID, need the current picture (not activity)
-- `list_activity` — already have a UUID, need the diary for that node (`target`)
+- `get` — already have a UUID, need the record (not activity)
+- `list_activity` — already have a UUID, need the diary for that record (`target`)
 - `working_set` — already have a UUID, need the open work around it
-- `search` — list or find without a bound id. `search` `{ living }` finds a Gmail, Calendar, or Drive object. `search` `{ code }` finds a GitHub object. `search` `{ receipt }` looks up a sent-mail or cleared-event pointer, then `get`. Same tool, not a new verb.
-- `upsert` — write or patch a node; passing `payload` replaces that body. A bot writes `data.receipt` after send or clear. The server does not invent it.
+- `search` — list or find without a bound id. `search` `{ url }` finds a Gmail, Calendar, or Drive object. `search` `{ repo }` finds a GitHub object. `search` `{ receipt }` looks up a sent-mail or cleared-event receipt, then `get`. Same tool, not a new verb.
+- `upsert` — write or patch a record; passing `payload` replaces that body. A bot writes `data.receipt` after send or clear. The server does not invent it.
 - `link` — accept a suggested edge or hang a child
 
-A node is what is true now, short. History stays in activity. To rewrite one node: `get` → `list_activity` `{ target }` → keep what still matters, invent nothing → `upsert` the same id with a short `payload` and `base_updated_at`. One node at a time. Not a background job. The server does not invent the picture.
+A record is what is true now, short. History stays in activity. To rewrite one record: `get` → `list_activity` `{ target }` → keep what still matters, invent nothing → `upsert` the same id with a short `payload` and `base_updated_at`. One record at a time. Not a background job. The server does not invent the body.
 
 ## Confirm
 
