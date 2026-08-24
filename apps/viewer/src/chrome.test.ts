@@ -134,6 +134,7 @@ test("collection empty copy and board width", async () => {
   assert.doesNotMatch(views, /No tasks yet/);
   assert.match(views, /resolveBindValue\(node, fields, groupBind\) === column/);
   assert.doesNotMatch(views, /node\.status === column/);
+  assert.match(views, /if \(columns\.length === 0\) \{\s*return <Quiet>Nothing yet\.<\/Quiet>;/);
   assert.match(views, /w-\[233px\]/);
   assert.match(views, /collection-preview/);
   const typeView = await src("pages/TypeViewPage.tsx");

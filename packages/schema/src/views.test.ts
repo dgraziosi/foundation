@@ -228,6 +228,12 @@ test("board columns follow view.group, not a hard-coded status bucket", () => {
   ];
   const byDate: ViewDeclaration = { id: "board", group: { bind: "date" } };
   assert.deepEqual(boardColumnIds([dueField], byDate, { nodes: dated }), ["2026-08-20", "2026-08-28"]);
+  assert.deepEqual(boardColumnIds([dueField], byDate, { nodes: [] }), []);
+  assert.deepEqual(
+    boardColumnIds([dueField], byDate, { nodes: [{ id: "4", title: "Undated", status: "active", data: {} }] }),
+    [],
+  );
+  assert.deepEqual(boardColumnIds([dueField], { id: "board" }), ["active", "completed", "archived"]);
 });
 
 test("collection chips are subtitle fields only", () => {

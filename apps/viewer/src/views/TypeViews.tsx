@@ -234,6 +234,9 @@ export function BoardView({
   onSelect: (id: string) => void;
 }) {
   const groupBind = boardGroupBind(view);
+  if (columns.length === 0) {
+    return <Quiet>Nothing yet.</Quiet>;
+  }
   return (
     <div className="flex flex-wrap items-start gap-md" data-surface="board">
       {columns.map((column) => {
