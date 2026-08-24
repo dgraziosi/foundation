@@ -15,10 +15,12 @@
 # (`pnpm start`) when /health is down. First-day 0 user records is
 # healthy. Refuses a missing data folder, a postgres/ tree without
 # PG_VERSION, and an empty live cluster next to a real one (a second
-# postgres tree or a backup that has people while live has 0 or the
-# live count is unknown) before any start or initdb. People means
-# blob files or a dump with node rows. A sibling postgres/base tree
-# is not people. Does not mkdir
+# postgres tree or a backup that has people while live has 0) before
+# any start or initdb. A failed count is not empty: a stopped real
+# vault must start. Count-unknown refuses only when live looks empty
+# without psql (no blobs, and no postgres/ or a first-day-empty
+# cluster). People means blob files or a dump with node rows. A
+# sibling postgres/base tree is not people. Does not mkdir
 # over a miss. Does not write the graph. Does not put a live path in
 # git.
 #
@@ -216,23 +218,59 @@ foundation_keep_vault_up_nearby_has_people() {
   foundation_keep_vault_up_second_tree_has_people "${data_dir}"
 }
 
-# Live is empty when there is no postgres tree yet (first-day), the
-# live count is 0, or the count is unknown (psql cannot talk while
-# /health is down). Count-unknown is the same family as a people-unknown
-# dump: fail closed. Nearby people → refuse. Do not start. Do not initdb.
+# Live blob files. Same rule as a second tree: files in blobs/, not
+# an empty blobs/ folder.
+foundation_keep_vault_up_live_has_blobs() {
+  local data_dir="${1%/}"
+  local found=""
+  [[ -d "${data_dir}/blobs" ]] || return 1
+  found="$(find "${data_dir}/blobs" -type f -print -quit 2>/dev/null || true)"
+  [[ -n "${found}" ]]
+}
+
+# Real cluster: PG_VERSION plus postgres/base with entries. A lone
+# version file (first-day-empty leftover) is not a real tree.
+foundation_keep_vault_up_live_has_real_postgres_tree() {
+  local postgres="${1%/}/postgres"
+  local found=""
+  [[ -e "${postgres}/PG_VERSION" && -d "${postgres}/base" ]] || return 1
+  found="$(find "${postgres}/base" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null || true)"
+  [[ -n "${found}" ]]
+}
+
+# Without psql: empty when there are no live blobs and either no
+# postgres/ (first-day) or only a first-day-empty cluster (PG_VERSION,
+# no real base/). Blobs or a real postgres tree are not empty.
+foundation_keep_vault_up_live_looks_empty_without_psql() {
+  local data_dir="${1%/}"
+  if foundation_keep_vault_up_live_has_blobs "${data_dir}"; then
+    return 1
+  fi
+  if foundation_keep_vault_up_may_init "${data_dir}"; then
+    return 0
+  fi
+  if foundation_keep_vault_up_live_has_real_postgres_tree "${data_dir}"; then
+    return 1
+  fi
+  return 0
+}
+
+# Numeric 0 is empty. A failed count is not empty unless live looks
+# empty without psql. Nearby people then refuse. Do not start. Do not
+# initdb. A stopped real vault must start.
 foundation_keep_vault_up_live_is_empty() {
   local repo_root="$1"
   local data_dir="$2"
   local count
-  if foundation_keep_vault_up_may_init "${data_dir}"; then
-    return 0
-  fi
   count="$(foundation_keep_vault_up_live_user_record_count "${repo_root}" || true)"
   count="${count//[$' \t\n\r']/}"
-  if [[ ! "${count}" =~ ^[0-9]+$ ]]; then
-    return 0
+  if [[ "${count}" =~ ^[0-9]+$ ]]; then
+    if [[ "${count}" == "0" ]]; then
+      return 0
+    fi
+    return 1
   fi
-  ((count == 0))
+  foundation_keep_vault_up_live_looks_empty_without_psql "${data_dir}"
 }
 
 foundation_keep_vault_up_refuse_empty_next_to_real() {
@@ -470,8 +508,9 @@ foundation_keep_vault_up_live_user_record_count() {
 
 # After a start (or when /health is already green): existing data dir
 # must have the live Postgres files. First-day 0 user records is
-# healthy. Empty live next to a real cluster (backup or second tree
-# has people) is a miss. /health green is not enough. Does not mkdir.
+# healthy. Empty-next-to-real is the refuse-before-start path, not
+# this check. A failed count here may nag could-not-count; it must
+# not refuse start. /health green is not enough. Does not mkdir.
 foundation_keep_vault_up_cluster_ok() {
   local repo_root="$1"
   local data_dir="$2"
@@ -493,10 +532,6 @@ foundation_keep_vault_up_cluster_ok() {
   count="$(printf '%s' "${count}" | tr -d '[:space:]')"
   if [[ ! "${count}" =~ ^[0-9]+$ ]]; then
     foundation_keep_vault_up_nag "could not count records in the live cluster."
-    return 1
-  fi
-  if ((count == 0)) && foundation_keep_vault_up_nearby_has_people "${data_dir}" "${backup_root}"; then
-    foundation_keep_vault_up_nag "the live vault has no user records, but a backup or another postgres tree nearby has people. This looks like an empty cluster next to a real one."
     return 1
   fi
   return 0

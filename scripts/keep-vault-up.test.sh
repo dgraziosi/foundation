@@ -478,8 +478,9 @@ if [[ -s "${start_log}" ]]; then
   fail "down empty-live-next-to-dump must not start (log: $(cat "${start_log}"))"
 fi
 
-# /health down, postgres/ exists, real count miss (do not inject 0), dump with
-# people: refuse BEFORE start. Nag empty-next-to-real, not only could-not-count.
+# /health down, empty-looking live (PG_VERSION only, no blobs, no real
+# cluster), real count miss (do not inject 0), dump with people: refuse
+# BEFORE start. Nag empty-next-to-real, not only could-not-count.
 count_miss="${tmp_root}/count-miss"
 mkdir -p "${count_miss}/postgres"
 printf '%s\n' '16' >"${count_miss}/postgres/PG_VERSION"
@@ -555,6 +556,66 @@ if [[ -s "${start_log}" ]]; then
   fail "count-unknown next to second tree must not start (log: $(cat "${start_log}"))"
 fi
 
+# Count miss on a real postgres tree (PG_VERSION + base/), backups nearby:
+# START (heal). Do not refuse as empty-next-to-real. Nested so a later
+# first-day folder under tmp_root does not see these blobs as people.
+heal_box="${tmp_root}/heal-box"
+heal_real="${heal_box}/real"
+mkdir -p "${heal_real}/postgres/base/16384"
+printf '%s\n' '16' >"${heal_real}/postgres/PG_VERSION"
+: >"${start_log}"
+set +e
+out="$(
+  FOUNDATION_DATA="${heal_real}"
+  BACKUP_ROOT="${tmp_root}/backups-people"
+  DATABASE_URL='postgres://foundation:foundation@127.0.0.1:1/foundation'
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_health_ok() { return 1; }
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
+    return 0
+  }
+  foundation_keep_vault_up_wait_health() { return 0; }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+set -e
+if [[ "$(wc -l <"${start_log}" | tr -d ' ')" != "1" ]]; then
+  fail "count-miss on a real postgres tree must start (log: $(cat "${start_log}"); out: ${out})"
+fi
+if grep -Fq -- 'empty cluster next to a real one' <<<"${out}"; then
+  fail "heal path must not refuse as empty-next-to-real (got: ${out})"
+fi
+
+# Count miss on live with blobs, backups nearby: START (heal).
+heal_blobs="${heal_box}/blobs"
+mkdir -p "${heal_blobs}/postgres" "${heal_blobs}/blobs"
+printf '%s\n' '16' >"${heal_blobs}/postgres/PG_VERSION"
+printf '%s\n' 'live-blob' >"${heal_blobs}/blobs/fixture"
+: >"${start_log}"
+set +e
+out="$(
+  FOUNDATION_DATA="${heal_blobs}"
+  BACKUP_ROOT="${tmp_root}/backups-people"
+  DATABASE_URL='postgres://foundation:foundation@127.0.0.1:1/foundation'
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_health_ok() { return 1; }
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
+    return 0
+  }
+  foundation_keep_vault_up_wait_health() { return 0; }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+set -e
+if [[ "$(wc -l <"${start_log}" | tr -d ' ')" != "1" ]]; then
+  fail "count-miss on live with blobs must start (log: $(cat "${start_log}"); out: ${out})"
+fi
+if grep -Fq -- 'empty cluster next to a real one' <<<"${out}"; then
+  fail "live blobs heal path must not refuse as empty-next-to-real (got: ${out})"
+fi
+
 # First-day folder (no postgres/) next to a dump with people: refuse. Do not initdb.
 first_init="${tmp_root}/first-init"
 mkdir -p "${first_init}"
@@ -587,12 +648,14 @@ if [[ -e "${first_init}/postgres" ]]; then
 fi
 
 # First-day folder (no postgres/) and no nearby people: may start (init).
-blank_first="${tmp_root}/blank-first"
-mkdir -p "${blank_first}" "${tmp_root}/backups-blank"
+# Own parent so other fixtures under tmp_root are not "nearby people".
+blank_box="${tmp_root}/blank-box"
+blank_first="${blank_box}/first"
+mkdir -p "${blank_first}" "${blank_box}/backups-blank"
 : >"${start_log}"
 out="$(
   FOUNDATION_DATA="${blank_first}"
-  BACKUP_ROOT="${tmp_root}/backups-blank"
+  BACKUP_ROOT="${blank_box}/backups-blank"
   foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
   foundation_keep_vault_up_health_ok() { return 1; }
   foundation_keep_vault_up_start() {

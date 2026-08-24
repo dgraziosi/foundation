@@ -42,9 +42,11 @@ Run in order:
 
 2. If `$FOUNDATION_DATA/postgres` exists and `PG_VERSION` is missing, **refuse.** That is a miss. Do not mkdir an empty live cluster over a miss. Do not start.
 
-3. Empty first-day folder may init. Existing folder without `PG_VERSION`: refuse.
+3. Empty cluster next to a real one: **refuse before start.** Numeric 0 live next to people refuses. First-day with no `postgres/` next to people refuses. A failed count is not empty: a stopped real vault must start. Count-unknown next to people refuses only when live looks empty without psql (no blobs, and no `postgres/` or a first-day-empty cluster). If live has blobs or a real postgres tree (`PG_VERSION` plus a cluster that is not first-day empty), start even when backups exist nearby and psql cannot count. People means blob files or a dump with node rows. A sibling `postgres/base` tree is not people.
 
-4. `GET /health` — unauthenticated. Default `http://127.0.0.1:8787/health`. Expect HTTP 200 and:
+4. Empty first-day folder may init when step 3 did not refuse. Existing folder without `PG_VERSION`: refuse.
+
+5. `GET /health` — unauthenticated. Default `http://127.0.0.1:8787/health`. Expect HTTP 200 and:
 
    ```json
    { "ok": true, "service": "foundation", "db": "up" }
@@ -52,13 +54,11 @@ Run in order:
 
    Fail if the request errors, status is not 200, `ok` is not true, `service` is not `foundation`, or `db` is not `up`.
 
-5. If health is down: start Postgres (the data folder’s postgres tree), then the app (`pnpm start`) **once**. Do not loop. Do not delete the data folder. Do not write the graph. Wait until `GET /health` is green, or about one minute. If start fails: **nag** that start failed. If health still fails: **nag.**
+6. If health is down: start Postgres (the data folder’s postgres tree), then the app (`pnpm start`) **once**. Do not loop. Do not delete the data folder. Do not write the graph. Wait until `GET /health` is green, or about one minute. If start fails: **nag** that start failed. If health still fails: **nag.** After a heal start, a failed count may nag could-not-count. Do not refuse start as empty-next-to-real.
 
-6. `/health` green is not enough. Version file alone is not enough. A first-day vault with 0 user records is healthy. **Nag** if this looks like an empty cluster next to a real one: `PG_VERSION` exists, live user records are 0, and a second postgres tree or a backup has people.
+7. `/health` green is not enough. Version file alone is not enough. A first-day vault with 0 user records is healthy. Quiet only when health is green **and** the live folder is the intended real cluster (`PG_VERSION` present; not empty-live-next-to-real).
 
    Do not mkdir an empty live cluster over a miss.
-
-7. Quiet only when health is green **and** the live folder is the intended real cluster (`PG_VERSION` present; not empty-live-next-to-real).
 
 Nag on stderr. Say what failed and the smallest next look (start Postgres, then from the clone: `pnpm start`; or point the script at the data dir that still holds the graph). Leave the graph and `FOUNDATION_DATA` as they are. The product does not send mail. If the machine’s scheduler mails stderr, that is the nag. The weekday 9:15 report also pings in chat if `/health` is still down that morning.
 
