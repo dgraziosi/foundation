@@ -15,9 +15,11 @@
 # (`pnpm start`) when /health is down. First-day 0 user records is
 # healthy. Refuses a missing data folder, a postgres/ tree without
 # PG_VERSION, and an empty live cluster next to a real one (a second
-# postgres tree or a backup that has people while live has 0). Does
-# not mkdir over a miss. Does not write the graph. Does not put a
-# live path in git.
+# postgres tree or a backup that has people while live has 0) before
+# any start or initdb. People means blob files or a dump with node
+# rows. A sibling postgres/base tree is not people. Does not mkdir
+# over a miss. Does not write the graph. Does not put a live path in
+# git.
 #
 #   scripts/keep-vault-up.sh        — start if needed, then check
 #   scripts/keep-vault-up.sh stop   — stop the app, then Postgres.
@@ -125,20 +127,40 @@ foundation_keep_vault_up_nag() {
 
 # A SQL dump has people when it copies or inserts at least one nodes row.
 # Empty COPY (header then \.) is not people. First-day schema-only is not.
+# Bash only. Missing python3 must not treat a dump with people as empty.
+# Unreadable or unscanable dump: people-unknown (return 0), never "no people".
 foundation_keep_vault_up_sql_has_people() {
   local file="$1"
-  [[ -f "${file}" ]] || return 1
-  python3 -c '
-import re, sys
-text = open(sys.argv[1], errors="replace").read()
-if re.search(r"(?i)INSERT\s+INTO\s+(public\.)?nodes\b", text):
-    sys.exit(0)
-for m in re.finditer(r"(?is)COPY\s+(public\.)?nodes\b.*?\n(.*?)\\.", text):
-    body = m.group(2).strip()
-    if body:
-        sys.exit(0)
-sys.exit(1)
-' "${file}"
+  local line stripped
+  local in_copy=0
+
+  if [[ ! -e "${file}" ]]; then
+    return 1
+  fi
+  if [[ ! -f "${file}" || ! -r "${file}" ]]; then
+    return 0
+  fi
+
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    stripped="${line#"${line%%[![:space:]]*}"}"
+    if [[ "${stripped}" =~ ^[Ii][Nn][Ss][Ee][Rr][Tt][[:space:]]+[Ii][Nn][Tt][Oo][[:space:]]+([Pp][Uu][Bb][Ll][Ii][Cc]\.)?[Nn][Oo][Dd][Ee][Ss]([^[:alnum:]_]|$) ]]; then
+      return 0
+    fi
+    if [[ "${stripped}" =~ ^[Cc][Oo][Pp][Yy][[:space:]]+([Pp][Uu][Bb][Ll][Ii][Cc]\.)?[Nn][Oo][Dd][Ee][Ss]([^[:alnum:]_]|$) ]]; then
+      in_copy=1
+      continue
+    fi
+    if ((in_copy)); then
+      if [[ "${line}" == '\.' ]]; then
+        in_copy=0
+        continue
+      fi
+      if [[ -n "${stripped}" ]]; then
+        return 0
+      fi
+    fi
+  done < "${file}" || return 0
+  return 1
 }
 
 # Backup dumps under BACKUP_ROOT (and default sibling) that have people.
@@ -191,6 +213,34 @@ foundation_keep_vault_up_nearby_has_people() {
     return 0
   fi
   foundation_keep_vault_up_second_tree_has_people "${data_dir}"
+}
+
+# Live is empty when there is no postgres tree yet (first-day) or the
+# live count is 0. Nearby people → refuse. Do not start. Do not initdb.
+foundation_keep_vault_up_live_is_empty() {
+  local repo_root="$1"
+  local data_dir="$2"
+  local count
+  if foundation_keep_vault_up_may_init "${data_dir}"; then
+    return 0
+  fi
+  count="$(foundation_keep_vault_up_live_user_record_count "${repo_root}" || true)"
+  count="${count//[$' \t\n\r']/}"
+  [[ "${count}" =~ ^[0-9]+$ ]] && ((count == 0))
+}
+
+foundation_keep_vault_up_refuse_empty_next_to_real() {
+  local repo_root="$1"
+  local data_dir="$2"
+  local backup_root="$3"
+  if ! foundation_keep_vault_up_live_is_empty "${repo_root}" "${data_dir}"; then
+    return 0
+  fi
+  if foundation_keep_vault_up_nearby_has_people "${data_dir}" "${backup_root}"; then
+    foundation_keep_vault_up_nag "the live vault has no user records, but a backup or another postgres tree nearby has people. This looks like an empty cluster next to a real one."
+    return 1
+  fi
+  return 0
 }
 
 # Data folder missing: refuse. Do not mkdir.
@@ -533,6 +583,9 @@ foundation_keep_vault_up_main() {
     return 1
   fi
   if ! foundation_keep_vault_up_refuse_miss "${data_dir}"; then
+    return 1
+  fi
+  if ! foundation_keep_vault_up_refuse_empty_next_to_real "${repo_root}" "${data_dir}" "${backup_root}"; then
     return 1
   fi
 

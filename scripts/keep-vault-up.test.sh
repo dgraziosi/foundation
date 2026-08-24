@@ -108,9 +108,15 @@ fi
 
 dump_empty="$(mktemp)"
 dump_people="$(mktemp)"
+dump_copy="$(mktemp)"
+dump_bad="$(mktemp)"
 start_log="$(mktemp)"
 tmp_root="$(mktemp -d)"
-trap 'rm -f -- "${dump_empty}" "${dump_people}" "${start_log}"; rm -rf -- "${tmp_root}"' EXIT
+trap 'chmod u+r -- "${dump_bad}" 2>/dev/null || true; rm -f -- "${dump_empty}" "${dump_people}" "${dump_copy}" "${dump_bad}" "${start_log}"; rm -rf -- "${tmp_root}"' EXIT
+
+if awk '/^foundation_keep_vault_up_sql_has_people\(\)/,/^}/' "${keep_script}" | grep -q -- 'python3'; then
+  fail "sql_has_people must parse dumps in bash, not python3"
+fi
 
 printf '%s\n' '-- first-day dump' 'COPY public.nodes (id) FROM stdin;' '\.' >"${dump_empty}"
 if foundation_keep_vault_up_sql_has_people "${dump_empty}"; then
@@ -121,6 +127,28 @@ printf '%s\n' '-- dump with people' 'INSERT INTO nodes (id, title) VALUES ('\''0
 if ! foundation_keep_vault_up_sql_has_people "${dump_people}"; then
   fail "INSERT INTO nodes must count as people"
 fi
+
+printf '%s\n' 'COPY public.nodes (id) FROM stdin;' '00000000-0000-0000-0000-000000000001' '\.' >"${dump_copy}"
+if ! foundation_keep_vault_up_sql_has_people "${dump_copy}"; then
+  fail "COPY nodes with a row must count as people"
+fi
+
+printf '%s\n' '-- unreadable dump' >"${dump_bad}"
+chmod a-r -- "${dump_bad}"
+if ! foundation_keep_vault_up_sql_has_people "${dump_bad}"; then
+  fail "unreadable dump must count as people-unknown, not no people"
+fi
+chmod u+r -- "${dump_bad}"
+
+(
+  PATH=/nonexistent
+  if ! foundation_keep_vault_up_sql_has_people "${dump_people}"; then
+    fail "INSERT dump must count as people without python3 on PATH"
+  fi
+  if foundation_keep_vault_up_sql_has_people "${dump_empty}"; then
+    fail "empty COPY must stay not-people without python3 on PATH"
+  fi
+)
 
 role_sql="$(foundation_keep_vault_up_app_role_sql 'postgres://foundation:foundation@localhost:5432/foundation' role)"
 if ! grep -Fq -- 'CREATE ROLE "foundation"' <<<"${role_sql}"; then
@@ -417,6 +445,158 @@ if ! grep -Fq -- 'empty cluster next to a real one' <<<"${out}"; then
 fi
 if [[ -s "${start_log}" ]]; then
   fail "empty-live-next-to-backup must not start"
+fi
+
+# /health down, live 0, dump with people: refuse BEFORE start.
+: >"${start_log}"
+set +e
+out="$(
+  FOUNDATION_DATA="${empty_live}"
+  BACKUP_ROOT="${tmp_root}/backups-people"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_health_ok() { return 1; }
+  foundation_keep_vault_up_live_user_record_count() { printf '%s\n' '0'; }
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
+    return 0
+  }
+  foundation_keep_vault_up_wait_health() {
+    echo waited >>"${start_log}"
+    return 0
+  }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+set -e
+if ((rc == 0)); then
+  fail "down + empty live next to a dump with people should fail"
+fi
+if ! grep -Fq -- 'empty cluster next to a real one' <<<"${out}"; then
+  fail "down empty-live-next-to-dump did not nag (got: ${out})"
+fi
+if [[ -s "${start_log}" ]]; then
+  fail "down empty-live-next-to-dump must not start (log: $(cat "${start_log}"))"
+fi
+
+# First-day folder (no postgres/) next to a dump with people: refuse. Do not initdb.
+first_init="${tmp_root}/first-init"
+mkdir -p "${first_init}"
+: >"${start_log}"
+set +e
+out="$(
+  FOUNDATION_DATA="${first_init}"
+  BACKUP_ROOT="${tmp_root}/backups-people"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_health_ok() { return 1; }
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
+    return 0
+  }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+set -e
+if ((rc == 0)); then
+  fail "first-day next to a dump with people should fail"
+fi
+if ! grep -Fq -- 'empty cluster next to a real one' <<<"${out}"; then
+  fail "first-day-next-to-dump did not nag (got: ${out})"
+fi
+if [[ -s "${start_log}" ]]; then
+  fail "first-day next to a dump with people must not start"
+fi
+if [[ -e "${first_init}/postgres" ]]; then
+  fail "first-day next to a dump with people must not initdb"
+fi
+
+# First-day folder (no postgres/) and no nearby people: may start (init).
+blank_first="${tmp_root}/blank-first"
+mkdir -p "${blank_first}" "${tmp_root}/backups-blank"
+: >"${start_log}"
+out="$(
+  FOUNDATION_DATA="${blank_first}"
+  BACKUP_ROOT="${tmp_root}/backups-blank"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_health_ok() { return 1; }
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
+    mkdir -p "${blank_first}/postgres"
+    printf '%s\n' '16' >"${blank_first}/postgres/PG_VERSION"
+    return 0
+  }
+  foundation_keep_vault_up_wait_health() { return 0; }
+  foundation_keep_vault_up_live_user_record_count() { printf '%s\n' '0'; }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+if ((rc != 0)); then
+  fail "first-day with no nearby people should start (got ${rc}: ${out})"
+fi
+if [[ "$(wc -l <"${start_log}" | tr -d ' ')" != "1" ]]; then
+  fail "first-day with no nearby people must start once (log: $(cat "${start_log}"))"
+fi
+
+# python3 missing: dump with INSERT still refuses empty live (no start).
+nopy="${tmp_root}/nopython"
+mkdir -p "${nopy}"
+printf '%s\n' '#!/bin/sh' 'echo python3-should-not-run >&2' 'exit 127' >"${nopy}/python3"
+chmod +x "${nopy}/python3"
+: >"${start_log}"
+set +e
+out="$(
+  PATH="${nopy}:${PATH}"
+  FOUNDATION_DATA="${empty_live}"
+  BACKUP_ROOT="${tmp_root}/backups-people"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_health_ok() { return 1; }
+  foundation_keep_vault_up_live_user_record_count() { printf '%s\n' '0'; }
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
+    return 0
+  }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+set -e
+if ((rc == 0)); then
+  fail "empty live + dump with people must refuse without python3"
+fi
+if ! grep -Fq -- 'empty cluster next to a real one' <<<"${out}"; then
+  fail "no-python3 dump people did not nag (got: ${out})"
+fi
+if [[ -s "${start_log}" ]]; then
+  fail "no-python3 dump people must not start"
+fi
+
+# Unreadable dump: people-unknown. Empty live must refuse, not start.
+mkdir -p "${tmp_root}/backups-unreadable/sql"
+printf '%s\n' '-- cannot scan' >"${tmp_root}/backups-unreadable/sql/foundation-20000101.sql"
+chmod a-r -- "${tmp_root}/backups-unreadable/sql/foundation-20000101.sql"
+: >"${start_log}"
+set +e
+out="$(
+  FOUNDATION_DATA="${empty_live}"
+  BACKUP_ROOT="${tmp_root}/backups-unreadable"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_health_ok() { return 1; }
+  foundation_keep_vault_up_live_user_record_count() { printf '%s\n' '0'; }
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
+    return 0
+  }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+set -e
+chmod u+r -- "${tmp_root}/backups-unreadable/sql/foundation-20000101.sql" || true
+if ((rc == 0)); then
+  fail "empty live + unreadable dump must refuse"
+fi
+if ! grep -Fq -- 'empty cluster next to a real one' <<<"${out}"; then
+  fail "unreadable dump did not nag (got: ${out})"
+fi
+if [[ -s "${start_log}" ]]; then
+  fail "unreadable dump must not start"
 fi
 
 # Empty live next to a second postgres tree that has people: refuse.
