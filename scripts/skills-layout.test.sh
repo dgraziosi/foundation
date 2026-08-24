@@ -428,6 +428,23 @@ fi
 if grep -Fq -- 'actor_label: "operator"' "${repo_root}/apps/server/src/cas-safety.test.ts"; then
   fail "cas-safety.test.ts still uses actor_label operator"
 fi
+if grep -Eiq -- '(^|[^[:alnum:]])operator([^[:alnum:]]|$)' \
+  "${repo_root}/packages/schema/src/fields.test.ts" \
+  "${repo_root}/apps/server/src/graph.test.ts"; then
+  fail "fields.test.ts or graph.test.ts still says operator"
+fi
+if ! grep -Fq -- 'merge keeps user field' "${repo_root}/packages/schema/src/fields.test.ts"; then
+  fail "fields.test.ts does not say merge keeps user field"
+fi
+if ! grep -Fq -- 'Discrete action — user note.' "${repo_root}/apps/server/src/graph.test.ts"; then
+  fail "graph.test.ts does not say Discrete action — user note."
+fi
+if ! grep -Fq -- 'User description' "${repo_root}/apps/server/src/graph.test.ts"; then
+  fail "graph.test.ts does not say User description"
+fi
+if ! grep -Fq -- 'user { id } clear on a system view survives seed apply' "${repo_root}/apps/server/src/graph.test.ts"; then
+  fail "graph.test.ts does not say user { id } clear"
+fi
 if [[ -f "${repo_root}/apps/viewer/src/components/ui/sheet.tsx" ]]; then
   fail "unused Inspector sheet component is still present"
 fi
