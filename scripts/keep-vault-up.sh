@@ -84,7 +84,7 @@ foundation_keep_vault_up_engine_up() {
 # Once. Not --build. Quiet so a healed run writes nothing.
 foundation_keep_vault_up_compose_up() {
   local repo_root="$1"
-  docker compose -f "${repo_root}/docker-compose.yml" --project-directory "${repo_root}" up -d >/dev/null
+  docker compose -f "${repo_root}/docker-compose.yml" --project-directory "${repo_root}" up -d >/dev/null 2>&1
 }
 
 # About one minute: 12 tries, 5 seconds apart.
@@ -186,7 +186,7 @@ foundation_keep_vault_up_main() {
   fi
 
   if ! foundation_keep_vault_up_compose_up "${repo_root}"; then
-    foundation_keep_vault_up_nag "compose up ran once and /health still failed. From the clone: docker compose up -d"
+    foundation_keep_vault_up_nag "compose up failed to start. From the clone: docker compose up -d"
     return 1
   fi
 

@@ -44,6 +44,9 @@ fi
 if ! grep -Fq -- 'no records' "${health_doc}"; then
   fail "VAULT_HEALTH.md does not alert on zero records"
 fi
+if ! grep -Fq -- 'nag and stop' "${health_doc}"; then
+  fail "VAULT_HEALTH.md step 3 must nag and stop when Docker is missing"
+fi
 
 if grep -Eq -- '(^|[^[:alnum:]])(operator|seat)([^[:alnum:]]|$)' "${keep_script}" "${health_doc}"; then
   fail "keep-vault-up copy must not write operator or seat"
@@ -56,6 +59,12 @@ if grep -Eq -- 'compose[^[:cntrl:]]*--build|--build[^[:cntrl:]]*up' "${keep_scri
 fi
 if ! grep -Fq -- 'up -d' "${keep_script}"; then
   fail "keep-vault-up.sh does not run compose up -d"
+fi
+if ! grep -Eq -- 'up -d >/dev/null 2>&1' "${keep_script}"; then
+  fail "keep-vault-up.sh must hide compose stdout and stderr"
+fi
+if ! grep -Fq -- 'compose up failed to start' "${keep_script}"; then
+  fail "keep-vault-up.sh must nag that compose start failed"
 fi
 if grep -Eq -- 'compose[[:space:]]+down' "${keep_script}"; then
   fail "keep-vault-up.sh must not take Compose down"
@@ -211,6 +220,39 @@ if ! grep -Fq -- 'compose up ran once and /health still failed' <<<"${out}"; the
 fi
 if [[ "$(wc -l <"${compose_log}" | tr -d ' ')" != "1" ]]; then
   fail "still-down must not loop compose up"
+fi
+
+# compose up itself fails: nag that start failed, not that /health still failed.
+: >"${compose_log}"
+set +e
+out="$(
+  foundation_keep_vault_up_health_ok() { return 1; }
+  foundation_keep_vault_up_refuse_miss() { return 0; }
+  foundation_keep_vault_up_have_docker() { return 0; }
+  foundation_keep_vault_up_engine_up() { return 0; }
+  foundation_keep_vault_up_compose_up() {
+    echo compose >>"${compose_log}"
+    return 1
+  }
+  foundation_keep_vault_up_wait_health() {
+    echo waited >>"${compose_log}"
+    return 1
+  }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+set -e
+if ((rc == 0)); then
+  fail "compose start failure should fail"
+fi
+if ! grep -Fq -- 'compose up failed to start' <<<"${out}"; then
+  fail "compose start failure did not nag (got: ${out})"
+fi
+if grep -Fq -- '/health still failed' <<<"${out}"; then
+  fail "compose start failure must not claim /health still failed (got: ${out})"
+fi
+if [[ "$(wc -l <"${compose_log}" | tr -d ' ')" != "1" ]]; then
+  fail "compose start failure must not wait on health (log: $(cat "${compose_log}"))"
 fi
 
 # /health green + empty cluster (0 records): nag. Do not compose up.
