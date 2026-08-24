@@ -111,9 +111,31 @@ role_sql="$(foundation_keep_vault_up_app_role_sql 'postgres://foundation:foundat
 if ! grep -Fq -- 'CREATE ROLE "foundation"' <<<"${role_sql}"; then
   fail "app role SQL must CREATE ROLE foundation (got: ${role_sql})"
 fi
+if ! grep -Fq -- 'DO $do$' <<<"${role_sql}"; then
+  fail "default role SQL should use \$do\$ (got: ${role_sql})"
+fi
 if ! grep -Fq -- 'CREATE DATABASE "foundation" OWNER "foundation"' \
   <<<"$(foundation_keep_vault_up_app_role_sql 'postgres://foundation:foundation@localhost:5432/foundation' createdb)"; then
   fail "app role SQL must CREATE DATABASE foundation"
+fi
+
+# Password (or user) containing $do$ must pick $do1$, not a broken quote.
+odd_sql="$(foundation_keep_vault_up_app_role_sql 'postgres://foundation:pass$do$word@localhost:5432/foundation' role)"
+if grep -Fq -- 'DO $do$' <<<"${odd_sql}"; then
+  fail "role SQL must not use \$do\$ when the password contains that tag (got: ${odd_sql})"
+fi
+if ! grep -Fq -- 'DO $do1$' <<<"${odd_sql}"; then
+  fail "role SQL should pick \$do1\$ when \$do\$ is in the password (got: ${odd_sql})"
+fi
+if ! grep -Fq -- "PASSWORD 'pass\$do\$word'" <<<"${odd_sql}"; then
+  fail "role SQL must keep a \$do\$ password intact (got: ${odd_sql})"
+fi
+odd_user_sql="$(foundation_keep_vault_up_app_role_sql 'postgres://user$do$1:foundation@localhost:5432/foundation' role)"
+if grep -Fq -- 'DO $do$' <<<"${odd_user_sql}"; then
+  fail "role SQL must not use \$do\$ when the user contains that tag (got: ${odd_user_sql})"
+fi
+if ! grep -Fq -- 'DO $do1$' <<<"${odd_user_sql}"; then
+  fail "role SQL should pick \$do1\$ when \$do\$ is in the user (got: ${odd_user_sql})"
 fi
 
 # Health + intended real cluster (records > 0): write nothing. Do not start.

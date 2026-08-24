@@ -263,7 +263,12 @@ database = unquote((u.path or "").lstrip("/") or "foundation")
 database = database.split("?", 1)[0].split("/", 1)[0] or "foundation"
 kind = sys.argv[2]
 if kind == "role":
-    print("DO $do$")
+    tag = "do"
+    n = 0
+    while ("$" + tag + "$") in user or ("$" + tag + "$") in password:
+        n += 1
+        tag = "do%s" % n
+    print("DO $%s$" % tag)
     print("BEGIN")
     print("  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = %s) THEN" % literal(user))
     print("    CREATE ROLE %s LOGIN SUPERUSER PASSWORD %s;" % (ident(user), literal(password)))
@@ -271,7 +276,7 @@ if kind == "role":
     print("    ALTER ROLE %s WITH LOGIN SUPERUSER PASSWORD %s;" % (ident(user), literal(password)))
     print("  END IF;")
     print("END")
-    print("$do$;")
+    print("$%s$;" % tag)
 elif kind == "exists":
     print("SELECT 1 FROM pg_database WHERE datname = %s" % literal(database))
 elif kind == "createdb":
