@@ -153,7 +153,7 @@ A record is what is true now, short. History stays in activity.
 
 **`payload`** is the written body. Inline body, or blob metadata when the file lives on disk. A rewrite passes a new `payload` and replaces that body. Omit `payload` and the body stays.
 
-**`data`** is the structured bag (due, link, repo, url, receipt, aliases, typed fields). An update merges keys. It is not the diary.
+**`data`** is the structured bag (due, repo, url (https), receipt, aliases, typed fields). An update merges keys. It is not the diary.
 
 A named **bot** rewrites the record on purpose. One record at a time. Not a background job. The server does not invent the body.
 
@@ -209,7 +209,7 @@ A named bot writes the receipt after the move in Gmail or Calendar. One node at 
 1. Send the message, or clear the event, in Gmail or Calendar.
 2. `get` `{ id }` — the record and `updated_at`.
 3. `search` `{ receipt: { system, id } }` — if a live record already holds that receipt, `get` that id. Do not twin.
-4. `upsert` the same record with `data.receipt` `{ system, id, kind }` and `base_updated_at` from `get`. Merge keeps link, due, and other keys. Omit `payload` unless the written body also changes.
+4. `upsert` the same record with `data.receipt` `{ system, id, kind }` and `base_updated_at` from `get`. Merge keeps due and the other live keys. Omit `payload` unless the written body also changes.
 5. The write leaves an activity row. That row is the diary of the patch, not the done fact. `undo` of the upsert restores the previous `data` while the row is reversible. It does not unsend mail or restore a calendar event.
 
 Fixture writes (no personal ids, no bodies):

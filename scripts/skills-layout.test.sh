@@ -300,6 +300,33 @@ if grep -Eiq -- 'wait until|#54|living/code pointer PR' "${dream_skill}"; then
   fail "Dream skill still defers Chief of Staff lines"
 fi
 
+spec_doc="${repo_root}/docs/SPEC.md"
+mcp_tools_doc="${repo_root}/docs/MCP_TOOLS.md"
+if [[ ! -f "${spec_doc}" ]]; then
+  fail "missing ${spec_doc}"
+fi
+if grep -Fq -- 'due, link, repo' "${spec_doc}"; then
+  fail "docs/SPEC.md rewrite bag still lists link as a data key"
+fi
+if ! grep -Fq -- 'due, repo, url (https), receipt' "${spec_doc}"; then
+  fail "docs/SPEC.md rewrite bag does not keep due, repo, url (https), receipt"
+fi
+if grep -Fq -- 'Merge keeps link' "${spec_doc}"; then
+  fail "docs/SPEC.md receipt write still says merge keeps link"
+fi
+if ! grep -Fq -- 'Merge keeps due and the other live keys' "${spec_doc}"; then
+  fail "docs/SPEC.md receipt write does not say merge keeps due and the other live keys"
+fi
+if [[ ! -f "${mcp_tools_doc}" ]]; then
+  fail "missing ${mcp_tools_doc}"
+fi
+if ! grep -Fq -- 'payload?, data?, url?, status?, metadata?' "${mcp_tools_doc}"; then
+  fail "docs/MCP_TOOLS.md upsert In omits top-level url?"
+fi
+if grep -Fq -- 'payload?, data?, status?, metadata?, base_updated_at?' "${mcp_tools_doc}"; then
+  fail "docs/MCP_TOOLS.md upsert In still omits url?"
+fi
+
 foundation_mcp="${skills_root}/foundation-mcp/SKILL.md"
 if [[ ! -f "${foundation_mcp}" ]]; then
   fail "missing ${foundation_mcp}"
