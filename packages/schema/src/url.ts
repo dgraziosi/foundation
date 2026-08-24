@@ -6,7 +6,7 @@ export const URL_FIXTURE = "https://example.test/drive/file-fixture-1";
 export const URL_MAX_LEN = 2048;
 
 export const URL_SUGGESTION =
-  "Set data.url to an https URL (no credentials). Pass url: null to clear. Omit the key to leave url unchanged. Foundation stores the href only — do not fetch or mirror the file body.";
+  "Set data.url to an https URL (no credentials). Pass data.url: null to clear. Omit the key to leave data.url unchanged. Foundation stores the href only — do not fetch or mirror the file body.";
 
 export function patchHasUrl(data: Record<string, unknown> | undefined): boolean {
   return Boolean(data && Object.prototype.hasOwnProperty.call(data, "url"));
@@ -78,7 +78,7 @@ export function canonicalizeUrlInData(data: Record<string, unknown>): Record<str
 /**
  * Apply url only when the incoming upsert patch has an own `url` key.
  * Unrelated patches leave legacy (even malformed) url untouched.
- * `url: null` clears.
+ * `data.url: null` clears the href.
  */
 export function applyUrlFromPatch(
   merged: Record<string, unknown>,

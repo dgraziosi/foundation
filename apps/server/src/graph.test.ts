@@ -670,7 +670,7 @@ test(
       const described = await manageType(pool, {
         action: "update",
         slug: "task",
-        description: "Discrete action — operator note.",
+        description: "Discrete action — user note.",
       });
       assert.equal(isToolError(described), false);
       if (isToolError(described)) {
@@ -703,7 +703,7 @@ test(
 );
 
 test(
-  "seed apply fills missing seed fields and view ids and keeps operator edits",
+  "seed apply fills missing seed fields and view ids and keeps user edits",
   { skip: !databaseUrl },
   async () => {
     if (!databaseUrl) {
@@ -725,7 +725,7 @@ test(
       const edited = await manageType(pool, {
         action: "update",
         slug: "task",
-        description: "Operator description",
+        description: "User description",
         views: editedViews,
         fields: [
           ...(task.fields ?? []),
@@ -736,7 +736,7 @@ test(
       await seedSystemOntology(pool);
       const again = await inspectOntology(pool, "types");
       const seeded = again.types.find((type) => type.slug === "task");
-      assert.equal(seeded?.description, "Operator description");
+      assert.equal(seeded?.description, "User description");
       assert.ok(seeded?.fields?.some((field) => field.name === "note"));
       assert.ok(seeded?.fields?.some((field) => field.name === "due"));
       const board = seeded?.views?.find((view) => view.id === "board");
@@ -760,7 +760,7 @@ test(
 );
 
 test(
-  "operator { id } clear on a system view survives seed apply",
+  "user { id } clear on a system view survives seed apply",
   { skip: !databaseUrl },
   async () => {
     if (!databaseUrl) {

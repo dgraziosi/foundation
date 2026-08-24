@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
@@ -65,6 +65,8 @@ test("Home is Recents, open tasks, and type folders — not the graph", async ()
   assert.match(canvas, /onNodeRightClick/);
   assert.match(canvas, /Depth \{depth\}/);
   assert.match(canvas, /nodeLabel=\{\(node\) => String\(node\.title\)\}/);
+  assert.match(canvas, /Nothing yet\./);
+  assert.doesNotMatch(canvas, /Search the graph, or wait for a node to land/);
   const frame = await src("graph/frame.ts");
   assert.match(frame, /h-\[max\(460px,100%\)\] min-h-\[460px\] w-full shrink-0/);
   assert.match(frame, /GRAPH_FLOOR_PX = 460/);
@@ -130,9 +132,18 @@ test("collection empty copy and board width", async () => {
   const views = await src("views/TypeViews.tsx");
   assert.match(views, /Nothing yet\./);
   assert.doesNotMatch(views, /No tasks yet/);
+  assert.match(views, /resolveBindValue\(node, fields, groupBind\) === column/);
+  assert.doesNotMatch(views, /node\.status === column/);
+  assert.match(views, /if \(columns\.length === 0\) \{\s*return <Quiet>\{empty\}<\/Quiet>;/);
+  assert.doesNotMatch(views, /if \(columns\.length === 0\) \{\s*return <Quiet>Nothing yet\.<\/Quiet>;/);
+  assert.match(views, /<BoardView[\s\S]*empty=\{empty\}/);
   assert.match(views, /w-\[233px\]/);
   assert.match(views, /collection-preview/);
   const typeView = await src("pages/TypeViewPage.tsx");
+  assert.match(
+    typeView,
+    /unfiltered === 0 \? "Nothing yet\." : queried\.length === 0 \? "Nothing matches your filters\." : "Nothing yet\."/,
+  );
   assert.match(typeView, /Nothing yet\./);
   assert.match(typeView, /Nothing matches your filters\./);
   assert.match(typeView, /count = activeView \? queried.length/);
@@ -188,6 +199,14 @@ test("shell uses canvas ground and a 224px rail", async () => {
   assert.match(shell, /bg-canvas/);
   const rail = await src("shell/Rail.tsx");
   assert.match(rail, /max-md:fixed/);
+});
+
+test("inspector leftovers are gone", async () => {
+  await assert.rejects(() => access(join(root, "components/ui/sheet.tsx")));
+  const config = await src("../tailwind.config.js");
+  assert.doesNotMatch(config, /inspector:/);
+  const css = await src("styles.css");
+  assert.doesNotMatch(css, /--radius-sheet/);
 });
 
 test("row chrome wraps titles without changing every Button", async () => {

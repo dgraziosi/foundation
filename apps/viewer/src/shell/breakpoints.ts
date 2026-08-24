@@ -1,15 +1,10 @@
 import { useEffect, useState } from "react";
 
-/** VIEWER.md wide stop. Sheet is medium and narrow only. */
+/** VIEWER.md wide stop. */
 export const WIDE_MIN_PX = 1280;
 
 export function isWideLane(width: number): boolean {
   return width >= WIDE_MIN_PX;
-}
-
-/** Docked inspector is the only inspector on wide. No portal, overlay, or focus trap. */
-export function inspectorSheetOpen(open: boolean, wide: boolean): boolean {
-  return open && !wide;
 }
 
 export function useWideLane(): boolean {

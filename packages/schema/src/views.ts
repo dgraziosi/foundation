@@ -505,23 +505,42 @@ export function applyViewQuery<T extends QueryNode>(
   });
 }
 
+export function boardGroupBind(view: ViewDeclaration): ViewBind {
+  return view.group?.bind ?? "status";
+}
+
 export function boardColumnIds(
   fields: readonly TypeField[],
   view: ViewDeclaration,
-  options: { showCompleted?: boolean } = {},
+  options: { showCompleted?: boolean; nodes?: readonly QueryNode[] } = {},
 ): string[] {
-  const statusField = fieldByRole(fields, "status");
-  const all = statusField?.enum_values ?? ["active", "completed", "archived"];
-  const clauses = effectiveClauses(view, options.showCompleted === true).filter((clause) => clause.bind === "status");
-  if (clauses.length === 0) {
-    return [...all];
+  const bind = boardGroupBind(view);
+  if (bind === "status") {
+    const statusField = fieldByRole(fields, "status");
+    const all = statusField?.enum_values ?? ["active", "completed", "archived"];
+    const clauses = effectiveClauses(view, options.showCompleted === true).filter((clause) => clause.bind === "status");
+    if (clauses.length === 0) {
+      return [...all];
+    }
+    return all.filter((id) =>
+      clauses.every((clause) => {
+        const values = clauseValues(clause.value);
+        return clause.op === "eq" ? id === values[0] : values.includes(id);
+      }),
+    );
   }
-  return all.filter((id) =>
-    clauses.every((clause) => {
-      const values = clauseValues(clause.value);
-      return clause.op === "eq" ? id === values[0] : values.includes(id);
-    }),
-  );
+  const field = bindField(fields, bind);
+  if (field?.enum_values && field.enum_values.length > 0) {
+    return [...field.enum_values];
+  }
+  const seen = new Set<string>();
+  for (const node of options.nodes ?? []) {
+    const value = resolveBindValue(node, fields, bind);
+    if (value !== undefined && value !== "") {
+      seen.add(value);
+    }
+  }
+  return [...seen].sort((left, right) => left.localeCompare(right));
 }
 
 export type CollectionChip = { name: string; display: string; value: string };

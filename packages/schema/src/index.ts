@@ -63,6 +63,7 @@ export {
   applyViewQuery,
   asViewDeclarations,
   boardColumnIds,
+  boardGroupBind,
   calendarAxisRole,
   collectionAxisDate,
   collectionChips,

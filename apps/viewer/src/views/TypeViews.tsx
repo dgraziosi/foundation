@@ -8,7 +8,7 @@ import { useThemeLane } from "../theme";
 import { typeColors, typeIcon } from "../type-meta";
 import { DueChip, StatusTag } from "../ui/Tags";
 import { Quiet } from "../ui/States";
-import { boardColumnIds, calendarAxisRole } from "./query";
+import { boardColumnIds, boardGroupBind, calendarAxisRole, resolveBindValue } from "./query";
 
 function columnLabel(id: string): string {
   return id.replace(/_/g, " ").replace(/^./, (char) => char.toUpperCase());
@@ -220,19 +220,29 @@ export function TableView({
 
 export function BoardView({
   nodes,
+  fields,
+  view,
   columns,
   selectedId,
   onSelect,
+  empty,
 }: {
   nodes: TypeViewNode[];
+  fields: TypeField[];
+  view: ViewDeclaration;
   columns: string[];
   selectedId?: string;
   onSelect: (id: string) => void;
+  empty: string;
 }) {
+  const groupBind = boardGroupBind(view);
+  if (columns.length === 0) {
+    return <Quiet>{empty}</Quiet>;
+  }
   return (
     <div className="flex flex-wrap items-start gap-md" data-surface="board">
       {columns.map((column) => {
-        const cards = nodes.filter((node) => node.status === column);
+        const cards = nodes.filter((node) => resolveBindValue(node, fields, groupBind) === column);
         return (
           <Card className="flex min-h-48 w-[233px] shrink-0 flex-col" key={column}>
             <CardContent className="flex flex-col gap-2 p-md">
@@ -477,9 +487,12 @@ export function EngineView({
     return (
       <BoardView
         nodes={nodes}
-        columns={boardColumnIds(typeFields, declared, { showCompleted })}
+        fields={typeFields}
+        view={declared}
+        columns={boardColumnIds(typeFields, declared, { showCompleted, nodes })}
         selectedId={selectedId}
         onSelect={onSelect}
+        empty={empty}
       />
     );
   }

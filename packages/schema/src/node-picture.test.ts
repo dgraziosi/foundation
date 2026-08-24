@@ -30,7 +30,7 @@ const fixtureNode = {
   deleted_at: null,
 };
 
-/** Locked rewrite loop: get the picture, read activity, upsert the new short body. */
+/** Locked rewrite loop: get the record, read activity, upsert the new short body. */
 const rewriteLoop = {
   get: {
     node: fixtureNode,
@@ -81,7 +81,7 @@ const rewriteLoop = {
   },
 };
 
-test("get returns the current node and no activity list", () => {
+test("get returns the record and no activity list", () => {
   const keys = Object.keys(GetSuccessSchema.shape);
   assert.deepEqual(keys, ["node", "edges", "blob", "suggested_links"]);
   assert.ok(!keys.includes("activities"));

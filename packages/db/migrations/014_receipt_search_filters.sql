@@ -1,7 +1,7 @@
 -- Live receipt refs are unique so a sent message or cleared event is one
--- current picture. Foundation stores data.receipt.{system,id,kind} only —
--- it does not fetch or mirror Gmail or Calendar bodies. Identity stays on
--- data.origin. Uniqueness is independent of the origin index.
+-- record. Foundation stores data.receipt.{system,id,kind} only —
+-- it does not fetch or mirror Gmail or Calendar bodies.
+-- Uniqueness is independent of the url index.
 
 CREATE UNIQUE INDEX nodes_receipt_live_uidx
   ON nodes (

@@ -165,7 +165,7 @@ export function GraphCanvas({
       ) : null}
       {empty ? (
         <div className="pointer-events-none absolute inset-0 grid place-items-center">
-          <Quiet>Search the graph, or wait for a node to land.</Quiet>
+          <Quiet>Nothing yet.</Quiet>
         </div>
       ) : null}
       <div className={passPageScroll ? "pointer-events-none" : undefined}>

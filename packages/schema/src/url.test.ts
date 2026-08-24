@@ -5,12 +5,18 @@ import { urlIdentityFromValue } from "./url-identity.js";
 import {
   URL_FIXTURE,
   URL_MAX_LEN,
+  URL_SUGGESTION,
   applyUrlFromPatch,
   canonicalizeUrlInData,
   openableUrlFromData,
   patchHasUrl,
   urlFromData,
 } from "./url.js";
+
+test("URL_SUGGESTION clears the href with data.url: null", () => {
+  assert.match(URL_SUGGESTION, /data\.url: null/);
+  assert.doesNotMatch(URL_SUGGESTION, /Pass url: null to clear/);
+});
 
 test("urlFromData ignores missing or null url", () => {
   assert.equal(urlFromData({}), undefined);

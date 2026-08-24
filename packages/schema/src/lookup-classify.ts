@@ -16,10 +16,10 @@ export const LOOKUP_FUZZY_MIN_COMPACT_LEN = 4;
 export const LOOKUP_CANDIDATE_DEFAULT = 5;
 
 export const LOOKUP_CANDIDATE_SUGGESTION =
-  "Ask the operator to confirm which UUID this is before any mutation that depends on the identity (link, upsert, merge, overwrite, or alias write). get is safe for inspection.";
+  "Ask the user to confirm which UUID this is before any mutation that depends on the identity (link, upsert, merge, overwrite, or alias write). get is safe for inspection.";
 
 export const LOOKUP_AMBIGUOUS_SUGGESTION =
-  "Several live nodes match this name exactly. Ask the operator to confirm which UUID to use before any mutation that depends on the identity. get is safe for inspection. Do not merge or upsert a twin.";
+  "Several live nodes match this name exactly. Ask the user to confirm which UUID to use before any mutation that depends on the identity. get is safe for inspection. Do not merge or upsert a twin.";
 
 export const LOOKUP_NO_MATCH_SUGGESTION =
   "No live candidate above the match floor. Do not upsert a duplicate. Ask if this entity is new, or try search.";
@@ -28,10 +28,10 @@ export const LOOKUP_UUID_SUGGESTION =
   "This input is a node UUID. Prefer get when you already have an id.";
 
 export const CREATE_DUPLICATE_SUGGESTION =
-  "Exact title or unique exact alias already exists. Do not write a twin. Use a candidate id to get or update, or pass allow_duplicate: true if the operator confirms this is a distinct same-name entity.";
+  "Exact title or unique exact alias already exists. Do not write a twin. Use a candidate id to get or update, or pass allow_duplicate: true if the user confirms this is a distinct same-name entity.";
 
 export const CREATE_AMBIGUOUS_SUGGESTION =
-  "Several live nodes match this title exactly. Ask the operator to confirm which UUID to use, or pass allow_duplicate: true if this is a distinct same-name entity. get is safe for inspection. Do not merge.";
+  "Several live nodes match this title exactly. Ask the user to confirm which UUID to use, or pass allow_duplicate: true if this is a distinct same-name entity. get is safe for inspection. Do not merge.";
 
 export const CREATE_SIMILAR_WARNING =
   "Similar live nodes exist (token, fuzzy, or space-compacted). This write was not blocked. Confirm you are not twinning an existing entity.";
@@ -64,7 +64,7 @@ function explanationFor(row: LookupRawCandidate, query: string): string {
     return "Title match after case, accent, punctuation, and whitespace folding.";
   }
   if (row.match === "alias_exact") {
-    return "Operator-authored alias match after case, accent, punctuation, and whitespace folding.";
+    return "User-authored alias match after case, accent, punctuation, and whitespace folding.";
   }
   if (row.match === "title_token") {
     return "Token match against a longer title (ranking field, not a probability). Not an exact match.";

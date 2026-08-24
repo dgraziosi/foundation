@@ -69,7 +69,6 @@ export default {
       },
       width: {
         rail: "14rem",
-        inspector: "21rem",
       },
       boxShadow: {
         xs: "var(--shadow-xs)",

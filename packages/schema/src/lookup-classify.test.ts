@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  CREATE_AMBIGUOUS_SUGGESTION,
   CREATE_DUPLICATE_SUGGESTION,
   CREATE_SIMILAR_WARNING,
   LOOKUP_AMBIGUOUS_SUGGESTION,
@@ -34,6 +35,25 @@ test("unique title exact is exact; unique alias is alias", () => {
     5,
   );
   assert.equal(alias.outcome, "alias");
+  assert.match(alias.candidates[0]?.explanation ?? "", /User-authored alias/);
+  assert.equal((alias.candidates[0]?.explanation ?? "").includes("Operator"), false);
+});
+
+test("lookup suggestions ask the user, not an operator", () => {
+  const texts = [
+    LOOKUP_CANDIDATE_SUGGESTION,
+    LOOKUP_AMBIGUOUS_SUGGESTION,
+    CREATE_DUPLICATE_SUGGESTION,
+    CREATE_AMBIGUOUS_SUGGESTION,
+  ];
+  for (const text of texts) {
+    assert.match(text, /user/);
+    assert.equal(/\boperator\b/i.test(text), false);
+  }
+  assert.match(LOOKUP_CANDIDATE_SUGGESTION, /Ask the user/);
+  assert.match(LOOKUP_AMBIGUOUS_SUGGESTION, /Ask the user/);
+  assert.match(CREATE_AMBIGUOUS_SUGGESTION, /Ask the user/);
+  assert.match(CREATE_DUPLICATE_SUGGESTION, /if the user confirms/);
 });
 
 test("token and fuzzy never become exact or alias", () => {

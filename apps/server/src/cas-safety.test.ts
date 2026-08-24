@@ -209,7 +209,7 @@ test(
           type: "note",
           title: "Who wrote",
           actor: "user",
-          actor_label: "operator",
+          actor_label: "user",
         });
         assert.equal(isToolError(created), false);
         if (isToolError(created)) return;
@@ -220,7 +220,7 @@ test(
         const row = listed.activities.find((item) => item.id === created.activity_id);
         assert.ok(row);
         assert.equal(row?.actor, "user");
-        assert.equal(row?.actor_label, "operator");
+        assert.equal(row?.actor_label, "user");
       });
 
       await t.test("stale from_base_updated_at refuses a link", async () => {

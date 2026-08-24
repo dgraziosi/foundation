@@ -54,7 +54,7 @@ test("compile: needed is not required; extra keys pass; wrong kind misses", () =
   assert.match(miss.error, /does not match json_schema/);
 });
 
-test("spend fields: fixture data passes; bad stage misses; merge keeps operator field", () => {
+test("spend fields: fixture data passes; bad stage misses; merge keeps user field", () => {
   const parsed = parseTypeFieldsInput([
     { name: "amount", kind: "number", display: "Amount", needed: true },
     { name: "currency", kind: "string", display: "Currency", needed: true },
@@ -87,8 +87,8 @@ test("spend fields: fixture data passes; bad stage misses; merge keeps operator 
   assert.match(badStage.suggestion ?? "", /inspect_ontology/);
 
   const seed = parsed.fields;
-  const operator = [{ name: "budget_amount", display: "Envelope", kind: "number" as const, needed: false }];
-  const merged = mergeMissingFields(operator, [
+  const user = [{ name: "budget_amount", display: "Envelope", kind: "number" as const, needed: false }];
+  const merged = mergeMissingFields(user, [
     { name: "budget_amount", display: "Budget", kind: "number", needed: false },
     { name: "budget_currency", display: "Budget currency", kind: "string", needed: false },
   ]);
