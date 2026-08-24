@@ -9,14 +9,9 @@ import {
   type ToolError,
 } from "@foundation/schema";
 import { createHash, randomUUID } from "node:crypto";
-import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
 import { chmod, mkdir, readFile, realpath, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
-import { promisify } from "node:util";
 import { iso, type Queryable } from "./tx.js";
-
-const execFileAsync = promisify(execFile);
 
 export const BLOB_DIR_MODE = 0o700;
 export const BLOB_FILE_MODE = 0o600;
@@ -63,25 +58,6 @@ export async function ensureBlobLayout(dataDir: string): Promise<void> {
   await mkdir(uploads, { recursive: true, mode: UPLOAD_DIR_MODE });
   await chmod(blobs, BLOB_DIR_MODE);
   await chmod(uploads, UPLOAD_DIR_MODE);
-  await grantHostRead(dataDir);
-}
-
-// chmod 0700/0600 zeros the named-ACL mask. Re-apply after those calls.
-// Host-read is backup convenience: missing helper or failed grant must
-// not take the app down.
-async function grantHostRead(dataDir: string): Promise<void> {
-  const helper = process.env.FOUNDATION_VAULT_DATA_DIR_HELPER ?? "/vault-data-dir.sh";
-  if (!existsSync(helper)) {
-    return;
-  }
-  try {
-    await execFileAsync("bash", [helper, "grant", dataDir], {
-      env: { ...process.env, FOUNDATION_GRANT_REQUIRED: "0" },
-      timeout: 30_000,
-    });
-  } catch {
-    // Host readability is backup convenience. Do not take the app down.
-  }
 }
 
 export async function getBlobById(db: Queryable, id: string): Promise<Blob | undefined> {
@@ -232,7 +208,6 @@ export async function ingestBlobBytes(
     await chmod(tmp, BLOB_FILE_MODE);
     await rename(tmp, abs);
     await chmod(abs, BLOB_FILE_MODE);
-    await grantHostRead(runtime.dataDir);
   } catch (error) {
     await unlinkQuiet(tmp);
     throw error;

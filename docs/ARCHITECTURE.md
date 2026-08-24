@@ -6,7 +6,7 @@ When a change alters the graph or vault shape, update this file in the same PR.
 
 ## Glossary
 
-**Foundation** is the product. A **vault** is one instance (`FOUNDATION_DATA` + Postgres). The **graph** is the live network in that vault. The **ontology** is the vocabulary (types and relations). A **blob** is bytes on a node. A **record** is the node. **Activity** is the audit log. An **agent** is anything that can reach the vault MCP. The **user** is the human who runs Compose. A **bot** is a named role that acts through an agent. Do not call the graph “the Vault.” A git clone is the product, not this vault — `compose up` elsewhere starts a different instance. Do not use “origin” as a Foundation key; Cursor Origin is source control. Feature brands only: Dream, Vault. Url, repo, and link are ordinary words. Contract: [`SPEC.md`](./SPEC.md#url-repo-and-link).
+**Foundation** is the product. A **vault** is one instance (`FOUNDATION_DATA` + Postgres). The **graph** is the live network in that vault. The **ontology** is the vocabulary (types and relations). A **blob** is bytes on a node. A **record** is the node. **Activity** is the audit log. An **agent** is anything that can reach the vault MCP. The **user** is the human who runs this vault on this machine. A **bot** is a named role that acts through an agent. Do not call the graph “the Vault.” A git clone is the product, not this vault — starting the host programs elsewhere starts a different instance. Do not use “origin” as a Foundation key; Cursor Origin is source control. Feature brands only: Dream, Vault. Url, repo, and link are ordinary words. Contract: [`SPEC.md`](./SPEC.md#url-repo-and-link).
 
 ## Vault
 
@@ -14,7 +14,7 @@ One vault is one running instance. Postgres files and blob files both live under
 
 ```mermaid
 flowchart TB
-  product["Foundation the product<br/>git + Docker + MCP server"]
+  product["Foundation the product<br/>git + Postgres + MCP server"]
 
   subgraph this_vault["This vault"]
     knowledge["Graph — knowledge"]
@@ -36,7 +36,7 @@ flowchart TB
   product --> other_vault
 ```
 
-The server listens on this process. MCP attach from a named harness is documented in [`HARNESS.md`](./HARNESS.md). The user window is `/view` on the view publish (Compose: 8788) and is meant to work from another machine on this vault.
+The server listens on this process. MCP attach from a named harness is documented in [`HARNESS.md`](./HARNESS.md). The user window is `/view` on the view publish (`8788`) and is meant to work from another machine on this vault.
 
 ## Graph
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Contract fixtures for keep-vault-up. No live vault. No real Compose.
+# Contract fixtures for keep-vault-up. No live vault. No Docker.
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -41,11 +41,11 @@ if ! grep -Fq -- 'Do not create an empty cluster over that miss' "${health_doc}"
   && ! grep -Fq -- 'Do not mkdir an empty live cluster over a miss' "${health_doc}"; then
   fail "VAULT_HEALTH.md does not refuse mkdir over a miss"
 fi
-if ! grep -Fq -- 'no records' "${health_doc}"; then
-  fail "VAULT_HEALTH.md does not alert on zero records"
+if ! grep -Fq -- '0 user records' "${health_doc}"; then
+  fail "VAULT_HEALTH.md does not say first-day 0 user records is healthy"
 fi
-if ! grep -Fq -- 'nag and stop' "${health_doc}"; then
-  fail "VAULT_HEALTH.md step 3 must nag and stop when Docker is missing"
+if ! grep -Fq -- 'empty cluster next to a real one' "${health_doc}"; then
+  fail "VAULT_HEALTH.md does not refuse an empty cluster next to a real one"
 fi
 
 if grep -Eq -- '(^|[^[:alnum:]])(operator|seat)([^[:alnum:]]|$)' "${keep_script}" "${health_doc}"; then
@@ -54,20 +54,17 @@ fi
 if grep -Eq -- '/Users/|/home/[a-zA-Z]' "${keep_script}"; then
   fail "keep-vault-up.sh must not contain a live home path"
 fi
-if grep -Eq -- 'compose[^[:cntrl:]]*--build|--build[^[:cntrl:]]*up' "${keep_script}"; then
-  fail "keep-vault-up.sh must not pass --build to compose"
+if grep -Eiq -- 'docker|compose' "${keep_script}"; then
+  fail "keep-vault-up.sh must not mention Docker or Compose"
 fi
-if ! grep -Fq -- 'up -d' "${keep_script}"; then
-  fail "keep-vault-up.sh does not run compose up -d"
+if grep -Eiq -- 'bot wake|wake a bot' "${keep_script}"; then
+  fail "keep-vault-up.sh must not wake a bot"
 fi
-if ! grep -Eq -- 'up -d >/dev/null 2>&1' "${keep_script}"; then
-  fail "keep-vault-up.sh must hide compose stdout and stderr"
+if ! grep -Fq -- 'pnpm start' "${keep_script}"; then
+  fail "keep-vault-up.sh must start the app with pnpm start"
 fi
-if ! grep -Fq -- 'compose up failed to start' "${keep_script}"; then
-  fail "keep-vault-up.sh must nag that compose start failed"
-fi
-if grep -Eq -- 'compose[[:space:]]+down' "${keep_script}"; then
-  fail "keep-vault-up.sh must not take Compose down"
+if ! grep -Fq -- 'pg_ctl' "${keep_script}"; then
+  fail "keep-vault-up.sh must start Postgres with pg_ctl"
 fi
 if ! grep -Fq -- 'http://127.0.0.1:8787/health' "${keep_script}"; then
   fail "keep-vault-up.sh does not default to localhost /health"
@@ -91,18 +88,31 @@ if foundation_keep_vault_up_body_is_green ''; then
   fail "empty body should fail"
 fi
 
-compose_log="$(mktemp)"
+dump_empty="$(mktemp)"
+dump_people="$(mktemp)"
+start_log="$(mktemp)"
 tmp_root="$(mktemp -d)"
-trap 'rm -f -- "${compose_log}"; rm -rf -- "${tmp_root}"' EXIT
+trap 'rm -f -- "${dump_empty}" "${dump_people}" "${start_log}"; rm -rf -- "${tmp_root}"' EXIT
 
-# Health + real cluster: write nothing. Do not start Compose.
-: >"${compose_log}"
+printf '%s\n' '-- first-day dump' 'COPY public.nodes (id) FROM stdin;' '\.' >"${dump_empty}"
+if foundation_keep_vault_up_sql_has_people "${dump_empty}"; then
+  fail "empty COPY nodes must not count as people"
+fi
+
+printf '%s\n' '-- dump with people' 'INSERT INTO nodes (id, title) VALUES ('\''00000000-0000-0000-0000-000000000001'\'', '\''Fixture person'\'');' >"${dump_people}"
+if ! foundation_keep_vault_up_sql_has_people "${dump_people}"; then
+  fail "INSERT INTO nodes must count as people"
+fi
+
+# Health + intended real cluster (records > 0): write nothing. Do not start.
+: >"${start_log}"
 out="$(
   foundation_keep_vault_up_health_ok() { return 0; }
   foundation_keep_vault_up_cluster_ok() { return 0; }
+  foundation_keep_vault_up_refuse_missing_folder() { return 0; }
   foundation_keep_vault_up_refuse_miss() { return 0; }
-  foundation_keep_vault_up_compose_up() {
-    echo compose >>"${compose_log}"
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
     return 0
   }
   foundation_keep_vault_up_main 2>&1
@@ -114,19 +124,23 @@ fi
 if [[ -n "${out}" ]]; then
   fail "health + real cluster should write nothing (got: ${out})"
 fi
-if [[ -s "${compose_log}" ]]; then
-  fail "health + real cluster must not run compose up"
+if [[ -s "${start_log}" ]]; then
+  fail "health + real cluster must not start"
 fi
 
-# Docker missing: nag. Do not start Compose.
-: >"${compose_log}"
+# Missing data folder: refuse. Do not start. Do not mkdir.
+missing="${tmp_root}/missing-folder"
+: >"${start_log}"
 set +e
 out="$(
+  FOUNDATION_DATA="${missing}"
+  BACKUP_ROOT="${tmp_root}/backups-missing"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
   foundation_keep_vault_up_health_ok() { return 1; }
-  foundation_keep_vault_up_refuse_miss() { return 0; }
-  foundation_keep_vault_up_have_docker() { return 1; }
-  foundation_keep_vault_up_compose_up() {
-    echo compose >>"${compose_log}"
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
+    mkdir -p "${missing}/postgres"
+    printf '%s\n' '16' >"${missing}/postgres/PG_VERSION"
     return 0
   }
   foundation_keep_vault_up_main 2>&1
@@ -134,77 +148,82 @@ out="$(
 rc=$?
 set -e
 if ((rc == 0)); then
-  fail "missing Docker should fail"
+  fail "missing data folder should fail"
 fi
-if ! grep -Fq -- 'Docker is not on this machine' <<<"${out}"; then
-  fail "missing Docker did not nag (got: ${out})"
+if ! grep -Fq -- 'data dir is missing' <<<"${out}"; then
+  fail "missing data folder did not nag (got: ${out})"
 fi
-if [[ -s "${compose_log}" ]]; then
-  fail "missing Docker must not run compose up"
+if [[ -e "${missing}" ]]; then
+  fail "must not mkdir a missing data folder"
 fi
-
-# Docker present but not running: nag. Do not start Compose.
-: >"${compose_log}"
-set +e
-out="$(
-  foundation_keep_vault_up_health_ok() { return 1; }
-  foundation_keep_vault_up_refuse_miss() { return 0; }
-  foundation_keep_vault_up_have_docker() { return 0; }
-  foundation_keep_vault_up_engine_up() { return 1; }
-  foundation_keep_vault_up_compose_up() {
-    echo compose >>"${compose_log}"
-    return 0
-  }
-  foundation_keep_vault_up_main 2>&1
-)"
-rc=$?
-set -e
-if ((rc == 0)); then
-  fail "Docker not running should fail"
-fi
-if ! grep -Fq -- 'Docker is not running' <<<"${out}"; then
-  fail "Docker not running did not nag (got: ${out})"
-fi
-if [[ -s "${compose_log}" ]]; then
-  fail "Docker not running must not run compose up"
+if [[ -s "${start_log}" ]]; then
+  fail "missing data folder must not start"
 fi
 
-# Down, then compose up once, then health + real cluster: quiet.
-: >"${compose_log}"
+# Down, then start once, then health + first-day 0 records: quiet.
+: >"${start_log}"
+first_day="${tmp_root}/first-day"
+mkdir -p "${first_day}/postgres"
+printf '%s\n' '16' >"${first_day}/postgres/PG_VERSION"
 out="$(
+  FOUNDATION_DATA="${first_day}"
+  BACKUP_ROOT="${tmp_root}/backups-first"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
   foundation_keep_vault_up_health_ok() { return 1; }
-  foundation_keep_vault_up_refuse_miss() { return 0; }
-  foundation_keep_vault_up_have_docker() { return 0; }
-  foundation_keep_vault_up_engine_up() { return 0; }
-  foundation_keep_vault_up_compose_up() {
-    echo compose >>"${compose_log}"
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
     return 0
   }
   foundation_keep_vault_up_wait_health() { return 0; }
-  foundation_keep_vault_up_cluster_ok() { return 0; }
+  foundation_keep_vault_up_live_user_record_count() { printf '%s\n' '0'; }
   foundation_keep_vault_up_main 2>&1
 )"
 rc=$?
 if ((rc != 0)); then
-  fail "healed after compose up should exit 0 (got ${rc})"
+  fail "healed first-day 0 user records should exit 0 (got ${rc})"
 fi
 if [[ -n "${out}" ]]; then
-  fail "healed after compose up should write nothing (got: ${out})"
+  fail "healed first-day 0 user records should write nothing (got: ${out})"
 fi
-if [[ "$(wc -l <"${compose_log}" | tr -d ' ')" != "1" ]]; then
-  fail "compose up must run once (log: $(cat "${compose_log}"))"
+if [[ "$(wc -l <"${start_log}" | tr -d ' ')" != "1" ]]; then
+  fail "start must run once (log: $(cat "${start_log}"))"
 fi
 
-# Still down after compose up once: nag.
-: >"${compose_log}"
+# /health already green + first-day 0 user records: quiet. Do not start.
+: >"${start_log}"
+out="$(
+  FOUNDATION_DATA="${first_day}"
+  BACKUP_ROOT="${tmp_root}/backups-first"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_health_ok() { return 0; }
+  foundation_keep_vault_up_live_user_record_count() { printf '%s\n' '0'; }
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
+    return 0
+  }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+if ((rc != 0)); then
+  fail "green first-day 0 user records should exit 0 (got ${rc})"
+fi
+if [[ -n "${out}" ]]; then
+  fail "green first-day 0 user records should write nothing (got: ${out})"
+fi
+if [[ -s "${start_log}" ]]; then
+  fail "green first-day must not start"
+fi
+
+# Still down after start once: nag.
+: >"${start_log}"
 set +e
 out="$(
+  FOUNDATION_DATA="${first_day}"
+  BACKUP_ROOT="${tmp_root}/backups-first"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
   foundation_keep_vault_up_health_ok() { return 1; }
-  foundation_keep_vault_up_refuse_miss() { return 0; }
-  foundation_keep_vault_up_have_docker() { return 0; }
-  foundation_keep_vault_up_engine_up() { return 0; }
-  foundation_keep_vault_up_compose_up() {
-    echo compose >>"${compose_log}"
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
     return 0
   }
   foundation_keep_vault_up_wait_health() { return 1; }
@@ -213,29 +232,30 @@ out="$(
 rc=$?
 set -e
 if ((rc == 0)); then
-  fail "still-down after compose up should fail"
+  fail "still-down after start should fail"
 fi
-if ! grep -Fq -- 'compose up ran once and /health still failed' <<<"${out}"; then
+if ! grep -Fq -- 'start ran once and /health still failed' <<<"${out}"; then
   fail "still-down did not nag (got: ${out})"
 fi
-if [[ "$(wc -l <"${compose_log}" | tr -d ' ')" != "1" ]]; then
-  fail "still-down must not loop compose up"
+if [[ "$(wc -l <"${start_log}" | tr -d ' ')" != "1" ]]; then
+  fail "still-down must not loop start"
 fi
 
-# compose up itself fails: nag that start failed, not that /health still failed.
-: >"${compose_log}"
+# Start itself fails: nag that start failed, not that /health still failed.
+: >"${start_log}"
 set +e
 out="$(
+  FOUNDATION_DATA="${first_day}"
+  BACKUP_ROOT="${tmp_root}/backups-first"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
   foundation_keep_vault_up_health_ok() { return 1; }
-  foundation_keep_vault_up_refuse_miss() { return 0; }
-  foundation_keep_vault_up_have_docker() { return 0; }
-  foundation_keep_vault_up_engine_up() { return 0; }
-  foundation_keep_vault_up_compose_up() {
-    echo compose >>"${compose_log}"
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
+    foundation_keep_vault_up_nag "start failed. Postgres did not start from the data dir."
     return 1
   }
   foundation_keep_vault_up_wait_health() {
-    echo waited >>"${compose_log}"
+    echo waited >>"${start_log}"
     return 1
   }
   foundation_keep_vault_up_main 2>&1
@@ -243,61 +263,30 @@ out="$(
 rc=$?
 set -e
 if ((rc == 0)); then
-  fail "compose start failure should fail"
+  fail "start failure should fail"
 fi
-if ! grep -Fq -- 'compose up failed to start' <<<"${out}"; then
-  fail "compose start failure did not nag (got: ${out})"
+if ! grep -Fq -- 'start failed' <<<"${out}"; then
+  fail "start failure did not nag (got: ${out})"
 fi
 if grep -Fq -- '/health still failed' <<<"${out}"; then
-  fail "compose start failure must not claim /health still failed (got: ${out})"
+  fail "start failure must not claim /health still failed (got: ${out})"
 fi
-if [[ "$(wc -l <"${compose_log}" | tr -d ' ')" != "1" ]]; then
-  fail "compose start failure must not wait on health (log: $(cat "${compose_log}"))"
-fi
-
-# /health green + empty cluster (0 records): nag. Do not compose up.
-miss="${tmp_root}/empty-cluster"
-mkdir -p "${miss}/postgres"
-printf '%s\n' '16' >"${miss}/postgres/PG_VERSION"
-: >"${compose_log}"
-set +e
-out="$(
-  FOUNDATION_DATA="${miss}"
-  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
-  foundation_keep_vault_up_health_ok() { return 0; }
-  foundation_keep_vault_up_live_node_count() { printf '%s\n' '0'; }
-  foundation_keep_vault_up_compose_up() {
-    echo compose >>"${compose_log}"
-    return 0
-  }
-  foundation_keep_vault_up_main 2>&1
-)"
-rc=$?
-set -e
-if ((rc == 0)); then
-  fail "zero records should fail even when /health is green"
-fi
-if ! grep -Fq -- 'no records' <<<"${out}"; then
-  fail "zero records did not nag (got: ${out})"
-fi
-if [[ -s "${compose_log}" ]]; then
-  fail "zero records must not run compose up"
+if [[ "$(wc -l <"${start_log}" | tr -d ' ')" != "1" ]]; then
+  fail "start failure must not wait on health (log: $(cat "${start_log}"))"
 fi
 
-# Existing data dir, postgres/ without PG_VERSION: refuse. Do not mkdir. Do not compose up.
+# Existing data dir, postgres/ without PG_VERSION: refuse. Do not mkdir. Do not start.
 miss_pg="${tmp_root}/miss-pg"
 mkdir -p "${miss_pg}/postgres"
-: >"${compose_log}"
+: >"${start_log}"
 set +e
 out="$(
   FOUNDATION_DATA="${miss_pg}"
+  BACKUP_ROOT="${tmp_root}/backups-miss"
   foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
   foundation_keep_vault_up_health_ok() { return 1; }
-  foundation_keep_vault_up_have_docker() { return 0; }
-  foundation_keep_vault_up_engine_up() { return 0; }
-  foundation_keep_vault_up_compose_up() {
-    echo compose >>"${compose_log}"
-    mkdir -p "${miss_pg}/postgres"
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
     printf '%s\n' '16' >"${miss_pg}/postgres/PG_VERSION"
     return 0
   }
@@ -314,21 +303,22 @@ fi
 if [[ -e "${miss_pg}/postgres/PG_VERSION" ]]; then
   fail "must not mkdir PG_VERSION over a miss"
 fi
-if [[ -s "${compose_log}" ]]; then
-  fail "missing PG_VERSION must not run compose up"
+if [[ -s "${start_log}" ]]; then
+  fail "missing PG_VERSION must not start"
 fi
 
 # /health green, data dir exists, PG_VERSION missing: nag. Do not mkdir.
 miss_up="${tmp_root}/miss-up"
 mkdir -p "${miss_up}/postgres"
-: >"${compose_log}"
+: >"${start_log}"
 set +e
 out="$(
   FOUNDATION_DATA="${miss_up}"
+  BACKUP_ROOT="${tmp_root}/backups-miss-up"
   foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
   foundation_keep_vault_up_health_ok() { return 0; }
-  foundation_keep_vault_up_compose_up() {
-    echo compose >>"${compose_log}"
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
     return 0
   }
   foundation_keep_vault_up_main 2>&1
@@ -344,19 +334,84 @@ fi
 if [[ -e "${miss_up}/postgres/PG_VERSION" ]]; then
   fail "green /health miss must not mkdir PG_VERSION"
 fi
-if [[ -s "${compose_log}" ]]; then
-  fail "green /health miss must not run compose up"
+if [[ -s "${start_log}" ]]; then
+  fail "green /health miss must not start"
+fi
+
+# Empty live (0 records, has PG_VERSION) next to a backup that has people: refuse.
+empty_live="${tmp_root}/empty-live"
+mkdir -p "${empty_live}/postgres" "${tmp_root}/backups-people/sql"
+printf '%s\n' '16' >"${empty_live}/postgres/PG_VERSION"
+printf '%s\n' 'INSERT INTO nodes (id, title) VALUES ('\''00000000-0000-0000-0000-000000000001'\'', '\''Fixture person'\'');' \
+  >"${tmp_root}/backups-people/sql/foundation-20000101.sql"
+: >"${start_log}"
+set +e
+out="$(
+  FOUNDATION_DATA="${empty_live}"
+  BACKUP_ROOT="${tmp_root}/backups-people"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_health_ok() { return 0; }
+  foundation_keep_vault_up_live_user_record_count() { printf '%s\n' '0'; }
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
+    return 0
+  }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+set -e
+if ((rc == 0)); then
+  fail "empty live next to a backup with people should fail"
+fi
+if ! grep -Fq -- 'empty cluster next to a real one' <<<"${out}"; then
+  fail "empty-live-next-to-backup did not nag (got: ${out})"
+fi
+if [[ -s "${start_log}" ]]; then
+  fail "empty-live-next-to-backup must not start"
+fi
+
+# Empty live next to a second postgres tree that has people: refuse.
+sibling="${tmp_root}/vaults"
+mkdir -p "${sibling}/live/postgres" "${sibling}/real/postgres/base/16384" "${sibling}/real/blobs"
+printf '%s\n' '16' >"${sibling}/live/postgres/PG_VERSION"
+printf '%s\n' '16' >"${sibling}/real/postgres/PG_VERSION"
+printf '%s\n' 'fixture-blob' >"${sibling}/real/blobs/fixture"
+: >"${start_log}"
+set +e
+out="$(
+  FOUNDATION_DATA="${sibling}/live"
+  BACKUP_ROOT="${tmp_root}/backups-empty"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_health_ok() { return 0; }
+  foundation_keep_vault_up_live_user_record_count() { printf '%s\n' '0'; }
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
+    return 0
+  }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+set -e
+if ((rc == 0)); then
+  fail "empty live next to a second tree with people should fail"
+fi
+if ! grep -Fq -- 'empty cluster next to a real one' <<<"${out}"; then
+  fail "empty-live-next-to-second-tree did not nag (got: ${out})"
+fi
+if [[ -s "${start_log}" ]]; then
+  fail "empty-live-next-to-second-tree must not start"
 fi
 
 # Health + PG_VERSION + records: quiet.
-real="${tmp_root}/real"
+real="${tmp_root}/real-only"
 mkdir -p "${real}/postgres"
 printf '%s\n' '16' >"${real}/postgres/PG_VERSION"
 out="$(
   FOUNDATION_DATA="${real}"
+  BACKUP_ROOT="${tmp_root}/backups-real"
   foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
   foundation_keep_vault_up_health_ok() { return 0; }
-  foundation_keep_vault_up_live_node_count() { printf '%s\n' '3'; }
+  foundation_keep_vault_up_live_user_record_count() { printf '%s\n' '3'; }
   foundation_keep_vault_up_main 2>&1
 )"
 rc=$?

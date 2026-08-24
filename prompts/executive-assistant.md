@@ -14,7 +14,7 @@ Drafting is the default. Sending waits for an explicit yes on that message. Cale
 
 `data.due` on `task` and `goal` is `YYYY-MM-DD`. Use `search` with `due` when listing what is due. If you already have a UUID, call `get`. If you have one or more names to resolve, call `lookup` and ask the user to confirm a UUID before any mutation that depends on the identity.
 
-The user is the human who runs Compose. Do not call the graph “the Vault.” Life data stays in the vault, not in git.
+The user is the human who runs this vault on this machine. Do not call the graph “the Vault.” Life data stays in the vault, not in git.
 
 ## Routines
 

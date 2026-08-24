@@ -20,12 +20,12 @@ The bots help you take action on what is in your vault. Three starter recipes sh
 Chief of Staff — The bot you talk to. You think out loud, dump what is on your mind, and work through decisions together. It files what matters in the vault, keeps you current on what is open and due, and hands work to the right bot. It asks you when something needs you. It also looks for recurring work in your day and suggests another bot when one would help.
 Out of the box: morning brief; capture (what you dump lands in the vault). When you want another bot, it uses [`.agents/skills/create-bot/`](.agents/skills/create-bot/) and the blank template in that folder.
 
-Vault Keeper — Keeps the vault healthy and organized. Checks that it is up. Runs the backup (`scripts/backup-vault.sh`). Reports obvious mess; cleans it only when you ask. Applies product updates on the machine that runs Compose. Keeps `FOUNDATION_DATA` in place and leaves Compose volumes intact.
-Out of the box: health check; nightly backup; backup freshness; periodic hygiene; product updates.
+Vault Keeper — Keeps the vault healthy and organized. Owns the weekday written health report. The host script keeps the vault up. Nags if the nightly dump is missing or old. Reports obvious mess; cleans it only when you ask. Applies product updates on the machine that runs this vault. Keeps `FOUNDATION_DATA` in place.
+Out of the box: health report; backup freshness; periodic graph report; product updates; Dream.
 
 Executive Assistant — Inbox and calendar for due dates in the vault. Drafts email; sends when you approve that specific message. Puts vault due dates on the calendar.
 
-**Glossary (locked):** **Foundation** = the product. A **vault** = one instance (`FOUNDATION_DATA` + Postgres). The **graph** = the live network in that vault. A **blob** = a file on a node. An **agent** = anything that can reach the vault MCP. The **user** = the human who runs Compose. Do not call the graph “the Vault.” Short analog: app / folder / links → Foundation / vault / graph. Ontology is the vocabulary (types and relations).
+**Glossary (locked):** **Foundation** = the product. A **vault** = one instance (`FOUNDATION_DATA` + Postgres). The **graph** = the live network in that vault. A **blob** = a file on a node. An **agent** = anything that can reach the vault MCP. The **user** = the human who runs this vault on this machine. Do not call the graph “the Vault.” Short analog: app / folder / links → Foundation / vault / graph. Ontology is the vocabulary (types and relations).
 
 Do not commit personal life data, documents, or secrets to this repository. Those belong in the user’s vault, not in git.
 
@@ -43,22 +43,24 @@ Do not commit personal life data, documents, or secrets to this repository. Thos
 
 ## Install
 
-Requires [Docker Compose](https://docs.docker.com/compose/) and a copy of this repo. Node 22 is only needed if you run the app on the host instead of in Compose.
+Mac and Linux. Clone this repo. Node 22 + pnpm. Postgres 16. Migrations create `pgcrypto`, `unaccent`, and `pg_trgm`. If a package name is not already in this repo, it is unknown here — do not guess an installer.
 
-1. Copy the env file and set an API key (do not commit `.env`):
+1. Copy the env file. The human sets the API key (do not commit `.env`):
 
    ```bash
    cp .env.example .env
    # set FOUNDATION_API_KEY to a long random string
    ```
 
-2. Start Postgres and the Foundation server. Durable files go under `FOUNDATION_DATA` (default `./data`):
+2. Start Postgres (the data folder’s `postgres` tree), then the app. Durable files go under `FOUNDATION_DATA` (default `./data`). Empty first-day folder may init. Missing folder, or `postgres/` without `PG_VERSION`: refuse.
 
    ```bash
-   docker compose up --build
+   ./scripts/keep-vault-up.sh
    ```
 
-   After Compose is up, paste the starter recipes in [`docs/AGENTS.md`](docs/AGENTS.md). What “healthy” means: [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md). Graph report: [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md).
+   Official app start is `pnpm start` (wait for the database, migrate, seed). Wait until `GET /health` is green. Paste the starter recipes in [`docs/AGENTS.md`](docs/AGENTS.md). What “healthy” means: [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md). Graph report: [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md).
+
+   Host schedules (keep-up, nightly dump, start-on-boot) stay on this machine. Do not commit home paths. Already on Compose: dump, stop Compose, host Postgres, restore — [`docs/BACKUP.md`](docs/BACKUP.md).
 
 3. Point an MCP client at `http://127.0.0.1:8787/mcp` with:
 
@@ -68,7 +70,7 @@ Requires [Docker Compose](https://docs.docker.com/compose/) and a copy of this r
 
    `Authorization: Bearer <FOUNDATION_API_KEY>` is accepted as an equivalent.
 
-   After Compose is up, attach from Grok Bot, Hermes, OpenClaw, Claude Code, or Codex on this same machine. Put the URL and API key in that harness. Confirm it works: call `bootstrap` (step 4) or a simple `search`. What the user does, plus the file snippet where the config differs: [`docs/HARNESS.md`](docs/HARNESS.md). The generic JSON shape (`url` + `headers`) is:
+   After `/health` is green, attach from Grok Bot, Hermes, OpenClaw, Claude Code, or Codex on this same machine. Put the URL and API key in that harness. Confirm it works: call `bootstrap` (step 4) or a simple `search`. What the user does, plus the file snippet where the config differs: [`docs/HARNESS.md`](docs/HARNESS.md). The generic JSON shape (`url` + `headers`) is:
 
    ```json
    {
@@ -87,7 +89,7 @@ Requires [Docker Compose](https://docs.docker.com/compose/) and a copy of this r
 
    After bootstrap, an agent can `upsert` an `area` and `project`, `link` them with `child_of`, store an HTML itinerary on a `trip` node (`payload.media_type = "text/html"`), `search` that itinerary back, list open or overdue tasks with `search` `{ type: "task", status: "active" }` or `{ type: "task", due: "overdue" }` (no query), `upsert` a `spend` under a project (`amount` `12.50`, `currency` `USD`, `vendor` `Fixture vendor`, `stage` `quoted` or `paid`) and list those lines with `search` `{ type: "spend", under }` or `{ type: "spend", data_equals: { stage: "paid" } }`, `lookup` a name then `working_set` for the open work around that node, attach a PDF blob on a `note` (`payload.storage = "blob"`), `manage_type` a custom type (including retire of an unused authored type), `list_activity` for receipts, and `undo` a reversible mutation. Destructive tools (`delete`, `unlink`, `undo`, `manage_type` retire) require `confirm: true`. If you already have a UUID, call `get` for the node or `working_set` for the agenda. An empty lexical `search` is not a reason to upsert a duplicate.
 
-   With Node 22 + pnpm (and Compose already up):
+   With Node 22 + pnpm (and the vault already up):
 
    ```bash
    pnpm bootstrap
@@ -164,9 +166,9 @@ trailer<</Root 1 0 R>>
      -o /tmp/sample.pdf
    ```
 
-   User drop-box (no base64): copy a file into `$FOUNDATION_DATA/uploads/` then `upsert` with `payload.source_path` set to the filename. The server moves it to `blobs/<uuid>`. Compose `db-init` creates `uploads/` mode 1777 (sticky) so the host user can write on a bind mount; `blobs/` stays 0700.
+   User drop-box (no base64): copy a file into `$FOUNDATION_DATA/uploads/` then `upsert` with `payload.source_path` set to the filename. The server moves it to `blobs/<uuid>`. `uploads/` is mode 1777 (sticky); `blobs/` stays 0700.
 
-   If Postgres fails to start on a bind-mounted data dir, Compose already runs a `db-init` step that `chown`s `$FOUNDATION_DATA/postgres` to uid 999. `FOUNDATION_DATA` is the vault; keep that directory and leave Compose volumes intact.
+   `FOUNDATION_DATA` is the vault. Keep that directory. Stop the app, then Postgres. Do not delete the data folder.
 
 Never point `FOUNDATION_DATA` at an agent profile or memory directory.
 

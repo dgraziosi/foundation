@@ -26,7 +26,7 @@ Short analog: app / folder / links → Foundation / vault / graph.
 - **receipt** — done after send or clear (`data.receipt { system, id, kind }`)
 - **ref** — a typed UUID field on `data`. Points at another node. Not an edge
 - **agent** — anything that can reach the vault MCP
-- **user** — the human who runs Compose
+- **user** — the human who runs this vault on this machine
 - **bot** — a named role that acts through an agent
 
 Do not call the graph “the Vault.”
@@ -94,7 +94,7 @@ A clone does not land insider words. Not a speech to a person.
 
 - **record** — the node
 - **activity** — the audit log
-- **user** — the human who runs Compose
+- **user** — the human who runs this vault on this machine
 - **bot** — a named role
 - Feature brands only: Dream, Vault. Url, repo, and link are ordinary words.
 - Tester fails a new glossary word that is not a feature name, same as OPERATIONS voice.
@@ -170,7 +170,7 @@ A bad body is rebuilt the same way. Activity already holds the snapshots. The bo
 
 When a bot sends mail or clears a calendar event, **done** is a graph fact on that record. Store the ref only.
 
-The user is the human who runs Compose. Named roles are bots. An agent is anything that can reach the vault.
+The user is the human who runs this vault on this machine. Named roles are bots. An agent is anything that can reach the vault.
 
 Gmail and Calendar stay the source of truth. The vault does not hold message or event bodies.
 
@@ -281,10 +281,10 @@ One type, one line, one envelope on the project. Agents record validated fields 
 
 ## Runtime
 
-- Docker Compose: Postgres 16 + Foundation server
+- Host programs: Postgres 16 + Foundation server (`pnpm start`), same user, one data folder
 - Durable files under `FOUNDATION_DATA`
 - Localhost MCP at `http://127.0.0.1:8787/mcp` with `Authorization: ApiKey <FOUNDATION_API_KEY>`
-- Read-only window at `/view` (same API key; not a second store). Compose publishes MCP / health / agent blobs on `127.0.0.1:8787` and `/view` on `8788` (`http://127.0.0.1:8788/view`; from another machine, `http://<this-host>:8788/view`). Unlock with the key, HttpOnly cookie `Path=/view`. After unlock: Home is Recents (5, newest first), open tasks (5, due-urgency), and type folders for types that have live objects. Collection and Detail are pages in the content host. Search is a rail overlay. The rail is Home and Search. A click on a record or graph node opens that object's detail page — not a docked inspector. Types carry hue and glyph; Viewer reads them. Dark is first paint; Light and System are real choices. A stored `paper` choice reads as Light. The cookie does not unlock `/mcp` or `/blobs/:id`. Contract: [`VIEWER.md`](./VIEWER.md).
+- Read-only window at `/view` (same API key; not a second store). MCP / health / agent blobs on `127.0.0.1:8787` and `/view` on `8788` (`http://127.0.0.1:8788/view`; from another machine, `http://<this-host>:8788/view`). Unlock with the key, HttpOnly cookie `Path=/view`. After unlock: Home is Recents (5, newest first), open tasks (5, due-urgency), and type folders for types that have live objects. Collection and Detail are pages in the content host. Search is a rail overlay. The rail is Home and Search. A click on a record or graph node opens that object's detail page — not a docked inspector. Types carry hue and glyph; Viewer reads them. Dark is first paint; Light and System are real choices. A stored `paper` choice reads as Light. The cookie does not unlock `/mcp` or `/blobs/:id`. Contract: [`VIEWER.md`](./VIEWER.md).
 - Blobs: `$FOUNDATION_DATA/blobs/<uuid>`; ingest on `upsert`; bytes via `GET /blobs/:id`
 
 ## Locked (do not reopen)

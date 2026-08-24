@@ -1,6 +1,6 @@
 # Attach the vault MCP
 
-After Compose is up, the user (the human who runs Compose) attaches a named harness on the same machine as Compose.
+After `/health` is green, the user (the human who runs this vault on this machine) attaches a named harness on the same machine.
 
 ## Shared pattern
 
@@ -40,7 +40,7 @@ Grok Bot’s skill library is not this git tree. Import [`.agents/skills/`](../.
 paths = ["/absolute/path/to/the/clone/.agents/skills"]
 ```
 
-Add a remote HTTP MCP connector named `foundation` on the machine that runs Compose. Put this in the connector config. Then call `bootstrap` or a simple `search`.
+Add a remote HTTP MCP connector named `foundation` on the machine that runs this vault. Put this in the connector config. Then call `bootstrap` or a simple `search`.
 
 ```json
 {

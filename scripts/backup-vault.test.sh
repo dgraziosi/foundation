@@ -5,15 +5,25 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 backup_script="${script_dir}/backup-vault.sh"
 
-bash -n "${backup_script}"
-
-# shellcheck source=backup-vault.sh
-source "${backup_script}"
-
 fail() {
   echo "backup-vault.test: $*" >&2
   exit 1
 }
+
+bash -n "${backup_script}"
+
+if grep -Eiq -- 'docker|compose exec' "${backup_script}"; then
+  fail "backup-vault.sh must talk to localhost, not compose exec"
+fi
+if ! grep -Fq -- 'pg_dump --dbname=' "${backup_script}"; then
+  fail "backup-vault.sh must dump with pg_dump against DATABASE_URL"
+fi
+if ! grep -Fq -- 'localhost' "${backup_script}"; then
+  fail "backup-vault.sh must name localhost Postgres"
+fi
+
+# shellcheck source=backup-vault.sh
+source "${backup_script}"
 
 # Single dated dump older than 14 days must survive prune.
 tmp_one="$(mktemp -d)"

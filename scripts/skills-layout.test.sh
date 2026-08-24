@@ -7,7 +7,7 @@
 # blank bot template lives under create-bot, and starters plus the
 # template use Job, Responsibilities, Standards, Routines, Skills,
 # Tools, Handoffs with Skills vs Tools split.
-# Does not launch harnesses or Compose.
+# Does not launch harnesses or host programs.
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -80,7 +80,7 @@ assert_skills_vs_tools() {
   if grep -Fq -- '.agents/skills/' <<<"${tools}"; then
     fail "${file} Tools cites a skill folder; recipe folders belong under Skills"
   fi
-  if ! grep -Eiq -- 'connector|runtime|MCP|mail|calendar|git|docker|health|http' <<<"${tools}"; then
+  if ! grep -Eiq -- 'connector|runtime|MCP|mail|calendar|git|postgres|health|http' <<<"${tools}"; then
     fail "${file} Tools must name connectors and runtimes"
   fi
 }
@@ -188,10 +188,23 @@ fi
 pr_copy_files=(
   "${dream_skill}"
   "${skills_root}/graph-hygiene/SKILL.md"
+  "${skills_root}/vault-health/SKILL.md"
+  "${skills_root}/backup-vault/SKILL.md"
+  "${skills_root}/update-foundation/SKILL.md"
+  "${skills_root}/foundation-mcp/SKILL.md"
+  "${skills_root}/handoff/SKILL.md"
+  "${skills_root}/repo-leak-scan/SKILL.md"
+  "${skills_root}/create-bot/SKILL.md"
+  "${skills_root}/create-bot/bot-template.md"
   "${repo_root}/docs/AGENTS.md"
   "${repo_root}/docs/GRAPH_HYGIENE.md"
+  "${repo_root}/docs/HARNESS.md"
+  "${repo_root}/docs/ARCHITECTURE.md"
+  "${repo_root}/docs/SPEC.md"
+  "${repo_root}/docs/VAULT_HEALTH.md"
   "${vault_keeper}"
   "${prompts_root}/chief.md"
+  "${prompts_root}/executive-assistant.md"
 )
 for copy in "${pr_copy_files[@]}"; do
   if [[ ! -f "${copy}" ]]; then
@@ -199,6 +212,9 @@ for copy in "${pr_copy_files[@]}"; do
   fi
   if grep -Eiq -- '(^|[^[:alnum:]])(operator|seat)([^[:alnum:]]|$)' "${copy}"; then
     fail "${copy} must not write operator or seat"
+  fi
+  if grep -Eiq -- '(^|[^[:alnum:]])(docker|compose)([^[:alnum:]]|$)' "${copy}"; then
+    fail "${copy} must not write Docker or Compose"
   fi
 done
 

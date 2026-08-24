@@ -1,19 +1,25 @@
 #!/usr/bin/env bash
-# Keep the vault up. Quiet when actually green (health + real cluster).
-# Not a bot.
+# Keep the vault up. Quiet when /health is green and the live folder is
+# the intended real cluster. Not a bot.
 #
 #   FOUNDATION_HEALTH_URL — optional. Default http://127.0.0.1:8787/health
 #   FOUNDATION_DATA       — the vault (default ./data under the clone;
 #                           also read from the clone .env)
+#   BACKUP_ROOT           — optional. Default: sibling of the data dir
+#   DATABASE_URL          — optional. Also read from the clone .env.
+#                           Default postgres://foundation:foundation@localhost:5432/foundation
 #
-# GET /health. If Docker is missing or not running, nag on stderr.
-# Else start Compose once from the clone (do not rebuild). Wait about
-# one minute. If health still fails, nag. /health green is not enough:
-# on an existing data dir after a start, refuse or nag if PG_VERSION
-# (or the live Postgres files) is missing, or if the live record count
-# is 0. Compose can serve an empty cluster while the real graph is
-# still on disk. Does not mkdir an empty live cluster over a miss.
-# Does not write the graph. Does not put a live path in git.
+# Starts Postgres 16 (the data folder's postgres tree) and the app
+# (`pnpm start`) when /health is down. First-day 0 user records is
+# healthy. Refuses a missing data folder, a postgres/ tree without
+# PG_VERSION, and an empty live cluster next to a real one (a second
+# postgres tree or a backup that has people while live has 0). Does
+# not mkdir over a miss. Does not write the graph. Does not put a
+# live path in git.
+#
+#   scripts/keep-vault-up.sh        — start if needed, then check
+#   scripts/keep-vault-up.sh stop   — stop the app, then Postgres.
+#                                     Does not delete the data folder.
 set -euo pipefail
 
 foundation_keep_vault_up_repo_root() {
@@ -26,22 +32,32 @@ foundation_keep_vault_up_health_url() {
   printf '%s\n' "${FOUNDATION_HEALTH_URL:-http://127.0.0.1:8787/health}"
 }
 
-# FOUNDATION_DATA from the environment, else the clone .env, else ./data.
-# Relative paths are under the clone. Does not print .env.
-foundation_keep_vault_up_data_dir() {
+# KEY from the environment, else the clone .env. Does not print .env.
+foundation_keep_vault_up_env_value() {
   local repo_root="$1"
-  local raw="${FOUNDATION_DATA:-}"
+  local key="$2"
+  local raw=""
   local line
 
+  eval "raw=\"\${${key}:-}\""
   if [[ -z "${raw}" && -f "${repo_root}/.env" ]]; then
-    line="$(grep -E '^[[:space:]]*FOUNDATION_DATA=' "${repo_root}/.env" | tail -n 1 || true)"
-    raw="${line#*FOUNDATION_DATA=}"
+    line="$(grep -E "^[[:space:]]*${key}=" "${repo_root}/.env" | tail -n 1 || true)"
+    raw="${line#*"${key}"=}"
     raw="${raw%$'\r'}"
     if [[ "${raw}" == \"*\" && "${raw}" == *\" ]]; then
       raw="${raw#\"}"
       raw="${raw%\"}"
     fi
   fi
+  printf '%s\n' "${raw}"
+}
+
+# FOUNDATION_DATA from the environment, else the clone .env, else ./data.
+# Relative paths are under the clone. Does not print .env.
+foundation_keep_vault_up_data_dir() {
+  local repo_root="$1"
+  local raw
+  raw="$(foundation_keep_vault_up_env_value "${repo_root}" FOUNDATION_DATA)"
   raw="${raw:-./data}"
   raw="${raw%/}"
   if [[ "${raw}" != /* ]]; then
@@ -49,6 +65,27 @@ foundation_keep_vault_up_data_dir() {
   else
     printf '%s\n' "${raw}"
   fi
+}
+
+foundation_keep_vault_up_backup_root() {
+  local data_dir="${1%/}"
+  local raw="${BACKUP_ROOT:-}"
+  if [[ -z "${raw}" ]]; then
+    raw="$(dirname -- "${data_dir}")/foundation-backups"
+  fi
+  raw="${raw%/}"
+  if [[ "${raw}" != /* ]]; then
+    printf '%s\n' "$(pwd)/${raw#./}"
+  else
+    printf '%s\n' "${raw}"
+  fi
+}
+
+foundation_keep_vault_up_database_url() {
+  local repo_root="$1"
+  local raw
+  raw="$(foundation_keep_vault_up_env_value "${repo_root}" DATABASE_URL)"
+  printf '%s\n' "${raw:-postgres://foundation:foundation@localhost:5432/foundation}"
 }
 
 # HTTP 200 and { ok: true, service: "foundation", db: "up" }.
@@ -73,18 +110,178 @@ foundation_keep_vault_up_health_ok() {
   foundation_keep_vault_up_body_is_green "${body}"
 }
 
-foundation_keep_vault_up_have_docker() {
-  command -v docker >/dev/null 2>&1
+foundation_keep_vault_up_nag() {
+  echo "vault is down: $*" >&2
 }
 
-foundation_keep_vault_up_engine_up() {
-  docker info >/dev/null 2>&1
+# A SQL dump has people when it copies or inserts at least one nodes row.
+# Empty COPY (header then \.) is not people. First-day schema-only is not.
+foundation_keep_vault_up_sql_has_people() {
+  local file="$1"
+  [[ -f "${file}" ]] || return 1
+  python3 -c '
+import re, sys
+text = open(sys.argv[1], errors="replace").read()
+if re.search(r"(?i)INSERT\s+INTO\s+(public\.)?nodes\b", text):
+    sys.exit(0)
+for m in re.finditer(r"(?is)COPY\s+(public\.)?nodes\b.*?\n(.*?)\\.", text):
+    body = m.group(2).strip()
+    if body:
+        sys.exit(0)
+sys.exit(1)
+' "${file}"
 }
 
-# Once. Not --build. Quiet so a healed run writes nothing.
-foundation_keep_vault_up_compose_up() {
+# Backup dumps under BACKUP_ROOT (and default sibling) that have people.
+foundation_keep_vault_up_backup_has_people() {
+  local backup_root="$1"
+  local f
+  [[ -d "${backup_root}" ]] || return 1
+  while IFS= read -r f; do
+    [[ -n "${f}" ]] || continue
+    if foundation_keep_vault_up_sql_has_people "${f}"; then
+      return 0
+    fi
+  done < <(find "${backup_root}" -type f \( -name 'foundation-*.sql' -o -name '*.sql' \) 2>/dev/null | LC_ALL=C sort)
+  return 1
+}
+
+# Another data-dir/postgres/PG_VERSION under the parent of the live
+# data dir (not files inside this cluster's base/). That other tree
+# "has people" when it has blob files, a dump with people, or a
+# postgres/base tree — a real other cluster, not a lone version file.
+foundation_keep_vault_up_second_tree_has_people() {
+  local data_dir="${1%/}"
+  local parent other pg f
+  parent="$(dirname -- "${data_dir}")"
+  [[ -d "${parent}" ]] || return 1
+  while IFS= read -r pg; do
+    [[ -n "${pg}" ]] || continue
+    other="$(cd "$(dirname -- "${pg}")/.." && pwd)"
+    if [[ "${other}" == "${data_dir}" ]]; then
+      continue
+    fi
+    if [[ -d "${other}/blobs" ]] && find "${other}/blobs" -type f -print -quit 2>/dev/null | grep -q .; then
+      return 0
+    fi
+    while IFS= read -r f; do
+      [[ -n "${f}" ]] || continue
+      if foundation_keep_vault_up_sql_has_people "${f}"; then
+        return 0
+      fi
+    done < <(find "${other}" -type f -name '*.sql' 2>/dev/null | LC_ALL=C sort)
+    if [[ -d "$(dirname -- "${pg}")/base" ]] \
+      && find "$(dirname -- "${pg}")/base" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | grep -q .; then
+      return 0
+    fi
+  done < <(find "${parent}" -mindepth 2 -maxdepth 3 -type f -path '*/postgres/PG_VERSION' 2>/dev/null | LC_ALL=C sort)
+  return 1
+}
+
+foundation_keep_vault_up_nearby_has_people() {
+  local data_dir="$1"
+  local backup_root="$2"
+  if foundation_keep_vault_up_backup_has_people "${backup_root}"; then
+    return 0
+  fi
+  foundation_keep_vault_up_second_tree_has_people "${data_dir}"
+}
+
+# Data folder missing: refuse. Do not mkdir.
+foundation_keep_vault_up_refuse_missing_folder() {
+  local data_dir="$1"
+  if [[ ! -d "${data_dir}" ]]; then
+    foundation_keep_vault_up_nag "data dir is missing. Do not create an empty cluster over a miss."
+    return 1
+  fi
+  return 0
+}
+
+# postgres/ without PG_VERSION is a miss. Do not mkdir.
+foundation_keep_vault_up_refuse_miss() {
+  local data_dir="$1"
+  local postgres="${data_dir%/}/postgres"
+  local pg_version="${postgres}/PG_VERSION"
+
+  if [[ -e "${postgres}" && ! -e "${pg_version}" ]]; then
+    foundation_keep_vault_up_nag "Postgres files are missing from the data dir (no PG_VERSION). Do not create an empty cluster over that miss."
+    return 1
+  fi
+  return 0
+}
+
+# Empty first-day folder (exists, no postgres tree) may init.
+foundation_keep_vault_up_may_init() {
+  local data_dir="$1"
+  local postgres="${data_dir%/}/postgres"
+  [[ -d "${data_dir}" && ! -e "${postgres}" ]]
+}
+
+foundation_keep_vault_up_pg_running() {
+  local postgres="$1"
+  command -v pg_ctl >/dev/null 2>&1 || return 1
+  [[ -d "${postgres}" ]] || return 1
+  pg_ctl -D "${postgres}" status >/dev/null 2>&1
+}
+
+# First-day init into the data folder's postgres tree. Does not mkdir
+# the data folder itself. Does not init over a miss.
+foundation_keep_vault_up_init_postgres() {
+  local data_dir="$1"
+  local postgres="${data_dir%/}/postgres"
+  if ! command -v initdb >/dev/null 2>&1; then
+    foundation_keep_vault_up_nag "Postgres 16 is not on PATH (initdb). The package name is unknown in this repo."
+    return 1
+  fi
+  initdb -D "${postgres}" --no-instructions >/dev/null
+}
+
+# Start the live cluster. Quiet so a healed run writes nothing.
+foundation_keep_vault_up_start_postgres() {
+  local data_dir="$1"
+  local postgres="${data_dir%/}/postgres"
+  local logfile="${postgres}/pg.log"
+
+  if ! command -v pg_ctl >/dev/null 2>&1; then
+    foundation_keep_vault_up_nag "Postgres 16 is not on PATH (pg_ctl). The package name is unknown in this repo."
+    return 1
+  fi
+  if foundation_keep_vault_up_pg_running "${postgres}"; then
+    return 0
+  fi
+  mkdir -p -- "$(dirname -- "${logfile}")"
+  pg_ctl -D "${postgres}" -l "${logfile}" -o "-h 127.0.0.1 -p 5432" start >/dev/null 2>&1
+}
+
+foundation_keep_vault_up_app_pid_file() {
+  local data_dir="${1%/}"
+  printf '%s/app.pid\n' "${data_dir}"
+}
+
+# Official app start: pnpm start (wait db, migrate, seed). Background.
+# Quiet so a healed run writes nothing.
+foundation_keep_vault_up_start_app() {
   local repo_root="$1"
-  docker compose -f "${repo_root}/docker-compose.yml" --project-directory "${repo_root}" up -d >/dev/null 2>&1
+  local data_dir="$2"
+  local pid_file log_file
+  pid_file="$(foundation_keep_vault_up_app_pid_file "${data_dir}")"
+  log_file="${data_dir%/}/app.log"
+
+  if [[ -f "${pid_file}" ]]; then
+    if kill -0 "$(cat "${pid_file}")" 2>/dev/null; then
+      return 0
+    fi
+    rm -f -- "${pid_file}"
+  fi
+  if ! command -v pnpm >/dev/null 2>&1; then
+    foundation_keep_vault_up_nag "pnpm is not on PATH. Node 22 + pnpm are required to start the app."
+    return 1
+  fi
+  (
+    cd "${repo_root}" || exit 1
+    nohup pnpm start >>"${log_file}" 2>&1 &
+    echo $! >"${pid_file}"
+  ) >/dev/null 2>&1
 }
 
 # About one minute: 12 tries, 5 seconds apart.
@@ -103,37 +300,25 @@ foundation_keep_vault_up_wait_health() {
   return 1
 }
 
-# Live records only. Does not mkdir.
-foundation_keep_vault_up_live_node_count() {
+# Live user records only (nodes, not seed types). Localhost psql.
+foundation_keep_vault_up_live_user_record_count() {
   local repo_root="$1"
-  docker compose -f "${repo_root}/docker-compose.yml" --project-directory "${repo_root}" \
-    exec -T db psql -U foundation -d foundation -tAc \
-    "SELECT COUNT(*) FROM nodes WHERE deleted_at IS NULL"
-}
-
-foundation_keep_vault_up_nag() {
-  echo "vault is down: $*" >&2
-}
-
-# postgres/ without PG_VERSION is a miss. Do not mkdir. Do not compose up.
-foundation_keep_vault_up_refuse_miss() {
-  local data_dir="$1"
-  local postgres="${data_dir%/}/postgres"
-  local pg_version="${postgres}/PG_VERSION"
-
-  if [[ -e "${postgres}" && ! -e "${pg_version}" ]]; then
-    foundation_keep_vault_up_nag "Postgres files are missing from the data dir (no PG_VERSION). Do not create an empty cluster over that miss."
+  local url
+  url="$(foundation_keep_vault_up_database_url "${repo_root}")"
+  if ! command -v psql >/dev/null 2>&1; then
     return 1
   fi
-  return 0
+  psql "${url}" -tAc "SELECT COUNT(*) FROM nodes WHERE deleted_at IS NULL" 2>/dev/null
 }
 
-# After a start (or when /health is already green): existing data dir must
-# have the live Postgres files and at least one record. /health green is
-# not enough. Does not mkdir.
+# After a start (or when /health is already green): existing data dir
+# must have the live Postgres files. First-day 0 user records is
+# healthy. Empty live next to a real cluster (backup or second tree
+# has people) is a miss. /health green is not enough. Does not mkdir.
 foundation_keep_vault_up_cluster_ok() {
   local repo_root="$1"
   local data_dir="$2"
+  local backup_root="$3"
   local postgres="${data_dir%/}/postgres"
   local pg_version="${postgres}/PG_VERSION"
   local count
@@ -147,57 +332,100 @@ foundation_keep_vault_up_cluster_ok() {
     return 1
   fi
 
-  count="$(foundation_keep_vault_up_live_node_count "${repo_root}" || true)"
+  count="$(foundation_keep_vault_up_live_user_record_count "${repo_root}" || true)"
   count="$(printf '%s' "${count}" | tr -d '[:space:]')"
   if [[ ! "${count}" =~ ^[0-9]+$ ]]; then
     foundation_keep_vault_up_nag "could not count records in the live cluster."
     return 1
   fi
-  if ((count == 0)); then
-    foundation_keep_vault_up_nag "the vault is up but it has no records. If you already had a graph, the real files may still be on disk. Do not create an empty cluster over them."
+  if ((count == 0)) && foundation_keep_vault_up_nearby_has_people "${data_dir}" "${backup_root}"; then
+    foundation_keep_vault_up_nag "the live vault has no user records, but a backup or another postgres tree nearby has people. This looks like an empty cluster next to a real one."
     return 1
   fi
   return 0
 }
 
+# Start Postgres then the app once. Not a rebuild. Quiet when it works.
+foundation_keep_vault_up_start() {
+  local repo_root="$1"
+  local data_dir="$2"
+  local postgres="${data_dir%/}/postgres"
+
+  if foundation_keep_vault_up_may_init "${data_dir}"; then
+    if ! foundation_keep_vault_up_init_postgres "${data_dir}"; then
+      return 1
+    fi
+  fi
+
+  if ! foundation_keep_vault_up_start_postgres "${data_dir}"; then
+    foundation_keep_vault_up_nag "start failed. Postgres did not start from the data dir."
+    return 1
+  fi
+
+  if ! foundation_keep_vault_up_start_app "${repo_root}" "${data_dir}"; then
+    foundation_keep_vault_up_nag "start failed. The app did not start (pnpm start)."
+    return 1
+  fi
+  return 0
+}
+
+# Stop the app, then Postgres. Does not delete the data folder.
+foundation_keep_vault_up_stop() {
+  local repo_root data_dir postgres pid_file pid
+  repo_root="$(foundation_keep_vault_up_repo_root)"
+  data_dir="$(foundation_keep_vault_up_data_dir "${repo_root}")"
+  postgres="${data_dir%/}/postgres"
+  pid_file="$(foundation_keep_vault_up_app_pid_file "${data_dir}")"
+
+  if [[ -f "${pid_file}" ]]; then
+    pid="$(tr -d '[:space:]' <"${pid_file}")"
+    if [[ "${pid}" =~ ^[0-9]+$ ]] && kill -0 "${pid}" 2>/dev/null; then
+      kill "${pid}" 2>/dev/null || true
+      wait "${pid}" 2>/dev/null || true
+    fi
+    rm -f -- "${pid_file}"
+  fi
+  if command -v pg_ctl >/dev/null 2>&1 && [[ -d "${postgres}" ]]; then
+    pg_ctl -D "${postgres}" stop -m fast >/dev/null 2>&1 || true
+  fi
+  return 0
+}
+
 foundation_keep_vault_up_main() {
-  local repo_root data_dir
+  local repo_root data_dir backup_root
 
   repo_root="$(foundation_keep_vault_up_repo_root)"
   data_dir="$(foundation_keep_vault_up_data_dir "${repo_root}")"
+  backup_root="$(foundation_keep_vault_up_backup_root "${data_dir}")"
 
+  if ! foundation_keep_vault_up_refuse_missing_folder "${data_dir}"; then
+    return 1
+  fi
   if ! foundation_keep_vault_up_refuse_miss "${data_dir}"; then
     return 1
   fi
 
   if foundation_keep_vault_up_health_ok; then
-    foundation_keep_vault_up_cluster_ok "${repo_root}" "${data_dir}"
+    foundation_keep_vault_up_cluster_ok "${repo_root}" "${data_dir}" "${backup_root}"
     return $?
   fi
 
-  if ! foundation_keep_vault_up_have_docker; then
-    foundation_keep_vault_up_nag "Docker is not on this machine. Start Docker, then from the clone: docker compose up -d"
-    return 1
-  fi
-
-  if ! foundation_keep_vault_up_engine_up; then
-    foundation_keep_vault_up_nag "Docker is not running. Start Docker, then from the clone: docker compose up -d"
-    return 1
-  fi
-
-  if ! foundation_keep_vault_up_compose_up "${repo_root}"; then
-    foundation_keep_vault_up_nag "compose up failed to start. From the clone: docker compose up -d"
+  if ! foundation_keep_vault_up_start "${repo_root}" "${data_dir}"; then
     return 1
   fi
 
   if ! foundation_keep_vault_up_wait_health; then
-    foundation_keep_vault_up_nag "compose up ran once and /health still failed. From the clone: docker compose up -d"
+    foundation_keep_vault_up_nag "start ran once and /health still failed. Start Postgres, then from the clone: pnpm start"
     return 1
   fi
 
-  foundation_keep_vault_up_cluster_ok "${repo_root}" "${data_dir}"
+  foundation_keep_vault_up_cluster_ok "${repo_root}" "${data_dir}" "${backup_root}"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  foundation_keep_vault_up_main "$@"
+  if [[ "${1:-}" == "stop" ]]; then
+    foundation_keep_vault_up_stop
+  else
+    foundation_keep_vault_up_main "$@"
+  fi
 fi
