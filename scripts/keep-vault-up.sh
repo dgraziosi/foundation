@@ -15,9 +15,10 @@
 # (`pnpm start`) when /health is down. First-day 0 user records is
 # healthy. Refuses a missing data folder, a postgres/ tree without
 # PG_VERSION, and an empty live cluster next to a real one (a second
-# postgres tree or a backup that has people while live has 0) before
-# any start or initdb. People means blob files or a dump with node
-# rows. A sibling postgres/base tree is not people. Does not mkdir
+# postgres tree or a backup that has people while live has 0 or the
+# live count is unknown) before any start or initdb. People means
+# blob files or a dump with node rows. A sibling postgres/base tree
+# is not people. Does not mkdir
 # over a miss. Does not write the graph. Does not put a live path in
 # git.
 #
@@ -215,8 +216,10 @@ foundation_keep_vault_up_nearby_has_people() {
   foundation_keep_vault_up_second_tree_has_people "${data_dir}"
 }
 
-# Live is empty when there is no postgres tree yet (first-day) or the
-# live count is 0. Nearby people → refuse. Do not start. Do not initdb.
+# Live is empty when there is no postgres tree yet (first-day), the
+# live count is 0, or the count is unknown (psql cannot talk while
+# /health is down). Count-unknown is the same family as a people-unknown
+# dump: fail closed. Nearby people → refuse. Do not start. Do not initdb.
 foundation_keep_vault_up_live_is_empty() {
   local repo_root="$1"
   local data_dir="$2"
@@ -226,7 +229,10 @@ foundation_keep_vault_up_live_is_empty() {
   fi
   count="$(foundation_keep_vault_up_live_user_record_count "${repo_root}" || true)"
   count="${count//[$' \t\n\r']/}"
-  [[ "${count}" =~ ^[0-9]+$ ]] && ((count == 0))
+  if [[ ! "${count}" =~ ^[0-9]+$ ]]; then
+    return 0
+  fi
+  ((count == 0))
 }
 
 foundation_keep_vault_up_refuse_empty_next_to_real() {

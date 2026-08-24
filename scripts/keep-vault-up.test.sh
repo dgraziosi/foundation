@@ -478,6 +478,83 @@ if [[ -s "${start_log}" ]]; then
   fail "down empty-live-next-to-dump must not start (log: $(cat "${start_log}"))"
 fi
 
+# /health down, postgres/ exists, real count miss (do not inject 0), dump with
+# people: refuse BEFORE start. Nag empty-next-to-real, not only could-not-count.
+count_miss="${tmp_root}/count-miss"
+mkdir -p "${count_miss}/postgres"
+printf '%s\n' '16' >"${count_miss}/postgres/PG_VERSION"
+: >"${start_log}"
+set +e
+out="$(
+  FOUNDATION_DATA="${count_miss}"
+  BACKUP_ROOT="${tmp_root}/backups-people"
+  DATABASE_URL='postgres://foundation:foundation@127.0.0.1:1/foundation'
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_health_ok() { return 1; }
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
+    return 0
+  }
+  foundation_keep_vault_up_wait_health() {
+    echo waited >>"${start_log}"
+    return 0
+  }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+set -e
+if ((rc == 0)); then
+  fail "count-unknown next to a dump with people should fail"
+fi
+if ! grep -Fq -- 'empty cluster next to a real one' <<<"${out}"; then
+  fail "count-unknown next to dump did not nag empty-next-to-real (got: ${out})"
+fi
+if grep -Fq -- 'could not count records' <<<"${out}"; then
+  fail "count-unknown next to people must nag empty-next-to-real, not only could-not-count (got: ${out})"
+fi
+if [[ -s "${start_log}" ]]; then
+  fail "count-unknown next to dump must not start (log: $(cat "${start_log}"))"
+fi
+
+# Same count miss next to a second tree with people (blobs), not an injected 0.
+count_miss_sib="${tmp_root}/count-miss-sib"
+mkdir -p "${count_miss_sib}/live/postgres" "${count_miss_sib}/real/postgres/base/1" "${count_miss_sib}/real/blobs"
+printf '%s\n' '16' >"${count_miss_sib}/live/postgres/PG_VERSION"
+printf '%s\n' '16' >"${count_miss_sib}/real/postgres/PG_VERSION"
+printf '%s\n' 'fixture-blob' >"${count_miss_sib}/real/blobs/fixture"
+: >"${start_log}"
+set +e
+out="$(
+  FOUNDATION_DATA="${count_miss_sib}/live"
+  BACKUP_ROOT="${tmp_root}/backups-count-miss-sib"
+  DATABASE_URL='postgres://foundation:foundation@127.0.0.1:1/foundation'
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_health_ok() { return 1; }
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
+    return 0
+  }
+  foundation_keep_vault_up_wait_health() {
+    echo waited >>"${start_log}"
+    return 0
+  }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+set -e
+if ((rc == 0)); then
+  fail "count-unknown next to a second tree with people should fail"
+fi
+if ! grep -Fq -- 'empty cluster next to a real one' <<<"${out}"; then
+  fail "count-unknown next to second tree did not nag empty-next-to-real (got: ${out})"
+fi
+if grep -Fq -- 'could not count records' <<<"${out}"; then
+  fail "count-unknown next to second tree must nag empty-next-to-real, not only could-not-count (got: ${out})"
+fi
+if [[ -s "${start_log}" ]]; then
+  fail "count-unknown next to second tree must not start (log: $(cat "${start_log}"))"
+fi
+
 # First-day folder (no postgres/) next to a dump with people: refuse. Do not initdb.
 first_init="${tmp_root}/first-init"
 mkdir -p "${first_init}"
