@@ -384,6 +384,51 @@ fi
 if grep -Fq -- 'payload?, data?, status?, metadata?, base_updated_at?' "${mcp_tools_doc}"; then
   fail "docs/MCP_TOOLS.md upsert In still omits url?"
 fi
+if ! grep -Fq -- 'Leftover `data.living`, `data.code`, `data.origin`, and `data.link` writes refuse.' "${mcp_tools_doc}"; then
+  fail "docs/MCP_TOOLS.md leftover writes omit data.origin or do not match SPEC"
+fi
+if grep -Fq -- 'A bad picture' "${mcp_tools_doc}"; then
+  fail "docs/MCP_TOOLS.md still says A bad picture"
+fi
+if ! grep -Fq -- 'A bad body' "${mcp_tools_doc}"; then
+  fail "docs/MCP_TOOLS.md does not say A bad body"
+fi
+if grep -Fq -- 'living vault and graph' "${repo_root}/README.md"; then
+  fail "README still says living vault and graph"
+fi
+if grep -Fq -- 'Runs `scripts/backup-vault.sh`.' "${agents_doc}"; then
+  fail "docs/AGENTS.md nightly backup is only Runs scripts/backup-vault.sh"
+fi
+if ! grep -Fq -- 'dumps localhost Postgres' "${agents_doc}"; then
+  fail "docs/AGENTS.md nightly dump does not name localhost Postgres"
+fi
+if ! grep -Fq -- 'nags if the dump is missing or old' "${agents_doc}"; then
+  fail "docs/AGENTS.md nightly backup does not say the bot nags if the dump is missing or old"
+fi
+if grep -Fq -- 'current picture' "${repo_root}/packages/db/migrations/014_receipt_search_filters.sql"; then
+  fail "014_receipt_search_filters.sql still says current picture"
+fi
+if grep -Fq -- 'Identity stays on' "${repo_root}/packages/db/migrations/014_receipt_search_filters.sql"; then
+  fail "014_receipt_search_filters.sql still says Identity stays on data.origin"
+fi
+if grep -Fq -- 'get the picture' "${repo_root}/packages/schema/src/node-picture.test.ts"; then
+  fail "node-picture.test.ts still says get the picture"
+fi
+if grep -Fq -- 'fiancee dinner' "${repo_root}/apps/viewer/src/format.test.ts"; then
+  fail "format.test.ts still uses a fiancee dinner fixture"
+fi
+if grep -Eiq -- '(^|[^[:alnum:]])operator([^[:alnum:]]|$)' "${repo_root}/packages/schema/src/lookup-classify.ts"; then
+  fail "lookup-classify.ts still says operator"
+fi
+if ! grep -Fq -- 'data.url: null clears the href' "${repo_root}/apps/server/src/tools/bootstrap.ts"; then
+  fail "bootstrap how_to_extend.nodes does not clear href with data.url: null"
+fi
+if grep -Fq -- 'Url is not unique' "${repo_root}/apps/server/src/tools/bootstrap.ts"; then
+  fail "bootstrap how_to_extend.nodes still says Url is not unique"
+fi
+if grep -Fq -- 'url: null clears; omit the key to leave url unchanged' "${repo_root}/apps/server/src/tools/bootstrap.ts"; then
+  fail "bootstrap how_to_extend.nodes still says url: null clears data.url"
+fi
 
 foundation_mcp="${skills_root}/foundation-mcp/SKILL.md"
 if [[ ! -f "${foundation_mcp}" ]]; then

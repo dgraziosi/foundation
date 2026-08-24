@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { TypeField, TypeViewNode, ViewDeclaration } from "../api";
-import { applyViewQuery, boardColumnIds, calendarAxisRole, collectionChips } from "./query.js";
+import { applyViewQuery, boardColumnIds, boardGroupBind, calendarAxisRole, collectionChips, resolveBindValue } from "./query.js";
 
 const dueField: TypeField = { name: "due", display: "Due", kind: "date", needed: false, role: "date" };
 const orgField: TypeField = { name: "org", display: "Org", kind: "string", needed: false, role: "subtitle" };
@@ -32,6 +32,36 @@ test("show completed widens active filter and still hides archived", () => {
   assert.equal(widened.length, 2);
   assert.deepEqual(boardColumnIds([dueField], activeList), ["active"]);
   assert.deepEqual(boardColumnIds([dueField], activeList, { showCompleted: true }), ["active", "completed"]);
+});
+
+test("board honors view.group instead of bucketing by node.status", () => {
+  const stageField: TypeField = {
+    name: "stage",
+    display: "Stage",
+    kind: "enum",
+    needed: false,
+    role: "subtitle",
+    enum_values: ["quoted", "paid"],
+  };
+  const byStage: ViewDeclaration = { id: "board", group: { bind: "subtitle" } };
+  assert.equal(boardGroupBind(byStage), "subtitle");
+  assert.deepEqual(boardColumnIds([stageField], byStage), ["quoted", "paid"]);
+  const paid: TypeViewNode = {
+    id: "1",
+    title: "Line",
+    type: "spend",
+    status: "active",
+    data: { stage: "paid" },
+  };
+  assert.equal(resolveBindValue(paid, [stageField], "subtitle"), "paid");
+  assert.equal(resolveBindValue(paid, [stageField], "status"), "active");
+  const dated: TypeViewNode[] = [
+    { id: "1", title: "A", type: "task", status: "active", data: { due: "2026-08-28" } },
+    { id: "2", title: "B", type: "task", status: "completed", data: { due: "2026-08-20" } },
+    { id: "3", title: "C", type: "task", status: "active", data: { due: "2026-08-28" } },
+  ];
+  const byDate: ViewDeclaration = { id: "board", group: { bind: "date" } };
+  assert.deepEqual(boardColumnIds([dueField], byDate, { nodes: dated }), ["2026-08-20", "2026-08-28"]);
 });
 
 test("person collection chips are subtitle fields, not the whole bag", () => {

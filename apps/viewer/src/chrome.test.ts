@@ -65,6 +65,8 @@ test("Home is Recents, open tasks, and type folders — not the graph", async ()
   assert.match(canvas, /onNodeRightClick/);
   assert.match(canvas, /Depth \{depth\}/);
   assert.match(canvas, /nodeLabel=\{\(node\) => String\(node\.title\)\}/);
+  assert.match(canvas, /Nothing yet\./);
+  assert.doesNotMatch(canvas, /Search the graph, or wait for a node to land/);
   const frame = await src("graph/frame.ts");
   assert.match(frame, /h-\[max\(460px,100%\)\] min-h-\[460px\] w-full shrink-0/);
   assert.match(frame, /GRAPH_FLOOR_PX = 460/);
@@ -130,6 +132,8 @@ test("collection empty copy and board width", async () => {
   const views = await src("views/TypeViews.tsx");
   assert.match(views, /Nothing yet\./);
   assert.doesNotMatch(views, /No tasks yet/);
+  assert.match(views, /resolveBindValue\(node, fields, groupBind\) === column/);
+  assert.doesNotMatch(views, /node\.status === column/);
   assert.match(views, /w-\[233px\]/);
   assert.match(views, /collection-preview/);
   const typeView = await src("pages/TypeViewPage.tsx");

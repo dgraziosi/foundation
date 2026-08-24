@@ -102,6 +102,11 @@ test(
       assert.ok(bootSlugs.includes("spend"));
       assert.match((boot.how_to_extend as { search: string }).search, /data_equals/);
       assert.equal((boot.how_to_extend as { nodes: string }).nodes.includes("upsert"), true);
+      const nodesHow = (boot.how_to_extend as { nodes: string }).nodes;
+      assert.match(nodesHow, /url: null clears that identity/);
+      assert.match(nodesHow, /data\.url: null clears the href/);
+      assert.equal(nodesHow.includes("Url is not unique"), false);
+      assert.equal(nodesHow.includes("url: null clears; omit the key to leave url unchanged"), false);
       assert.equal((boot.how_to_extend as { activity: string }).activity.includes("list_activity"), true);
       assert.equal((boot.how_to_extend as { search: string }).search.includes("full-text"), true);
       assert.match((boot.how_to_extend as { lookup: string }).lookup, /lookup resolves/);

@@ -32,7 +32,7 @@ Do not commit personal life data, documents, or secrets to this repository. Thos
 ## Docs
 
 - [`docs/SPEC.md`](docs/SPEC.md) — product contract
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — living vault and graph
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — vault and graph
 - [`docs/MCP_TOOLS.md`](docs/MCP_TOOLS.md) — 14-tool MCP surface
 - [`docs/HARNESS.md`](docs/HARNESS.md) — attach the vault MCP from a named harness
 - [`docs/AGENTS.md`](docs/AGENTS.md) — starter recipes (Chief of Staff, Vault Keeper, Executive Assistant)

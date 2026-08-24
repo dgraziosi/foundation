@@ -48,10 +48,10 @@ test("Home widget sort is due-urgency then recency, capped at 5", () => {
 });
 
 test("parseSearchSnippet turns FTS <b> marks into emphasis parts", () => {
-  assert.deepEqual(parseSearchSnippet("note about <b>fiancee</b> dinner"), [
+  assert.deepEqual(parseSearchSnippet("note about <b>sample</b> text"), [
     { text: "note about ", hit: false },
-    { text: "fiancee", hit: true },
-    { text: " dinner", hit: false },
+    { text: "sample", hit: true },
+    { text: " text", hit: false },
   ]);
   assert.deepEqual(parseSearchSnippet("no marks here"), [{ text: "no marks here", hit: false }]);
   assert.deepEqual(parseSearchSnippet("see <b>one</b> and <b>two</b>"), [

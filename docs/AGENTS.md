@@ -16,7 +16,7 @@ Paste [`prompts/vault-keeper.md`](../prompts/vault-keeper.md). Same machine, sam
 
 1. Vault health — [`.agents/skills/vault-health/`](../.agents/skills/vault-health/). Read [`VAULT_HEALTH.md`](./VAULT_HEALTH.md). Weekday 9:15 written report. The host script [`scripts/keep-vault-up.sh`](../scripts/keep-vault-up.sh) keeps the vault up every 15 minutes. Health checks `BACKUP_ROOT`; it does not create a dump.
 2. Dream — [`.agents/skills/dream/`](../.agents/skills/dream/). Nightly vault pass at 02:00 user-local, all 7 nights. Run before backup when both exist. Rewrites the record from today's activity, closes what's done, and cleans obvious duplicates. Invents nothing.
-3. Nightly backup — [`.agents/skills/backup-vault/`](../.agents/skills/backup-vault/). Runs `scripts/backup-vault.sh`.
+3. Nightly backup — [`.agents/skills/backup-vault/`](../.agents/skills/backup-vault/). Host script [`scripts/backup-vault.sh`](../scripts/backup-vault.sh) dumps localhost Postgres. The bot nags if the dump is missing or old.
 4. Graph hygiene — [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/). Read [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md).
 5. Product updates — [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/). On the machine that runs this vault: `git fetch` / `git pull --ff-only` on main, restart the app (`pnpm start`) so migrations run, wait for `/health`. Dirty tree or not fast-forward: stop and tell the user.
 
@@ -49,7 +49,7 @@ Named skill folders under [`.agents/skills/`](../.agents/skills/). Do not paste 
 | [`.agents/skills/foundation-mcp/`](../.agents/skills/foundation-mcp/) | Vault MCP — which call to use |
 | [`.agents/skills/vault-health/`](../.agents/skills/vault-health/) | Weekday 9:15 written report; host script keeps the vault up (`scripts/keep-vault-up.sh`) |
 | [`.agents/skills/dream/`](../.agents/skills/dream/) | Nightly Dream pass (02:00 user-local) |
-| [`.agents/skills/backup-vault/`](../.agents/skills/backup-vault/) | Nightly backup (`scripts/backup-vault.sh`) |
+| [`.agents/skills/backup-vault/`](../.agents/skills/backup-vault/) | Nightly dump is a host script; bot nags if missing or old |
 | [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/) | Weekly graph-hygiene routine |
 | [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/) | Weekday product-update routine |
 | [`.agents/skills/repo-leak-scan/`](../.agents/skills/repo-leak-scan/) | Optional git-tree scan for secrets (no vault key) |

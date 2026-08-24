@@ -12,6 +12,7 @@ import {
   SEED_TYPE_VIEWS,
   VIEW_ENGINE_IDS,
   viewIds,
+  type ViewDeclaration,
 } from "./views.js";
 import type { TypeField } from "./fields.js";
 
@@ -207,6 +208,26 @@ test("applyViewQuery filters active, sort skips missing date role, showCompleted
   assert.equal(calendarAxisRole([dueField]), "date");
   assert.deepEqual(boardColumnIds([dueField], view), ["active"]);
   assert.deepEqual(boardColumnIds([dueField], view, { showCompleted: true }), ["active", "completed"]);
+});
+
+test("board columns follow view.group, not a hard-coded status bucket", () => {
+  const stageField: TypeField = {
+    name: "stage",
+    display: "Stage",
+    kind: "enum",
+    needed: false,
+    role: "subtitle",
+    enum_values: ["quoted", "paid"],
+  };
+  const byStage: ViewDeclaration = { id: "board", group: { bind: "subtitle" } };
+  assert.deepEqual(boardColumnIds([stageField], byStage), ["quoted", "paid"]);
+  const dated = [
+    { id: "1", title: "A", status: "active", data: { due: "2026-08-28" } },
+    { id: "2", title: "B", status: "completed", data: { due: "2026-08-20" } },
+    { id: "3", title: "C", status: "active", data: { due: "2026-08-28" } },
+  ];
+  const byDate: ViewDeclaration = { id: "board", group: { bind: "date" } };
+  assert.deepEqual(boardColumnIds([dueField], byDate, { nodes: dated }), ["2026-08-20", "2026-08-28"]);
 });
 
 test("collection chips are subtitle fields only", () => {
