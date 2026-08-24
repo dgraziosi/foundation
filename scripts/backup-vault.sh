@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# Nightly vault backup. Driven only by env. Do not stop Compose.
+# Nightly vault backup. Driven only by env. Host script, not a bot wake.
+# Talks to localhost Postgres. Does not stop the vault.
 #
 #   FOUNDATION_DATA  — the vault (default ./data)
+#   DATABASE_URL     — optional. Also read from the clone .env.
+#                      Default postgres://foundation:foundation@localhost:5432/foundation
 #   BACKUP_ROOT      — optional. Default: sibling of the data dir
 #                      (./foundation-backups when FOUNDATION_DATA is ./data).
 #                      Must not be inside FOUNDATION_DATA.
@@ -293,10 +296,40 @@ foundation_backup_install() {
   )
 }
 
-foundation_backup_compose_exec() {
+# KEY from the environment, else the clone .env. Does not print .env.
+foundation_backup_env_value() {
   local repo_root="$1"
-  shift
-  docker compose -f "${repo_root}/docker-compose.yml" --project-directory "${repo_root}" exec -T "$@"
+  local key="$2"
+  local raw=""
+  local line
+
+  eval "raw=\"\${${key}:-}\""
+  if [[ -z "${raw}" && -f "${repo_root}/.env" ]]; then
+    line="$(grep -E "^[[:space:]]*${key}=" "${repo_root}/.env" | tail -n 1 || true)"
+    raw="${line#*"${key}"=}"
+    raw="${raw%$'\r'}"
+    if [[ "${raw}" == \"*\" && "${raw}" == *\" ]]; then
+      raw="${raw#\"}"
+      raw="${raw%\"}"
+    fi
+  fi
+  printf '%s\n' "${raw}"
+}
+
+foundation_backup_database_url() {
+  local repo_root="$1"
+  local raw
+  raw="$(foundation_backup_env_value "${repo_root}" DATABASE_URL)"
+  printf '%s\n' "${raw:-postgres://foundation:foundation@localhost:5432/foundation}"
+}
+
+# Online dump against localhost Postgres.
+foundation_backup_pg_dump() {
+  local repo_root="$1"
+  local dest="$2"
+  local url
+  url="$(foundation_backup_database_url "${repo_root}")"
+  pg_dump --dbname="${url}" --no-owner --no-acl >"${dest}"
 }
 
 foundation_backup_main() {
@@ -323,8 +356,8 @@ foundation_backup_main() {
     return 1
   fi
 
-  if ! command -v docker >/dev/null 2>&1; then
-    echo "backup-vault: docker is required for online pg_dump" >&2
+  if ! command -v pg_dump >/dev/null 2>&1; then
+    echo "backup-vault: pg_dump is required for online dump (localhost Postgres)" >&2
     return 1
   fi
   if ! command -v rsync >/dev/null 2>&1; then
@@ -343,9 +376,9 @@ foundation_backup_main() {
   FOUNDATION_BACKUP_MAIN_DUMP_TMP="${dump_tmp}"
   trap 'foundation_backup_discard "${FOUNDATION_BACKUP_MAIN_DUMP_TMP:-}"' EXIT
 
-  # Online dump. Compose stays up. Dump, MANIFEST, and the live blob tree stay
+  # Online dump. The vault stays up. Dump, MANIFEST, and the live blob tree stay
   # put until staging rsync, MANIFEST, and the final blob swap all succeed.
-  if ! foundation_backup_compose_exec "${repo_root}" db pg_dump -U foundation -d foundation >"${dump_tmp}"; then
+  if ! foundation_backup_pg_dump "${repo_root}" "${dump_tmp}"; then
     foundation_backup_discard "${dump_tmp}"
     FOUNDATION_BACKUP_MAIN_DUMP_TMP=""
     trap - EXIT

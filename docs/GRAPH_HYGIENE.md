@@ -4,7 +4,7 @@ Weekly, report-only look at the **graph** in this vault. Quiet if green. Not vau
 
 ## Glossary
 
-Same locked terms as [`VAULT_HEALTH.md`](./VAULT_HEALTH.md): Foundation = the product; vault = one instance (`FOUNDATION_DATA` + Postgres); graph = the knowledge in that vault; blob = a file on a node; agent = anything that can reach the vault MCP; user = the human who runs Compose. Do **not** call the graph “the Vault.”
+Same locked terms as [`VAULT_HEALTH.md`](./VAULT_HEALTH.md): Foundation = the product; vault = one instance (`FOUNDATION_DATA` + Postgres); graph = the knowledge in that vault; blob = a file on a node; agent = anything that can reach the vault MCP; user = the human who runs this vault on this machine. Do **not** call the graph “the Vault.”
 
 The user can run this report, or attach it to Vault Keeper ([`AGENTS.md`](./AGENTS.md)). Skill: [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/).
 
@@ -24,17 +24,17 @@ Do not add `get_vault_health`, `run_maintenance`, `propose_reorganize`, `audit_l
 
 - **Not vault health.** Process, `FOUNDATION_DATA`, canaries, and backup freshness are [`VAULT_HEALTH.md`](./VAULT_HEALTH.md).
 - **Not Dream.** Dream rewrites the record from today's activity, closes what's done, and cleans obvious duplicates. Skill: [`.agents/skills/dream/`](../.agents/skills/dream/). This weekly report stays report-only.
-- **Not applying product updates.** Git pull + compose rebuild is [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/).
+- **Not applying product updates.** Git pull + restart the app is [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/).
 - **Not a mutation pass.** No `upsert` / `delete` / `unlink` / `undo` / `manage_type` on the quiet run.
 - **Not email.** No digest. Ping only when there is something to report.
 - **Not a write-ACL.** The API key is the gate.
-- **Reachability.** Run from an agent that can reach the vault MCP on the host running Compose.
+- **Reachability.** Run from an agent that can reach the vault MCP on the machine that runs this vault.
 
 A first-day vault (seed types, zero user nodes) is **healthy**. Zero user nodes is not “type soup” and not a pile of orphans. Skip duplicate/orphan reports when there is nothing to scan.
 
 ## Weekly checks (report only)
 
-Intent only — call `bootstrap` if you need the current tool surface. Prefer MCP. A read-only SQL look via `docker compose exec` on the host running Compose is allowed when MCP cannot enumerate the whole graph (there is no `list_nodes` tool). Do not add one. `search` can list by `type` / `status` / `under` / `due` without a query (limit 100); that is a sample, not a full dump.
+Intent only — call `bootstrap` if you need the current tool surface. Prefer MCP. A read-only SQL look via `psql` on localhost is allowed when MCP cannot enumerate the whole graph (there is no `list_nodes` tool). Do not add one. `search` can list by `type` / `status` / `under` / `due` without a query (limit 100); that is a sample, not a full dump.
 
 ### 1. Duplicate titles
 
@@ -46,7 +46,7 @@ If you cannot scan (no SQL), use `search` with type filters (no query) as a samp
 
 Live nodes with no incident edges. Seed-only / empty graph: skip. Person/note/trip with no links yet can be real; report them, don’t delete them.
 
-`get` returns incident edges for a node you already know. For a full pass, read-only SQL on the host running Compose is OK.
+`get` returns incident edges for a node you already know. For a full pass, read-only SQL on localhost is OK.
 
 ### 3. Type soup
 
@@ -65,7 +65,7 @@ Report slug, kind, parent_types. Do not `manage_type` on this routine.
 | Types vs spine | `bootstrap` / `inspect_ontology` |
 | A known node’s edges | `get` |
 | Title recall or list by type/status/under | `search` (query optional when a filter is set; not a dump of the whole graph) |
-| Full duplicate / zero-edge scan | Read-only SQL on the host running Compose, if needed |
+| Full duplicate / zero-edge scan | Read-only SQL on localhost, if needed |
 | Recent writes (context, not a fail) | `list_activity` |
 
 ## Failure / findings ping

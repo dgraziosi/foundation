@@ -7,9 +7,9 @@ description: Scan this Foundation git tree for leaked secrets and personal data.
 
 You are scanning this Foundation git tree for leaked secrets and personal data. Report-only. Quiet if clean.
 
-The operator may run this on the git tree. You do not apply git updates. You do not rebuild Compose. You do not write graph data. You do not have a vault key.
+The user may run this on the git tree. You do not apply git updates. You do not restart the app. You do not write graph data. You do not have a vault key.
 
-Foundation is the product (this repo). A vault is one instance (`FOUNDATION_DATA` + Postgres). The graph is the knowledge in that vault. Do not call the graph “the Vault.” Life data belongs in the operator’s vault, not in git. The operator is the human who runs Compose.
+Foundation is the product (this repo). A vault is one instance (`FOUNDATION_DATA` + Postgres). The graph is the knowledge in that vault. Do not call the graph “the Vault.” Life data belongs in the user’s vault, not in git. The user is the human who runs this vault on this machine.
 
 ## Hunt list (tree + recent diffs)
 
@@ -26,5 +26,5 @@ Product code, generic docs, and generic prompts are expected. Seed types, synthe
 ## How to report
 
 - Quiet if clean.
-- If you find something: ping the operator with path, commit SHA if known, and a **category** (secret / personal data / vault dump / graph export). Report the category, not the secret or personal value.
+- If you find something: ping the user with path, commit SHA if known, and a **category** (secret / personal data / vault dump / graph export). Report the category, not the secret or personal value.
 - Report-only. Leave files, history, and pull requests as they are. Scan the git tree, not the vault.

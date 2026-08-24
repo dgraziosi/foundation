@@ -11,7 +11,7 @@ Dream rewrites the record from today's activity, closes what's done, and cleans 
 
 Cite [`.agents/skills/foundation-mcp/`](../foundation-mcp/) for which vault call to use. Cite [`.agents/skills/handoff/`](../handoff/) when a step finishes. Look up the live vault schema at call time (`bootstrap`, `inspect_ontology`, or the server tool list). Do not trust a dump in this file.
 
-The user is the human who runs Compose. The vault MCP is on this machine (`http://127.0.0.1:8787`). Stay on localhost. Do not tell anyone to expose it.
+The user is the human who runs this vault on this machine. The vault MCP is on this machine (`http://127.0.0.1:8787`). Stay on localhost. Do not tell anyone to expose it.
 
 A **record** is the node (the system of record). **Activity** is the audit log. History stays in activity. Do not call the graph “the Vault.”
 

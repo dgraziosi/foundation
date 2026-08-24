@@ -7,7 +7,7 @@
 # blank bot template lives under create-bot, and starters plus the
 # template use Job, Responsibilities, Standards, Routines, Skills,
 # Tools, Handoffs with Skills vs Tools split.
-# Does not launch harnesses or Compose.
+# Does not launch harnesses or host programs.
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -80,7 +80,7 @@ assert_skills_vs_tools() {
   if grep -Fq -- '.agents/skills/' <<<"${tools}"; then
     fail "${file} Tools cites a skill folder; recipe folders belong under Skills"
   fi
-  if ! grep -Eiq -- 'connector|runtime|MCP|mail|calendar|git|docker|health|http' <<<"${tools}"; then
+  if ! grep -Eiq -- 'connector|runtime|MCP|mail|calendar|git|postgres|health|http' <<<"${tools}"; then
     fail "${file} Tools must name connectors and runtimes"
   fi
 }
@@ -188,10 +188,23 @@ fi
 pr_copy_files=(
   "${dream_skill}"
   "${skills_root}/graph-hygiene/SKILL.md"
+  "${skills_root}/vault-health/SKILL.md"
+  "${skills_root}/backup-vault/SKILL.md"
+  "${skills_root}/update-foundation/SKILL.md"
+  "${skills_root}/foundation-mcp/SKILL.md"
+  "${skills_root}/handoff/SKILL.md"
+  "${skills_root}/repo-leak-scan/SKILL.md"
+  "${skills_root}/create-bot/SKILL.md"
+  "${skills_root}/create-bot/bot-template.md"
   "${repo_root}/docs/AGENTS.md"
   "${repo_root}/docs/GRAPH_HYGIENE.md"
+  "${repo_root}/docs/HARNESS.md"
+  "${repo_root}/docs/ARCHITECTURE.md"
+  "${repo_root}/docs/SPEC.md"
+  "${repo_root}/docs/VAULT_HEALTH.md"
   "${vault_keeper}"
   "${prompts_root}/chief.md"
+  "${prompts_root}/executive-assistant.md"
 )
 for copy in "${pr_copy_files[@]}"; do
   if [[ ! -f "${copy}" ]]; then
@@ -199,6 +212,9 @@ for copy in "${pr_copy_files[@]}"; do
   fi
   if grep -Eiq -- '(^|[^[:alnum:]])(operator|seat)([^[:alnum:]]|$)' "${copy}"; then
     fail "${copy} must not write operator or seat"
+  fi
+  if grep -Eiq -- '(^|[^[:alnum:]])(docker|compose)([^[:alnum:]]|$)' "${copy}"; then
+    fail "${copy} must not write Docker or Compose"
   fi
 done
 
@@ -219,6 +235,18 @@ done
 if ! grep -Fq -- '02:00' <<<"${routines}"; then
   fail "Vault Keeper Routines does not recommend Dream at 02:00"
 fi
+if ! grep -Fq -- '9:15' <<<"${routines}"; then
+  fail "Vault Keeper Routines does not set the health report at 9:15"
+fi
+if ! grep -Fq -- 'scripts/keep-vault-up.sh' <<<"${routines}"; then
+  fail "Vault Keeper Routines does not cite scripts/keep-vault-up.sh"
+fi
+if ! grep -Fq -- '9:15' "${vault_keeper}"; then
+  fail "Vault Keeper does not recommend the weekday health report at 9:15"
+fi
+if ! grep -Fq -- 'scripts/keep-vault-up.sh' "${vault_keeper}"; then
+  fail "Vault Keeper does not name scripts/keep-vault-up.sh"
+fi
 
 if grep -E -q -- '(^|[^[:alnum:]._/])skills/(dream|vault-health|backup-vault|graph-hygiene|update-foundation)/' <<<"${routines}"; then
   fail "Vault Keeper Routines still cites repo-root skills/ instead of .agents/skills/"
@@ -237,6 +265,15 @@ if ! grep -Fq -- '.agents/skills/dream/' "${agents_doc}"; then
 fi
 if ! grep -Fq -- '02:00' "${agents_doc}"; then
   fail "docs/AGENTS.md does not recommend Dream at 02:00"
+fi
+if ! grep -Fq -- '9:15' "${agents_doc}"; then
+  fail "docs/AGENTS.md does not set the health report at 9:15"
+fi
+if ! grep -Fq -- 'scripts/keep-vault-up.sh' "${agents_doc}"; then
+  fail "docs/AGENTS.md does not name scripts/keep-vault-up.sh"
+fi
+if grep -Fq -- 'Weekday morning vault-health routine' "${agents_doc}"; then
+  fail "docs/AGENTS.md still calls vault-health a weekday morning routine only"
 fi
 if ! grep -Fq -- '## Everyday words' "${agents_doc}"; then
   fail "docs/AGENTS.md is missing Everyday words"
@@ -281,6 +318,21 @@ fi
 if ! grep -Fq -- '.agents/skills/dream/' <<<"${chief_skills}"; then
   fail "Chief of Staff Skills does not cite .agents/skills/dream/"
 fi
+if ! grep -Fq -- '.agents/skills/vault-health/' <<<"${chief_routines}"; then
+  fail "Chief of Staff Routines does not cite .agents/skills/vault-health/"
+fi
+if ! grep -Fq -- '9:15' <<<"${chief_routines}"; then
+  fail "Chief of Staff Routines does not say the health report is 9:15"
+fi
+if ! grep -Fq -- 'scripts/keep-vault-up.sh' <<<"${chief_routines}"; then
+  fail "Chief of Staff Routines does not name scripts/keep-vault-up.sh"
+fi
+if ! grep -Fq -- 'Do not run them from this bot' <<<"${chief_routines}"; then
+  fail "Chief of Staff Routines does not leave vault health to Vault Keeper"
+fi
+if ! grep -Fq -- '.agents/skills/vault-health/' <<<"${chief_skills}"; then
+  fail "Chief of Staff Skills does not cite .agents/skills/vault-health/"
+fi
 if grep -Eq -- 'search `living`|data\.living|data\.code|search `code`|search `link`|data\.link' "${chief}"; then
   fail "Chief of Staff still uses leftover living/code/link keys"
 fi
@@ -310,6 +362,12 @@ if grep -Fq -- 'due, link, repo' "${spec_doc}"; then
 fi
 if ! grep -Fq -- 'due, repo, url (https), receipt' "${spec_doc}"; then
   fail "docs/SPEC.md rewrite bag does not keep due, repo, url (https), receipt"
+fi
+if ! grep -Fq -- 'scripts/keep-vault-up.sh' "${spec_doc}"; then
+  fail "docs/SPEC.md instance routines do not name scripts/keep-vault-up.sh"
+fi
+if ! grep -Fq -- '9:15' "${spec_doc}"; then
+  fail "docs/SPEC.md instance routines do not name the weekday 9:15 written report"
 fi
 if grep -Fq -- 'Merge keeps link' "${spec_doc}"; then
   fail "docs/SPEC.md receipt write still says merge keeps link"

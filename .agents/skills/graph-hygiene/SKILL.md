@@ -9,7 +9,7 @@ You are running graph hygiene. The user can run this, or attach it to Vault Keep
 
 Read docs/GRAPH_HYGIENE.md and follow it. Call bootstrap if you need the current tools.
 
-The user is the human who runs Compose. The graph is the knowledge in this vault. Do not call the graph “the Vault.”
+The user is the human who runs this vault on this machine. The graph is the knowledge in this vault. Do not call the graph “the Vault.”
 
 ## Schedule and voice
 
@@ -28,7 +28,7 @@ A first-day vault (seed types, zero user nodes) is healthy — skip duplicate an
 2. Live nodes with zero edges. Report them; do not delete. Skip if the graph has no user nodes.
 3. Type soup: inspect_ontology / bootstrap types. Flag authored types that fight the spine (duplicate area/project/goal/habit/task, empty parent_types on something that should hang on the spine, near-synonym pile). System seeds are not soup. Do not manage_type on this run.
 
-Prefer MCP (bootstrap, inspect_ontology, get, search, list_activity). There is no list_nodes tool. A read-only SQL look on the machine that runs Compose is allowed if you need a full scan.
+Prefer MCP (bootstrap, inspect_ontology, get, search, list_activity). There is no list_nodes tool. A read-only SQL look on localhost is allowed if you need a full scan.
 
 This pass is the weekly graph report. Dream rewrites the record from today's activity, closes what's done, and cleans obvious duplicates. Vault health and product updates have their own schedules.
 
