@@ -90,6 +90,21 @@ fi
 if foundation_keep_vault_up_body_is_green ''; then
   fail "empty body should fail"
 fi
+if ! foundation_keep_vault_up_body_is_green '{"ok":true,"service":"foundation","db":"up"}'; then
+  fail "compact green /health body should pass"
+fi
+if foundation_keep_vault_up_body_is_green '{"ok":true,"service":"foundation","db":"upx"}'; then
+  fail "db upx must not count as up"
+fi
+if awk '/^foundation_keep_vault_up_body_is_green\(\)/,/^}/' "${keep_script}" | grep -q -- 'python3'; then
+  fail "body_is_green must parse /health in bash, not python3"
+fi
+(
+  PATH=/nonexistent
+  if ! foundation_keep_vault_up_body_is_green "${green_json}"; then
+    fail "green /health must parse without python3 on PATH"
+  fi
+)
 
 dump_empty="$(mktemp)"
 dump_people="$(mktemp)"

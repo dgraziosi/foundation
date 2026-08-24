@@ -95,18 +95,22 @@ foundation_keep_vault_up_database_url() {
 }
 
 # HTTP 200 and { ok: true, service: "foundation", db: "up" }.
+# Bash only. A missing python3 must not treat a live green body as down.
+foundation_keep_vault_up_json_field() {
+  local compact="$1"
+  local needle="$2"
+  [[ "${compact}" == *"${needle},"* || "${compact}" == *"${needle}}"* ]]
+}
+
 foundation_keep_vault_up_body_is_green() {
   local body="$1"
-  printf '%s' "${body}" | python3 -c '
-import json, sys
-try:
-    data = json.load(sys.stdin)
-except Exception:
-    sys.exit(1)
-if data.get("ok") is True and data.get("service") == "foundation" and data.get("db") == "up":
-    sys.exit(0)
-sys.exit(1)
-'
+  local compact
+  compact="$(printf '%s' "${body}" | tr -d '[:space:]')"
+  [[ -n "${compact}" ]] || return 1
+  foundation_keep_vault_up_json_field "${compact}" '"ok":true' || return 1
+  foundation_keep_vault_up_json_field "${compact}" '"service":"foundation"' || return 1
+  foundation_keep_vault_up_json_field "${compact}" '"db":"up"' || return 1
+  return 0
 }
 
 foundation_keep_vault_up_health_ok() {
