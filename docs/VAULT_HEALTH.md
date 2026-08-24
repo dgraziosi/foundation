@@ -48,7 +48,7 @@ Run in order:
 
    Fail if the request errors, status is not 200, `ok` is not true, `service` is not `foundation`, or `db` is not `up`.
 
-3. If Docker is not on this machine, or Compose cannot talk to it: **nag.** Do not invent another start path.
+3. If Docker is not on this machine, or Compose cannot talk to it: **nag and stop.** Do not invent another start path. Do not start Compose.
 
 4. If health is down: from the clone that has `docker-compose.yml`, `docker compose up -d` **once**. Not `--build` (that is product updates). Do not loop. Do not `down`. Do not mkdir `FOUNDATION_DATA`. Do not write the graph. Wait until `GET /health` is green, or about one minute. If health still fails: **nag.**
 
