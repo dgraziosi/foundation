@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
-# Keep the vault up. Quiet when green. Not a bot.
+# Keep the vault up. Quiet when actually green (health + real cluster).
+# Not a bot.
 #
 #   FOUNDATION_HEALTH_URL — optional. Default http://127.0.0.1:8787/health
+#   FOUNDATION_DATA       — the vault (default ./data under the clone;
+#                           also read from the clone .env)
 #
-# GET /health. If green, write nothing. If Docker is missing or not
-# running, nag on stderr. Else `docker compose up -d` once from the
-# clone (not --build). Wait about one minute. If health still fails,
-# nag on stderr. Does not mkdir FOUNDATION_DATA. Does not write the
-# graph. Does not put a live path in git.
+# GET /health. If Docker is missing or not running, nag on stderr.
+# Else start Compose once from the clone (do not rebuild). Wait about
+# one minute. If health still fails, nag. /health green is not enough:
+# on an existing data dir after a start, refuse or nag if PG_VERSION
+# (or the live Postgres files) is missing, or if the live record count
+# is 0. Compose can serve an empty cluster while the real graph is
+# still on disk. Does not mkdir an empty live cluster over a miss.
+# Does not write the graph. Does not put a live path in git.
 set -euo pipefail
 
 foundation_keep_vault_up_repo_root() {
@@ -18,6 +24,31 @@ foundation_keep_vault_up_repo_root() {
 
 foundation_keep_vault_up_health_url() {
   printf '%s\n' "${FOUNDATION_HEALTH_URL:-http://127.0.0.1:8787/health}"
+}
+
+# FOUNDATION_DATA from the environment, else the clone .env, else ./data.
+# Relative paths are under the clone. Does not print .env.
+foundation_keep_vault_up_data_dir() {
+  local repo_root="$1"
+  local raw="${FOUNDATION_DATA:-}"
+  local line
+
+  if [[ -z "${raw}" && -f "${repo_root}/.env" ]]; then
+    line="$(grep -E '^[[:space:]]*FOUNDATION_DATA=' "${repo_root}/.env" | tail -n 1 || true)"
+    raw="${line#*FOUNDATION_DATA=}"
+    raw="${raw%$'\r'}"
+    if [[ "${raw}" == \"*\" && "${raw}" == *\" ]]; then
+      raw="${raw#\"}"
+      raw="${raw%\"}"
+    fi
+  fi
+  raw="${raw:-./data}"
+  raw="${raw%/}"
+  if [[ "${raw}" != /* ]]; then
+    printf '%s\n' "${repo_root}/${raw#./}"
+  else
+    printf '%s\n' "${raw}"
+  fi
 }
 
 # HTTP 200 and { ok: true, service: "foundation", db: "up" }.
@@ -72,15 +103,76 @@ foundation_keep_vault_up_wait_health() {
   return 1
 }
 
+# Live records only. Does not mkdir.
+foundation_keep_vault_up_live_node_count() {
+  local repo_root="$1"
+  docker compose -f "${repo_root}/docker-compose.yml" --project-directory "${repo_root}" \
+    exec -T db psql -U foundation -d foundation -tAc \
+    "SELECT COUNT(*) FROM nodes WHERE deleted_at IS NULL"
+}
+
 foundation_keep_vault_up_nag() {
   echo "vault is down: $*" >&2
 }
 
+# postgres/ without PG_VERSION is a miss. Do not mkdir. Do not compose up.
+foundation_keep_vault_up_refuse_miss() {
+  local data_dir="$1"
+  local postgres="${data_dir%/}/postgres"
+  local pg_version="${postgres}/PG_VERSION"
+
+  if [[ -e "${postgres}" && ! -e "${pg_version}" ]]; then
+    foundation_keep_vault_up_nag "Postgres files are missing from the data dir (no PG_VERSION). Do not create an empty cluster over that miss."
+    return 1
+  fi
+  return 0
+}
+
+# After a start (or when /health is already green): existing data dir must
+# have the live Postgres files and at least one record. /health green is
+# not enough. Does not mkdir.
+foundation_keep_vault_up_cluster_ok() {
+  local repo_root="$1"
+  local data_dir="$2"
+  local postgres="${data_dir%/}/postgres"
+  local pg_version="${postgres}/PG_VERSION"
+  local count
+
+  if [[ -e "${postgres}" && ! -e "${pg_version}" ]]; then
+    foundation_keep_vault_up_nag "Postgres files are missing from the data dir (no PG_VERSION). Do not create an empty cluster over that miss."
+    return 1
+  fi
+  if [[ ! -e "${pg_version}" ]]; then
+    foundation_keep_vault_up_nag "Postgres files are missing from the data dir (no PG_VERSION). Do not create an empty cluster over that miss."
+    return 1
+  fi
+
+  count="$(foundation_keep_vault_up_live_node_count "${repo_root}" || true)"
+  count="$(printf '%s' "${count}" | tr -d '[:space:]')"
+  if [[ ! "${count}" =~ ^[0-9]+$ ]]; then
+    foundation_keep_vault_up_nag "could not count records in the live cluster."
+    return 1
+  fi
+  if ((count == 0)); then
+    foundation_keep_vault_up_nag "the vault is up but it has no records. If you already had a graph, the real files may still be on disk. Do not create an empty cluster over them."
+    return 1
+  fi
+  return 0
+}
+
 foundation_keep_vault_up_main() {
-  local repo_root
+  local repo_root data_dir
+
+  repo_root="$(foundation_keep_vault_up_repo_root)"
+  data_dir="$(foundation_keep_vault_up_data_dir "${repo_root}")"
+
+  if ! foundation_keep_vault_up_refuse_miss "${data_dir}"; then
+    return 1
+  fi
 
   if foundation_keep_vault_up_health_ok; then
-    return 0
+    foundation_keep_vault_up_cluster_ok "${repo_root}" "${data_dir}"
+    return $?
   fi
 
   if ! foundation_keep_vault_up_have_docker; then
@@ -93,18 +185,17 @@ foundation_keep_vault_up_main() {
     return 1
   fi
 
-  repo_root="$(foundation_keep_vault_up_repo_root)"
   if ! foundation_keep_vault_up_compose_up "${repo_root}"; then
     foundation_keep_vault_up_nag "compose up ran once and /health still failed. From the clone: docker compose up -d"
     return 1
   fi
 
-  if foundation_keep_vault_up_wait_health; then
-    return 0
+  if ! foundation_keep_vault_up_wait_health; then
+    foundation_keep_vault_up_nag "compose up ran once and /health still failed. From the clone: docker compose up -d"
+    return 1
   fi
 
-  foundation_keep_vault_up_nag "compose up ran once and /health still failed. From the clone: docker compose up -d"
-  return 1
+  foundation_keep_vault_up_cluster_ok "${repo_root}" "${data_dir}"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

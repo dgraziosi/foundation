@@ -2,7 +2,7 @@
 
 Two quiet jobs for a running Foundation **vault** (the instance). Quiet if green. Not the graph. Not an MCP tool. Not a bot wake to keep the process up.
 
-1. **Keep the vault up** — a small script on this machine’s own schedule, every 15 minutes. Curls `/health`. If down, starts Compose once. Nags only when Docker is missing or health still fails.
+1. **Keep the vault up** — a small script on this machine’s own schedule, every 15 minutes. Curls `/health`. If down, starts Compose once. Nags when Docker is missing, health still fails, or the live cluster is empty or missing its Postgres files. `/health` green is not enough.
 2. **Weekday 9:15 written report** — Vault Keeper. Process + db, the data dir is the real vault, optional canaries, backup freshness. Does not start Compose.
 
 ## Glossary
@@ -38,7 +38,9 @@ Every **15 minutes**, all 7 days, user-local, on the machine that runs Compose. 
 
 Run in order:
 
-1. `GET /health` — unauthenticated. Default `http://127.0.0.1:8787/health`. Expect HTTP 200 and:
+1. If `$FOUNDATION_DATA/postgres` exists and `PG_VERSION` is missing, **refuse.** That is a miss. Do not mkdir an empty live cluster over a miss. Do not start Compose.
+
+2. `GET /health` — unauthenticated. Default `http://127.0.0.1:8787/health`. Expect HTTP 200 and:
 
    ```json
    { "ok": true, "service": "foundation", "db": "up" }
@@ -46,19 +48,20 @@ Run in order:
 
    Fail if the request errors, status is not 200, `ok` is not true, `service` is not `foundation`, or `db` is not `up`.
 
-2. If that is green: **stop. Write nothing.**
-
 3. If Docker is not on this machine, or Compose cannot talk to it: **nag.** Do not invent another start path.
 
-4. From the clone that has `docker-compose.yml`: `docker compose up -d` **once**. Not `--build` (that is product updates). Do not loop. Do not `down`. Do not mkdir `FOUNDATION_DATA`. Do not write the graph.
+4. If health is down: from the clone that has `docker-compose.yml`, `docker compose up -d` **once**. Not `--build` (that is product updates). Do not loop. Do not `down`. Do not mkdir `FOUNDATION_DATA`. Do not write the graph. Wait until `GET /health` is green, or about one minute. If health still fails: **nag.**
 
-5. Wait until `GET /health` is green, or about one minute.
+5. `/health` green is not enough. Compose can serve an empty cluster while the real graph is still on disk. On an existing data dir after a start (or when health is already green), **nag** if:
 
-6. If health came back: **stop. Write nothing.**
+   - `PG_VERSION` (or the live Postgres files) is missing, or
+   - it has no records (live record count is 0)
 
-7. If health still fails: **nag.**
+   Do not mkdir an empty live cluster over a miss.
 
-Nag on stderr. Say what failed and the smallest next look (start Docker, then from the clone: `docker compose up -d`). Leave the graph and `FOUNDATION_DATA` as they are. The product does not send mail. If the machine’s scheduler mails stderr, that is the nag. The weekday 9:15 report also pings in chat if `/health` is still down that morning.
+6. Quiet only when health is green **and** the live cluster is real (`PG_VERSION` present, at least one record).
+
+Nag on stderr. Say what failed and the smallest next look (start Docker, then from the clone: `docker compose up -d`; or point Compose at the data dir that still holds the graph). Leave the graph and `FOUNDATION_DATA` as they are. The product does not send mail. If the machine’s scheduler mails stderr, that is the nag. The weekday 9:15 report also pings in chat if `/health` is still down that morning.
 
 The product ships [`scripts/keep-vault-up.sh`](../scripts/keep-vault-up.sh). Point the machine’s schedule at that file. Use a clone path on that machine; do not commit that path.
 

@@ -9,7 +9,7 @@ You are writing the weekday vault-health report. The user can run this, or attac
 
 Read docs/VAULT_HEALTH.md and follow the written-report section. Call bootstrap if you need the current tools.
 
-You are not the host script. Do not start Compose. Do not install a schedule. Do not wake a bot to curl /health on a timer. That job is [`scripts/keep-vault-up.sh`](../../../scripts/keep-vault-up.sh), every 15 minutes.
+You are not the host script. Do not start Compose. Do not install a schedule. Do not wake a bot to curl /health on a timer. That job is [`scripts/keep-vault-up.sh`](../../../scripts/keep-vault-up.sh), every 15 minutes. It nags when Docker is missing, health still fails, or the live cluster has no Postgres files or no records. `/health` green is not enough.
 
 The user is the human who runs Compose. A vault is this running instance (`FOUNDATION_DATA` + Postgres). Do not call the graph “the Vault.”
 
@@ -17,7 +17,7 @@ The user is the human who runs Compose. A vault is this running instance (`FOUND
 
 Weekdays, 9:15 user-local. If every check passes, stay quiet. Ping the user only on failure.
 
-Keeping the vault up is every 15 minutes on the machine’s own schedule. Not this pass. Quiet when green.
+Keeping the vault up is every 15 minutes on the machine’s own schedule. Not this pass. Quiet when health is green and the live cluster is real.
 
 ## User config (fill in; blank means skip that check)
 
