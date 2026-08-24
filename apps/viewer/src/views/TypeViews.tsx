@@ -225,6 +225,7 @@ export function BoardView({
   columns,
   selectedId,
   onSelect,
+  empty,
 }: {
   nodes: TypeViewNode[];
   fields: TypeField[];
@@ -232,10 +233,11 @@ export function BoardView({
   columns: string[];
   selectedId?: string;
   onSelect: (id: string) => void;
+  empty: string;
 }) {
   const groupBind = boardGroupBind(view);
   if (columns.length === 0) {
-    return <Quiet>Nothing yet.</Quiet>;
+    return <Quiet>{empty}</Quiet>;
   }
   return (
     <div className="flex flex-wrap items-start gap-md" data-surface="board">
@@ -490,6 +492,7 @@ export function EngineView({
         columns={boardColumnIds(typeFields, declared, { showCompleted, nodes })}
         selectedId={selectedId}
         onSelect={onSelect}
+        empty={empty}
       />
     );
   }

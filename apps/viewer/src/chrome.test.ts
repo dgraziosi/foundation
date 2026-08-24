@@ -134,10 +134,16 @@ test("collection empty copy and board width", async () => {
   assert.doesNotMatch(views, /No tasks yet/);
   assert.match(views, /resolveBindValue\(node, fields, groupBind\) === column/);
   assert.doesNotMatch(views, /node\.status === column/);
-  assert.match(views, /if \(columns\.length === 0\) \{\s*return <Quiet>Nothing yet\.<\/Quiet>;/);
+  assert.match(views, /if \(columns\.length === 0\) \{\s*return <Quiet>\{empty\}<\/Quiet>;/);
+  assert.doesNotMatch(views, /if \(columns\.length === 0\) \{\s*return <Quiet>Nothing yet\.<\/Quiet>;/);
+  assert.match(views, /<BoardView[\s\S]*empty=\{empty\}/);
   assert.match(views, /w-\[233px\]/);
   assert.match(views, /collection-preview/);
   const typeView = await src("pages/TypeViewPage.tsx");
+  assert.match(
+    typeView,
+    /unfiltered === 0 \? "Nothing yet\." : queried\.length === 0 \? "Nothing matches your filters\." : "Nothing yet\."/,
+  );
   assert.match(typeView, /Nothing yet\./);
   assert.match(typeView, /Nothing matches your filters\./);
   assert.match(typeView, /count = activeView \? queried.length/);
