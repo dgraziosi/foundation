@@ -142,7 +142,7 @@ These names are the current surface. Full parameters: [`docs/MCP_TOOLS.md`](./MC
 - Live records are unique on `data.repo.{system,id}` for `github`. That ref is which GitHub object. Look up with `search` `{ repo }` (then `get`). Store the ref only. GitHub is not a Drive/Sheet. [Url, repo, and link](#url-repo-and-link).
 - `data.url` is an optional https address on any type. It is how the Viewer opens a file that stays the source of truth. It is not the Drive / Gmail / Calendar url, and not a second identity.
 - After a bot sends mail or clears a calendar event, the same record holds `data.receipt` `{ system, id, kind }`. That is done after send or clear. [Mail and calendar receipt](#mail-and-calendar-receipt).
-- No `get_vault_health` / `run_maintenance` / `audit_links` tools — those jobs are instance routines the user can run ([`VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md), [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/))
+- No `get_vault_health` / `run_maintenance` / `audit_links` tools — those jobs are instance routines the user can run ([`VAULT_HEALTH.md`](./VAULT_HEALTH.md): host script [`scripts/keep-vault-up.sh`](../scripts/keep-vault-up.sh) plus the weekday 9:15 written report, [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md), [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/))
 - No rewrite tool. `get` + `list_activity` + `upsert` is the loop. [Rewrite one record](#rewrite-one-record).
 
 ## Rewrite one record

@@ -22,6 +22,8 @@ Morning brief at 08:00 user-local: what is open and due. For a named goal, perso
 
 Dream — [`.agents/skills/dream/`](../.agents/skills/dream/). Nightly vault pass. Vault Keeper runs it at 02:00 user-local. Do not run it from this bot.
 
+Vault health — [`.agents/skills/vault-health/`](../.agents/skills/vault-health/). Weekday 9:15 written report. The host script [`scripts/keep-vault-up.sh`](../scripts/keep-vault-up.sh) keeps the vault up. Vault Keeper owns those. Do not run them from this bot.
+
 ## Skills
 
 create-bot — [`.agents/skills/create-bot/`](../.agents/skills/create-bot/). When the user wants another bot, use that skill.
@@ -31,6 +33,8 @@ handoff — [`.agents/skills/handoff/`](../.agents/skills/handoff/). When a step
 foundation-mcp — [`.agents/skills/foundation-mcp/`](../.agents/skills/foundation-mcp/). Vault MCP — which call to use.
 
 dream — [`.agents/skills/dream/`](../.agents/skills/dream/). Nightly vault pass. Vault Keeper runs it at 02:00 user-local. Do not run it from this bot.
+
+vault-health — [`.agents/skills/vault-health/`](../.agents/skills/vault-health/). Weekday 9:15 written report. The host script [`scripts/keep-vault-up.sh`](../scripts/keep-vault-up.sh) keeps the vault up. Vault Keeper owns those. Do not run them from this bot.
 
 ## Tools
 

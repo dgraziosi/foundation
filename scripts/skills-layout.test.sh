@@ -219,6 +219,18 @@ done
 if ! grep -Fq -- '02:00' <<<"${routines}"; then
   fail "Vault Keeper Routines does not recommend Dream at 02:00"
 fi
+if ! grep -Fq -- '9:15' <<<"${routines}"; then
+  fail "Vault Keeper Routines does not set the health report at 9:15"
+fi
+if ! grep -Fq -- 'scripts/keep-vault-up.sh' <<<"${routines}"; then
+  fail "Vault Keeper Routines does not cite scripts/keep-vault-up.sh"
+fi
+if ! grep -Fq -- '9:15' "${vault_keeper}"; then
+  fail "Vault Keeper does not recommend the weekday health report at 9:15"
+fi
+if ! grep -Fq -- 'scripts/keep-vault-up.sh' "${vault_keeper}"; then
+  fail "Vault Keeper does not name scripts/keep-vault-up.sh"
+fi
 
 if grep -E -q -- '(^|[^[:alnum:]._/])skills/(dream|vault-health|backup-vault|graph-hygiene|update-foundation)/' <<<"${routines}"; then
   fail "Vault Keeper Routines still cites repo-root skills/ instead of .agents/skills/"
@@ -237,6 +249,15 @@ if ! grep -Fq -- '.agents/skills/dream/' "${agents_doc}"; then
 fi
 if ! grep -Fq -- '02:00' "${agents_doc}"; then
   fail "docs/AGENTS.md does not recommend Dream at 02:00"
+fi
+if ! grep -Fq -- '9:15' "${agents_doc}"; then
+  fail "docs/AGENTS.md does not set the health report at 9:15"
+fi
+if ! grep -Fq -- 'scripts/keep-vault-up.sh' "${agents_doc}"; then
+  fail "docs/AGENTS.md does not name scripts/keep-vault-up.sh"
+fi
+if grep -Fq -- 'Weekday morning vault-health routine' "${agents_doc}"; then
+  fail "docs/AGENTS.md still calls vault-health a weekday morning routine only"
 fi
 if ! grep -Fq -- '## Everyday words' "${agents_doc}"; then
   fail "docs/AGENTS.md is missing Everyday words"
@@ -281,6 +302,21 @@ fi
 if ! grep -Fq -- '.agents/skills/dream/' <<<"${chief_skills}"; then
   fail "Chief of Staff Skills does not cite .agents/skills/dream/"
 fi
+if ! grep -Fq -- '.agents/skills/vault-health/' <<<"${chief_routines}"; then
+  fail "Chief of Staff Routines does not cite .agents/skills/vault-health/"
+fi
+if ! grep -Fq -- '9:15' <<<"${chief_routines}"; then
+  fail "Chief of Staff Routines does not say the health report is 9:15"
+fi
+if ! grep -Fq -- 'scripts/keep-vault-up.sh' <<<"${chief_routines}"; then
+  fail "Chief of Staff Routines does not name scripts/keep-vault-up.sh"
+fi
+if ! grep -Fq -- 'Do not run them from this bot' <<<"${chief_routines}"; then
+  fail "Chief of Staff Routines does not leave vault health to Vault Keeper"
+fi
+if ! grep -Fq -- '.agents/skills/vault-health/' <<<"${chief_skills}"; then
+  fail "Chief of Staff Skills does not cite .agents/skills/vault-health/"
+fi
 if grep -Eq -- 'search `living`|data\.living|data\.code|search `code`|search `link`|data\.link' "${chief}"; then
   fail "Chief of Staff still uses leftover living/code/link keys"
 fi
@@ -310,6 +346,12 @@ if grep -Fq -- 'due, link, repo' "${spec_doc}"; then
 fi
 if ! grep -Fq -- 'due, repo, url (https), receipt' "${spec_doc}"; then
   fail "docs/SPEC.md rewrite bag does not keep due, repo, url (https), receipt"
+fi
+if ! grep -Fq -- 'scripts/keep-vault-up.sh' "${spec_doc}"; then
+  fail "docs/SPEC.md instance routines do not name scripts/keep-vault-up.sh"
+fi
+if ! grep -Fq -- '9:15' "${spec_doc}"; then
+  fail "docs/SPEC.md instance routines do not name the weekday 9:15 written report"
 fi
 if grep -Fq -- 'Merge keeps link' "${spec_doc}"; then
   fail "docs/SPEC.md receipt write still says merge keeps link"

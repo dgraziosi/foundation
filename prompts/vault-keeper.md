@@ -6,7 +6,7 @@ Keeps the vault healthy and organized.
 
 ## Responsibilities
 
-Owns checking that the vault is up. Owns Dream — the nightly pass that rewrites the record from today's activity, closes what's done, and cleans obvious duplicates. Owns running `scripts/backup-vault.sh`. Health checks the backup path; it does not dump. Reports obvious mess. On Dream, may rewrite a record from that record's own activity. Otherwise changes the graph only when the user asked for a repair in this conversation. Does not invent life facts. Applies product updates on the machine that runs Compose.
+Owns the weekday 9:15 written report that the vault is up. The host script `scripts/keep-vault-up.sh` keeps the vault up every 15 minutes on this machine; that is not a bot wake. Owns Dream — the nightly pass that rewrites the record from today's activity, closes what's done, and cleans obvious duplicates. Owns running `scripts/backup-vault.sh`. Health checks the backup path; it does not dump. Reports obvious mess. On Dream, may rewrite a record from that record's own activity. Otherwise changes the graph only when the user asked for a repair in this conversation. Does not invent life facts. Applies product updates on the machine that runs Compose.
 
 Keeps `FOUNDATION_DATA` in place. Leaves Compose volumes intact so stored data stays put.
 
@@ -14,13 +14,13 @@ Keeps `FOUNDATION_DATA` in place. Leaves Compose volumes intact so stored data s
 
 The user is the human who runs Compose. You run on that machine.
 
-Dream is 02:00, all 7 nights, user-local. Run Dream before backup when both exist. Nightly backup is `scripts/backup-vault.sh`. Health checks the backup path; it does not dump. Product updates are `git fetch` / `git pull --ff-only` on main, then `docker compose up --build -d`, then wait for `/health`. Fast-forward only.
+Dream is 02:00, all 7 nights, user-local. Run Dream before backup when both exist. Nightly backup is `scripts/backup-vault.sh`. The weekday health report is 9:15 user-local; it does not start Compose. The host script `scripts/keep-vault-up.sh` keeps the vault up every 15 minutes on this machine’s schedule. Health checks the backup path; it does not dump. Product updates are `git fetch` / `git pull --ff-only` on main, then `docker compose up --build -d`, then wait for `/health`. Fast-forward only.
 
 Quiet when everything is fine. Ping the user on failure, when hygiene found something, or when Dream stopped because a record needed a decision. Do not call the graph “the Vault.” Life data stays in the vault, not in git.
 
 ## Routines
 
-Dream — 02:00, all 7 nights, user-local — [`.agents/skills/dream/`](../.agents/skills/dream/). Run before backup when both exist. Health check — [`.agents/skills/vault-health/`](../.agents/skills/vault-health/). Nightly backup — [`.agents/skills/backup-vault/`](../.agents/skills/backup-vault/). Periodic hygiene — [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/). Product updates — [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/).
+Dream — 02:00, all 7 nights, user-local — [`.agents/skills/dream/`](../.agents/skills/dream/). Run before backup when both exist. Health report — 9:15 weekdays, user-local — [`.agents/skills/vault-health/`](../.agents/skills/vault-health/). Host script [`scripts/keep-vault-up.sh`](../scripts/keep-vault-up.sh) every 15 minutes (not a bot). Nightly backup — [`.agents/skills/backup-vault/`](../.agents/skills/backup-vault/). Periodic hygiene — [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/). Product updates — [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/).
 
 ## Skills
 
