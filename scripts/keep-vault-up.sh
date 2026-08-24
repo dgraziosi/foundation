@@ -19,10 +19,12 @@
 # any start or initdb. A failed count is not empty: a stopped real
 # vault must start. Count-unknown refuses only when live looks empty
 # without psql (no blobs, and no postgres/ or a first-day-empty
-# cluster). People means blob files or a dump with node rows. A
-# sibling postgres/base tree is not people. Does not mkdir
-# over a miss. Does not write the graph. Does not put a live path in
-# git.
+# cluster). After start (or when /health is already green), numeric
+# 0 next to people nags empty-next-to-real. First-day 0 with no
+# people nearby stays healthy. People means blob files or a dump
+# with node rows. A sibling postgres/base tree is not people. Does
+# not mkdir over a miss. Does not write the graph. Does not put a
+# live path in git.
 #
 #   scripts/keep-vault-up.sh        — start if needed, then check
 #   scripts/keep-vault-up.sh stop   — stop the app, then Postgres.
@@ -508,8 +510,8 @@ foundation_keep_vault_up_live_user_record_count() {
 
 # After a start (or when /health is already green): existing data dir
 # must have the live Postgres files. First-day 0 user records is
-# healthy. Empty-next-to-real is the refuse-before-start path, not
-# this check. A failed count here may nag could-not-count; it must
+# healthy. Numeric 0 next to people nags empty-next-to-real; do not
+# stay quiet. A failed count here may nag could-not-count; it must
 # not refuse start. /health green is not enough. Does not mkdir.
 foundation_keep_vault_up_cluster_ok() {
   local repo_root="$1"
@@ -532,6 +534,10 @@ foundation_keep_vault_up_cluster_ok() {
   count="$(printf '%s' "${count}" | tr -d '[:space:]')"
   if [[ ! "${count}" =~ ^[0-9]+$ ]]; then
     foundation_keep_vault_up_nag "could not count records in the live cluster."
+    return 1
+  fi
+  if [[ "${count}" == "0" ]] && foundation_keep_vault_up_nearby_has_people "${data_dir}" "${backup_root}"; then
+    foundation_keep_vault_up_nag "the live vault has no user records, but a backup or another postgres tree nearby has people. This looks like an empty cluster next to a real one."
     return 1
   fi
   return 0

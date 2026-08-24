@@ -616,6 +616,50 @@ if grep -Fq -- 'empty cluster next to a real one' <<<"${out}"; then
   fail "live blobs heal path must not refuse as empty-next-to-real (got: ${out})"
 fi
 
+# After heal start, count becomes numeric 0 next to people: nag
+# empty-next-to-real. First count misses (heal). Do not inject 0
+# before start.
+heal_then_zero="${heal_box}/then-zero"
+mkdir -p "${heal_then_zero}/postgres/base/16384"
+printf '%s\n' '16' >"${heal_then_zero}/postgres/PG_VERSION"
+# Count is read inside $(...); persist calls in a file, not a shell var.
+printf '%s\n' '0' >"${tmp_root}/heal-then-zero-count"
+: >"${start_log}"
+set +e
+out="$(
+  FOUNDATION_DATA="${heal_then_zero}"
+  BACKUP_ROOT="${tmp_root}/backups-people"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_health_ok() { return 1; }
+  foundation_keep_vault_up_live_user_record_count() {
+    local n
+    n="$(tr -d '[:space:]' <"${tmp_root}/heal-then-zero-count")"
+    n=$((n + 1))
+    printf '%s\n' "${n}" >"${tmp_root}/heal-then-zero-count"
+    if ((n == 1)); then
+      return 1
+    fi
+    printf '%s\n' '0'
+  }
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
+    return 0
+  }
+  foundation_keep_vault_up_wait_health() { return 0; }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+set -e
+if [[ "$(wc -l <"${start_log}" | tr -d ' ')" != "1" ]]; then
+  fail "heal then 0+people must start (log: $(cat "${start_log}"); out: ${out})"
+fi
+if ((rc == 0)); then
+  fail "heal then 0+people must not stay quiet (out: ${out})"
+fi
+if ! grep -Fq -- 'empty cluster next to a real one' <<<"${out}"; then
+  fail "heal then 0+people did not nag empty-next-to-real (got: ${out})"
+fi
+
 # First-day folder (no postgres/) next to a dump with people: refuse. Do not initdb.
 first_init="${tmp_root}/first-init"
 mkdir -p "${first_init}"

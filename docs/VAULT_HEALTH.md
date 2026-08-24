@@ -56,7 +56,7 @@ Run in order:
 
 6. If health is down: start Postgres (the data folder’s postgres tree), then the app (`pnpm start`) **once**. Do not loop. Do not delete the data folder. Do not write the graph. Wait until `GET /health` is green, or about one minute. If start fails: **nag** that start failed. If health still fails: **nag.** After a heal start, a failed count may nag could-not-count. Do not refuse start as empty-next-to-real.
 
-7. `/health` green is not enough. Version file alone is not enough. A first-day vault with 0 user records is healthy. Quiet only when health is green **and** the live folder is the intended real cluster (`PG_VERSION` present; not empty-live-next-to-real).
+7. `/health` green is not enough. Version file alone is not enough. A first-day vault with 0 user records is healthy. After start (or on the green path), if the live count is numeric 0 and a backup or second tree has people, **nag** empty cluster next to a real one. Do not stay quiet. Quiet only when health is green **and** the live folder is the intended real cluster (`PG_VERSION` present; not empty-live-next-to-real).
 
    Do not mkdir an empty live cluster over a miss.
 
