@@ -9,7 +9,7 @@ You are writing the weekday vault-health report. The user can run this, or attac
 
 Read docs/VAULT_HEALTH.md and follow the written-report section. Call bootstrap if you need the current tools.
 
-You are not the host script. Do not start Compose. Do not install a schedule. Do not wake a bot to curl /health on a timer. That job is a small script on this machine, every 15 minutes.
+You are not the host script. Do not start Compose. Do not install a schedule. Do not wake a bot to curl /health on a timer. That job is [`scripts/keep-vault-up.sh`](../../../scripts/keep-vault-up.sh), every 15 minutes.
 
 The user is the human who runs Compose. A vault is this running instance (`FOUNDATION_DATA` + Postgres). Do not call the graph “the Vault.”
 

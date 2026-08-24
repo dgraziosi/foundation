@@ -60,10 +60,10 @@ Run in order:
 
 Nag on stderr. Say what failed and the smallest next look (start Docker, then from the clone: `docker compose up -d`). Leave the graph and `FOUNDATION_DATA` as they are. The product does not send mail. If the machine’s scheduler mails stderr, that is the nag. The weekday 9:15 report also pings in chat if `/health` is still down that morning.
 
-Save a script with those steps on the machine. Point the schedule at that script. Use a clone path on that machine; do not commit that path.
+The product ships [`scripts/keep-vault-up.sh`](../scripts/keep-vault-up.sh). Point the machine’s schedule at that file. Use a clone path on that machine; do not commit that path.
 
 ```
-*/15 * * * * /path/to/the/clone/keep-vault-up.sh
+*/15 * * * * /path/to/the/clone/scripts/keep-vault-up.sh
 ```
 
 ## Weekday 9:15 written report
