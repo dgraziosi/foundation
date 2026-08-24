@@ -104,8 +104,7 @@ foundation_keep_vault_up_json_field() {
 
 foundation_keep_vault_up_body_is_green() {
   local body="$1"
-  local compact
-  compact="$(printf '%s' "${body}" | tr -d '[:space:]')"
+  local compact="${body//[$' \t\n\r']/}"
   [[ -n "${compact}" ]] || return 1
   foundation_keep_vault_up_json_field "${compact}" '"ok":true' || return 1
   foundation_keep_vault_up_json_field "${compact}" '"service":"foundation"' || return 1
