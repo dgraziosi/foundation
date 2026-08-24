@@ -1,6 +1,9 @@
 # Vault health
 
-Weekday morning checkup for a running Foundation **vault** (the instance). Quiet if green. Not the graph. Not an MCP tool.
+Two quiet jobs for a running Foundation **vault** (the instance). Quiet if green. Not the graph. Not an MCP tool. Not a bot wake to keep the process up.
+
+1. **Keep the vault up** — a small script on this machine’s own schedule, every 15 minutes. Curls `/health`. If down, starts Compose once. Nags only when Docker is missing or health still fails.
+2. **Weekday 9:15 written report** — Vault Keeper. Process + db, the data dir is the real vault, optional canaries, backup freshness. Does not start Compose.
 
 ## Glossary
 
@@ -15,26 +18,65 @@ Short analog: app / folder / links → Foundation / vault / graph.
 
 Do not call the graph “the Vault.”
 
-The user can run this checkup, or attach it to Vault Keeper ([`AGENTS.md`](./AGENTS.md)). Skill: [`.agents/skills/vault-health/`](../.agents/skills/vault-health/).
+The user can run the written report, or attach it to Vault Keeper ([`AGENTS.md`](./AGENTS.md)). Skill: [`.agents/skills/vault-health/`](../.agents/skills/vault-health/). The host script keeps the vault up. The skill is the written report.
 
-## What it is
+## Compose stays
 
-A **quiet instance routine** (weekdays, morning local). Instance ops: process + db, the data dir is the real vault, optional canaries, backup freshness. It uses HTTP, the host filesystem, and existing MCP tools the same way a careful user would. When everything is fine, it stays silent. It pings the user **only on failure**.
+The vault is a folder, Postgres, and the Foundation process. Compose is how a clone starts those today (`docker compose up --build`). `restart: unless-stopped` already restarts a container when Docker itself is still running. That line does nothing when Docker is quit, missing from this machine, or not on `PATH`. Port `8787` is refused. The data dir is still there.
 
-Do not add `get_vault_health`, `run_maintenance`, `propose_reorganize`, `audit_links`, or `cleanup_dangling_links`. Those jobs are this routine and [graph hygiene](./GRAPH_HYGIENE.md), not MCP tools.
+A tighter Compose restart policy cannot start Docker. The product does not ship a second official way to run Postgres and the app as host processes. The host script notices when the vault is down and tries Compose once.
 
-Graph-side report (duplicate titles, zero-edge nodes, type soup) is **not** this routine. That is weekly [graph hygiene](./GRAPH_HYGIENE.md). Git pull, compose rebuild, and the post-pull git-tree leak scan are **not** this routine. Those are [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/) and [`.agents/skills/repo-leak-scan/`](../.agents/skills/repo-leak-scan/).
+Do not add `get_vault_health`, `run_maintenance`, `propose_reorganize`, `audit_links`, or `cleanup_dangling_links`. Those jobs are this note and [graph hygiene](./GRAPH_HYGIENE.md), not MCP tools.
 
-## What it is not
+Graph-side report (duplicate titles, zero-edge nodes, type soup) is **not** this note. That is weekly [graph hygiene](./GRAPH_HYGIENE.md). Git pull, compose rebuild, and the post-pull git-tree leak scan are **not** this note. Those are [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/) and [`.agents/skills/repo-leak-scan/`](../.agents/skills/repo-leak-scan/). Dream rewrites the record from today's activity; that pass has its own clock.
 
-- **Not the graph.** `$FOUNDATION_DATA` and Postgres *are* the vault. The graph lives in them. Do not call the graph “the Vault.” Do not dual-write a markdown store.
-- **Starter recipes.** Paste Vault Keeper; its health routine is this skill. See [`AGENTS.md`](./AGENTS.md).
-- **Not email.** No SMTP, no digest. Pings stay in the user’s chat. Ping only when a check fails.
-- **Not a write-ACL.** The API key is the gate. Do not invent default-deny.
-- **Not a mutation pass.** The quiet weekday run does not `upsert`, `delete`, `unlink`, `undo`, or `manage_type` unless the user asked for a repair in that conversation. Report; don’t rewrite the graph unattended.
-- **Reachability.** An agent that can reach the vault MCP (`http://127.0.0.1:8787/mcp`) may read/write; one that cannot does not. Run this checkup from a process that can hit that URL on the host running Compose.
+## Keep the vault up
 
-## Quiet weekday checks
+A **machine job**. Not a bot. Not a weekday-only check. No bot wake. Curl is cheap; a bot every few minutes is not.
+
+Every **15 minutes**, all 7 days, user-local, on the machine that runs Compose. Put the script on that machine’s schedule (cron on Linux or Mac, or the equivalent). Do not put a live schedule or a home path into git.
+
+Run in order:
+
+1. `GET /health` — unauthenticated. Default `http://127.0.0.1:8787/health`. Expect HTTP 200 and:
+
+   ```json
+   { "ok": true, "service": "foundation", "db": "up" }
+   ```
+
+   Fail if the request errors, status is not 200, `ok` is not true, `service` is not `foundation`, or `db` is not `up`.
+
+2. If that is green: **stop. Write nothing.**
+
+3. If Docker is not on this machine, or Compose cannot talk to it: **nag.** Do not invent another start path.
+
+4. From the clone that has `docker-compose.yml`: `docker compose up -d` **once**. Not `--build` (that is product updates). Do not loop. Do not `down`. Do not mkdir `FOUNDATION_DATA`. Do not write the graph.
+
+5. Wait until `GET /health` is green, or about one minute.
+
+6. If health came back: **stop. Write nothing.**
+
+7. If health still fails: **nag.**
+
+Nag on stderr. Say what failed and the smallest next look (start Docker, then from the clone: `docker compose up -d`). Leave the graph and `FOUNDATION_DATA` as they are. The product does not send mail. If the machine’s scheduler mails stderr, that is the nag. The weekday 9:15 report also pings in chat if `/health` is still down that morning.
+
+Save a script with those steps on the machine. Point the schedule at that script. Use a clone path on that machine; do not commit that path.
+
+```
+*/15 * * * * /path/to/the/clone/keep-vault-up.sh
+```
+
+## Weekday 9:15 written report
+
+A **quiet report** (weekdays, **9:15** user-local). Attach it to Vault Keeper, or run it. It uses HTTP, the host filesystem, and existing MCP tools the same way a careful user would. When everything is fine, it stays silent. It pings the user **only on failure**. It does **not** start Compose. The host script should have already tried.
+
+Do not `upsert`, `delete`, `unlink`, `undo`, or `manage_type` unless the user asked for a repair in that conversation. Report; don’t rewrite the graph unattended.
+
+Not email. No digest. Pings stay in the user’s chat.
+
+Not a write-ACL. The API key is the gate.
+
+Run this report from a process that can hit `http://127.0.0.1:8787` on the host running Compose.
 
 Run in order. Stop at the first hard failure and ping. Skip a check when its input is unset — a fresh clone with no well-known nodes is allowed to be healthy. Backup freshness uses `BACKUP_ROOT`; skip that check only if the user unset it.
 
@@ -42,15 +84,7 @@ A first-day empty graph is a valid vault. Keep `FOUNDATION_DATA` in place and le
 
 ### 1. `GET /health` — process + db
 
-Unauthenticated. Expect HTTP 200 and:
-
-```json
-{ "ok": true, "service": "foundation", "db": "up" }
-```
-
-Default: `http://127.0.0.1:8787/health`.
-
-Fail if the request errors, status is not 200, `ok` is not true, `service` is not `foundation`, or `db` is not `up`. That covers “Compose is up” and “Postgres answers `ping`.”
+Same contract as the host script. Default: `http://127.0.0.1:8787/health`. If this fails, ping. Do not run `compose up` from this report.
 
 ### 2. `FOUNDATION_DATA` is the real vault
 
@@ -96,6 +130,7 @@ Intent only — tool JSON schemas change; call `bootstrap` and use what the serv
 | Check | Use |
 | --- | --- |
 | Process + db | `GET /health` |
+| Start the stack once | Host script: `docker compose up -d` (not `--build`) |
 | Types still seeded | `bootstrap` or `inspect_ontology`. Seed-only is OK on day one. |
 | Canary nodes | `get` / `search` |
 | Recent writes (optional context, not a fail) | `list_activity` with a `since` window |
@@ -106,4 +141,6 @@ Auth for `/mcp`: `Authorization: ApiKey <FOUNDATION_API_KEY>` (Bearer equivalent
 
 ## Failure ping
 
-Say what failed, what you observed, and the smallest next look (restart Compose, fix `FOUNDATION_DATA`, restore from the user’s backup). Ping in chat. Leave the graph and `FOUNDATION_DATA` as they are unless the user asked for a repair in this conversation.
+**Host script:** stderr. What failed, and the smallest next look (start Docker, then `docker compose up -d` from the clone).
+
+**Weekday report:** chat. What failed, what you observed, and the smallest next look (start Docker, fix `FOUNDATION_DATA`, restore from the user’s backup). Leave the graph and `FOUNDATION_DATA` as they are unless the user asked for a repair in this conversation.
