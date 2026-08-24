@@ -71,7 +71,7 @@ test(
         assert.ok(project?.fields?.some((field) => field.name === "budget_currency"));
       });
 
-      await t.test("seed apply fills missing project budget fields and keeps an operator edit", async () => {
+      await t.test("seed apply fills missing project budget fields and keeps a user edit", async () => {
         const ontology = await inspectOntology(pool, "types");
         const project = ontology.types.find((type) => type.slug === "project");
         assert.ok(project);

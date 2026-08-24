@@ -92,7 +92,7 @@ export const SEED_TYPE_IDENTITY: Record<string, { hue: TypeHueName; glyph: strin
   spend: { hue: "teal", glyph: "Receipt" },
 };
 
-/** Fill missing seed hue/glyph only. Do not overwrite an operator edit. */
+/** Fill missing seed hue/glyph only. Do not overwrite a user edit. */
 export function mergeMissingTypeIdentity(
   existing: { hue?: string | null; glyph?: string | null },
   seed: { hue?: TypeHueName; glyph?: string },

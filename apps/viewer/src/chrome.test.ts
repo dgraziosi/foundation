@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
@@ -199,6 +199,14 @@ test("shell uses canvas ground and a 224px rail", async () => {
   assert.match(shell, /bg-canvas/);
   const rail = await src("shell/Rail.tsx");
   assert.match(rail, /max-md:fixed/);
+});
+
+test("inspector leftovers are gone", async () => {
+  await assert.rejects(() => access(join(root, "components/ui/sheet.tsx")));
+  const config = await src("../tailwind.config.js");
+  assert.doesNotMatch(config, /inspector:/);
+  const css = await src("styles.css");
+  assert.doesNotMatch(css, /--radius-sheet/);
 });
 
 test("row chrome wraps titles without changing every Button", async () => {

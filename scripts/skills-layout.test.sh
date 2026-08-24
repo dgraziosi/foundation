@@ -420,6 +420,23 @@ fi
 if grep -Eiq -- '(^|[^[:alnum:]])operator([^[:alnum:]]|$)' "${repo_root}/packages/schema/src/lookup-classify.ts"; then
   fail "lookup-classify.ts still says operator"
 fi
+if grep -Eiq -- '(^|[^[:alnum:]])operator([^[:alnum:]]|$)' \
+  "${repo_root}/packages/schema/src/type-identity.ts" \
+  "${repo_root}/packages/schema/src/type-identity.test.ts"; then
+  fail "type-identity still says operator"
+fi
+if grep -Fq -- 'actor_label: "operator"' "${repo_root}/apps/server/src/cas-safety.test.ts"; then
+  fail "cas-safety.test.ts still uses actor_label operator"
+fi
+if [[ -f "${repo_root}/apps/viewer/src/components/ui/sheet.tsx" ]]; then
+  fail "unused Inspector sheet component is still present"
+fi
+if grep -Fq -- 'inspector:' "${repo_root}/apps/viewer/tailwind.config.js"; then
+  fail "tailwind still has unused width.inspector"
+fi
+if grep -Fq -- '--radius-sheet' "${repo_root}/apps/viewer/src/styles.css"; then
+  fail "styles.css still has unused --radius-sheet"
+fi
 if ! grep -Fq -- 'data.url: null clears the href' "${repo_root}/apps/server/src/tools/bootstrap.ts"; then
   fail "bootstrap how_to_extend.nodes does not clear href with data.url: null"
 fi

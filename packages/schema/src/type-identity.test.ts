@@ -65,7 +65,7 @@ test("parseTypeIdentity treats null as a clear", () => {
   assert.equal(parsed.glyph, null);
 });
 
-test("seed apply fills missing identity and keeps an operator edit", () => {
+test("seed apply fills missing identity and keeps a user edit", () => {
   const filled = mergeMissingTypeIdentity({}, SEED_TYPE_IDENTITY.task!);
   assert.equal(filled.hue, "green");
   assert.equal(filled.glyph, "CircleCheck");

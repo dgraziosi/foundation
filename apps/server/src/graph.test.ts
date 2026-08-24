@@ -703,7 +703,7 @@ test(
 );
 
 test(
-  "seed apply fills missing seed fields and view ids and keeps operator edits",
+  "seed apply fills missing seed fields and view ids and keeps user edits",
   { skip: !databaseUrl },
   async () => {
     if (!databaseUrl) {
