@@ -5,7 +5,9 @@
 #   FOUNDATION_HEALTH_URL — optional. Default http://127.0.0.1:8787/health
 #   FOUNDATION_DATA       — the vault (default ./data under the clone;
 #                           also read from the clone .env)
-#   BACKUP_ROOT           — optional. Default: sibling of the data dir
+#   BACKUP_ROOT           — optional. Also read from the clone .env.
+#                           Default: sibling of the data dir.
+#                           Relative paths are under the clone.
 #   DATABASE_URL          — optional. Also read from the clone .env.
 #                           Default postgres://foundation:foundation@localhost:5432/foundation
 #
@@ -67,15 +69,19 @@ foundation_keep_vault_up_data_dir() {
   fi
 }
 
+# BACKUP_ROOT from the environment, else the clone .env, else a sibling
+# of the data dir. Relative paths are under the clone (not cwd).
 foundation_keep_vault_up_backup_root() {
   local data_dir="${1%/}"
-  local raw="${BACKUP_ROOT:-}"
+  local repo_root raw
+  repo_root="$(foundation_keep_vault_up_repo_root)"
+  raw="$(foundation_keep_vault_up_env_value "${repo_root}" BACKUP_ROOT)"
   if [[ -z "${raw}" ]]; then
     raw="$(dirname -- "${data_dir}")/foundation-backups"
   fi
   raw="${raw%/}"
   if [[ "${raw}" != /* ]]; then
-    printf '%s\n' "$(pwd)/${raw#./}"
+    printf '%s\n' "${repo_root}/${raw#./}"
   else
     printf '%s\n' "${raw}"
   fi
@@ -147,9 +153,10 @@ foundation_keep_vault_up_backup_has_people() {
 }
 
 # Another data-dir/postgres/PG_VERSION under the parent of the live
-# data dir (not files inside this cluster's base/). That other tree
-# "has people" when it has blob files, a dump with people, or a
-# postgres/base tree — a real other cluster, not a lone version file.
+# data dir. That other tree "has people" when it has blob files or a
+# dump with people. An initdb cluster (postgres/base exists) with no
+# blobs and no dump is not people — first-day or a throwaway restore
+# folder next to live must stay healthy.
 foundation_keep_vault_up_second_tree_has_people() {
   local data_dir="${1%/}"
   local parent other pg f
@@ -170,10 +177,6 @@ foundation_keep_vault_up_second_tree_has_people() {
         return 0
       fi
     done < <(find "${other}" -type f -name '*.sql' 2>/dev/null | LC_ALL=C sort)
-    if [[ -d "$(dirname -- "${pg}")/base" ]] \
-      && find "$(dirname -- "${pg}")/base" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | grep -q .; then
-      return 0
-    fi
   done < <(find "${parent}" -mindepth 2 -maxdepth 3 -type f -path '*/postgres/PG_VERSION' 2>/dev/null | LC_ALL=C sort)
   return 1
 }
@@ -225,7 +228,9 @@ foundation_keep_vault_up_pg_running() {
 }
 
 # First-day init into the data folder's postgres tree. Does not mkdir
-# the data folder itself. Does not init over a miss.
+# the data folder itself. Does not init over a miss. Role and database
+# from DATABASE_URL are created after Postgres is up (initdb alone
+# only makes a cluster for the OS user).
 foundation_keep_vault_up_init_postgres() {
   local data_dir="$1"
   local postgres="${data_dir%/}/postgres"
@@ -234,6 +239,93 @@ foundation_keep_vault_up_init_postgres() {
     return 1
   fi
   initdb -D "${postgres}" --no-instructions >/dev/null
+}
+
+# SQL for the DATABASE_URL role/database. kind is role|exists|createdb.
+foundation_keep_vault_up_app_role_sql() {
+  local url="$1"
+  local kind="$2"
+  python3 -c '
+from urllib.parse import urlparse, unquote
+import sys
+
+def ident(s):
+    return "\"" + s.replace("\"", "\"\"") + "\""
+
+def literal(s):
+    q = chr(39)
+    return q + s.replace(q, q + q) + q
+
+u = urlparse(sys.argv[1])
+user = unquote(u.username or "foundation")
+password = unquote(u.password or "foundation")
+database = unquote((u.path or "").lstrip("/") or "foundation")
+database = database.split("?", 1)[0].split("/", 1)[0] or "foundation"
+kind = sys.argv[2]
+if kind == "role":
+    print("DO $do$")
+    print("BEGIN")
+    print("  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = %s) THEN" % literal(user))
+    print("    CREATE ROLE %s LOGIN SUPERUSER PASSWORD %s;" % (ident(user), literal(password)))
+    print("  ELSE")
+    print("    ALTER ROLE %s WITH LOGIN SUPERUSER PASSWORD %s;" % (ident(user), literal(password)))
+    print("  END IF;")
+    print("END")
+    print("$do$;")
+elif kind == "exists":
+    print("SELECT 1 FROM pg_database WHERE datname = %s" % literal(database))
+elif kind == "createdb":
+    print("CREATE DATABASE %s OWNER %s;" % (ident(database), ident(user)))
+' "${url}" "${kind}"
+}
+
+# Local socket into this cluster (OS superuser from initdb). Not DATABASE_URL.
+foundation_keep_vault_up_psql_local() {
+  local postgres="$1"
+  shift
+  local pid_file="${postgres}/postmaster.pid"
+  local socket_dir="" port=""
+  if [[ -f "${pid_file}" ]]; then
+    port="$(sed -n '4p' "${pid_file}" | tr -d '[:space:]')"
+    socket_dir="$(sed -n '5p' "${pid_file}" | tr -d '[:space:]')"
+  fi
+  if [[ -n "${socket_dir}" && -n "${port}" ]]; then
+    psql -h "${socket_dir}" -p "${port}" -d postgres -v ON_ERROR_STOP=1 "$@"
+  else
+    psql -d postgres -p "${port:-5432}" -v ON_ERROR_STOP=1 "$@"
+  fi
+}
+
+# App URL already works, or create that role/database in this cluster.
+foundation_keep_vault_up_ensure_app_database() {
+  local repo_root="$1"
+  local data_dir="$2"
+  local postgres="${data_dir%/}/postgres"
+  local url role_sql exists_sql create_sql exists
+
+  url="$(foundation_keep_vault_up_database_url "${repo_root}")"
+  if ! command -v psql >/dev/null 2>&1; then
+    foundation_keep_vault_up_nag "psql is not on PATH. Cannot create the app database role."
+    return 1
+  fi
+  if psql "${url}" -tAc "SELECT 1" >/dev/null 2>&1; then
+    return 0
+  fi
+  role_sql="$(foundation_keep_vault_up_app_role_sql "${url}" role)" || return 1
+  exists_sql="$(foundation_keep_vault_up_app_role_sql "${url}" exists)" || return 1
+  create_sql="$(foundation_keep_vault_up_app_role_sql "${url}" createdb)" || return 1
+  if ! foundation_keep_vault_up_psql_local "${postgres}" -c "${role_sql}"; then
+    foundation_keep_vault_up_nag "start failed. Could not create the app database role."
+    return 1
+  fi
+  exists="$(foundation_keep_vault_up_psql_local "${postgres}" -tAc "${exists_sql}" | tr -d '[:space:]')"
+  if [[ "${exists}" != "1" ]]; then
+    if ! foundation_keep_vault_up_psql_local "${postgres}" -c "${create_sql}"; then
+      foundation_keep_vault_up_nag "start failed. Could not create the app database."
+      return 1
+    fi
+  fi
+  return 0
 }
 
 # Start the live cluster. Quiet so a healed run writes nothing.
@@ -278,6 +370,7 @@ foundation_keep_vault_up_start_app() {
     return 1
   fi
   (
+    set -m
     cd "${repo_root}" || exit 1
     nohup pnpm start >>"${log_file}" 2>&1 &
     echo $! >"${pid_file}"
@@ -362,6 +455,10 @@ foundation_keep_vault_up_start() {
     return 1
   fi
 
+  if ! foundation_keep_vault_up_ensure_app_database "${repo_root}" "${data_dir}"; then
+    return 1
+  fi
+
   if ! foundation_keep_vault_up_start_app "${repo_root}" "${data_dir}"; then
     foundation_keep_vault_up_nag "start failed. The app did not start (pnpm start)."
     return 1
@@ -369,9 +466,26 @@ foundation_keep_vault_up_start() {
   return 0
 }
 
+# Kill a pid and its descendants. A later stop cannot wait(1) a pid
+# from the start invocation.
+foundation_keep_vault_up_stop_pid_tree() {
+  local pid="$1"
+  local sig="${2:-TERM}"
+  local child
+  [[ "${pid}" =~ ^[0-9]+$ ]] || return 0
+  kill -0 "${pid}" 2>/dev/null || return 0
+  while IFS= read -r child; do
+    [[ -n "${child}" ]] || continue
+    foundation_keep_vault_up_stop_pid_tree "${child}" "${sig}"
+  done < <(pgrep -P "${pid}" 2>/dev/null || true)
+  kill "-${sig}" "${pid}" 2>/dev/null || true
+}
+
 # Stop the app, then Postgres. Does not delete the data folder.
+# Kills the pnpm wrapper and the Node listener (process group + tree).
+# Does not wait(1) a pid from another process.
 foundation_keep_vault_up_stop() {
-  local repo_root data_dir postgres pid_file pid
+  local repo_root data_dir postgres pid_file pid i
   repo_root="$(foundation_keep_vault_up_repo_root)"
   data_dir="$(foundation_keep_vault_up_data_dir "${repo_root}")"
   postgres="${data_dir%/}/postgres"
@@ -380,8 +494,17 @@ foundation_keep_vault_up_stop() {
   if [[ -f "${pid_file}" ]]; then
     pid="$(tr -d '[:space:]' <"${pid_file}")"
     if [[ "${pid}" =~ ^[0-9]+$ ]] && kill -0 "${pid}" 2>/dev/null; then
-      kill "${pid}" 2>/dev/null || true
-      wait "${pid}" 2>/dev/null || true
+      kill -- "-${pid}" 2>/dev/null || true
+      foundation_keep_vault_up_stop_pid_tree "${pid}" TERM
+      i=0
+      while ((i < 5)) && kill -0 "${pid}" 2>/dev/null; do
+        sleep 1
+        i=$((i + 1))
+      done
+      if kill -0 "${pid}" 2>/dev/null; then
+        kill -9 -- "-${pid}" 2>/dev/null || true
+        foundation_keep_vault_up_stop_pid_tree "${pid}" KILL
+      fi
     fi
     rm -f -- "${pid_file}"
   fi

@@ -63,6 +63,9 @@ fi
 if ! grep -Fq -- 'pnpm start' "${keep_script}"; then
   fail "keep-vault-up.sh must start the app with pnpm start"
 fi
+if ! grep -Fq -- 'CREATE ROLE' "${keep_script}"; then
+  fail "keep-vault-up.sh must create the app database role after initdb"
+fi
 if ! grep -Fq -- 'pg_ctl' "${keep_script}"; then
   fail "keep-vault-up.sh must start Postgres with pg_ctl"
 fi
@@ -102,6 +105,15 @@ fi
 printf '%s\n' '-- dump with people' 'INSERT INTO nodes (id, title) VALUES ('\''00000000-0000-0000-0000-000000000001'\'', '\''Fixture person'\'');' >"${dump_people}"
 if ! foundation_keep_vault_up_sql_has_people "${dump_people}"; then
   fail "INSERT INTO nodes must count as people"
+fi
+
+role_sql="$(foundation_keep_vault_up_app_role_sql 'postgres://foundation:foundation@localhost:5432/foundation' role)"
+if ! grep -Fq -- 'CREATE ROLE "foundation"' <<<"${role_sql}"; then
+  fail "app role SQL must CREATE ROLE foundation (got: ${role_sql})"
+fi
+if ! grep -Fq -- 'CREATE DATABASE "foundation" OWNER "foundation"' \
+  <<<"$(foundation_keep_vault_up_app_role_sql 'postgres://foundation:foundation@localhost:5432/foundation' createdb)"; then
+  fail "app role SQL must CREATE DATABASE foundation"
 fi
 
 # Health + intended real cluster (records > 0): write nothing. Do not start.
@@ -400,6 +412,106 @@ if ! grep -Fq -- 'empty cluster next to a real one' <<<"${out}"; then
 fi
 if [[ -s "${start_log}" ]]; then
   fail "empty-live-next-to-second-tree must not start"
+fi
+
+# First-day 0 records next to a sibling initdb cluster (base/ exists, no people): healthy.
+empty_sib="${tmp_root}/empty-sib"
+mkdir -p "${empty_sib}/live/postgres" "${empty_sib}/restore-data/postgres/base/1"
+printf '%s\n' '16' >"${empty_sib}/live/postgres/PG_VERSION"
+printf '%s\n' '16' >"${empty_sib}/restore-data/postgres/PG_VERSION"
+: >"${start_log}"
+out="$(
+  FOUNDATION_DATA="${empty_sib}/live"
+  BACKUP_ROOT="${tmp_root}/backups-empty-sib"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_health_ok() { return 0; }
+  foundation_keep_vault_up_live_user_record_count() { printf '%s\n' '0'; }
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
+    return 0
+  }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+if ((rc != 0)); then
+  fail "first-day next to empty sibling cluster should exit 0 (got ${rc}: ${out})"
+fi
+if [[ -n "${out}" ]]; then
+  fail "first-day next to empty sibling cluster should write nothing (got: ${out})"
+fi
+if [[ -s "${start_log}" ]]; then
+  fail "first-day next to empty sibling cluster must not start"
+fi
+
+# BACKUP_ROOT from clone .env; relative path is under the clone, not cwd.
+env_clone="${tmp_root}/env-clone"
+mkdir -p "${env_clone}/data/postgres" "${env_clone}/my-backups/sql"
+printf '%s\n' '16' >"${env_clone}/data/postgres/PG_VERSION"
+printf '%s\n' 'BACKUP_ROOT=./my-backups' >"${env_clone}/.env"
+printf '%s\n' 'INSERT INTO nodes (id, title) VALUES ('\''00000000-0000-0000-0000-000000000001'\'', '\''Fixture person'\'');' \
+  >"${env_clone}/my-backups/sql/foundation-20000101.sql"
+backup_got="$(
+  cd "${tmp_root}"
+  unset BACKUP_ROOT
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${env_clone}"; }
+  foundation_keep_vault_up_backup_root "${env_clone}/data"
+)"
+if [[ "${backup_got}" != "${env_clone}/my-backups" ]]; then
+  fail "BACKUP_ROOT from clone .env should resolve under the clone (got: ${backup_got})"
+fi
+: >"${start_log}"
+set +e
+out="$(
+  cd "${tmp_root}"
+  unset BACKUP_ROOT
+  FOUNDATION_DATA="${env_clone}/data"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${env_clone}"; }
+  foundation_keep_vault_up_health_ok() { return 0; }
+  foundation_keep_vault_up_live_user_record_count() { printf '%s\n' '0'; }
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
+    return 0
+  }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+set -e
+if ((rc == 0)); then
+  fail "empty live next to .env BACKUP_ROOT with people should fail"
+fi
+if ! grep -Fq -- 'empty cluster next to a real one' <<<"${out}"; then
+  fail "empty-live-next-to-env-backup did not nag (got: ${out})"
+fi
+
+# Stop kills the recorded pid and its child (not wait of another process).
+stop_dir="${tmp_root}/stop-tree"
+mkdir -p "${stop_dir}/postgres"
+(
+  sleep 120 &
+  echo $! >"${tmp_root}/stop-child.pid"
+  sleep 120
+) &
+echo $! >"${stop_dir}/app.pid"
+i=0
+while ((i < 5)) && [[ ! -s "${tmp_root}/stop-child.pid" ]]; do
+  sleep 1
+  i=$((i + 1))
+done
+stop_parent="$(tr -d '[:space:]' <"${stop_dir}/app.pid")"
+stop_child="$(tr -d '[:space:]' <"${tmp_root}/stop-child.pid")"
+if ! kill -0 "${stop_parent}" 2>/dev/null || ! kill -0 "${stop_child}" 2>/dev/null; then
+  fail "stop fixture did not start a parent/child tree"
+fi
+(
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_data_dir() { printf '%s\n' "${stop_dir}"; }
+  foundation_keep_vault_up_stop
+)
+if kill -0 "${stop_parent}" 2>/dev/null; then
+  fail "stop left the app wrapper running"
+fi
+if kill -0 "${stop_child}" 2>/dev/null; then
+  fail "stop left the app child running"
 fi
 
 # Health + PG_VERSION + records: quiet.
