@@ -41,9 +41,17 @@ test("seed node types parse and include spine plus artifacts", () => {
   assert.equal(company?.is_system, true);
   const task = SEED_NODE_TYPES.find((type) => type.slug === "task");
   const goal = SEED_NODE_TYPES.find((type) => type.slug === "goal");
+  const habit = SEED_NODE_TYPES.find((type) => type.slug === "habit");
+  const lesson = SEED_NODE_TYPES.find((type) => type.slug === "lesson");
+  const decision = SEED_NODE_TYPES.find((type) => type.slug === "decision");
   assert.deepEqual(task?.parent_types, ["goal", "project"]);
   assert.match(task?.description ?? "", /Prefer child_of a goal/);
   assert.match(task?.description ?? "", /child_of a project is allowed/);
+  assert.deepEqual(habit?.parent_types, ["goal"]);
+  assert.match(habit?.description ?? "", /Prefer child_of a goal/);
+  assert.match(habit?.description ?? "", /does not need a goal parent/);
+  assert.match(lesson?.description ?? "", /does not need that parent/);
+  assert.match(decision?.description ?? "", /does not need that parent/);
   const dueSchema = task?.json_schema as {
     properties?: { due?: { anyOf?: Array<{ pattern?: string; type?: string }> } };
     additionalProperties?: boolean;
@@ -80,6 +88,7 @@ test("seed node types parse and include spine plus artifacts", () => {
   const spend = SEED_NODE_TYPES.find((type) => type.slug === "spend");
   assert.equal(spend?.kind, "artifact");
   assert.deepEqual(spend?.parent_types, ["project"]);
+  assert.match(spend?.description ?? "", /does not need a project parent/);
   assert.deepEqual(spend?.fields?.map((field) => field.name), [
     "amount",
     "currency",

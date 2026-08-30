@@ -24,11 +24,15 @@ export function getParentType(
   return parents.length === 1 ? parents[0] : undefined;
 }
 
+/**
+ * A parent is never required to create a record. `parent_types` is the
+ * child_of allow-list (what you may hang under), not a must-have-parent gate.
+ */
 export function requiresHierarchyParent(
-  slug: string,
-  types: readonly NodeType[] = SEED_NODE_TYPES,
+  _slug: string,
+  _types: readonly NodeType[] = SEED_NODE_TYPES,
 ): boolean {
-  return getParentTypes(slug, types).length > 0;
+  return false;
 }
 
 export function canChildOf(
