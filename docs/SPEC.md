@@ -112,11 +112,11 @@ Do not put this bar in Vault Keeper. Do not add a bot for it.
 area → project → goal → habit | task
 ```
 
-Recommended structure: Area → project → goal → task. A habit hangs under a goal. A task may child_of a goal or a project. A spend hangs under a project.
+Recommended structure: Area → project → goal → task. Prefer a habit under a goal; a habit does not need a goal parent. A task may child_of a goal or a project. Prefer a spend under a project; a spend does not need a project parent. Prefer a lesson or decision under an area, project, or goal; they do not need that parent.
 
-**Area** is the spine root (life domain + what you value). The spine is preferred placement, not a hard gate: `task` may `child_of` `project` (skip a dummy goal). Prefer goal when there is a real outcome. `task` still cannot `child_of` `area`. Seed artifacts include person, place, company, journal, idea, lesson, note, trip, decision, spend. Hierarchy verb is `child_of`. Associative seeds: relates_to, supports, inspired_by, references, about.
+**Area** is the spine root (life domain + what you value). The spine is preferred placement, not a hard gate: `habit` may skip a goal parent; `task` may `child_of` `project` (skip a dummy goal). Prefer goal when there is a real outcome. `task` still cannot `child_of` `area`. Seed artifacts include person, place, company, journal, idea, lesson, note, trip, decision, spend. A lesson or decision may hang under area, project, or goal and does not need that parent. Hierarchy verb is `child_of`. Associative seeds: relates_to, supports, inspired_by, references, about.
 
-A `spend` is one recorded money line under a project. Hang it with `child_of` that project. A project may hold optional `budget_amount` and `budget_currency` so an envelope can live on the project node. Field template, validation, and search: [Project spend](#project-spend).
+A `spend` is one recorded money line. Prefer hanging it under a project with `child_of`. A spend does not need a project parent. A project may hold optional `budget_amount` and `budget_currency` so an envelope can live on the project node. Field template, validation, and search: [Project spend](#project-spend).
 
 Agents can add types and relations over time. No approval inbox.
 
@@ -238,9 +238,9 @@ No new MCP tool. No new store. No mail or event bodies in the vault. No `kind` o
 
 ## Project spend
 
-`spend` is a seed type: one recorded money line under a project (a bid or a payment). Artifact. `parent_types`: `["project"]`. Hue `teal`, glyph `Receipt`. Views: `list` (`default_view: "list"`). The Viewer opens it from that declared view. `inspect_ontology` and `bootstrap` list it.
+`spend` is a seed type: one recorded money line (a bid or a payment). Artifact. `parent_types`: `["project"]`. Hue `teal`, glyph `Receipt`. Views: `list` (`default_view: "list"`). The Viewer opens it from that declared view. `inspect_ontology` and `bootstrap` list it.
 
-It hangs under a `project` via `child_of` (child → parent; at most one). It does not hang under `area` or `goal`. `upsert` the line, then `link` it to the project. `search` `{ type: "spend", under: <project uuid> }` lists the lines.
+Prefer hanging it under a `project` via `child_of` (child → parent; at most one). A spend does not need a project parent — do not invent a dummy project to record a line. If you hang it, it must be a `project`, not `area` or `goal`. `upsert` the line; `link` it to a project when there is one. `search` `{ type: "spend", under: <project uuid> }` lists the lines under that project.
 
 ### Fields
 

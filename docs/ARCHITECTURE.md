@@ -88,11 +88,11 @@ flowchart TB
 
 Hierarchy verb is `child_of`. At most one `child_of` per node. Allowed parents come from the child’s type (`parent_types`).
 
-Spine: **area → project → goal → habit | task** — preferred placement, not a hard gate. `task` may `child_of` `goal` or `project` (prefer goal when there is a real outcome). `task` cannot `child_of` `area`.
+Spine: **area → project → goal → habit | task** — preferred placement, not a hard gate. `habit` prefers a goal parent and does not need one. `task` may `child_of` `goal` or `project` (prefer goal when there is a real outcome). `task` cannot `child_of` `area`.
 
-Recommended structure: Area → project → goal → task. A habit hangs under a goal. A task may child_of a goal or a project. A spend hangs under a project.
+Recommended structure: Area → project → goal → task. Prefer a habit under a goal; a habit does not need a goal parent. A task may child_of a goal or a project. Prefer a spend under a project; a spend does not need a project parent. Prefer a lesson or decision under an area, project, or goal; they do not need that parent.
 
-Artifacts hang off that spine or sit beside it. Seeds include person, place, company, decision, note, lesson, journal, idea, trip, spend. `lesson` and `decision` may hang under area, project, or goal. `spend` hangs under a project (`child_of`). `person`, `place`, `company`, `note`, and the other artifacts sit beside unless an agent links them. `spend` is one money line, not a ledger.
+Artifacts hang off that spine or sit beside it. Seeds include person, place, company, decision, note, lesson, journal, idea, trip, spend. `lesson` and `decision` may hang under area, project, or goal and do not need that parent. Prefer a `spend` under a project (`child_of`); a spend does not need a project parent. If you hang it, it must be a project. `person`, `place`, `company`, `note`, and the other artifacts sit beside unless an agent links them. `spend` is one money line, not a ledger.
 
 ```mermaid
 flowchart TB
@@ -104,7 +104,7 @@ flowchart TB
 
   area --> project
   project --> goal
-  goal --> habit
+  goal -.->|"preferred"| habit
   goal --> task
   project -.->|"allowed"| task
 

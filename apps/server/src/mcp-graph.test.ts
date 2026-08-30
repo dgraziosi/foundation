@@ -96,6 +96,8 @@ test(
       const boot = asObject(await client.callTool({ name: "bootstrap", arguments: {} }));
       assert.equal((boot.spine as { diagram: string }).diagram, "area → project → goal → habit | task");
       assert.match((boot.spine as { description: string }).description, /preferred placement, not a hard gate/);
+      assert.match((boot.spine as { description: string }).description, /does not need one/);
+      assert.match((boot.spine as { description: string }).description, /does not need that parent/);
       const bootSlugs = (boot.types as Array<{ slug: string }>).map((type) => type.slug);
       assert.ok(bootSlugs.includes("place"));
       assert.ok(bootSlugs.includes("company"));

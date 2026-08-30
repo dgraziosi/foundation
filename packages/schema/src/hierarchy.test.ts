@@ -17,12 +17,24 @@ test("getParentType(project) === area", () => {
 test("spine parent chain", () => {
   assert.equal(getParentType("goal"), "project");
   assert.equal(getParentType("habit"), "goal");
+  assert.equal(canChildOf("habit", "goal"), true);
+  assert.equal(canChildOf("habit", "project"), false);
+  assert.equal(canChildOf("habit", "area"), false);
+  assert.equal(requiresHierarchyParent("habit"), false);
   assert.deepEqual(getParentTypes("task"), ["goal", "project"]);
   assert.equal(getParentType("task"), undefined);
   assert.equal(canChildOf("task", "goal"), true);
   assert.equal(canChildOf("task", "project"), true);
   assert.equal(canChildOf("task", "area"), false);
+  assert.equal(requiresHierarchyParent("task"), false);
   assert.equal(getParentType("area"), undefined);
+});
+
+test("habit does not need a goal parent", () => {
+  assert.deepEqual(getParentTypes("habit"), ["goal"]);
+  assert.equal(requiresHierarchyParent("habit"), false);
+  assert.equal(canChildOf("habit", "goal"), true);
+  assert.equal(canChildOf("habit", "area"), false);
 });
 
 test("lesson may hang under area, project, or goal", () => {
@@ -32,14 +44,11 @@ test("lesson may hang under area, project, or goal", () => {
   assert.equal(canChildOf("lesson", "goal"), true);
   assert.equal(canChildOf("lesson", "habit"), false);
   assert.equal(getParentType("lesson"), undefined);
+  assert.equal(requiresHierarchyParent("lesson"), false);
 });
 
 test("artifacts without parent_types do not require a parent", () => {
   for (const slug of ARTIFACT_TYPE_SLUGS) {
-    if (slug === "lesson" || slug === "decision" || slug === "spend") {
-      assert.equal(requiresHierarchyParent(slug), true);
-      continue;
-    }
     assert.equal(requiresHierarchyParent(slug), false);
     assert.equal(isArtifactType(slug), true);
   }
@@ -49,14 +58,15 @@ test("decision may hang under area, project, or goal", () => {
   assert.deepEqual(getParentTypes("decision"), ["area", "project", "goal"]);
   assert.equal(canChildOf("decision", "area"), true);
   assert.equal(canChildOf("decision", "habit"), false);
+  assert.equal(requiresHierarchyParent("decision"), false);
 });
 
-test("spend hangs under a project only", () => {
+test("spend may child_of a project only; a parent is not required", () => {
   assert.deepEqual(getParentTypes("spend"), ["project"]);
   assert.equal(canChildOf("spend", "project"), true);
   assert.equal(canChildOf("spend", "area"), false);
   assert.equal(canChildOf("spend", "goal"), false);
-  assert.equal(requiresHierarchyParent("spend"), true);
+  assert.equal(requiresHierarchyParent("spend"), false);
   assert.equal(isArtifactType("spend"), true);
 });
 

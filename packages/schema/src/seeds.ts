@@ -102,7 +102,7 @@ const SEED_NODE_TYPE_DEFS = [
     slug: "habit",
     label: "Habit",
     description:
-      "A repeating practice under a goal. Frequency and tracking live on the node data object.",
+      "A repeating practice. Prefer child_of a goal; a habit does not need a goal parent. Frequency and tracking live on the node data object.",
     kind: "spine" as const,
     parent_types: ["goal"],
     is_system: true,
@@ -120,7 +120,8 @@ const SEED_NODE_TYPE_DEFS = [
   {
     slug: "lesson",
     label: "Lesson",
-    description: "Something learned. May hang under an area, project, or goal.",
+    description:
+      "Something learned. Prefer hanging under an area, project, or goal. A lesson does not need that parent.",
     kind: "artifact" as const,
     parent_types: ["area", "project", "goal"],
     is_system: true,
@@ -187,7 +188,8 @@ const SEED_NODE_TYPE_DEFS = [
   {
     slug: "decision",
     label: "Decision",
-    description: "A choice that was made. May hang under an area, project, or goal.",
+    description:
+      "A choice that was made. Prefer hanging under an area, project, or goal. A decision does not need that parent.",
     kind: "artifact" as const,
     parent_types: ["area", "project", "goal"],
     is_system: true,
@@ -196,7 +198,7 @@ const SEED_NODE_TYPE_DEFS = [
     slug: "spend",
     label: "Spend",
     description:
-      "One recorded money line under a project (a bid or a payment). Hang with child_of a project. Optional amount, currency, due (Date), vendor, and stage (quoted or paid).",
+      "One recorded money line (a bid or a payment). Prefer child_of a project. A spend does not need a project parent. If you hang it, hang with child_of a project. Optional amount, currency, due (Date), vendor, and stage (quoted or paid).",
     kind: "artifact" as const,
     parent_types: ["project"],
     fields: SPEND_FIELDS,
