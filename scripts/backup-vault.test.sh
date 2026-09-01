@@ -25,9 +25,13 @@ fi
 # shellcheck source=backup-vault.sh
 source "${backup_script}"
 
+# Contract fixtures. No live vault. Drop leftover host env so clone .env
+# resolution is not shadowed by a cluster this run did not create.
+unset FOUNDATION_DATA BACKUP_ROOT DATABASE_URL
+
 # Single dated dump older than 14 days must survive prune.
 tmp_one="$(mktemp -d)"
-trap 'rm -rf -- "${tmp_one}" "${tmp_two:-}" "${tmp_fail:-}" "${tmp_blobs:-}" "${tmp_abort:-}" "${tmp_swap:-}"' EXIT
+trap 'rm -rf -- "${tmp_one}" "${tmp_two:-}" "${tmp_fail:-}" "${tmp_blobs:-}" "${tmp_abort:-}" "${tmp_swap:-}" "${tmp_env:-}"' EXIT
 printf '%s\n' '-- fixture dump, not a vault' >"${tmp_one}/foundation-20000101.sql"
 foundation_backup_prune_sql "${tmp_one}"
 if [[ ! -f "${tmp_one}/foundation-20000101.sql" ]]; then
@@ -243,6 +247,56 @@ if [[ -e "${tmp_swap}/backup/blobs/staged" ]]; then
 fi
 if compgen -G "${tmp_swap}/backup/blobs.staging.*" >/dev/null; then
   fail "first-of-day swap failure left a blobs.staging.* tree"
+fi
+
+# FOUNDATION_DATA and BACKUP_ROOT from clone .env, same as keep-up.
+# Relative paths are under the clone, not cwd. Process env wins.
+tmp_env="$(mktemp -d)"
+mkdir -p "${tmp_env}/clone/vault-data" "${tmp_env}/elsewhere"
+printf '%s\n' 'FOUNDATION_DATA=./vault-data' 'BACKUP_ROOT=./my-backups' >"${tmp_env}/clone/.env"
+
+data_got="$(
+  cd "${tmp_env}/elsewhere"
+  unset FOUNDATION_DATA BACKUP_ROOT
+  foundation_backup_repo_root() { printf '%s\n' "${tmp_env}/clone"; }
+  foundation_backup_data_dir "${tmp_env}/clone"
+)"
+if [[ "${data_got}" != "${tmp_env}/clone/vault-data" ]]; then
+  fail "FOUNDATION_DATA from clone .env should resolve under the clone (got: ${data_got})"
+fi
+
+backup_got="$(
+  cd "${tmp_env}/elsewhere"
+  unset FOUNDATION_DATA BACKUP_ROOT
+  foundation_backup_repo_root() { printf '%s\n' "${tmp_env}/clone"; }
+  foundation_backup_backup_root "${tmp_env}/clone/vault-data"
+)"
+if [[ "${backup_got}" != "${tmp_env}/clone/my-backups" ]]; then
+  fail "BACKUP_ROOT from clone .env should resolve under the clone (got: ${backup_got})"
+fi
+
+override_data="${tmp_env}/elsewhere/override-data"
+override_backups="${tmp_env}/elsewhere/override-backups"
+mkdir -p "${override_data}"
+data_env="$(
+  cd "${tmp_env}/elsewhere"
+  unset BACKUP_ROOT
+  FOUNDATION_DATA="${override_data}"
+  foundation_backup_repo_root() { printf '%s\n' "${tmp_env}/clone"; }
+  foundation_backup_data_dir "${tmp_env}/clone"
+)"
+if [[ "${data_env}" != "${override_data}" ]]; then
+  fail "process FOUNDATION_DATA must win over clone .env (got: ${data_env})"
+fi
+backup_env="$(
+  cd "${tmp_env}/elsewhere"
+  unset FOUNDATION_DATA
+  BACKUP_ROOT="${override_backups}"
+  foundation_backup_repo_root() { printf '%s\n' "${tmp_env}/clone"; }
+  foundation_backup_backup_root "${tmp_env}/clone/vault-data"
+)"
+if [[ "${backup_env}" != "${override_backups}" ]]; then
+  fail "process BACKUP_ROOT must win over clone .env (got: ${backup_env})"
 fi
 
 echo "backup-vault.test: ok"

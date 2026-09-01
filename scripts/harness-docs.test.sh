@@ -47,6 +47,15 @@ section_ok() {
 if [[ ! -f "${doc}" ]]; then
   fail "missing ${doc}"
 fi
+if ! grep -Fq -- 'After unlock the window can write today’s journal' "${doc}"; then
+  fail "HARNESS.md does not say after unlock the window can write today’s journal"
+fi
+if ! grep -Fq -- 'Other types stay read-only' "${doc}"; then
+  fail "HARNESS.md does not say other types stay read-only"
+fi
+if ! grep -Fq -- 'The cookie still does not open MCP' "${doc}"; then
+  fail "HARNESS.md does not say the cookie still does not open MCP"
+fi
 
 for name in "Grok Bot" "Hermes" "OpenClaw" "Claude Code" "Codex"; do
   body="$(extract_section "${doc}" "${name}")"

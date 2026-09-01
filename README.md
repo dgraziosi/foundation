@@ -43,7 +43,7 @@ Do not commit personal life data, documents, or secrets to this repository. Thos
 
 ## Install
 
-Mac and Linux. Clone this repo. Node 22 + pnpm. Postgres 16. Migrations create `pgcrypto`, `unaccent`, and `pg_trgm`. If a package name is not already in this repo, it is unknown here — do not guess an installer.
+Mac and Linux. Clone this repo. Node 22 + pnpm. Postgres 16. PATH must include `initdb`, `pg_ctl`, and `psql`. Migrations create `pgcrypto`, `unaccent`, `pg_trgm`, and `vector`. If a package name is not already in this repo, it is unknown here — do not guess an installer.
 
 1. Copy the env file. The human sets the API key (do not commit `.env`):
 
@@ -52,9 +52,10 @@ Mac and Linux. Clone this repo. Node 22 + pnpm. Postgres 16. Migrations create `
    # set FOUNDATION_API_KEY to a long random string
    ```
 
-2. Start Postgres (the data folder’s `postgres` tree), then the app. Durable files go under `FOUNDATION_DATA` (default `./data`). Empty first-day folder may init. Missing folder, or `postgres/` without `PG_VERSION`: refuse.
+2. Create an empty first-day data folder if it is not there yet (default `./data`). Then start Postgres (the data folder’s `postgres` tree), then the app. Durable files go under `FOUNDATION_DATA`. Empty first-day folder may init. Missing folder, or `postgres/` without `PG_VERSION`: refuse.
 
    ```bash
+   mkdir -p ./data
    ./scripts/keep-vault-up.sh
    ```
 

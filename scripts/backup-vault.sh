@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
-# Nightly vault backup. Driven only by env. Host script, not a bot wake.
+# Nightly vault backup. Host script, not a bot wake.
 # Talks to localhost Postgres. Does not stop the vault.
+# FOUNDATION_DATA, BACKUP_ROOT, and DATABASE_URL come from the
+# environment, else the clone .env, same as keep-vault-up.
+# Relative paths are under the clone.
 #
-#   FOUNDATION_DATA  — the vault (default ./data)
+#   FOUNDATION_DATA  — the vault (default ./data under the clone)
 #   DATABASE_URL     — optional. Also read from the clone .env.
 #                      Default postgres://foundation:foundation@localhost:5432/foundation
-#   BACKUP_ROOT      — optional. Default: sibling of the data dir
+#   BACKUP_ROOT      — optional. Also read from the clone .env.
+#                      Default: sibling of the data dir
 #                      (./foundation-backups when FOUNDATION_DATA is ./data).
+#                      Relative paths are under the clone.
 #                      Must not be inside FOUNDATION_DATA.
 #
 # Writes $BACKUP_ROOT/sql/foundation-YYYYMMDD.sql (mode 0600),
@@ -323,6 +328,39 @@ foundation_backup_database_url() {
   printf '%s\n' "${raw:-postgres://foundation:foundation@localhost:5432/foundation}"
 }
 
+# FOUNDATION_DATA from the environment, else the clone .env, else ./data.
+# Relative paths are under the clone. Does not print .env.
+foundation_backup_data_dir() {
+  local repo_root="$1"
+  local raw
+  raw="$(foundation_backup_env_value "${repo_root}" FOUNDATION_DATA)"
+  raw="${raw:-./data}"
+  raw="${raw%/}"
+  if [[ "${raw}" != /* ]]; then
+    printf '%s\n' "${repo_root}/${raw#./}"
+  else
+    printf '%s\n' "${raw}"
+  fi
+}
+
+# BACKUP_ROOT from the environment, else the clone .env, else a sibling
+# of the data dir. Relative paths are under the clone (not cwd).
+foundation_backup_backup_root() {
+  local data_dir="${1%/}"
+  local repo_root raw
+  repo_root="$(foundation_backup_repo_root)"
+  raw="$(foundation_backup_env_value "${repo_root}" BACKUP_ROOT)"
+  if [[ -z "${raw}" ]]; then
+    raw="$(foundation_backup_default_root "${data_dir}")"
+  fi
+  raw="${raw%/}"
+  if [[ "${raw}" != /* ]]; then
+    printf '%s\n' "${repo_root}/${raw#./}"
+  else
+    printf '%s\n' "${raw}"
+  fi
+}
+
 # Online dump against localhost Postgres.
 foundation_backup_pg_dump() {
   local repo_root="$1"
@@ -336,13 +374,9 @@ foundation_backup_main() {
   local data_dir backup_root repo_root data_abs backup_abs
   local day dump_path dump_tmp git_sha
 
-  data_dir="${FOUNDATION_DATA:-./data}"
-  data_dir="${data_dir%/}"
-  if [[ -n "${BACKUP_ROOT:-}" ]]; then
-    backup_root="${BACKUP_ROOT%/}"
-  else
-    backup_root="$(foundation_backup_default_root "${data_dir}")"
-  fi
+  repo_root="$(foundation_backup_repo_root)"
+  data_dir="$(foundation_backup_data_dir "${repo_root}")"
+  backup_root="$(foundation_backup_backup_root "${data_dir}")"
 
   if [[ ! -d "${data_dir}" ]]; then
     echo "backup-vault: FOUNDATION_DATA is not a directory: ${data_dir}" >&2
@@ -365,7 +399,6 @@ foundation_backup_main() {
     return 1
   fi
 
-  repo_root="$(foundation_backup_repo_root)"
   mkdir -p -- "${backup_abs}/sql"
 
   day="$(date +%Y%m%d)"
