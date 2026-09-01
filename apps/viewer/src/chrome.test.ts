@@ -79,6 +79,7 @@ test("journal page is a document; today is the start path", async () => {
   assert.match(journal, /journal-title/);
   assert.match(journal, /LiveMarkdown/);
   assert.match(journal, /saveJournal/);
+  assert.match(journal, /journalDraftQuiet/);
   assert.match(journal, /draftId !== id/);
   assert.doesNotMatch(journal, /Properties/);
   assert.doesNotMatch(journal, /StatusTag/);

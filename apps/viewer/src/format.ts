@@ -38,6 +38,14 @@ export function journalPayloadBody(source: string): string {
   return source.replace(/<br\s*\/?>\n?/gi, "\n").replace(/\n{3,}/g, "\n\n");
 }
 
+/** True when the draft would store the same title and markdown already saved. */
+export function journalDraftQuiet(
+  draft: { title: string; body: string },
+  saved: { title: string; body: string },
+): boolean {
+  return draft.title === saved.title && journalPayloadBody(draft.body) === journalPayloadBody(saved.body);
+}
+
 export function relativeTime(iso: string, now = new Date()): string {
   const then = Date.parse(iso);
   if (Number.isNaN(then)) {
