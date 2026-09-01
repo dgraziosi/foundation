@@ -11,6 +11,11 @@ readme="${repo_root}/README.md"
 # shellcheck source=keep-vault-up.sh
 source "${keep_script}"
 
+# Contract fixtures. No live vault. Drop leftover host env so fixtures
+# do not count or start a cluster this run did not create.
+unset FOUNDATION_DATA BACKUP_ROOT DATABASE_URL
+export DATABASE_URL="postgres://foundation:foundation@127.0.0.1:1/foundation"
+
 fail() {
   echo "keep-vault-up.test: $*" >&2
   exit 1
@@ -943,6 +948,7 @@ fi
 real="${tmp_root}/real-only"
 mkdir -p "${real}/postgres"
 printf '%s\n' '16' >"${real}/postgres/PG_VERSION"
+set +e
 out="$(
   FOUNDATION_DATA="${real}"
   BACKUP_ROOT="${tmp_root}/backups-real"
@@ -952,6 +958,7 @@ out="$(
   foundation_keep_vault_up_main 2>&1
 )"
 rc=$?
+set -e
 if ((rc != 0)); then
   fail "health + real cluster fixture should exit 0 (got ${rc})"
 fi
@@ -981,8 +988,14 @@ case " $* " in
 esac
 EOF
 chmod +x "${sock_tmp}/bin/pg_ctl"
-PG_CTL_LOG="${sock_tmp}/pg_ctl.log"
+export PG_CTL_LOG="${sock_tmp}/pg_ctl.log"
+set +e
 PATH="${sock_tmp}/bin:${PATH}" foundation_keep_vault_up_start_postgres "${sock_tmp}/data"
+start_rc=$?
+set -e
+if ((start_rc != 0)); then
+  fail "start_postgres failed (rc ${start_rc}; log: $(cat "${PG_CTL_LOG}" 2>/dev/null || true))"
+fi
 if [[ ! -d "${sock_tmp}/data/pg-sock" ]]; then
   fail "start_postgres must mkdir the data-folder socket dir"
 fi

@@ -25,6 +25,10 @@ fi
 # shellcheck source=backup-vault.sh
 source "${backup_script}"
 
+# Contract fixtures. No live vault. Drop leftover host env so clone .env
+# resolution is not shadowed by a cluster this run did not create.
+unset FOUNDATION_DATA BACKUP_ROOT DATABASE_URL
+
 # Single dated dump older than 14 days must survive prune.
 tmp_one="$(mktemp -d)"
 trap 'rm -rf -- "${tmp_one}" "${tmp_two:-}" "${tmp_fail:-}" "${tmp_blobs:-}" "${tmp_abort:-}" "${tmp_swap:-}" "${tmp_env:-}"' EXIT
