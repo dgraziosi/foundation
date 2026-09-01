@@ -88,8 +88,20 @@ assert_skills_vs_tools() {
 if [[ -e "${repo_root}/skills" ]]; then
   fail "repo-root skills/ must not exist; skills live in .agents/skills/"
 fi
+# Product recipes stay in .agents/skills/. A pstack verify-* skill may live
+# under .cursor/skills/verify-*/ only. Anything else here is a fork.
 if [[ -e "${repo_root}/.cursor/skills" ]]; then
-  fail "do not fork skills into .cursor/skills/; use .agents/skills/ only"
+  while IFS= read -r skill_md; do
+    [[ -n "${skill_md}" ]] || continue
+    folder_name="$(basename -- "$(dirname -- "${skill_md}")")"
+    if [[ "${folder_name}" != verify-* ]]; then
+      fail "do not fork skills into .cursor/skills/; use .agents/skills/ only (${folder_name})"
+    fi
+    name="$(frontmatter_name "${skill_md}")" || fail "${skill_md} is missing YAML frontmatter name"
+    if [[ "${name}" != "${folder_name}" ]]; then
+      fail "${skill_md} frontmatter name '${name}' does not match folder '${folder_name}'"
+    fi
+  done < <(find "${repo_root}/.cursor/skills" -mindepth 2 -maxdepth 2 -type f -name SKILL.md | LC_ALL=C sort)
 fi
 
 if [[ ! -d "${skills_root}" ]]; then
