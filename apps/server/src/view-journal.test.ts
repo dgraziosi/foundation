@@ -83,6 +83,13 @@ test("viewer journal write gate: today, patch, types, if-match, cookie is not MC
   const cookie = await unlockCookie(viewOrigin);
 
   try {
+    const peekEmpty = await fetch(`${viewOrigin}/view/api/journals/today`, {
+      headers: { cookie },
+    });
+    assert.equal(peekEmpty.status, 200);
+    const peekNone = (await peekEmpty.json()) as { node: null };
+    assert.equal(peekNone.node, null);
+
     const first = await fetch(`${viewOrigin}/view/api/journals/today`, {
       method: "POST",
       headers: { cookie, "content-type": "application/json" },
@@ -95,6 +102,13 @@ test("viewer journal write gate: today, patch, types, if-match, cookie is not MC
     assert.equal(created.node.title, journalDayTitle(todayInNewYork()));
     assert.equal(created.node.payload.media_type, "text/markdown");
     assert.equal(created.node.payload.body, "");
+
+    const peekLive = await fetch(`${viewOrigin}/view/api/journals/today`, {
+      headers: { cookie },
+    });
+    assert.equal(peekLive.status, 200);
+    const peeked = (await peekLive.json()) as { node: { id: string } };
+    assert.equal(peeked.node.id, created.node.id);
 
     const again = await fetch(`${viewOrigin}/view/api/journals/today`, {
       method: "POST",

@@ -34,6 +34,71 @@ export function journalDayLabel(iso?: string, now = new Date()): string {
   }).format(stamp);
 }
 
+/** Calendar-day title the window writes when the person leaves the first line empty. */
+export function journalDayTitle(day: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
+  if (!match) {
+    return day;
+  }
+  const stamp = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12);
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(stamp));
+}
+
+export function journalWriteTitle(title: string, dayTitle: string): { title: string; keepTitle: boolean } {
+  const trimmed = title.trim();
+  if (trimmed) {
+    return { title: trimmed, keepTitle: false };
+  }
+  return { title: dayTitle, keepTitle: true };
+}
+
+export function journalFirstSentence(body: string): string {
+  const text = journalPayloadBody(body)
+    .replace(/^#{1,6}\s+/gm, "")
+    .trim();
+  if (!text) {
+    return "";
+  }
+  const line = text.split(/\n+/)[0] ?? "";
+  if (line.length <= 160) {
+    return line;
+  }
+  return `${line.slice(0, 159)}…`;
+}
+
+export function journalHomeToday(
+  body: string | undefined,
+  dayTitle: string,
+): { invite: string; day: string; prose: string | null } {
+  const prose = journalFirstSentence(body ?? "");
+  if (!prose) {
+    return { invite: "Write today", day: dayTitle, prose: null };
+  }
+  return { invite: dayTitle, day: dayTitle, prose };
+}
+
+export type JournalSaveStatus = "quiet" | "saving" | "saved" | "clash" | "failed";
+
+export function journalSaveCopy(
+  status: JournalSaveStatus,
+  keepTitle: boolean,
+): { status: string | null; reload: boolean; keepTitle: boolean } {
+  const label =
+    status === "saving"
+      ? "Saving"
+      : status === "saved"
+        ? "Saved"
+        : status === "clash" || status === "failed"
+          ? "Couldn't save"
+          : null;
+  return { status: label, reload: status === "clash", keepTitle };
+}
+
 export function journalPayloadBody(source: string): string {
   return source.replace(/<br\s*\/?>\n?/gi, "\n").replace(/\n{3,}/g, "\n\n");
 }

@@ -20,6 +20,7 @@ test("chrome is Home + Search; Search is an overlay; Recents is not a rail item"
   assert.doesNotMatch(rail, /Recents/);
   assert.doesNotMatch(rail, /Graph/);
   assert.doesNotMatch(rail, /Tasks/);
+  assert.doesNotMatch(rail, /Today/);
   const app = await src("App.tsx");
   assert.match(app, /path="\/" element=\{<HomePage/);
   assert.match(app, /DetailPage/);
@@ -46,6 +47,12 @@ test("Home is Recents, open tasks, and type folders — not the graph", async ()
   assert.match(home, /compareRecentRows/);
   assert.match(home, /openCollection\("task"/);
   assert.match(home, /type\.count > 0/);
+  assert.match(home, /data-surface="home-today"/);
+  assert.match(home, /Write today/);
+  assert.match(home, /\/journal\/today/);
+  assert.match(home, /peekTodayJournal/);
+  assert.match(home, /journalHomeToday/);
+  assert.doesNotMatch(home, /MCP|API key|nodes/);
   assert.match(home, /No open tasks/);
   assert.doesNotMatch(home, /status === "active"/);
   assert.doesNotMatch(home, /status !== "completed"/);
@@ -90,7 +97,17 @@ test("journal page is a document; today is the start path", async () => {
   assert.doesNotMatch(live, /Crepe.Feature.AI]: true/);
   const today = await src("pages/TodayJournalPage.tsx");
   assert.match(today, /fetchTodayJournal/);
-  assert.match(today, /openDetail/);
+  assert.match(today, /JournalPage/);
+  assert.doesNotMatch(today, /openDetail/);
+  assert.doesNotMatch(today, /<Placeholders/);
+  assert.match(journal, /journalSaveCopy/);
+  assert.match(journal, /Keep a title/);
+  assert.match(journal, />Reload</);
+  assert.match(journal, /data-save=/);
+  const saveCopy = await src("format.ts");
+  assert.match(saveCopy, /Saving/);
+  assert.match(saveCopy, /Saved/);
+  assert.match(saveCopy, /Couldn't save/);
   const typeView = await src("pages/TypeViewPage.tsx");
   assert.match(typeView, /slug === "journal"/);
   assert.match(typeView, /\/journal\/today/);
@@ -176,6 +193,20 @@ test("collection empty copy and board width", async () => {
   assert.match(typeView, /Nothing matches your filters\./);
   assert.match(typeView, /count = activeView \? queried.length/);
   assert.doesNotMatch(typeView, /const count = typeQuery.data\?\.nodes.length/);
+});
+
+test("Unlock copy is the vault key, not a staff door", async () => {
+  const unlock = await src("pages/UnlockPage.tsx");
+  assert.match(unlock, />Unlock\.</);
+  assert.match(unlock, /Vault key/);
+  assert.match(unlock, /That key did not unlock\./);
+  assert.doesNotMatch(unlock, /MCP|API key|agent|nodes/i);
+  const fallback = await src("../../server/src/view.ts");
+  assert.match(fallback, /<h1>Unlock\.<\/h1>/);
+  assert.match(fallback, /Vault key/);
+  assert.match(fallback, /That key did not unlock\./);
+  assert.doesNotMatch(fallback, /Same key as MCP/);
+  assert.doesNotMatch(fallback, /Unlock the vault window/);
 });
 
 test("chrome uses shadcn primitives, not homemade fields", async () => {

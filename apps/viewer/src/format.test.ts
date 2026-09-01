@@ -1,14 +1,87 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { dueTone, isUuid, journalDayLabel, journalDraftQuiet, journalPayloadBody, parseSearchSnippet, relativeTime, truncate, compareOpenTasks, compareRecentRows, HOME_WIDGET_LIMIT } from "./format";
+import {
+  dueTone,
+  isUuid,
+  journalDayLabel,
+  journalDayTitle,
+  journalDraftQuiet,
+  journalFirstSentence,
+  journalHomeToday,
+  journalPayloadBody,
+  journalSaveCopy,
+  journalWriteTitle,
+  parseSearchSnippet,
+  relativeTime,
+  truncate,
+  compareOpenTasks,
+  compareRecentRows,
+  HOME_WIDGET_LIMIT,
+} from "./format";
 
 test("journal day label and payload stay one markdown body", () => {
   assert.equal(journalDayLabel("2026-09-01T16:00:00.000Z"), "Tuesday, September 1, 2026");
+  assert.equal(journalDayTitle("2026-09-01"), "September 1, 2026");
   assert.equal(journalPayloadBody("# Morning\n\nHi."), "# Morning\n\nHi.");
   assert.equal(
     journalPayloadBody("Hi.\n\n<br />\n\n## Light\n"),
     "Hi.\n\n## Light\n",
   );
+});
+
+test("Home Today stays visible at an empty body and shows the first sentence after a write", () => {
+  assert.deepEqual(journalHomeToday("", "September 1, 2026"), {
+    invite: "Write today",
+    day: "September 1, 2026",
+    prose: null,
+  });
+  assert.deepEqual(journalHomeToday(undefined, "September 1, 2026"), {
+    invite: "Write today",
+    day: "September 1, 2026",
+    prose: null,
+  });
+  assert.deepEqual(journalHomeToday("First light.\n\nMore later.", "September 1, 2026"), {
+    invite: "September 1, 2026",
+    day: "September 1, 2026",
+    prose: "First light.",
+  });
+  assert.equal(journalFirstSentence("# Morning\n\nHello."), "Morning");
+});
+
+test("empty title keeps the calendar day and save copy is visible", () => {
+  assert.deepEqual(journalWriteTitle("  ", "September 1, 2026"), {
+    title: "September 1, 2026",
+    keepTitle: true,
+  });
+  assert.deepEqual(journalWriteTitle("Morning", "September 1, 2026"), {
+    title: "Morning",
+    keepTitle: false,
+  });
+  assert.deepEqual(journalSaveCopy("quiet", true), {
+    status: null,
+    reload: false,
+    keepTitle: true,
+  });
+  assert.deepEqual(journalSaveCopy("saving", false), {
+    status: "Saving",
+    reload: false,
+    keepTitle: false,
+  });
+  assert.deepEqual(journalSaveCopy("saved", false), {
+    status: "Saved",
+    reload: false,
+    keepTitle: false,
+  });
+  assert.deepEqual(journalSaveCopy("clash", false), {
+    status: "Couldn't save",
+    reload: true,
+    keepTitle: false,
+  });
+  assert.deepEqual(journalSaveCopy("failed", false), {
+    status: "Couldn't save",
+    reload: false,
+    keepTitle: false,
+  });
 });
 
 test("autosave stays quiet when only editor breaks differ from the stored body", () => {

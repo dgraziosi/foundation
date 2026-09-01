@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 
 export type HostTab =
+  | { kind: "today"; label: string }
   | { kind: "recents"; label: string }
   | { kind: "collection"; slug: string; label: string }
   | { kind: "detail"; id: string; label: string };

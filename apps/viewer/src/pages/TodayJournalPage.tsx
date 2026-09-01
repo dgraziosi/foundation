@@ -1,25 +1,28 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect } from "react";
 import { fetchTodayJournal } from "../api";
-import { useShell } from "../shell/context";
-import { LoadError, Placeholders } from "../ui/States";
+import { journalDayLabel } from "../format";
+import { LoadError } from "../ui/States";
+import { JournalPage } from "./JournalPage";
 
 export function TodayJournalPage() {
-  const { openDetail } = useShell();
   const today = useQuery({
     queryKey: ["journal-today"],
     queryFn: fetchTodayJournal,
     retry: false,
   });
 
-  useEffect(() => {
-    if (today.data?.node.id) {
-      openDetail(today.data.node.id, today.data.node.title);
-    }
-  }, [today.data, openDetail]);
-
+  if (today.data?.node.id) {
+    return <JournalPage id={today.data.node.id} initial={today.data} />;
+  }
   if (today.isError) {
     return <LoadError onRetry={() => void today.refetch()} />;
   }
-  return <Placeholders />;
+  return (
+    <div className="journal-page" data-surface="journal-page">
+      <div className="journal-page-column">
+        <div className="journal-day">{journalDayLabel()}</div>
+        <p className="journal-loading">Opening the page…</p>
+      </div>
+    </div>
+  );
 }

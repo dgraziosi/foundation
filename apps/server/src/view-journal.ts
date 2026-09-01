@@ -28,6 +28,15 @@ function todayJournalKey(day: string): string {
   return `view-journal-${day}`;
 }
 
+export async function viewJournalTodayPeek(pool: Pool, dataDir: string) {
+  const day = todayInNewYork();
+  const existing = await findLiveJournalOnDay(pool, day);
+  if (!existing) {
+    return { node: null as null };
+  }
+  return viewNode(pool, existing.id, dataDir);
+}
+
 export async function viewJournalToday(pool: Pool, dataDir: string) {
   const day = todayInNewYork();
   const existing = await findLiveJournalOnDay(pool, day);
