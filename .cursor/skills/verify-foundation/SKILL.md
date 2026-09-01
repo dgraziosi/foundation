@@ -1,11 +1,11 @@
 ---
 name: verify-foundation
-description: Drive Foundation's Viewer (the human window on the life graph) to launch, doctor, prove a mapped surface, capture evidence, and clean up. Use when verifying Viewer behavior after a change, or when a later agent needs a scripted way to prove Home, collection, detail, search, or unlock.
+description: Drive Foundation's Viewer (the human window on the life graph) to launch, doctor, prove a mapped surface, capture evidence, and clean up. Use when verifying Viewer behavior after a change, or when a later agent needs a scripted way to prove Home, collection, detail, search, unlock, or journal write.
 ---
 
 # Verify Foundation (Viewer)
 
-Foundation is a life graph that models the user so bots can help with life goals. Viewer is the human UI — a read-only window on one vault. It is not a personal-knowledge-management app and not harness chat-memory.
+Foundation is a life graph that models the user so bots can help with life goals. Viewer is the human UI — a window on one vault. It writes journal only (Today + autosave). It is not a personal-knowledge-management app and not harness chat-memory.
 
 This skill is for the next agent, read cold. The person using a clone is the user. Stay on product. No live vault contents, no staff names, no personal data.
 
@@ -16,14 +16,14 @@ pstack's generic generator writes `.cursor/skills/verify-*`. This repo's product
 - **graph** — live records (nodes) and edges
 - **ontology** — types and how they connect
 - **MCP** — how a bot talks to the graph (`http://127.0.0.1:8787/mcp`)
-- **Viewer** — the read-only window (`http://127.0.0.1:8788/view`)
+- **Viewer** — the human window (`http://127.0.0.1:8788/view`). Writes journal only.
 - **vault** — one instance (`FOUNDATION_DATA` + host Postgres)
 - **record** — the node
 - **user** — the human who runs this vault on this machine
 
 Do not write a live personal vault into git. Do not reintroduce Compose as install. Host programs: Postgres 16 on PATH (`initdb`, `pg_ctl`, `psql`) plus the app (`pnpm start`). The package name for Postgres is unknown in this repo — do not guess an installer.
 
-Journal write (a page that creates or edits a journal record) is **forthcoming**. It is not on this branch. `journal` is only a seed type the window can list when live records exist.
+Journal write is on this branch. **Today** (or `/view/journal/today`) creates today's journal if none is live, then the page autosaves title and body. Other types stay display-only. Bots still write everything else through MCP.
 
 ## Launch
 
@@ -71,7 +71,7 @@ Viewer assets come from `apps/viewer/dist`. `pnpm start` does not build them. Be
 pnpm --filter @foundation/viewer build
 ```
 
-Without that dist, `/view` still serves the unlock fallback HTML (`Unlock the vault window`). The React Home / collection / detail / search chrome needs the build.
+Without that dist, `/view` still serves the unlock fallback HTML (`Unlock the vault window`). The React Home / collection / detail / search / journal chrome needs the build.
 
 ## Doctor
 
@@ -110,6 +110,10 @@ Stable handles (prefer these over coordinates):
 | `[data-surface="view-strip"]` | Content-host strip. Pinned `Home` plus open collection/detail tabs |
 | `[data-surface="detail-page"]` | Detail page |
 | `[data-surface="graph"]` | Collection graph layout |
+| `[data-surface="journal-page"]` | Journal write page (not Properties) |
+| `aria-label="Title"` | Journal title |
+| `[data-editor="live-markdown"]` | Journal body. Placeholder `Write a first sentence.` |
+| button `Today` | Journal collection → `/view/journal/today` |
 | `aria-label="View"` | Collection layout switcher |
 | `aria-label="Show completed"` | Collection session chrome (does not write) |
 | `aria-label="Theme"` | Rail Light / Dark / System |
@@ -120,8 +124,9 @@ Routes (basename `/view`):
 | --- | --- |
 | `/view` | Unlock gate, then Home |
 | `/view/recents` | Recents page (from Home Recents **View all**) |
+| `/view/journal/today` | Create or open today's journal, then the write page |
 | `/view/types/:slug` | Collection for that type |
-| `/view/nodes/:id` | Detail for that record |
+| `/view/nodes/:id` | Detail for that record. A journal with inline markdown renders the write page |
 
 HTTP the window already uses (cookie `foundation_key` with `Path=/view`, or `Authorization: ApiKey <key>`):
 
@@ -142,9 +147,16 @@ curl -sS http://127.0.0.1:8788/view/api/ontology -H "Authorization: ApiKey $(cat
 curl -sS "http://127.0.0.1:8788/view/api/types/task" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
 curl -sS "http://127.0.0.1:8788/view/api/nodes/<UUID>" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
 curl -sS "http://127.0.0.1:8788/view/api/search?q=Fixture" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
+
+# journal write (the only Viewer mutation)
+curl -sS -X POST http://127.0.0.1:8788/view/api/journals/today \
+  -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
+curl -sS -X PATCH http://127.0.0.1:8788/view/api/nodes/<UUID> \
+  -H "Authorization: ApiKey $(cat "${KEY_FILE}")" -H "content-type: application/json" \
+  -d '{"title":"Morning","body":"# Morning\\n\\nWrote in the window.\\n","base_updated_at":"<updated_at>"}'
 ```
 
-The cookie does not unlock `/mcp` or `/blobs/:id`. Do not post writes through Viewer — the window has no create/edit/complete. Do not call MCP `upsert` to fake a Viewer write.
+The cookie does not unlock `/mcp` or agent `/blobs/:id`. Viewer writes journal only (`POST /view/api/journals/today`, `PATCH /view/api/nodes/:id` on a journal). Do not PATCH other types. Do not call MCP `upsert` to fake a Viewer write.
 
 Read the feature map under [`features/`](features/README.md) before driving. Drive one mapped feature end to end. A proof that only hits `/health` is not a Viewer proof.
 
@@ -177,7 +189,7 @@ Capture:
 - The feature id and entry point (see the map)
 - The action (click Unlock, open Search, GET `/view/api/session`, …)
 - The resulting state (heading, empty copy, JSON body, HTTP status)
-- Side effects that matter: `Set-Cookie` on unlock; no new rows from Viewer (read-only)
+- Side effects that matter: `Set-Cookie` on unlock; journal Today creates today's journal if none is live; no other Viewer writes
 - Screenshot + ARIA snapshot when a browser drove the window
 - Command, stdout, stderr, exit code when HTTP or tests were the drive
 
@@ -245,4 +257,4 @@ Env the helper reads (all optional except as noted):
 
 Index: [`features/README.md`](features/README.md).
 
-Mapped now: Unlock, Home, Collection, Detail, Search. Journal write is forthcoming (not on this branch).
+Mapped now: Unlock, Home, Collection, Detail, Search, Journal write.

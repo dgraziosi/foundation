@@ -1,6 +1,6 @@
 # Home
 
-Home is the first surface after Unlock. It shows Recents (last 5 live records that are not tasks), Open tasks (5, from the `task` type's default filter, by due urgency), and type folders for types that have live records. The window does not write.
+Home is the first surface after Unlock. It shows Recents (last 5 live records that are not tasks), Open tasks (5, from the `task` type's default filter, by due urgency), and type folders for types that have live records. Home does not write.
 
 ## Sub-features
 
@@ -42,3 +42,4 @@ Preconditions:
 - Show completed lives on collection, not Home.
 - Theme Light / Dark / System is rail chrome. It is not a Home feature.
 - An ontology with zero live records hides the Types section. That is not a load error.
+- Home has no Today control. Journal write starts from the journal collection **Today** or `/view/journal/today`. After that write, a Journal folder can appear here.
