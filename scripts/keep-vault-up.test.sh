@@ -90,7 +90,7 @@ fi
 if ! grep -Fq -- 'mkdir -p ./data' "${readme}"; then
   fail "README does not mkdir the empty first-day data folder"
 fi
-if ! grep -Fq -- 'mkdir the data dir' "${health_doc}"; then
+if ! grep -Fq -- '`mkdir` the data dir' "${health_doc}"; then
   fail "VAULT_HEALTH.md does not say to mkdir the empty first-day data dir"
 fi
 if ! grep -Fq -- 'http://127.0.0.1:8787/health' "${keep_script}"; then
