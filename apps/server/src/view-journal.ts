@@ -1,4 +1,5 @@
-import { findLiveJournalOnDay, type Pool } from "@foundation/db";
+import { randomUUID } from "node:crypto";
+import { findLiveJournalOnDay, getNodeByIdempotencyKey, type Pool } from "@foundation/db";
 import { isToolError, todayInNewYork } from "@foundation/schema";
 import { upsertGraphNode } from "./graph.js";
 import { viewNode } from "./view-data.js";
@@ -23,17 +24,24 @@ export function journalMarkdownPayload(body: string) {
   return { media_type: "text/markdown" as const, storage: "inline" as const, body };
 }
 
+function todayJournalKey(day: string): string {
+  return `view-journal-${day}`;
+}
+
 export async function viewJournalToday(pool: Pool, dataDir: string) {
   const day = todayInNewYork();
   const existing = await findLiveJournalOnDay(pool, day);
   if (existing) {
     return viewNode(pool, existing.id, dataDir);
   }
+  const stable = todayJournalKey(day);
+  const prior = await getNodeByIdempotencyKey(pool, stable, { includeDeleted: true });
+  const key = prior?.deleted_at ? `${stable}-${randomUUID()}` : stable;
   const created = await upsertGraphNode(pool, {
     type: "journal",
     title: journalDayTitle(day),
     payload: journalMarkdownPayload(""),
-    idempotency_key: `view-journal-${day}`,
+    idempotency_key: key,
     allow_duplicate: true,
     ...VIEWER_WRITER,
   });

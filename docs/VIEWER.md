@@ -107,7 +107,7 @@ Empty collection: **Nothing yet.** Filtered to zero: **Nothing matches your filt
 
 A dated reflection. Opening a journal record opens a writing page, not the inspector. The day sits above the title. The title is the first line. The body is a live markdown document (shortcuts resolve in place, slash menu, block handles). One `text/markdown` payload. Autosave. Properties stay off the page.
 
-**Today.** From the Journal collection, **Today** opens today's entry. If none exists, the window creates one (writer is the user) and puts the cursor in the body. Same record a bot can `get`. Updates use if-match. A clash does not overwrite. The cookie still does not unlock `/mcp`.
+**Today.** From the Journal collection, **Today** opens today's entry. If none exists, the window creates one (writer is the user) and puts the cursor in the body. A deleted today entry stays deleted; Today makes a new one. Same record a bot can `get`. Updates use if-match. A clash does not overwrite. The cookie still does not unlock `/mcp`.
 
 ## Detail
 
