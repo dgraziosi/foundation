@@ -32,7 +32,7 @@ Preconditions:
 - **Tasks View all.** Choose Open tasks **View all**. Path `/view/types/task`. The collection heading includes **Task**.
 - **Type folder.** When a folder is shown (count > 0), choose it. Path `/view/types/<slug>`. Types with count 0 do not appear.
 - **Open a row.** Choose a Recents or open-task title. Path `/view/nodes/<uuid>`. `[data-surface="detail-page"]` and that title as the page heading.
-- **HTTP Home widgets.** `GET /view/api/recents` and `GET /view/api/tasks` and `GET /view/api/ontology` with the API key. Empty first-day: `rows` and `tasks` are `[]`. Ontology lists types; folders in the window are those with `count > 0`.
+- **HTTP Home widgets.** `GET /view/api/recents?limit=5` and `GET /view/api/tasks?limit=5` and `GET /view/api/ontology` with the API key. The window caps Recents and Open tasks at 5. Empty first-day: `rows` and `tasks` are `[]`. Ontology lists types; folders in the window are those with `count > 0`.
 - **Proof.** Screenshot Home with Recents and Open tasks visible, or save the three JSON bodies (no personal titles if you drove a user's vault). Feature id `home-empty` or `home-chrome`.
 
 ## Gotchas

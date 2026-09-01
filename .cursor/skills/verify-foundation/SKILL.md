@@ -56,10 +56,10 @@ That script:
 1. Refuses if `GET /health` is already green and this run did not start it — do not drive a shared instance.
 2. Requires Node 22, `pnpm`, and Postgres 16 on PATH (`initdb`, `pg_ctl`, `psql`). If any are missing, it prints the gap and exits. It does not guess a package installer.
 3. Makes an empty first-day folder under `$VERIFY_DATA_DIR` (default `/tmp/foundation-verify-$RUN_ID/data`).
-4. Starts through `scripts/keep-vault-up.sh` with env overrides only. Always passes a disposable `BACKUP_ROOT` under that run folder (`/tmp/foundation-verify-$RUN_ID/backups`) so an empty first-day vault does not see the clone's dumps.
-5. Writes the API key this instance will use to `/tmp/foundation-verify-$RUN_ID/api_key` (mode 0600). Not evidence. Not git. Doctor and Unlock read that file when `FOUNDATION_API_KEY` is unset.
-6. Mints a new run id unless `VERIFY_RUN_ID` is set. Remembers that id in `/tmp/foundation-verify-last-run` only after this launch writes state, so later `doctor`, `evidence-dir`, and `cleanup` hit the same folders when `VERIFY_RUN_ID` is unset. A second launch while the vault is still up refuses (shared instance). It does not reuse the last id and call that "already this run".
-7. Waits until `/health` is green, or fails with the keep-vault-up nag.
+4. Starts through `scripts/keep-vault-up.sh` with env overrides only. Always passes a disposable `BACKUP_ROOT` under that run folder (`/tmp/foundation-verify-$RUN_ID/backups`) so an empty first-day vault does not see the clone's dumps. Always passes `DATABASE_URL=postgres://foundation:foundation@127.0.0.1:5432/foundation`. It does not forward an ambient `DATABASE_URL` onto disposable `FOUNDATION_DATA`.
+5. Loads `FOUNDATION_API_KEY` in this process (env, else this run's key file, else the clone `.env`, else mint). Writes that key to `/tmp/foundation-verify-$RUN_ID/api_key` (mode 0600). Not evidence. Not git. Does not print the key. Doctor and Unlock read that file when `FOUNDATION_API_KEY` is unset.
+6. Mints a new run id unless `VERIFY_RUN_ID` is set. After `keep-vault-up` succeeds and `/health` is green, writes state (`RUN_ID`, `DATA_DIR`, `STARTED=1`, `APP_PID` from the data dir's `app.pid`) and remembers the id in `/tmp/foundation-verify-last-run`. A leftover `STARTED=1` without a live `APP_PID` is not "already this run" — if `/health` is green, launch refuses the shared instance.
+7. Waits until `/health` is green, or fails with the keep-vault-up nag. Does not write `STARTED=1` before that.
 
 Default ports (`8787`, `8788`, `5432`) are one-instance. Two side-by-side vaults need different `PORT`, `VIEW_PORT`, and a Postgres port in `DATABASE_URL`, plus a second data folder. This skill does not do that. Refuse a second drive on a shared instance.
 
@@ -136,8 +136,8 @@ curl -sS -D - http://127.0.0.1:8788/view/unlock \
 
 # session / Home widgets / collection / detail / search
 curl -sS http://127.0.0.1:8788/view/api/session -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
-curl -sS http://127.0.0.1:8788/view/api/recents -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
-curl -sS http://127.0.0.1:8788/view/api/tasks -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
+curl -sS "http://127.0.0.1:8788/view/api/recents?limit=5" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
+curl -sS "http://127.0.0.1:8788/view/api/tasks?limit=5" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
 curl -sS http://127.0.0.1:8788/view/api/ontology -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
 curl -sS "http://127.0.0.1:8788/view/api/types/task" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
 curl -sS "http://127.0.0.1:8788/view/api/nodes/<UUID>" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
@@ -195,7 +195,7 @@ Proof standards:
 .cursor/skills/verify-foundation/scripts/verify-foundation.sh cleanup
 ```
 
-Stops only what **this run** started (pid from the helper state file, then `scripts/keep-vault-up.sh stop` with that `FOUNDATION_DATA`). Never `pkill` by process name. Does not delete `./data` on the clone. Does not delete evidence.
+Stops only what **this run** started: the `APP_PID` from the helper state file, then `scripts/keep-vault-up.sh stop` with that `FOUNDATION_DATA`. Never `pkill` by process name. Does not delete `./data` on the clone. Does not delete evidence.
 
 Cleanup may `rm -rf` only `/tmp/foundation-verify-<run-id>` when the recorded data dir is that folder or its `data/` child. A `VERIFY_DATA_DIR` that is a direct child of `/tmp` is that run root. Its parent is `/tmp` and is never removed. Any other data dir is left in place after stop.
 
@@ -213,17 +213,19 @@ Executable helper (from the clone root):
 .cursor/skills/verify-foundation/scripts/verify-foundation.sh run-id
 .cursor/skills/verify-foundation/scripts/verify-foundation.sh key-file
 .cursor/skills/verify-foundation/scripts/verify-foundation.sh backup-root
+.cursor/skills/verify-foundation/scripts/verify-foundation.sh database-url
 ```
 
 | Command | What it does |
 | --- | --- |
 | `doctor` | Read-only health, window GET, toolchain, optional state-file check. Loads this run's key file when env is unset |
-| `launch` | Mint a run id (unless `VERIFY_RUN_ID` is set). Disposable first-day folder + `keep-vault-up.sh`. Writes state, last-run id, key file, and a disposable backup root |
-| `cleanup` | Stop what launch started; remove only a safe run root; keep evidence |
+| `launch` | Mint a run id (unless `VERIFY_RUN_ID` is set). Disposable first-day folder + `keep-vault-up.sh`. After keep succeeds: state with `APP_PID` and `STARTED=1`, last-run id, key file, disposable backup root |
+| `cleanup` | Stop the recorded `APP_PID`, then `keep-vault-up.sh stop`; remove only a safe run root; keep evidence |
 | `evidence-dir` | Print the evidence path for the resolved run id |
 | `run-id` | Print the resolved run id |
 | `key-file` | Print the key file path. Not the key |
 | `backup-root` | Print the disposable `BACKUP_ROOT` launch passes |
+| `database-url` | Print the disposable `DATABASE_URL` launch passes. Not an ambient value |
 
 Env the helper reads (all optional except as noted):
 
@@ -234,6 +236,7 @@ Env the helper reads (all optional except as noted):
 | `VERIFY_STATE_FILE` | `/tmp/foundation-verify-$VERIFY_RUN_ID/state` |
 | `VERIFY_EVIDENCE_DIR` | `.cursor/skills/verify-foundation/evidence/$VERIFY_RUN_ID` |
 | `VERIFY_BACKUP_ROOT` | `/tmp/foundation-verify-$VERIFY_RUN_ID/backups` |
+| `VERIFY_KEEP_VAULT_UP` | `scripts/keep-vault-up.sh` (override for a stub in helper tests) |
 | `FOUNDATION_HEALTH_URL` | `http://127.0.0.1:8787/health` |
 | `FOUNDATION_VIEW_URL` | `http://127.0.0.1:8788/view` |
 | `FOUNDATION_API_KEY` | Env, else this run's key file, else clone `.env`, else launch mints a scaffold key |

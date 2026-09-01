@@ -8,13 +8,15 @@
 #   run-id       — print the follow-up run id (VERIFY_RUN_ID or last launch)
 #   key-file     — print the path of this run's key file (not the key)
 #   backup-root  — print the disposable BACKUP_ROOT launch will pass
+#   database-url — print the DATABASE_URL launch will pass (never ambient)
 #
 # Env: VERIFY_RUN_ID, VERIFY_DATA_DIR, VERIFY_STATE_FILE, VERIFY_EVIDENCE_DIR,
-#      VERIFY_BACKUP_ROOT, VERIFY_LAST_RUN_FILE, FOUNDATION_HEALTH_URL,
-#      FOUNDATION_VIEW_URL, FOUNDATION_API_KEY.
+#      VERIFY_BACKUP_ROOT, VERIFY_LAST_RUN_FILE, VERIFY_KEEP_VAULT_UP,
+#      FOUNDATION_HEALTH_URL, FOUNDATION_VIEW_URL, FOUNDATION_API_KEY.
 # Does not guess a Postgres installer. Does not write the graph.
 # Does not print the API key.
 set -euo pipefail
+VERIFY_KEY_SOURCE="missing"
 
 verify_repo_root() {
   local script_dir
@@ -149,19 +151,23 @@ verify_disposable_run_root() {
   return 1
 }
 
+# Sets FOUNDATION_API_KEY in this shell (not a subshell). Do not wrap
+# in $(...). That would drop the export and, with set -u, crash launch.
+# VERIFY_KEY_SOURCE is env | run-file | clone-env | missing. Never the key.
 verify_load_api_key() {
   local repo_root="$1"
   local id="$2"
   local key_file line raw
+  VERIFY_KEY_SOURCE="missing"
   if [[ -n "${FOUNDATION_API_KEY:-}" ]]; then
-    printf '%s\n' "env"
+    VERIFY_KEY_SOURCE="env"
     return 0
   fi
   key_file="$(verify_api_key_file "${id}")"
   if [[ -f "${key_file}" && -s "${key_file}" ]]; then
     FOUNDATION_API_KEY="$(tr -d '\r\n' <"${key_file}")"
     export FOUNDATION_API_KEY
-    printf '%s\n' "run-file"
+    VERIFY_KEY_SOURCE="run-file"
     return 0
   fi
   if [[ -f "${repo_root}/.env" ]]; then
@@ -175,12 +181,63 @@ verify_load_api_key() {
     if [[ -n "${raw}" ]]; then
       FOUNDATION_API_KEY="${raw}"
       export FOUNDATION_API_KEY
-      printf '%s\n' "clone-env"
+      VERIFY_KEY_SOURCE="clone-env"
       return 0
     fi
   fi
-  printf '%s\n' "missing"
   return 1
+}
+
+# Disposable cluster only. Never an ambient DATABASE_URL (that would
+# attach the app to a live cluster while FOUNDATION_DATA looks throwaway).
+verify_launch_database_url() {
+  printf '%s\n' "postgres://foundation:foundation@127.0.0.1:5432/foundation"
+}
+
+verify_app_pid_file() {
+  printf '%s/app.pid\n' "${1%/}"
+}
+
+verify_read_app_pid() {
+  local file
+  file="$(verify_app_pid_file "$1")"
+  [[ -f "${file}" ]] || return 1
+  tr -d '[:space:]' <"${file}"
+}
+
+# Stop this pid and its children. Never pkill by process name.
+verify_stop_app_pid() {
+  local pid="$1"
+  local child i
+  [[ "${pid}" =~ ^[0-9]+$ ]] || return 0
+  [[ "${pid}" != "1" ]] || return 0
+  kill -0 "${pid}" 2>/dev/null || return 0
+  while IFS= read -r child; do
+    [[ -n "${child}" ]] || continue
+    verify_stop_app_pid "${child}"
+  done < <(pgrep -P "${pid}" 2>/dev/null || true)
+  kill -TERM "${pid}" 2>/dev/null || true
+  i=0
+  while ((i < 10)) && kill -0 "${pid}" 2>/dev/null; do
+    sleep 0.1
+    i=$((i + 1))
+  done
+  if kill -0 "${pid}" 2>/dev/null; then
+    kill -KILL "${pid}" 2>/dev/null || true
+  fi
+  return 0
+}
+
+# This run is up only when we recorded STARTED=1 and that pid still lives.
+# Leftover STARTED=1 without a live pid is not "already this run".
+verify_this_run_up() {
+  local state="$1"
+  local pid
+  [[ -f "${state}" ]] || return 1
+  [[ "$(verify_state_get "${state}" STARTED || true)" == "1" ]] || return 1
+  pid="$(verify_state_get "${state}" APP_PID || true)"
+  [[ "${pid}" =~ ^[0-9]+$ ]] || return 1
+  kill -0 "${pid}" 2>/dev/null
 }
 
 verify_health_url() {
@@ -223,16 +280,23 @@ verify_state_get() {
   printf '%s\n' "${line#*"${key}"=}"
 }
 
+# STARTED=1 only with a numeric APP_PID (keep-vault-up succeeded).
 verify_write_state() {
   local file="$1"
   local id="$2"
   local data_dir="$3"
+  local app_pid="${4:-}"
+  local started=0
+  if [[ "${app_pid}" =~ ^[0-9]+$ ]]; then
+    started=1
+  fi
   mkdir -p -- "$(dirname -- "${file}")"
   umask 077
   cat >"${file}" <<EOF
 RUN_ID=${id}
 DATA_DIR=${data_dir}
-STARTED=1
+STARTED=${started}
+APP_PID=${app_pid}
 EOF
   verify_remember_run_id "${id}"
 }
@@ -263,14 +327,14 @@ verify_toolchain() {
 }
 
 verify_cmd_doctor() {
-  local repo_root id state health_url view_url body view_code view_body dist key_source
+  local repo_root id state health_url view_url body view_code view_body dist app_pid
   repo_root="$(verify_repo_root)"
   id="$(verify_resolve_run_id)"
   state="$(verify_state_file "${id}")"
   health_url="$(verify_health_url)"
   view_url="$(verify_view_url)"
   dist="${repo_root}/apps/viewer/dist/index.html"
-  key_source="$(verify_load_api_key "${repo_root}" "${id}" || true)"
+  verify_load_api_key "${repo_root}" "${id}" || true
 
   echo "doctor: repo ${repo_root}"
   echo "doctor: run ${id}"
@@ -280,6 +344,10 @@ verify_cmd_doctor() {
 
   if [[ -f "${state}" ]]; then
     echo "doctor: state ${state} (this run launched)"
+    app_pid="$(verify_state_get "${state}" APP_PID || true)"
+    if [[ "${app_pid}" =~ ^[0-9]+$ ]]; then
+      echo "doctor: app pid ${app_pid}"
+    fi
   else
     echo "doctor: no state file for run ${id} (this run did not launch)"
   fi
@@ -296,7 +364,7 @@ verify_cmd_doctor() {
     echo "doctor: Viewer dist missing (${dist}). Full window chrome needs: pnpm --filter @foundation/viewer build"
   fi
 
-  case "${key_source}" in
+  case "${VERIFY_KEY_SOURCE:-missing}" in
     env) echo "doctor: FOUNDATION_API_KEY is set (not printed)" ;;
     run-file) echo "doctor: FOUNDATION_API_KEY is in this run's key file $(verify_api_key_file "${id}") (not printed)" ;;
     clone-env) echo "doctor: FOUNDATION_API_KEY is in the clone .env (not printed)" ;;
@@ -331,14 +399,15 @@ verify_cmd_doctor() {
 }
 
 verify_cmd_launch() {
-  local repo_root id data_dir state keep backup_root key_file key_source
+  local repo_root id data_dir state keep backup_root key_file app_pid db_url
   repo_root="$(verify_repo_root)"
   id="$(verify_launch_run_id)"
   data_dir="$(verify_data_dir "${id}")"
   state="$(verify_state_file "${id}")"
-  keep="${repo_root}/scripts/keep-vault-up.sh"
+  keep="${VERIFY_KEEP_VAULT_UP:-${repo_root}/scripts/keep-vault-up.sh}"
   backup_root="$(verify_backup_root "${id}")"
   key_file="$(verify_api_key_file "${id}")"
+  db_url="$(verify_launch_database_url)"
 
   if [[ ! -x "${keep}" ]]; then
     echo "launch: missing ${keep}" >&2
@@ -346,7 +415,7 @@ verify_cmd_launch() {
   fi
 
   if verify_health_ok; then
-    if [[ -f "${state}" ]] && [[ "$(verify_state_get "${state}" STARTED || true)" == "1" ]]; then
+    if verify_this_run_up "${state}"; then
       echo "launch: already up from this run"
       return 0
     fi
@@ -361,8 +430,8 @@ verify_cmd_launch() {
     return 1
   fi
 
-  key_source="$(verify_load_api_key "${repo_root}" "${id}" || true)"
-  if [[ "${key_source}" == "missing" ]]; then
+  verify_load_api_key "${repo_root}" "${id}" || true
+  if [[ "${VERIFY_KEY_SOURCE:-missing}" == "missing" ]]; then
     FOUNDATION_API_KEY="verify-scaffold-${id}-$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
     export FOUNDATION_API_KEY
     echo "launch: minted a verification FOUNDATION_API_KEY (not printed; not a personal key)"
@@ -371,20 +440,18 @@ verify_cmd_launch() {
   mkdir -p -- "${data_dir}"
   mkdir -p -- "${backup_root}"
   mkdir -p -- "$(verify_evidence_dir "${id}")"
-  verify_write_state "${state}" "${id}" "${data_dir}"
   umask 077
   printf '%s\n' "${FOUNDATION_API_KEY}" >"${key_file}"
 
   echo "launch: run ${id}"
   echo "launch: disposable data dir ${data_dir}"
   echo "launch: backup root ${backup_root}"
-  echo "launch: state ${state}"
   echo "launch: key file ${key_file}"
   echo "launch: evidence $(verify_evidence_dir "${id}")"
 
   if ! FOUNDATION_DATA="${data_dir}" \
     FOUNDATION_API_KEY="${FOUNDATION_API_KEY}" \
-    DATABASE_URL="${DATABASE_URL:-postgres://foundation:foundation@127.0.0.1:5432/foundation}" \
+    DATABASE_URL="${db_url}" \
     BACKUP_ROOT="${backup_root}" \
     FOUNDATION_HEALTH_URL="$(verify_health_url)" \
     "${keep}"; then
@@ -397,17 +464,25 @@ verify_cmd_launch() {
     return 1
   fi
 
+  app_pid="$(verify_read_app_pid "${data_dir}" || true)"
+  if ! [[ "${app_pid}" =~ ^[0-9]+$ ]]; then
+    echo "launch: keep-vault-up succeeded but app pid is missing" >&2
+    return 1
+  fi
+  verify_write_state "${state}" "${id}" "${data_dir}" "${app_pid}"
+  echo "launch: state ${state}"
+  echo "launch: app pid ${app_pid}"
   echo "launch: ready. Viewer $(verify_view_url)"
   return 0
 }
 
 verify_cmd_cleanup() {
-  local repo_root id data_dir state keep evidence disposable
+  local repo_root id data_dir state keep evidence disposable app_pid
   repo_root="$(verify_repo_root)"
   id="$(verify_resolve_run_id)"
   state="$(verify_state_file "${id}")"
   evidence="$(verify_evidence_dir "${id}")"
-  keep="${repo_root}/scripts/keep-vault-up.sh"
+  keep="${VERIFY_KEEP_VAULT_UP:-${repo_root}/scripts/keep-vault-up.sh}"
 
   if [[ -z "${VERIFY_RUN_ID:-}" && -f "$(verify_last_run_file)" ]]; then
     echo "cleanup: using last run ${id}"
@@ -420,6 +495,11 @@ verify_cmd_cleanup() {
   fi
 
   data_dir="$(verify_state_get "${state}" DATA_DIR || true)"
+  app_pid="$(verify_state_get "${state}" APP_PID || true)"
+  if [[ "${app_pid}" =~ ^[0-9]+$ ]]; then
+    echo "cleanup: stopping app pid ${app_pid}"
+    verify_stop_app_pid "${app_pid}"
+  fi
   if [[ -n "${data_dir}" && -x "${keep}" ]]; then
     echo "cleanup: stopping host programs for ${data_dir}"
     FOUNDATION_DATA="${data_dir}" "${keep}" stop || true
@@ -462,8 +542,12 @@ verify_cmd_backup_root() {
   verify_backup_root "$(verify_resolve_run_id)"
 }
 
+verify_cmd_database_url() {
+  verify_launch_database_url
+}
+
 usage() {
-  echo "usage: verify-foundation.sh doctor|launch|cleanup|evidence-dir|run-id|key-file|backup-root" >&2
+  echo "usage: verify-foundation.sh doctor|launch|cleanup|evidence-dir|run-id|key-file|backup-root|database-url" >&2
   return 2
 }
 
@@ -476,6 +560,7 @@ main() {
     run-id) verify_cmd_run_id ;;
     key-file) verify_cmd_key_file ;;
     backup-root) verify_cmd_backup_root ;;
+    database-url) verify_cmd_database_url ;;
     *) usage ;;
   esac
 }
