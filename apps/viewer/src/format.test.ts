@@ -6,11 +6,15 @@ import {
   journalDayLabel,
   journalDayTitle,
   journalDraftQuiet,
+  journalEntryDayTitle,
   journalFirstSentence,
   journalHomeToday,
   journalPayloadBody,
   journalSaveCopy,
+  journalSaveResultApplies,
+  journalSaveWhenQuiet,
   journalWriteTitle,
+  todayInNewYork,
   parseSearchSnippet,
   relativeTime,
   truncate,
@@ -82,6 +86,54 @@ test("empty title keeps the calendar day and save copy is visible", () => {
     reload: false,
     keepTitle: false,
   });
+});
+
+test("undoing a draft change inside debounce does not leave Saving stuck", () => {
+  assert.equal(
+    journalSaveWhenQuiet({ status: "saving", writeInFlight: false, settled: "quiet" }),
+    "quiet",
+  );
+  assert.equal(
+    journalSaveWhenQuiet({ status: "saving", writeInFlight: false, settled: "saved" }),
+    "saved",
+  );
+  assert.equal(
+    journalSaveWhenQuiet({ status: "saving", writeInFlight: true, settled: "saved" }),
+    null,
+  );
+  assert.equal(
+    journalSaveWhenQuiet({ status: "clash", writeInFlight: false, settled: "saved" }),
+    "saved",
+  );
+  assert.equal(
+    journalSaveWhenQuiet({ status: "failed", writeInFlight: false, settled: "quiet" }),
+    "quiet",
+  );
+  assert.equal(
+    journalSaveWhenQuiet({ status: "saved", writeInFlight: false, settled: "saved" }),
+    null,
+  );
+});
+
+test("blank title on a past journal uses that entry's day", () => {
+  const past = "2026-08-19T16:00:00.000Z";
+  const wall = new Date("2026-09-01T16:00:00.000Z");
+  assert.equal(journalEntryDayTitle(past, wall), "August 19, 2026");
+  assert.notEqual(journalEntryDayTitle(past, wall), journalDayTitle(todayInNewYork(wall)));
+  assert.equal(journalEntryDayTitle(undefined, wall), journalDayTitle(todayInNewYork(wall)));
+  assert.equal(journalEntryDayTitle("2026-09-01T16:00:00.000Z"), journalDayTitle(todayInNewYork(new Date("2026-09-01T16:00:00.000Z"))));
+  assert.deepEqual(journalWriteTitle("  ", journalEntryDayTitle(past, wall)), {
+    title: "August 19, 2026",
+    keepTitle: true,
+  });
+});
+
+test("a stale failed save cannot clobber a later Saved", () => {
+  assert.equal(journalSaveResultApplies(1, 2), false);
+  assert.equal(journalSaveResultApplies(2, 2), true);
+  const later = "saved" as const;
+  const incoming = journalSaveResultApplies(1, 2) ? "clash" : later;
+  assert.equal(incoming, "saved");
 });
 
 test("autosave stays quiet when only editor breaks differ from the stored body", () => {

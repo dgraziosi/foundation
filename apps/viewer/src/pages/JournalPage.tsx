@@ -6,12 +6,13 @@ import { ApiError, fetchNode, saveJournal, type NodeDetail } from "../api";
 import {
   isUuid,
   journalDayLabel,
-  journalDayTitle,
   journalDraftQuiet,
+  journalEntryDayTitle,
   journalPayloadBody,
   journalSaveCopy,
+  journalSaveResultApplies,
+  journalSaveWhenQuiet,
   journalWriteTitle,
-  todayInNewYork,
   type JournalSaveStatus,
 } from "../format";
 import { LoadError, Placeholders, Quiet } from "../ui/States";
@@ -48,6 +49,8 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
         }
       : { title: "", body: "", base: "" },
   );
+  const saveGen = useRef(0);
+  const settled = useRef<"quiet" | "saved">("quiet");
 
   useEffect(() => {
     const detail = node.data;
@@ -61,10 +64,12 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
     setBase(detail.node.updated_at ?? "");
     skip.current = { title: nextTitle, body: nextBody, base: detail.node.updated_at ?? "" };
     setDraftId(id);
+    settled.current = "quiet";
     setSaveStatus("quiet");
   }, [id, node.data, draftId]);
 
-  const dayTitle = journalDayTitle(todayInNewYork());
+  const createdAt = seeded?.node.created_at ?? node.data?.node.created_at;
+  const dayTitle = journalEntryDayTitle(createdAt);
   const written = journalWriteTitle(title, dayTitle);
   const saveCopy = journalSaveCopy(saveStatus, written.keepTitle);
 
@@ -73,8 +78,18 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
       return;
     }
     if (journalDraftQuiet({ title: written.title, body }, { title: skip.current.title, body: skip.current.body })) {
+      saveGen.current += 1;
+      const next = journalSaveWhenQuiet({
+        status: saveStatus,
+        writeInFlight: false,
+        settled: settled.current,
+      });
+      if (next) {
+        setSaveStatus(next);
+      }
       return;
     }
+    const mine = ++saveGen.current;
     setSaveStatus("saving");
     const handle = window.setTimeout(() => {
       void (async () => {
@@ -85,6 +100,9 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
             body: journalPayloadBody(body),
             base_updated_at: base,
           });
+          if (!journalSaveResultApplies(mine, saveGen.current)) {
+            return;
+          }
           skip.current = {
             title: saved.node.title,
             body: saved.node.payload.body ?? "",
@@ -94,11 +112,15 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
           if (title.trim()) {
             setTitle(saved.node.title);
           }
+          settled.current = "saved";
           setSaveStatus("saved");
           await queryClient.invalidateQueries({ queryKey: ["node", id] });
           await queryClient.invalidateQueries({ queryKey: ["journal-today-peek"] });
           await queryClient.invalidateQueries({ queryKey: ["recents"] });
         } catch (error) {
+          if (!journalSaveResultApplies(mine, saveGen.current)) {
+            return;
+          }
           if (error instanceof ApiError && error.status === 409) {
             setSaveStatus("clash");
             return;
@@ -114,18 +136,23 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
     if (!id) {
       return;
     }
+    const mine = ++saveGen.current;
+    setSaveStatus("saving");
     try {
       const latest = await fetchNode(id);
+      if (!journalSaveResultApplies(mine, saveGen.current)) {
+        return;
+      }
       const nextBase = latest.node.updated_at ?? "";
-      setBase(nextBase);
-      skip.current = { ...skip.current, base: nextBase };
-      setSaveStatus("saving");
       const saved = await saveJournal({
         id,
         title: written.title,
         body: journalPayloadBody(body),
         base_updated_at: nextBase,
       });
+      if (!journalSaveResultApplies(mine, saveGen.current)) {
+        return;
+      }
       skip.current = {
         title: saved.node.title,
         body: saved.node.payload.body ?? "",
@@ -135,11 +162,15 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
       if (title.trim()) {
         setTitle(saved.node.title);
       }
+      settled.current = "saved";
       setSaveStatus("saved");
       await queryClient.invalidateQueries({ queryKey: ["node", id] });
       await queryClient.invalidateQueries({ queryKey: ["journal-today-peek"] });
       await queryClient.invalidateQueries({ queryKey: ["recents"] });
     } catch (error) {
+      if (!journalSaveResultApplies(mine, saveGen.current)) {
+        return;
+      }
       if (error instanceof ApiError && error.status === 409) {
         setSaveStatus("clash");
         return;

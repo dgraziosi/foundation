@@ -101,6 +101,10 @@ test("journal page is a document; today is the start path", async () => {
   assert.doesNotMatch(today, /openDetail/);
   assert.doesNotMatch(today, /<Placeholders/);
   assert.match(journal, /journalSaveCopy/);
+  assert.match(journal, /journalEntryDayTitle/);
+  assert.match(journal, /journalSaveWhenQuiet/);
+  assert.match(journal, /journalSaveResultApplies/);
+  assert.doesNotMatch(journal, /todayInNewYork/);
   assert.match(journal, /Keep a title/);
   assert.match(journal, />Reload</);
   assert.match(journal, /data-save=/);

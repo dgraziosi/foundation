@@ -49,12 +49,38 @@ export function journalDayTitle(day: string): string {
   }).format(new Date(stamp));
 }
 
+export type JournalSaveStatus = "quiet" | "saving" | "saved" | "clash" | "failed";
+
 export function journalWriteTitle(title: string, dayTitle: string): { title: string; keepTitle: boolean } {
   const trimmed = title.trim();
   if (trimmed) {
     return { title: trimmed, keepTitle: false };
   }
   return { title: dayTitle, keepTitle: true };
+}
+
+/** Calendar-day title for this journal, from its created day, not wall-clock today. */
+export function journalEntryDayTitle(createdAt?: string, now = new Date()): string {
+  const stamp = createdAt && !Number.isNaN(Date.parse(createdAt)) ? new Date(createdAt) : now;
+  return journalDayTitle(todayInNewYork(stamp));
+}
+
+export function journalSaveWhenQuiet(input: {
+  status: JournalSaveStatus;
+  writeInFlight: boolean;
+  settled: "quiet" | "saved";
+}): JournalSaveStatus | null {
+  if (input.writeInFlight) {
+    return null;
+  }
+  if (input.status === "saving" || input.status === "clash" || input.status === "failed") {
+    return input.settled;
+  }
+  return null;
+}
+
+export function journalSaveResultApplies(generation: number, current: number): boolean {
+  return generation === current;
 }
 
 export function journalFirstSentence(body: string): string {
@@ -81,8 +107,6 @@ export function journalHomeToday(
   }
   return { invite: dayTitle, day: dayTitle, prose };
 }
-
-export type JournalSaveStatus = "quiet" | "saving" | "saved" | "clash" | "failed";
 
 export function journalSaveCopy(
   status: JournalSaveStatus,
