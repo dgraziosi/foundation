@@ -82,6 +82,87 @@
     @apply border-border;
   }
 
+  .journal-page {
+    --crepe-font-default: var(--font);
+    --crepe-font-code: ui-monospace, SFMono-Regular, Menlo, monospace;
+    --crepe-base-font-size: 17px;
+    --crepe-color-background: transparent;
+    --crepe-color-on-background: var(--ink);
+    --crepe-color-surface: var(--elevated);
+    --crepe-color-on-surface: var(--ink);
+    --crepe-color-on-surface-variant: var(--ink-2);
+    --crepe-color-surface-low: var(--inset);
+    --crepe-color-hover: var(--active);
+    --crepe-color-selected: var(--active);
+    --crepe-color-inline-code: var(--ink);
+    --crepe-color-inline-area: var(--inset);
+    --crepe-color-primary: var(--ink);
+    --crepe-color-secondary: var(--ink-2);
+    --crepe-color-on-secondary: var(--ink);
+    --crepe-color-inverse: var(--ink);
+    --crepe-color-on-inverse: var(--canvas);
+    --crepe-color-error: var(--removed);
+    --crepe-color-outline: var(--hairline);
+    --crepe-font-title: var(--font);
+    --crepe-shadow-1: var(--shadow-sm);
+    --crepe-shadow-2: var(--shadow-sm);
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    justify-content: center;
+    overflow: auto;
+    background: var(--canvas);
+  }
+
+  .journal-page-column {
+    box-sizing: border-box;
+    width: min(42rem, 100%);
+    padding: 34px 21px 89px;
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+  }
+
+  .journal-day {
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    color: var(--ink-2);
+  }
+
+  .journal-title {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    color: var(--ink);
+    font: 500 28px/1.2 var(--font);
+    letter-spacing: -0.02em;
+    padding: 0;
+    outline: none;
+  }
+
+  .journal-loading {
+    margin: 21px 0 0;
+    color: var(--ink-3);
+    font-size: 15px;
+  }
+
+  .journal-editor .milkdown {
+    background: transparent;
+    color: var(--ink);
+    font-family: var(--font);
+  }
+
+  .journal-editor .milkdown .ProseMirror {
+    min-height: 50vh;
+    padding: 0;
+    line-height: 1.65;
+  }
+
+  .journal-page .milkdown-slash-menu,
+  .journal-page .milkdown-slash-menu li {
+    font-weight: 500;
+  }
+
   html,
   body,
   #root {

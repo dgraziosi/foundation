@@ -942,6 +942,24 @@ export async function listTypeCards(
   return rows;
 }
 
+/** Live journal whose created day (America/New_York) matches `day` (YYYY-MM-DD). Newest write first. */
+export async function findLiveJournalOnDay(
+  db: Queryable,
+  day: string,
+): Promise<{ id: string } | undefined> {
+  const { rows } = await db.query<{ id: string }>(
+    `SELECT id
+     FROM nodes
+     WHERE deleted_at IS NULL
+       AND type = 'journal'
+       AND timezone('America/New_York', created_at)::date = $1::date
+     ORDER BY updated_at DESC
+     LIMIT 1`,
+    [day],
+  );
+  return rows[0];
+}
+
 export type OutlineChildRow = {
   id: string;
   title: string;

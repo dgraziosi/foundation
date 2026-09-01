@@ -1,6 +1,25 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { dueTone, isUuid, parseSearchSnippet, relativeTime, truncate, compareOpenTasks, compareRecentRows, HOME_WIDGET_LIMIT } from "./format";
+import { dueTone, isUuid, journalDayLabel, journalDraftQuiet, journalPayloadBody, parseSearchSnippet, relativeTime, truncate, compareOpenTasks, compareRecentRows, HOME_WIDGET_LIMIT } from "./format";
+
+test("journal day label and payload stay one markdown body", () => {
+  assert.equal(journalDayLabel("2026-09-01T16:00:00.000Z"), "Tuesday, September 1, 2026");
+  assert.equal(journalPayloadBody("# Morning\n\nHi."), "# Morning\n\nHi.");
+  assert.equal(
+    journalPayloadBody("Hi.\n\n<br />\n\n## Light\n"),
+    "Hi.\n\n## Light\n",
+  );
+});
+
+test("autosave stays quiet when only editor breaks differ from the stored body", () => {
+  const raw = "Hi.\n\n<br />\n\n## Light\n";
+  const stored = journalPayloadBody(raw);
+  assert.equal(journalDraftQuiet({ title: "Morning", body: raw }, { title: "Morning", body: stored }), true);
+  assert.equal(
+    journalDraftQuiet({ title: "Morning", body: `${raw}\nMore.\n` }, { title: "Morning", body: stored }),
+    false,
+  );
+});
 
 test("dueTone: overdue, today, future", () => {
   assert.equal(dueTone("2026-08-01", "2026-08-19"), "overdue");

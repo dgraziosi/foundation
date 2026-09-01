@@ -242,3 +242,19 @@ export function fetchType(slug: string) {
 export function fetchNode(id: string) {
   return viewFetch<NodeDetail>(`/view/api/nodes/${encodeURIComponent(id)}`);
 }
+
+export function fetchTodayJournal() {
+  return viewFetch<NodeDetail>("/view/api/journals/today", { method: "POST" });
+}
+
+export function saveJournal(input: { id: string; title: string; body: string; base_updated_at: string }) {
+  return viewFetch<NodeDetail>(`/view/api/nodes/${encodeURIComponent(input.id)}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      title: input.title,
+      body: input.body,
+      base_updated_at: input.base_updated_at,
+    }),
+  });
+}

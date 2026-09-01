@@ -54,6 +54,7 @@ export {
   listOutlineChildren,
   listTaskCards,
   listTypeCards,
+  findLiveJournalOnDay,
   purgeDeletedNodesByType,
   restoreEdge,
   restoreNode,

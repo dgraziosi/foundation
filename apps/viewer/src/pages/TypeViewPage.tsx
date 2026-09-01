@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -17,6 +18,7 @@ export function TypeViewPage({ slug: forcedSlug }: { slug?: string }) {
   const { slug: routeSlug } = useParams();
   const slug = forcedSlug ?? routeSlug ?? "";
   const { openDetail, syncCollectionLabel } = useShell();
+  const navigate = useNavigate();
   const lane = useThemeLane();
   const typeQuery = useQuery({
     queryKey: ["type", slug],
@@ -73,6 +75,11 @@ export function TypeViewPage({ slug: forcedSlug }: { slug?: string }) {
               <Icon size={20} strokeWidth={2} />
               <span className="text-foreground">{typeQuery.data.type.label}</span>
               <span className="text-meta font-normal text-muted-foreground">{count}</span>
+              {slug === "journal" ? (
+                <Button type="button" variant="link" className="h-auto p-0" onClick={() => navigate("/journal/today")}>
+                  Today
+                </Button>
+              ) : null}
             </h1>
             {resolved.views.length === 0 ? (
               <Quiet>No views declared for this type.</Quiet>

@@ -5,6 +5,7 @@ import { AuthError, session } from "./api";
 import { DetailPage } from "./pages/DetailPage";
 import { HomePage } from "./pages/HomePage";
 import { RecentsPage } from "./pages/RecentsPage";
+import { TodayJournalPage } from "./pages/TodayJournalPage";
 import { TypeViewPage } from "./pages/TypeViewPage";
 import { UnlockPage } from "./pages/UnlockPage";
 import { Shell } from "./shell/Shell";
@@ -37,6 +38,7 @@ function Gate() {
       <Route element={<Shell />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/recents" element={<RecentsPage />} />
+        <Route path="/journal/today" element={<TodayJournalPage />} />
         <Route path="/types/:slug" element={<TypeViewRoute />} />
         <Route path="/nodes/:id" element={<DetailPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -104,7 +104,7 @@ Do not put this bar in Vault Keeper. Do not add a bot for it.
 ## Primary users
 
 1. **Agents** via MCP — default interface (Cursor, Claude, and other MCP clients)
-2. **Users** via the read-only window on the same API (`/view`). Same graph as MCP. The window is not a second store. Surfaces, shell, tokens, and states: [`VIEWER.md`](./VIEWER.md).
+2. **Users** via the window on the same API (`/view`). Same graph as MCP. The window is not a second store. Journal title and markdown body may write (if-match, actor user). Other types stay read-only. Surfaces, shell, tokens, and states: [`VIEWER.md`](./VIEWER.md).
 
 ## Starter spine
 
@@ -284,7 +284,7 @@ One type, one line, one envelope on the project. Agents record validated fields 
 - Host programs: Postgres 16 + Foundation server (`pnpm start`), same user, one data folder
 - Durable files under `FOUNDATION_DATA`
 - Localhost MCP at `http://127.0.0.1:8787/mcp` with `Authorization: ApiKey <FOUNDATION_API_KEY>`
-- Read-only window at `/view` (same API key; not a second store). MCP / health / agent blobs on `127.0.0.1:8787` and `/view` on `8788` (`http://127.0.0.1:8788/view`; from another machine, `http://<this-host>:8788/view`). Unlock with the key, HttpOnly cookie `Path=/view`. After unlock: Home is Recents (5, newest first), open tasks (5, due-urgency), and type folders for types that have live objects. Collection and Detail are pages in the content host. Search is a rail overlay. The rail is Home and Search. A click on a record or graph node opens that object's detail page — not a docked inspector. Types carry hue and glyph; Viewer reads them. Dark is first paint; Light and System are real choices. A stored `paper` choice reads as Light. The cookie does not unlock `/mcp` or `/blobs/:id`. Contract: [`VIEWER.md`](./VIEWER.md).
+- Window at `/view` (same API key; not a second store). MCP / health / agent blobs on `127.0.0.1:8787` and `/view` on `8788` (`http://127.0.0.1:8788/view`; from another machine, `http://<this-host>:8788/view`). Unlock with the key, HttpOnly cookie `Path=/view`. After unlock: Home is Recents (5, newest first), open tasks (5, due-urgency), and type folders for types that have live objects. Collection and Detail are pages in the content host. A journal opens a writing page (title + markdown body, autosave, if-match). Search is a rail overlay. The rail is Home and Search. A click on a record or graph node opens that object's detail page — not a docked inspector. Types carry hue and glyph; Viewer reads them. Dark is first paint; Light and System are real choices. A stored `paper` choice reads as Light. The cookie does not unlock `/mcp` or `/blobs/:id`. Contract: [`VIEWER.md`](./VIEWER.md).
 - Blobs: `$FOUNDATION_DATA/blobs/<uuid>`; ingest on `upsert`; bytes via `GET /blobs/:id`
 
 ## Locked (do not reopen)
