@@ -969,6 +969,7 @@ test("view window writes journal only; still 14 tools", async () => {
   const posts = [...view.matchAll(/app\.post\(/g)];
   assert.equal(posts.length, 2);
   assert.match(view, /app\.post\(`\$\{VIEW_PATH\}\/unlock`/);
+  assert.match(view, /app\.get\(`\$\{VIEW_PATH\}\/api\/journals\/today`/);
   assert.match(view, /app\.post\(`\$\{VIEW_PATH\}\/api\/journals\/today`/);
   assert.match(view, /app\.patch\(`\$\{VIEW_PATH\}\/api\/nodes\/:id`/);
   assert.match(view, /app\.get\(`\$\{VIEW_PATH\}\/api\/graph`/);
