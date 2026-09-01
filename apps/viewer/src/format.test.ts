@@ -8,6 +8,8 @@ import {
   journalDayTitle,
   journalDraftQuiet,
   journalEntryDayTitle,
+  journalMayPaintSaved,
+  journalShouldRetryDirty,
   journalFirstSentence,
   journalHomeToday,
   journalPayloadBody,
@@ -174,6 +176,27 @@ test("quiet revert with a write still in flight does not settle to quiet", () =>
     journalSaveWhenQuiet({ status: "saving", writeInFlight: true, settled: "quiet" }),
     null,
   );
+});
+
+test("Saved is not painted after the draft has already changed", () => {
+  const landed = { title: "Morning", body: "First light." };
+  assert.equal(journalMayPaintSaved({ title: "Morning", body: "First light." }, landed), true);
+  assert.equal(
+    journalMayPaintSaved({ title: "Evening", body: "First light." }, landed),
+    false,
+  );
+  assert.equal(
+    journalMayPaintSaved({ title: "Morning", body: "First light.\nKeep going." }, landed),
+    false,
+  );
+});
+
+test("a failed write still retries a newer draft", () => {
+  const skip = { title: "Morning", body: "First light." };
+  const later = { title: "Morning", body: "First light.\nKeep going." };
+  assert.equal(journalShouldRetryDirty(later, skip, false), true);
+  assert.equal(journalShouldRetryDirty(later, skip, true), false);
+  assert.equal(journalShouldRetryDirty(skip, skip, false), false);
 });
 
 test("autosave stays quiet when only editor breaks differ from the stored body", () => {

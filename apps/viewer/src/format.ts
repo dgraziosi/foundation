@@ -105,6 +105,23 @@ export function journalApplyLandedWrite(input: {
   };
 }
 
+/** Saved and title rewrite only when the on-screen draft still matches what landed. */
+export function journalMayPaintSaved(draft: JournalDraft, landed: JournalDraft): boolean {
+  return journalDraftQuiet(draft, landed);
+}
+
+/** After a failed write, retry a newer draft once. A clash waits for Reload. */
+export function journalShouldRetryDirty(
+  draft: JournalDraft,
+  skip: JournalDraft,
+  clash: boolean,
+): boolean {
+  if (clash) {
+    return false;
+  }
+  return !journalDraftQuiet(draft, skip);
+}
+
 export function journalFirstSentence(body: string): string {
   const text = journalPayloadBody(body)
     .replace(/^#{1,6}\s+/gm, "")
