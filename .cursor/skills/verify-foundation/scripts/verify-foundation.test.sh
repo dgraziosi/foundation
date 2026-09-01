@@ -302,6 +302,254 @@ db_out="$(
 [[ "${db_out}" == "postgres://foundation:foundation@127.0.0.1:5432/foundation" ]] || fail "database-url should be disposable, got '${db_out}'"
 [[ "${db_out}" != *"10.9.8.7"* ]] || fail "database-url leaked ambient DATABASE_URL"
 
+# 5. Failed keep after a start must not orphan the vault.
+run_id="orphan$$"
+last_file="/tmp/foundation-verify-last-run-test-$$"
+run_root="/tmp/foundation-verify-${run_id}"
+data_dir="${run_root}/data"
+state_file="${run_root}/state"
+evidence_dir="/tmp/foundation-verify-evidence-${run_id}"
+rm -f -- "${green_flag}"
+sleep 1000 &
+orphan_pid="$!"
+[[ "${orphan_pid}" =~ ^[0-9]+$ ]] || fail "orphan stub pid"
+cat >"${real_keep}" <<EOF
+#!/bin/sh
+if [ "\${1:-}" = "stop" ]; then
+  rm -f "${green_flag}"
+  exit 0
+fi
+mkdir -p -- "${data_dir}"
+printf '%s\\n' "${orphan_pid}" >"${data_dir}/app.pid"
+touch "${green_flag}"
+exit 1
+EOF
+chmod +x "${real_keep}"
+mkdir -p -- "${run_root}" "${data_dir}" "${evidence_dir}"
+printf '%s\n' "verify-scaffold-orphan-key" >"${run_root}/api_key"
+orphan_out="$(
+  env -u FOUNDATION_API_KEY -u DATABASE_URL -u VERIFY_RUN_ID \
+    PATH="${real_bin}:${PATH}" \
+    VERIFY_LAST_RUN_FILE="${last_file}" VERIFY_RUN_ID="${run_id}" \
+    VERIFY_DATA_DIR="${data_dir}" VERIFY_STATE_FILE="${state_file}" \
+    VERIFY_EVIDENCE_DIR="${evidence_dir}" VERIFY_KEEP_VAULT_UP="${real_keep}" \
+    "${helper}" launch 2>&1
+)" && fail "launch should fail when keep starts then exits 1, got: ${orphan_out}"
+[[ "${orphan_out}" == *"keep-vault-up failed"* ]] || fail "should report keep failure, got: ${orphan_out}"
+[[ "${orphan_out}" == *"recorded failed start"* ]] || fail "should record failed start, got: ${orphan_out}"
+[[ -f "${state_file}" ]] || fail "failed start that launched programs must write state"
+started="$(grep -E '^STARTED=' "${state_file}" | tail -n 1)"
+[[ "${started}" == "STARTED=0" ]] || fail "failed start must not set STARTED=1, got ${started}"
+recorded="$(grep -E '^APP_PID=' "${state_file}" | tail -n 1)"
+[[ "${recorded}" == "APP_PID=${orphan_pid}" ]] || fail "failed start must record APP_PID, got ${recorded}"
+last_got="$(tr -d '[:space:]' <"${last_file}")"
+[[ "${last_got}" == "${run_id}" ]] || fail "failed start must remember last-run, got '${last_got}'"
+if kill -0 "${orphan_pid}" 2>/dev/null; then
+  kill -KILL "${orphan_pid}" 2>/dev/null || true
+  fail "failed launch left the started pid running"
+fi
+
+# Cleanup must still stop a recorded failed start (STARTED=0 + APP_PID).
+sleep 1000 &
+cleanup_fail_pid="$!"
+cat >"${state_file}" <<EOF
+RUN_ID=${run_id}
+DATA_DIR=${data_dir}
+STARTED=0
+APP_PID=${cleanup_fail_pid}
+EOF
+printf '%s\n' "${run_id}" >"${last_file}"
+cleanup_fail_out="$(
+  env -u VERIFY_RUN_ID VERIFY_LAST_RUN_FILE="${last_file}" VERIFY_RUN_ID="${run_id}" \
+    VERIFY_DATA_DIR="${data_dir}" VERIFY_STATE_FILE="${state_file}" \
+    VERIFY_EVIDENCE_DIR="${evidence_dir}" VERIFY_KEEP_VAULT_UP="${real_keep}" \
+    "${helper}" cleanup 2>&1
+)" || fail "cleanup of STARTED=0 leftover should exit 0, got: ${cleanup_fail_out}"
+[[ "${cleanup_fail_out}" == *"stopping app pid ${cleanup_fail_pid}"* ]] || fail "cleanup should stop failed-start pid, got: ${cleanup_fail_out}"
+if kill -0 "${cleanup_fail_pid}" 2>/dev/null; then
+  kill -KILL "${cleanup_fail_pid}" 2>/dev/null || true
+  fail "cleanup left STARTED=0 APP_PID ${cleanup_fail_pid} running"
+fi
+mkdir -p -- "${data_dir}" "${evidence_dir}"
+
+# keep wrote a pid but /health never greened (wait_health timeout).
+sleep 1000 &
+timeout_pid="$!"
+rm -f -- "${green_flag}"
+cat >"${real_keep}" <<EOF
+#!/bin/sh
+if [ "\${1:-}" = "stop" ]; then
+  rm -f "${green_flag}"
+  exit 0
+fi
+mkdir -p -- "${data_dir}"
+printf '%s\\n' "${timeout_pid}" >"${data_dir}/app.pid"
+exit 1
+EOF
+chmod +x "${real_keep}"
+timeout_out="$(
+  env -u FOUNDATION_API_KEY -u DATABASE_URL -u VERIFY_RUN_ID \
+    PATH="${real_bin}:${PATH}" \
+    VERIFY_LAST_RUN_FILE="${last_file}" VERIFY_RUN_ID="${run_id}" \
+    VERIFY_DATA_DIR="${data_dir}" VERIFY_STATE_FILE="${state_file}" \
+    VERIFY_EVIDENCE_DIR="${evidence_dir}" VERIFY_KEEP_VAULT_UP="${real_keep}" \
+    "${helper}" launch 2>&1
+)" && fail "launch should fail when keep writes a pid then exits 1, got: ${timeout_out}"
+[[ "${timeout_out}" == *"recorded failed start"* ]] || fail "health-timeout path must record, got: ${timeout_out}"
+started="$(grep -E '^STARTED=' "${state_file}" | tail -n 1)"
+[[ "${started}" == "STARTED=0" ]] || fail "health-timeout must not set STARTED=1, got ${started}"
+if kill -0 "${timeout_pid}" 2>/dev/null; then
+  kill -KILL "${timeout_pid}" 2>/dev/null || true
+  fail "health-timeout launch left the started pid running"
+fi
+
+# keep succeeded and health is green, but app.pid is missing.
+: >"${green_flag}"
+cat >"${real_keep}" <<EOF
+#!/bin/sh
+if [ "\${1:-}" = "stop" ]; then
+  rm -f "${green_flag}"
+  exit 0
+fi
+rm -f "${data_dir}/app.pid"
+touch "${green_flag}"
+exit 0
+EOF
+chmod +x "${real_keep}"
+missing_out="$(
+  env -u FOUNDATION_API_KEY -u DATABASE_URL -u VERIFY_RUN_ID \
+    PATH="${real_bin}:${PATH}" \
+    VERIFY_LAST_RUN_FILE="${last_file}" VERIFY_RUN_ID="${run_id}" \
+    VERIFY_DATA_DIR="${data_dir}" VERIFY_STATE_FILE="${state_file}" \
+    VERIFY_EVIDENCE_DIR="${evidence_dir}" VERIFY_KEEP_VAULT_UP="${real_keep}" \
+    "${helper}" launch 2>&1
+)" && fail "launch should fail when app pid is missing, got: ${missing_out}"
+[[ "${missing_out}" == *"app pid is missing"* ]] || fail "should report missing pid, got: ${missing_out}"
+[[ "${missing_out}" == *"recorded failed start"* ]] || fail "missing-pid path must record, got: ${missing_out}"
+started="$(grep -E '^STARTED=' "${state_file}" | tail -n 1)"
+[[ "${started}" == "STARTED=0" ]] || fail "missing pid must not set STARTED=1, got ${started}"
+if [[ -f "${green_flag}" ]]; then
+  rm -f -- "${green_flag}"
+  fail "missing-pid launch left leftover green /health"
+fi
+
+# Later launch must reclaim leftover green /health from STARTED=0, not refuse.
+sleep 1000 &
+reclaim_pid="$!"
+cat >"${state_file}" <<EOF
+RUN_ID=${run_id}
+DATA_DIR=${data_dir}
+STARTED=0
+APP_PID=${reclaim_pid}
+EOF
+printf '%s\n' "${run_id}" >"${last_file}"
+: >"${green_flag}"
+success_pid=""
+sleep 1000 &
+success_pid="$!"
+cat >"${real_keep}" <<EOF
+#!/bin/sh
+if [ "\${1:-}" = "stop" ]; then
+  rm -f "${green_flag}"
+  exit 0
+fi
+printf '%s\\n' "${success_pid}" >"${data_dir}/app.pid"
+touch "${green_flag}"
+exit 0
+EOF
+chmod +x "${real_keep}"
+reclaim_out="$(
+  env -u FOUNDATION_API_KEY -u DATABASE_URL -u VERIFY_RUN_ID \
+    PATH="${real_bin}:${PATH}" \
+    VERIFY_LAST_RUN_FILE="${last_file}" VERIFY_RUN_ID="${run_id}" \
+    VERIFY_DATA_DIR="${data_dir}" VERIFY_STATE_FILE="${state_file}" \
+    VERIFY_EVIDENCE_DIR="${evidence_dir}" VERIFY_KEEP_VAULT_UP="${real_keep}" \
+    "${helper}" launch 2>&1
+)" || fail "reclaim then launch should succeed, got: ${reclaim_out}"
+[[ "${reclaim_out}" != *"Refusing to take over a shared instance"* ]] || fail "must not refuse leftover failed start: ${reclaim_out}"
+[[ "${reclaim_out}" == *"reclaiming a failed start"* ]] || fail "should reclaim failed start, got: ${reclaim_out}"
+[[ "${reclaim_out}" == *"already up from this run"* ]] && fail "reclaim should start, not already-up: ${reclaim_out}"
+if kill -0 "${reclaim_pid}" 2>/dev/null; then
+  kill -KILL "${reclaim_pid}" 2>/dev/null || true
+  fail "reclaim left the leftover pid running"
+fi
+started="$(grep -E '^STARTED=' "${state_file}" | tail -n 1)"
+[[ "${started}" == "STARTED=1" ]] || fail "successful reclaim launch should set STARTED=1, got ${started}"
+env -u VERIFY_RUN_ID VERIFY_LAST_RUN_FILE="${last_file}" VERIFY_RUN_ID="${run_id}" \
+  VERIFY_DATA_DIR="${data_dir}" VERIFY_STATE_FILE="${state_file}" \
+  VERIFY_EVIDENCE_DIR="${evidence_dir}" VERIFY_KEEP_VAULT_UP="${real_keep}" \
+  "${helper}" cleanup >/tmp/foundation-verify-cleanup-orphan-$$
+if kill -0 "${success_pid}" 2>/dev/null; then
+  kill -KILL "${success_pid}" 2>/dev/null || true
+  fail "cleanup left reclaim APP_PID running"
+fi
+rm -f -- /tmp/foundation-verify-cleanup-orphan-$$
+rm -rf -- "${run_root}" "${evidence_dir}"
+rm -f -- "${last_file}" "${green_flag}"
+kill -KILL "${orphan_pid}" "${reclaim_pid}" "${success_pid}" 2>/dev/null || true
+
+# Later launch without VERIFY_RUN_ID reclaims last-run's STARTED=0 leftover.
+failed_id="orphanlast$$"
+failed_root="/tmp/foundation-verify-${failed_id}"
+failed_data="${failed_root}/data"
+failed_state="${failed_root}/state"
+mint_evidence="/tmp/foundation-verify-evidence-lastreclaim-$$"
+mkdir -p -- "${failed_data}"
+sleep 1000 &
+last_leftover_pid="$!"
+cat >"${failed_state}" <<EOF
+RUN_ID=${failed_id}
+DATA_DIR=${failed_data}
+STARTED=0
+APP_PID=${last_leftover_pid}
+EOF
+printf '%s\n' "${failed_id}" >"${last_file}"
+: >"${green_flag}"
+sleep 1000 &
+last_success_pid="$!"
+cat >"${real_keep}" <<EOF
+#!/bin/sh
+if [ "\${1:-}" = "stop" ]; then
+  rm -f "${green_flag}"
+  exit 0
+fi
+printf '%s\\n' "${last_success_pid}" >"\${FOUNDATION_DATA}/app.pid"
+touch "${green_flag}"
+exit 0
+EOF
+chmod +x "${real_keep}"
+last_reclaim_out="$(
+  env -u FOUNDATION_API_KEY -u DATABASE_URL -u VERIFY_RUN_ID -u VERIFY_STATE_FILE -u VERIFY_DATA_DIR \
+    PATH="${real_bin}:${PATH}" \
+    VERIFY_LAST_RUN_FILE="${last_file}" \
+    VERIFY_EVIDENCE_DIR="${mint_evidence}" VERIFY_KEEP_VAULT_UP="${real_keep}" \
+    "${helper}" launch 2>&1
+)" || fail "last-run reclaim then launch should succeed, got: ${last_reclaim_out}"
+[[ "${last_reclaim_out}" != *"Refusing to take over a shared instance"* ]] || fail "must not refuse last-run leftover: ${last_reclaim_out}"
+[[ "${last_reclaim_out}" == *"reclaiming a failed start"* ]] || fail "should reclaim last-run failed start, got: ${last_reclaim_out}"
+if kill -0 "${last_leftover_pid}" 2>/dev/null; then
+  kill -KILL "${last_leftover_pid}" 2>/dev/null || true
+  fail "last-run reclaim left the leftover pid running"
+fi
+minted_id="$(printf '%s\n' "${last_reclaim_out}" | sed -n 's/^launch: run //p' | head -n 1)"
+[[ "${minted_id}" =~ ^[0-9]{8}T[0-9]{6}Z$ ]] || fail "last-run reclaim should mint, got '${minted_id}'"
+[[ "${minted_id}" != "${failed_id}" ]] || fail "last-run reclaim must not reuse the failed id"
+minted_state="/tmp/foundation-verify-${minted_id}/state"
+[[ -f "${minted_state}" ]] || fail "minted launch must write its own state"
+started="$(grep -E '^STARTED=' "${minted_state}" | tail -n 1)"
+[[ "${started}" == "STARTED=1" ]] || fail "minted reclaim launch should set STARTED=1, got ${started}"
+env -u VERIFY_RUN_ID -u VERIFY_STATE_FILE -u VERIFY_DATA_DIR \
+  VERIFY_LAST_RUN_FILE="${last_file}" VERIFY_RUN_ID="${minted_id}" \
+  VERIFY_EVIDENCE_DIR="${mint_evidence}" VERIFY_KEEP_VAULT_UP="${real_keep}" \
+  "${helper}" cleanup >/tmp/foundation-verify-cleanup-lastreclaim-$$
+if kill -0 "${last_success_pid}" 2>/dev/null; then
+  kill -KILL "${last_success_pid}" 2>/dev/null || true
+  fail "cleanup left last-run reclaim APP_PID running"
+fi
+rm -f -- /tmp/foundation-verify-cleanup-lastreclaim-$$ "${last_file}" "${green_flag}"
+rm -rf -- "${failed_root}" "/tmp/foundation-verify-${minted_id}" "${mint_evidence}"
+kill -KILL "${last_leftover_pid}" "${last_success_pid}" 2>/dev/null || true
+
 rm -rf -- "${real_bin}"
 
 echo "verify-foundation.test: ok"

@@ -59,7 +59,7 @@ That script:
 4. Starts through `scripts/keep-vault-up.sh` with env overrides only. Always passes a disposable `BACKUP_ROOT` under that run folder (`/tmp/foundation-verify-$RUN_ID/backups`) so an empty first-day vault does not see the clone's dumps. Always passes `DATABASE_URL=postgres://foundation:foundation@127.0.0.1:5432/foundation`. It does not forward an ambient `DATABASE_URL` onto disposable `FOUNDATION_DATA`.
 5. Loads `FOUNDATION_API_KEY` in this process (env, else this run's key file, else the clone `.env`, else mint). Writes that key to `/tmp/foundation-verify-$RUN_ID/api_key` (mode 0600). Not evidence. Not git. Does not print the key. Doctor and Unlock read that file when `FOUNDATION_API_KEY` is unset.
 6. Mints a new run id unless `VERIFY_RUN_ID` is set. After `keep-vault-up` succeeds and `/health` is green, writes state (`RUN_ID`, `DATA_DIR`, `STARTED=1`, `APP_PID` from the data dir's `app.pid`) and remembers the id in `/tmp/foundation-verify-last-run`. A leftover `STARTED=1` without a live `APP_PID` is not "already this run" — if `/health` is green, launch refuses the shared instance.
-7. Waits until `/health` is green, or fails with the keep-vault-up nag. Does not write `STARTED=1` before that.
+7. Waits until `/health` is green, or fails with the keep-vault-up nag. Does not write `STARTED=1` before that. If keep starts host programs and then fails (health wait, cluster check, missing pid), launch records `STARTED=0` plus the app pid and last-run id, then stops those programs. A later launch does not refuse leftover green `/health` from that failed start as a shared instance — it reclaims (stops) the leftover and continues.
 
 Default ports (`8787`, `8788`, `5432`) are one-instance. Two side-by-side vaults need different `PORT`, `VIEW_PORT`, and a Postgres port in `DATABASE_URL`, plus a second data folder. This skill does not do that. Refuse a second drive on a shared instance.
 
@@ -195,7 +195,7 @@ Proof standards:
 .cursor/skills/verify-foundation/scripts/verify-foundation.sh cleanup
 ```
 
-Stops only what **this run** started: the `APP_PID` from the helper state file, then `scripts/keep-vault-up.sh stop` with that `FOUNDATION_DATA`. Never `pkill` by process name. Does not delete `./data` on the clone. Does not delete evidence.
+Stops only what **this run** started: the `APP_PID` from the helper state file (including a failed start that recorded `STARTED=0`), then `scripts/keep-vault-up.sh stop` with that `FOUNDATION_DATA`. Never `pkill` by process name. Does not delete `./data` on the clone. Does not delete evidence.
 
 Cleanup may `rm -rf` only `/tmp/foundation-verify-<run-id>` when the recorded data dir is that folder or its `data/` child. A `VERIFY_DATA_DIR` that is a direct child of `/tmp` is that run root. Its parent is `/tmp` and is never removed. Any other data dir is left in place after stop.
 
@@ -219,8 +219,8 @@ Executable helper (from the clone root):
 | Command | What it does |
 | --- | --- |
 | `doctor` | Read-only health, window GET, toolchain, optional state-file check. Loads this run's key file when env is unset |
-| `launch` | Mint a run id (unless `VERIFY_RUN_ID` is set). Disposable first-day folder + `keep-vault-up.sh`. After keep succeeds: state with `APP_PID` and `STARTED=1`, last-run id, key file, disposable backup root |
-| `cleanup` | Stop the recorded `APP_PID`, then `keep-vault-up.sh stop`; remove only a safe run root; keep evidence |
+| `launch` | Mint a run id (unless `VERIFY_RUN_ID` is set). Disposable first-day folder + `keep-vault-up.sh`. After keep succeeds: state with `APP_PID` and `STARTED=1`, last-run id, key file, disposable backup root. A failed start that launched host programs records `STARTED=0` plus the app pid and last-run id, then stops those programs |
+| `cleanup` | Stop the recorded `APP_PID` (including a failed start), then `keep-vault-up.sh stop`; remove only a safe run root; keep evidence |
 | `evidence-dir` | Print the evidence path for the resolved run id |
 | `run-id` | Print the resolved run id |
 | `key-file` | Print the key file path. Not the key |

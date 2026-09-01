@@ -280,16 +280,13 @@ verify_state_get() {
   printf '%s\n' "${line#*"${key}"=}"
 }
 
-# STARTED=1 only with a numeric APP_PID (keep-vault-up succeeded).
+# Fifth arg is STARTED (1 only after keep + health + numeric pid).
 verify_write_state() {
   local file="$1"
   local id="$2"
   local data_dir="$3"
   local app_pid="${4:-}"
-  local started=0
-  if [[ "${app_pid}" =~ ^[0-9]+$ ]]; then
-    started=1
-  fi
+  local started="${5:-0}"
   mkdir -p -- "$(dirname -- "${file}")"
   umask 077
   cat >"${file}" <<EOF
@@ -299,6 +296,42 @@ STARTED=${started}
 APP_PID=${app_pid}
 EOF
   verify_remember_run_id "${id}"
+}
+
+# Stop pid from state or data_dir/app.pid, then keep-vault-up stop.
+verify_stop_this_start() {
+  local data_dir="$1"
+  local keep="$2"
+  local state="${3:-}"
+  local app_pid=""
+  if [[ -n "${state}" && -f "${state}" ]]; then
+    app_pid="$(verify_state_get "${state}" APP_PID || true)"
+  fi
+  if ! [[ "${app_pid}" =~ ^[0-9]+$ ]] && [[ -n "${data_dir}" ]]; then
+    app_pid="$(verify_read_app_pid "${data_dir}" || true)"
+  fi
+  if [[ "${app_pid}" =~ ^[0-9]+$ ]]; then
+    echo "launch: stopping app pid ${app_pid} after a failed start"
+    verify_stop_app_pid "${app_pid}"
+  fi
+  if [[ -n "${data_dir}" && -x "${keep}" ]]; then
+    echo "launch: stopping host programs after a failed start"
+    FOUNDATION_DATA="${data_dir}" "${keep}" stop || true
+  fi
+}
+
+# Failed start: STARTED!=1. Not a successful vault. Stop it so a later
+# launch does not refuse leftover green /health as a shared instance.
+verify_reclaim_failed_start() {
+  local state="$1"
+  local keep="$2"
+  local data_dir
+  [[ -f "${state}" ]] || return 1
+  [[ "$(verify_state_get "${state}" STARTED || true)" != "1" ]] || return 1
+  data_dir="$(verify_state_get "${state}" DATA_DIR || true)"
+  echo "launch: reclaiming a failed start at ${state}"
+  verify_stop_this_start "${data_dir}" "${keep}" "${state}"
+  return 0
 }
 
 verify_toolchain() {
@@ -399,7 +432,7 @@ verify_cmd_doctor() {
 }
 
 verify_cmd_launch() {
-  local repo_root id data_dir state keep backup_root key_file app_pid db_url
+  local repo_root id data_dir state keep backup_root key_file app_pid db_url last_id
   repo_root="$(verify_repo_root)"
   id="$(verify_launch_run_id)"
   data_dir="$(verify_data_dir "${id}")"
@@ -419,9 +452,21 @@ verify_cmd_launch() {
       echo "launch: already up from this run"
       return 0
     fi
-    echo "launch: GET /health is already green. Refusing to take over a shared instance." >&2
-    echo "launch: stop that vault, or drive it only if the user asked." >&2
-    return 1
+    if verify_reclaim_failed_start "${state}" "${keep}"; then
+      :
+    elif [[ -z "${VERIFY_RUN_ID:-}" ]]; then
+      last_id="$(tr -d '[:space:]' <"$(verify_last_run_file)" 2>/dev/null || true)"
+      if [[ -n "${last_id}" && "${last_id}" != "${id}" ]] && verify_run_id_ok "${last_id}"; then
+        verify_reclaim_failed_start "$(verify_state_file "${last_id}")" "${keep}" || true
+      fi
+    fi
+    if ! verify_health_ok; then
+      echo "launch: stopped a leftover failed start; continuing"
+    else
+      echo "launch: GET /health is already green. Refusing to take over a shared instance." >&2
+      echo "launch: stop that vault, or drive it only if the user asked." >&2
+      return 1
+    fi
   fi
 
   if ! verify_toolchain; then
@@ -456,24 +501,44 @@ verify_cmd_launch() {
     FOUNDATION_HEALTH_URL="$(verify_health_url)" \
     "${keep}"; then
     echo "launch: keep-vault-up failed" >&2
+    verify_fail_after_keep "${id}" "${data_dir}" "${state}" "${keep}"
     return 1
   fi
 
   if ! verify_health_ok; then
     echo "launch: start ran and /health still failed" >&2
+    verify_fail_after_keep "${id}" "${data_dir}" "${state}" "${keep}"
     return 1
   fi
 
   app_pid="$(verify_read_app_pid "${data_dir}" || true)"
   if ! [[ "${app_pid}" =~ ^[0-9]+$ ]]; then
     echo "launch: keep-vault-up succeeded but app pid is missing" >&2
+    verify_fail_after_keep "${id}" "${data_dir}" "${state}" "${keep}"
     return 1
   fi
-  verify_write_state "${state}" "${id}" "${data_dir}" "${app_pid}"
+  verify_write_state "${state}" "${id}" "${data_dir}" "${app_pid}" 1
   echo "launch: state ${state}"
   echo "launch: app pid ${app_pid}"
   echo "launch: ready. Viewer $(verify_view_url)"
   return 0
+}
+
+# keep-vault-up may have started host programs and still failed.
+# Record STARTED=0 + pid + last-run so cleanup can stop them, then stop now.
+# Successful launch still writes STARTED=1 only after keep + health + pid.
+verify_fail_after_keep() {
+  local id="$1"
+  local data_dir="$2"
+  local state="$3"
+  local keep="$4"
+  local app_pid=""
+  app_pid="$(verify_read_app_pid "${data_dir}" || true)"
+  if [[ "${app_pid}" =~ ^[0-9]+$ ]] || verify_health_ok; then
+    verify_write_state "${state}" "${id}" "${data_dir}" "${app_pid}" 0
+    echo "launch: recorded failed start (STARTED=0) so cleanup can stop it"
+  fi
+  verify_stop_this_start "${data_dir}" "${keep}" "${state}"
 }
 
 verify_cmd_cleanup() {
