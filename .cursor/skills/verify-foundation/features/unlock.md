@@ -1,6 +1,6 @@
 # Unlock
 
-Unlock is the door to the Viewer. The user types the same API key as MCP. A good key sets an HttpOnly cookie `Path=/view` and shows Home. A bad key stays on the door with **API key required**. After unlock the window can write today’s journal. Other types stay read-only. That cookie does not unlock MCP or agent blobs.
+Unlock is the door to the Viewer. The user types the same API key as MCP. A good key sets an HttpOnly cookie `Path=/view` and shows Home. A bad key stays on the door with **API key required**. The window is read-only. That cookie does not unlock MCP or agent blobs.
 
 ## Sub-features
 
@@ -23,7 +23,7 @@ Preconditions:
 - The key this vault accepted is in `verify-foundation.sh key-file` (or `FOUNDATION_API_KEY`). Do not print it.
 - No `foundation_key` cookie in this browser, or use a fresh profile.
 
-- **Open door.** Go to `http://127.0.0.1:8788/view`. The heading reads `Unlock the vault window`. Quiet copy: `Same key as MCP.`
+- **Open door.** Go to `http://127.0.0.1:8788/view`. The heading reads `Unlock the vault window`. Quiet copy: `Same key as MCP. This window is read-only.`
 - **Reject.** Type a wrong key and choose **Unlock**. The door stays. Error copy: `API key required`.
 - **Accept.** Type the real key and choose **Unlock**. Home appears (`[data-surface="home"]`) with Recents and Open tasks. The rail shows Home and Search.
 - **HTTP reject.** `curl -sS -o /tmp/unlock-bad.json -w "%{http_code}" http://127.0.0.1:8788/view/unlock -H "content-type: application/json" -H "accept: application/json" -d '{"api_key":"wrong"}'`. Status `401`. Body `{"error":"API key required"}`.

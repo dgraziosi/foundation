@@ -36,4 +36,3 @@ Preconditions:
 - **Open** is `data.url` (https). It is not which Drive / Gmail / Calendar object. That identity is upsert `url { system, id }`, looked up with MCP `search { url }`.
 - Blob body in the window is `GET /view/blobs/:id` (cookie or Authorization). Agents still use `GET /blobs/:id` with the header.
 - Do not prove detail by calling MCP `get` only. The user path is the page or `/view/api/nodes/:id`.
-- A journal record opens the writing page, not `[data-surface="detail-page"]`. See [Journal write](./journal-write.md).

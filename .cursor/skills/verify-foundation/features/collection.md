@@ -11,7 +11,6 @@ Collection is one type's records in the layouts that type declared. The user ope
 - `collection-show-completed` toggles **Show completed** for this window only. It does not write. It does not change Home, Recents, or Search.
 - `collection-open-record` opens a row, card, cell, board card, calendar item, outline row, or graph node as a detail page.
 - `collection-no-views` shows **No views declared for this type.** when `views` is empty.
-- `collection-journal-today` shows **Today** on the Journal collection. That is journal write's entry. First-day Home has no Today.
 
 ## How to get to it (user POV)
 
@@ -39,6 +38,5 @@ Preconditions:
 
 - The window does not add a ninth layout. Declared set: list, card, table, board, calendar, timeline, outline, graph.
 - Count in the heading is after the active view's filter, not always the live type count on Home folders.
-- `journal` as a collection is a list of journal records plus **Today**. Today is journal write's entry. First-day Home still has no Today.
-- First-day `/view/types/journal` still opens with **Nothing yet.** and **Today**.
+- `journal` as a collection is a list of journal records. It is not journal write (forthcoming).
 - Do not treat MCP `search { type }` as a collection proof. Drive `/view/types/<slug>` or `GET /view/api/types/<slug>`.

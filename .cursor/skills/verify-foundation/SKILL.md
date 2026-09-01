@@ -1,11 +1,11 @@
 ---
 name: verify-foundation
-description: Drive Foundation's Viewer (the human window on the life graph) to launch, doctor, prove a mapped surface, capture evidence, and clean up. Use when verifying Viewer behavior after a change, or when a later agent needs a scripted way to prove Home, collection, detail, search, unlock, or journal write.
+description: Drive Foundation's Viewer (the human window on the life graph) to launch, doctor, prove a mapped surface, capture evidence, and clean up. Use when verifying Viewer behavior after a change, or when a later agent needs a scripted way to prove Home, collection, detail, search, or unlock.
 ---
 
 # Verify Foundation (Viewer)
 
-Foundation is a life graph that models the user so bots can help with life goals. Viewer is the human UI — a window on one vault. After unlock it can write today’s journal. Other types stay read-only. The cookie still does not open MCP. It is not a personal-knowledge-management app and not harness chat-memory.
+Foundation is a life graph that models the user so bots can help with life goals. Viewer is the human UI — a read-only window on one vault. It is not a personal-knowledge-management app and not harness chat-memory.
 
 This skill is for the next agent, read cold. The person using a clone is the user. Stay on product. No live vault contents, no staff names, no personal data.
 
@@ -16,14 +16,14 @@ pstack's generic generator writes `.cursor/skills/verify-*`. This repo's product
 - **graph** — live records (nodes) and edges
 - **ontology** — types and how they connect
 - **MCP** — how a bot talks to the graph (`http://127.0.0.1:8787/mcp`)
-- **Viewer** — the human window (`http://127.0.0.1:8788/view`). After unlock it can write today’s journal. Other types stay read-only.
+- **Viewer** — the read-only window (`http://127.0.0.1:8788/view`)
 - **vault** — one instance (`FOUNDATION_DATA` + host Postgres)
 - **record** — the node
 - **user** — the human who runs this vault on this machine
 
 Do not write a live personal vault into git. Do not reintroduce Compose as install. Host programs: Postgres 16 on PATH (`initdb`, `pg_ctl`, `psql`) plus the app (`pnpm start`). The package name for Postgres is unknown in this repo — do not guess an installer.
 
-Journal write is live: title and markdown body on the same record, if-match, actor user. HTTP `POST /view/api/journals/today` and `PATCH /view/api/nodes/:id` are real. Other types stay read-only. The cookie still does not open MCP. First-day Home still has no Today.
+Journal write (a page that creates or edits a journal record) is **forthcoming**. It is not on this branch. `journal` is only a seed type the window can list when live records exist.
 
 ## Launch
 
@@ -121,8 +121,7 @@ Routes (basename `/view`):
 | `/view` | Unlock gate, then Home |
 | `/view/recents` | Recents page (from Home Recents **View all**) |
 | `/view/types/:slug` | Collection for that type |
-| `/view/nodes/:id` | Detail for that record. A journal record opens the writing page. |
-| `/view/journal/today` | Today’s journal (create if missing). Not on first-day Home. |
+| `/view/nodes/:id` | Detail for that record |
 
 HTTP the window already uses (cookie `foundation_key` with `Path=/view`, or `Authorization: ApiKey <key>`):
 
@@ -143,16 +142,9 @@ curl -sS http://127.0.0.1:8788/view/api/ontology -H "Authorization: ApiKey $(cat
 curl -sS "http://127.0.0.1:8788/view/api/types/task" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
 curl -sS "http://127.0.0.1:8788/view/api/nodes/<UUID>" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
 curl -sS "http://127.0.0.1:8788/view/api/search?q=Fixture" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
-
-# journal write (cookie or Authorization). Same record. if-match. Actor user.
-curl -sS -X POST http://127.0.0.1:8788/view/api/journals/today \
-  -H "Authorization: ApiKey $(cat "${KEY_FILE}")" -H "content-type: application/json"
-curl -sS -X PATCH "http://127.0.0.1:8788/view/api/nodes/<UUID>" \
-  -H "Authorization: ApiKey $(cat "${KEY_FILE}")" -H "content-type: application/json" \
-  -d '{"title":"Morning","body":"Two fixture sentences.\\n","base_updated_at":"<updated_at>"}'
 ```
 
-The cookie does not unlock `/mcp` or `/blobs/:id`. Journal write is the one Viewer write. Other types stay read-only. Do not call MCP `upsert` to fake a Viewer write.
+The cookie does not unlock `/mcp` or `/blobs/:id`. Do not post writes through Viewer — the window has no create/edit/complete. Do not call MCP `upsert` to fake a Viewer write.
 
 Read the feature map under [`features/`](features/README.md) before driving. Drive one mapped feature end to end. A proof that only hits `/health` is not a Viewer proof.
 
@@ -185,7 +177,7 @@ Capture:
 - The feature id and entry point (see the map)
 - The action (click Unlock, open Search, GET `/view/api/session`, …)
 - The resulting state (heading, empty copy, JSON body, HTTP status)
-- Side effects that matter: `Set-Cookie` on unlock; journal today/write creates or updates one journal record (actor `user`); cookie still does not open MCP
+- Side effects that matter: `Set-Cookie` on unlock; no new rows from Viewer (read-only)
 - Screenshot + ARIA snapshot when a browser drove the window
 - Command, stdout, stderr, exit code when HTTP or tests were the drive
 
@@ -253,4 +245,4 @@ Env the helper reads (all optional except as noted):
 
 Index: [`features/README.md`](features/README.md).
 
-Mapped now: Unlock, Home, Collection, Detail, Search, Journal write. Journal write is live. First-day Home still has no Today.
+Mapped now: Unlock, Home, Collection, Detail, Search. Journal write is forthcoming (not on this branch).
