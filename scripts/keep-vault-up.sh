@@ -12,7 +12,9 @@
 #                           Default postgres://foundation:foundation@localhost:5432/foundation
 #
 # Starts Postgres 16 (the data folder's postgres tree) and the app
-# (`pnpm start`) when /health is down. First-day 0 user records is
+# (`pnpm start`) when /health is down. Postgres listens on
+# 127.0.0.1:5432 and a unix socket under the data folder (pg-sock),
+# not /var/run/postgresql. First-day 0 user records is
 # healthy. Refuses a missing data folder, a postgres/ tree without
 # PG_VERSION, and an empty live cluster next to a real one (a second
 # postgres tree or a backup that has people while live has 0) before
@@ -383,6 +385,18 @@ elif kind == "createdb":
 ' "${url}" "${kind}"
 }
 
+# Unix socket directory for this vault. Under the data folder, not
+# PGDATA and not /var/run/postgresql.
+foundation_keep_vault_up_socket_dir() {
+  local data_dir="${1%/}"
+  printf '%s/pg-sock\n' "${data_dir}"
+}
+
+foundation_keep_vault_up_postgres_listen_args() {
+  local socket_dir="$1"
+  printf '%s\n' "-h 127.0.0.1 -p 5432 -k ${socket_dir}"
+}
+
 # Local socket into this cluster (OS superuser from initdb). Not DATABASE_URL.
 foundation_keep_vault_up_psql_local() {
   local postgres="$1"
@@ -433,10 +447,14 @@ foundation_keep_vault_up_ensure_app_database() {
 }
 
 # Start the live cluster. Quiet so a healed run writes nothing.
+# Socket lives under the data folder so a first-day vault can start
+# without write access to /var/run/postgresql.
 foundation_keep_vault_up_start_postgres() {
   local data_dir="$1"
   local postgres="${data_dir%/}/postgres"
   local logfile="${postgres}/pg.log"
+  local socket_dir
+  socket_dir="$(foundation_keep_vault_up_socket_dir "${data_dir}")"
 
   if ! command -v pg_ctl >/dev/null 2>&1; then
     foundation_keep_vault_up_nag "Postgres 16 is not on PATH (pg_ctl). The package name is unknown in this repo."
@@ -445,8 +463,10 @@ foundation_keep_vault_up_start_postgres() {
   if foundation_keep_vault_up_pg_running "${postgres}"; then
     return 0
   fi
+  mkdir -p -- "${socket_dir}"
+  chmod 700 -- "${socket_dir}"
   mkdir -p -- "$(dirname -- "${logfile}")"
-  pg_ctl -D "${postgres}" -l "${logfile}" -o "-h 127.0.0.1 -p 5432" start >/dev/null 2>&1
+  pg_ctl -D "${postgres}" -l "${logfile}" -o "$(foundation_keep_vault_up_postgres_listen_args "${socket_dir}")" start >/dev/null 2>&1
 }
 
 foundation_keep_vault_up_app_pid_file() {
