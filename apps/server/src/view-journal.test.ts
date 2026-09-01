@@ -4,10 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { AddressInfo, Server } from "node:net";
-import { createPool, migrate, seedSystemOntology, type Pool } from "@foundation/db";
+import { createPool, getNodeById, migrate, seedSystemOntology, type Pool } from "@foundation/db";
 import { isToolError, todayInNewYork } from "@foundation/schema";
 import { createApp } from "./app.js";
-import { getGraphNode, listGraphActivity, upsertGraphNode } from "./graph.js";
+import { deleteGraphNode, getGraphNode, listGraphActivity, upsertGraphNode } from "./graph.js";
 import { journalDayTitle, journalMarkdownPayload } from "./view-journal.js";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -181,6 +181,87 @@ test("viewer journal write gate: today, patch, types, if-match, cookie is not MC
     assert.equal(mcpWithCookie.status, 403);
   } finally {
     await new Promise<void>((resolve) => httpServer.close(() => resolve()));
+    await new Promise<void>((resolve) => viewServer.close(() => resolve()));
+    await pool.end();
+  }
+});
+
+test("Today after a deleted same-day journal makes a new entry", { skip: !databaseUrl }, async () => {
+  if (!databaseUrl) {
+    return;
+  }
+  const pool = await poolForSchema("journal_view_today_after_delete");
+  const dataDir = await mkdtemp(join(tmpdir(), "foundation-journal-today-"));
+  const bindings = {
+    FOUNDATION_API_KEY: apiKey,
+    DATABASE_URL: databaseUrl,
+    FOUNDATION_DATA: dataDir,
+    PORT: 0,
+    HOST: "127.0.0.1",
+    VIEW_PORT: 0,
+    VIEW_HOST: "0.0.0.0",
+  };
+  const viewApp = createApp(pool, bindings, "view");
+  const viewServer = viewApp.listen(0);
+  const viewOrigin = await listenOrigin(viewServer);
+  const cookie = await unlockCookie(viewOrigin);
+
+  try {
+    const first = await fetch(`${viewOrigin}/view/api/journals/today`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+    });
+    assert.equal(first.status, 200);
+    const created = (await first.json()) as {
+      node: { id: string; updated_at: string; payload: { body?: string } };
+    };
+    const written = await fetch(`${viewOrigin}/view/api/nodes/${created.node.id}`, {
+      method: "PATCH",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({
+        title: "Morning",
+        body: "Kept on the deleted record.\n",
+        base_updated_at: created.node.updated_at,
+      }),
+    });
+    assert.equal(written.status, 200);
+
+    const removed = await deleteGraphNode(pool, { id: created.node.id, confirm: true });
+    assert.equal(isToolError(removed), false);
+    const gone = await getGraphNode(pool, created.node.id);
+    assert.equal(isToolError(gone), true);
+
+    const again = await fetch(`${viewOrigin}/view/api/journals/today`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+    });
+    assert.equal(again.status, 200);
+    const next = (await again.json()) as {
+      node: { id: string; type: string; payload: { body?: string; media_type: string } };
+    };
+    assert.equal(next.node.type, "journal");
+    assert.notEqual(next.node.id, created.node.id);
+    assert.equal(next.node.payload.media_type, "text/markdown");
+    assert.equal(next.node.payload.body, "");
+
+    const tomb = await getNodeById(pool, created.node.id, { includeDeleted: true });
+    assert.ok(tomb?.deleted_at);
+    assert.equal(tomb?.payload.body, "Kept on the deleted record.\n");
+
+    const live = await getGraphNode(pool, next.node.id);
+    assert.equal(isToolError(live), false);
+    if (!isToolError(live)) {
+      assert.equal(live.node.payload.body, "");
+    }
+
+    const third = await fetch(`${viewOrigin}/view/api/journals/today`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+    });
+    assert.equal(third.status, 200);
+    const same = (await third.json()) as { node: { id: string } };
+    assert.equal(same.node.id, next.node.id);
+  } finally {
     await new Promise<void>((resolve) => viewServer.close(() => resolve()));
     await pool.end();
   }
