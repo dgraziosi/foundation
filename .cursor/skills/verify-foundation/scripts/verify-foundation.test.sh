@@ -31,6 +31,8 @@ got="$(verify_disposable_run_root "user" "/workspace/data" || true)"
 
 got="$(verify_disposable_run_root "../x" "/tmp/foundation-verify-../x" || true)"
 [[ -z "${got}" ]] || fail "bad run id must not be disposable, got '${got}'"
+verify_run_id_ok ".." && fail "run id .. must be invalid"
+verify_run_id_ok "20260901Tproof1" || fail "date-stamp run id must be valid"
 
 # Live cleanup of a direct-child VERIFY_DATA_DIR must leave /tmp and a canary.
 canary="/tmp/foundation-verify-canary-$$"
@@ -58,15 +60,33 @@ env -u VERIFY_RUN_ID VERIFY_LAST_RUN_FILE="${last_file}" VERIFY_RUN_ID="${run_id
 rm -f -- "${canary}" /tmp/foundation-verify-cleanup-out-$$ "${last_file}"
 rm -rf -- "/tmp/foundation-verify-evidence-${run_id}"
 
-# 2. Follow-up commands reuse the last launch id.
+# 2. Follow-up commands reuse the last launch id. Launch mints a new one.
 last_file="/tmp/foundation-verify-last-run-test-$$"
 printf '%s\n' "sharedrun" >"${last_file}"
 id="$(env -u VERIFY_RUN_ID VERIFY_LAST_RUN_FILE="${last_file}" "${helper}" run-id)"
 [[ "${id}" == "sharedrun" ]] || fail "run-id should reuse last launch, got '${id}'"
 ev="$(env -u VERIFY_RUN_ID VERIFY_LAST_RUN_FILE="${last_file}" "${helper}" evidence-dir)"
 [[ "${ev}" == *"/evidence/sharedrun" ]] || fail "evidence-dir should use last launch, got '${ev}'"
+launch_id="$(
+  env -u VERIFY_RUN_ID VERIFY_LAST_RUN_FILE="${last_file}" bash -c '
+    source "$1"
+    verify_launch_run_id
+  ' bash "${helper}"
+)"
+[[ "${launch_id}" != "sharedrun" ]] || fail "launch should mint, not reuse last-run"
+[[ "${launch_id}" =~ ^[0-9]{8}T[0-9]{6}Z$ ]] || fail "launch mint should be a UTC stamp, got '${launch_id}'"
+if ! env -u VERIFY_RUN_ID VERIFY_LAST_RUN_FILE="${last_file}" bash -c '
+  source "$1"
+  verify_run_id_ok "sharedrun"
+' bash "${helper}"; then
+  fail "sharedrun should be a valid follow-up id"
+fi
 rm -rf -- "$(env -u VERIFY_RUN_ID VERIFY_LAST_RUN_FILE="${last_file}" "${helper}" evidence-dir)"
-rm -f -- "${last_file}"
+printf '%s\n' "../x" >"${last_file}"
+if env -u VERIFY_RUN_ID VERIFY_LAST_RUN_FILE="${last_file}" "${helper}" run-id >/tmp/foundation-verify-badid-$$ 2>/tmp/foundation-verify-badid-err-$$; then
+  fail "run-id should refuse an invalid last-run id"
+fi
+rm -f -- /tmp/foundation-verify-badid-$$ /tmp/foundation-verify-badid-err-$$ "${last_file}"
 
 # 3. Doctor loads this run's key file when env and clone .env are empty.
 run_id="keyreuse$$"

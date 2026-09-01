@@ -5,7 +5,7 @@
 #   launch       — disposable first-day folder + scripts/keep-vault-up.sh
 #   cleanup      — stop what launch started; keep evidence
 #   evidence-dir — print the evidence path for this run
-#   run-id       — print the resolved run id (VERIFY_RUN_ID or last launch)
+#   run-id       — print the follow-up run id (VERIFY_RUN_ID or last launch)
 #   key-file     — print the path of this run's key file (not the key)
 #   backup-root  — print the disposable BACKUP_ROOT launch will pass
 #
@@ -23,7 +23,9 @@ verify_repo_root() {
 }
 
 verify_run_id_ok() {
-  [[ "${1:-}" =~ ^[A-Za-z0-9._-]+$ ]]
+  local id="${1:-}"
+  [[ "${id}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || return 1
+  [[ "${id}" != *..* ]]
 }
 
 verify_last_run_file() {
@@ -34,10 +36,15 @@ verify_mint_run_id() {
   date -u +%Y%m%dT%H%M%SZ
 }
 
-# VERIFY_RUN_ID wins. Else the id launch wrote. Else a fresh stamp (not stored).
+# Follow-up commands: VERIFY_RUN_ID, else the id launch wrote, else a
+# fresh stamp (not stored). Launch does not use this — it mints.
 verify_resolve_run_id() {
   local last id
   if [[ -n "${VERIFY_RUN_ID:-}" ]]; then
+    if ! verify_run_id_ok "${VERIFY_RUN_ID}"; then
+      echo "verify: invalid VERIFY_RUN_ID" >&2
+      return 1
+    fi
     printf '%s\n' "${VERIFY_RUN_ID}"
     return
   fi
@@ -45,6 +52,10 @@ verify_resolve_run_id() {
   if [[ -f "${last}" ]]; then
     id="$(tr -d '[:space:]' <"${last}")"
     if [[ -n "${id}" ]]; then
+      if ! verify_run_id_ok "${id}"; then
+        echo "verify: last-run id is invalid" >&2
+        return 1
+      fi
       printf '%s\n' "${id}"
       return
     fi
@@ -52,8 +63,24 @@ verify_resolve_run_id() {
   verify_mint_run_id
 }
 
+# Launch starts a new disposable run unless VERIFY_RUN_ID is set.
+# Reusing last-run would write a second launch into the previous
+# evidence folder and treat a still-up vault as "already this run".
+verify_launch_run_id() {
+  if [[ -n "${VERIFY_RUN_ID:-}" ]]; then
+    if ! verify_run_id_ok "${VERIFY_RUN_ID}"; then
+      echo "launch: invalid VERIFY_RUN_ID" >&2
+      return 1
+    fi
+    printf '%s\n' "${VERIFY_RUN_ID}"
+    return
+  fi
+  verify_mint_run_id
+}
+
 verify_remember_run_id() {
   local id="$1"
+  verify_run_id_ok "${id}" || return 1
   printf '%s\n' "${id}" >"$(verify_last_run_file)"
 }
 
@@ -306,8 +333,7 @@ verify_cmd_doctor() {
 verify_cmd_launch() {
   local repo_root id data_dir state keep backup_root key_file key_source
   repo_root="$(verify_repo_root)"
-  id="$(verify_resolve_run_id)"
-  verify_remember_run_id "${id}"
+  id="$(verify_launch_run_id)"
   data_dir="$(verify_data_dir "${id}")"
   state="$(verify_state_file "${id}")"
   keep="${repo_root}/scripts/keep-vault-up.sh"

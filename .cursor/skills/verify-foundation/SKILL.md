@@ -58,7 +58,7 @@ That script:
 3. Makes an empty first-day folder under `$VERIFY_DATA_DIR` (default `/tmp/foundation-verify-$RUN_ID/data`).
 4. Starts through `scripts/keep-vault-up.sh` with env overrides only. Always passes a disposable `BACKUP_ROOT` under that run folder (`/tmp/foundation-verify-$RUN_ID/backups`) so an empty first-day vault does not see the clone's dumps.
 5. Writes the API key this instance will use to `/tmp/foundation-verify-$RUN_ID/api_key` (mode 0600). Not evidence. Not git. Doctor and Unlock read that file when `FOUNDATION_API_KEY` is unset.
-6. Remembers the run id in `/tmp/foundation-verify-last-run` so later `doctor`, `evidence-dir`, and `cleanup` hit the same folders when `VERIFY_RUN_ID` is unset.
+6. Mints a new run id unless `VERIFY_RUN_ID` is set. Remembers that id in `/tmp/foundation-verify-last-run` only after this launch writes state, so later `doctor`, `evidence-dir`, and `cleanup` hit the same folders when `VERIFY_RUN_ID` is unset. A second launch while the vault is still up refuses (shared instance). It does not reuse the last id and call that "already this run".
 7. Waits until `/health` is green, or fails with the keep-vault-up nag.
 
 Default ports (`8787`, `8788`, `5432`) are one-instance. Two side-by-side vaults need different `PORT`, `VIEW_PORT`, and a Postgres port in `DATABASE_URL`, plus a second data folder. This skill does not do that. Refuse a second drive on a shared instance.
@@ -218,7 +218,7 @@ Executable helper (from the clone root):
 | Command | What it does |
 | --- | --- |
 | `doctor` | Read-only health, window GET, toolchain, optional state-file check. Loads this run's key file when env is unset |
-| `launch` | Disposable first-day folder + `keep-vault-up.sh`. Writes state, last-run id, key file, and a disposable backup root |
+| `launch` | Mint a run id (unless `VERIFY_RUN_ID` is set). Disposable first-day folder + `keep-vault-up.sh`. Writes state, last-run id, key file, and a disposable backup root |
 | `cleanup` | Stop what launch started; remove only a safe run root; keep evidence |
 | `evidence-dir` | Print the evidence path for the resolved run id |
 | `run-id` | Print the resolved run id |
@@ -229,7 +229,7 @@ Env the helper reads (all optional except as noted):
 
 | Variable | Default |
 | --- | --- |
-| `VERIFY_RUN_ID` | Last launch id, else a UTC stamp |
+| `VERIFY_RUN_ID` | Launch: mint a UTC stamp when unset. Doctor / cleanup / evidence / key-file / backup-root: last launch id, else a UTC stamp |
 | `VERIFY_DATA_DIR` | `/tmp/foundation-verify-$VERIFY_RUN_ID/data` |
 | `VERIFY_STATE_FILE` | `/tmp/foundation-verify-$VERIFY_RUN_ID/state` |
 | `VERIFY_EVIDENCE_DIR` | `.cursor/skills/verify-foundation/evidence/$VERIFY_RUN_ID` |
