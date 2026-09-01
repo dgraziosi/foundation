@@ -83,6 +83,28 @@ export function journalSaveResultApplies(generation: number, current: number): b
   return generation === current;
 }
 
+export type JournalDraft = { title: string; body: string };
+export type JournalSnapshot = { title: string; body: string; base: string };
+
+/** A write that landed always becomes the next save's base. Saved only when this write is current and the draft still matches it. */
+export function journalApplyLandedWrite(input: {
+  generation: number;
+  current: number;
+  draft: JournalDraft;
+  landed: JournalSnapshot;
+}): { skip: JournalSnapshot; showSaved: boolean } {
+  return {
+    skip: {
+      title: input.landed.title,
+      body: input.landed.body,
+      base: input.landed.base,
+    },
+    showSaved:
+      journalSaveResultApplies(input.generation, input.current) &&
+      journalDraftQuiet(input.draft, input.landed),
+  };
+}
+
 export function journalFirstSentence(body: string): string {
   const text = journalPayloadBody(body)
     .replace(/^#{1,6}\s+/gm, "")

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ApiError, fetchNode, saveJournal, type NodeDetail } from "../api";
 import {
   isUuid,
+  journalApplyLandedWrite,
   journalDayLabel,
   journalDraftQuiet,
   journalEntryDayTitle,
@@ -51,6 +52,11 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
   );
   const saveGen = useRef(0);
   const settled = useRef<"quiet" | "saved">("quiet");
+  const writesInFlight = useRef(0);
+  const idRef = useRef(id);
+  idRef.current = id;
+  const baseRef = useRef(base);
+  baseRef.current = base;
 
   useEffect(() => {
     const detail = node.data;
@@ -63,7 +69,9 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
     setBody(nextBody);
     setBase(detail.node.updated_at ?? "");
     skip.current = { title: nextTitle, body: nextBody, base: detail.node.updated_at ?? "" };
+    baseRef.current = detail.node.updated_at ?? "";
     setDraftId(id);
+    saveGen.current += 1;
     settled.current = "quiet";
     setSaveStatus("quiet");
   }, [id, node.data, draftId]);
@@ -72,16 +80,48 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
   const dayTitle = journalEntryDayTitle(createdAt);
   const written = journalWriteTitle(title, dayTitle);
   const saveCopy = journalSaveCopy(saveStatus, written.keepTitle);
+  const draftRef = useRef({ title: written.title, body });
+  draftRef.current = { title: written.title, body };
+
+  function applyLanded(mine: number, saved: NodeDetail): boolean {
+    if (saved.node.id !== idRef.current) {
+      return false;
+    }
+    const applied = journalApplyLandedWrite({
+      generation: mine,
+      current: saveGen.current,
+      draft: draftRef.current,
+      landed: {
+        title: saved.node.title,
+        body: saved.node.payload.body ?? "",
+        base: saved.node.updated_at ?? "",
+      },
+    });
+    skip.current = applied.skip;
+    baseRef.current = applied.skip.base;
+    setBase(applied.skip.base);
+    settled.current = "saved";
+    return applied.showSaved;
+  }
+
+  async function refreshLists(journalId: string) {
+    await queryClient.invalidateQueries({ queryKey: ["node", journalId] });
+    await queryClient.invalidateQueries({ queryKey: ["journal-today-peek"] });
+    await queryClient.invalidateQueries({ queryKey: ["recents"] });
+  }
 
   useEffect(() => {
     if (!id || !base || draftId !== id) {
       return;
     }
+    const inFlight = writesInFlight.current > 0;
     if (journalDraftQuiet({ title: written.title, body }, { title: skip.current.title, body: skip.current.body })) {
-      saveGen.current += 1;
+      if (!inFlight) {
+        saveGen.current += 1;
+      }
       const next = journalSaveWhenQuiet({
         status: saveStatus,
-        writeInFlight: false,
+        writeInFlight: inFlight,
         settled: settled.current,
       });
       if (next) {
@@ -89,44 +129,54 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
       }
       return;
     }
+    if (inFlight) {
+      setSaveStatus("saving");
+      return;
+    }
     const mine = ++saveGen.current;
     setSaveStatus("saving");
     const handle = window.setTimeout(() => {
       void (async () => {
+        writesInFlight.current += 1;
+        let saved: NodeDetail | undefined;
+        let showSaved = false;
         try {
-          const saved = await saveJournal({
+          saved = await saveJournal({
             id,
             title: written.title,
             body: journalPayloadBody(body),
-            base_updated_at: base,
+            base_updated_at: baseRef.current,
           });
-          if (!journalSaveResultApplies(mine, saveGen.current)) {
-            return;
-          }
-          skip.current = {
-            title: saved.node.title,
-            body: saved.node.payload.body ?? "",
-            base: saved.node.updated_at ?? "",
-          };
-          setBase(saved.node.updated_at ?? "");
-          if (title.trim()) {
-            setTitle(saved.node.title);
-          }
-          settled.current = "saved";
-          setSaveStatus("saved");
-          await queryClient.invalidateQueries({ queryKey: ["node", id] });
-          await queryClient.invalidateQueries({ queryKey: ["journal-today-peek"] });
-          await queryClient.invalidateQueries({ queryKey: ["recents"] });
+          showSaved = applyLanded(mine, saved);
         } catch (error) {
-          if (!journalSaveResultApplies(mine, saveGen.current)) {
-            return;
+          if (journalSaveResultApplies(mine, saveGen.current)) {
+            if (journalDraftQuiet(draftRef.current, { title: skip.current.title, body: skip.current.body })) {
+              const next = journalSaveWhenQuiet({
+                status: "saving",
+                writeInFlight: writesInFlight.current > 1,
+                settled: settled.current,
+              });
+              if (next) {
+                setSaveStatus(next);
+              }
+            } else if (error instanceof ApiError && error.status === 409) {
+              setSaveStatus("clash");
+            } else {
+              setSaveStatus("failed");
+            }
           }
-          if (error instanceof ApiError && error.status === 409) {
-            setSaveStatus("clash");
-            return;
-          }
-          setSaveStatus("failed");
+          return;
+        } finally {
+          writesInFlight.current -= 1;
         }
+        await refreshLists(id);
+        if (!showSaved || !saved) {
+          return;
+        }
+        if (title.trim()) {
+          setTitle(saved.node.title);
+        }
+        setSaveStatus("saved");
       })();
     }, 700);
     return () => window.clearTimeout(handle);
@@ -138,35 +188,21 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
     }
     const mine = ++saveGen.current;
     setSaveStatus("saving");
+    writesInFlight.current += 1;
+    let saved: NodeDetail | undefined;
+    let showSaved = false;
     try {
       const latest = await fetchNode(id);
       if (!journalSaveResultApplies(mine, saveGen.current)) {
         return;
       }
-      const nextBase = latest.node.updated_at ?? "";
-      const saved = await saveJournal({
+      saved = await saveJournal({
         id,
         title: written.title,
         body: journalPayloadBody(body),
-        base_updated_at: nextBase,
+        base_updated_at: latest.node.updated_at ?? "",
       });
-      if (!journalSaveResultApplies(mine, saveGen.current)) {
-        return;
-      }
-      skip.current = {
-        title: saved.node.title,
-        body: saved.node.payload.body ?? "",
-        base: saved.node.updated_at ?? "",
-      };
-      setBase(saved.node.updated_at ?? "");
-      if (title.trim()) {
-        setTitle(saved.node.title);
-      }
-      settled.current = "saved";
-      setSaveStatus("saved");
-      await queryClient.invalidateQueries({ queryKey: ["node", id] });
-      await queryClient.invalidateQueries({ queryKey: ["journal-today-peek"] });
-      await queryClient.invalidateQueries({ queryKey: ["recents"] });
+      showSaved = applyLanded(mine, saved);
     } catch (error) {
       if (!journalSaveResultApplies(mine, saveGen.current)) {
         return;
@@ -176,7 +212,18 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
         return;
       }
       setSaveStatus("failed");
+      return;
+    } finally {
+      writesInFlight.current -= 1;
     }
+    await refreshLists(id);
+    if (!showSaved || !saved) {
+      return;
+    }
+    if (title.trim()) {
+      setTitle(saved.node.title);
+    }
+    setSaveStatus("saved");
   }
 
   if (!id || invalid) {

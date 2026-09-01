@@ -4,6 +4,7 @@ import {
   dueTone,
   isUuid,
   journalDayLabel,
+  journalApplyLandedWrite,
   journalDayTitle,
   journalDraftQuiet,
   journalEntryDayTitle,
@@ -134,6 +135,45 @@ test("a stale failed save cannot clobber a later Saved", () => {
   const later = "saved" as const;
   const incoming = journalSaveResultApplies(1, 2) ? "clash" : later;
   assert.equal(incoming, "saved");
+});
+
+test("pause then keep typing refreshes the base and does not show Saved", () => {
+  const landed = journalApplyLandedWrite({
+    generation: 1,
+    current: 2,
+    draft: { title: "Morning", body: "First light.\nKeep going." },
+    landed: { title: "Morning", body: "First light.", base: "2026-09-01T12:00:01.000Z" },
+  });
+  assert.equal(landed.skip.base, "2026-09-01T12:00:01.000Z");
+  assert.equal(landed.skip.body, "First light.");
+  assert.equal(landed.showSaved, false);
+});
+
+test("undo after a write has started does not show Saved for the typed body", () => {
+  const landed = journalApplyLandedWrite({
+    generation: 1,
+    current: 1,
+    draft: { title: "Morning", body: "" },
+    landed: { title: "Morning", body: "Typed and sent.", base: "2026-09-01T12:00:01.000Z" },
+  });
+  assert.equal(landed.skip.base, "2026-09-01T12:00:01.000Z");
+  assert.equal(landed.showSaved, false);
+  assert.equal(
+    journalApplyLandedWrite({
+      generation: 1,
+      current: 1,
+      draft: { title: "Morning", body: "Typed and sent." },
+      landed: { title: "Morning", body: "Typed and sent.", base: "2026-09-01T12:00:01.000Z" },
+    }).showSaved,
+    true,
+  );
+});
+
+test("quiet revert with a write still in flight does not settle to quiet", () => {
+  assert.equal(
+    journalSaveWhenQuiet({ status: "saving", writeInFlight: true, settled: "quiet" }),
+    null,
+  );
 });
 
 test("autosave stays quiet when only editor breaks differ from the stored body", () => {
