@@ -1,29 +1,34 @@
-# First proof (20260901Tproof1)
+# Proofs
+
+Journal write is on this branch. **Today** (`/view/journal/today`, `POST /view/api/journals/today`) creates today's journal if none is live. The page autosaves title and one markdown body on that record (`PATCH /view/api/nodes/:id`). Unlock quiet copy is `Same key as MCP.` Home has no Today control. Other types stay display-only. The Viewer cookie does not unlock MCP.
+
+Live journal HTTP was not driven on the VMs that ran these proofs. Host Postgres 16 was not on PATH (`initdb`, `pg_ctl`, `psql`). That is a run limitation. The feature is on the branch.
+
+## Generate run (20260901Tproof1)
 
 The generated skill was executed once. Cleanup did not delete evidence.
 
-## Launch / doctor
+Launch refused. Postgres 16 was not on PATH. Doctor reported health down. After `pnpm --filter @foundation/viewer build`, doctor reported Viewer dist present.
 
-- Official start remains `./scripts/keep-vault-up.sh` then wait for `GET http://127.0.0.1:8787/health`.
-- This VM did not have Postgres 16 on PATH (`initdb`, `pg_ctl`, `psql`). The package name is unknown in this repo. Launch refused. It did not guess an installer. It did not invent a live personal vault.
-- Doctor: health down; instance not worth driving. After `pnpm --filter @foundation/viewer build`, doctor reported Viewer dist present.
+Live Unlock HTTP was not driven. Host programs never started.
 
-## Drive (Unlock)
+What that run drove instead, as the skill allows when launch is blocked:
 
-Live door (`http://127.0.0.1:8788/view` POST `/view/unlock`) was not driven — host programs never started.
+- Feature id `unlock-door`. The built Viewer bundle contained `Unlock the vault window`, `Same key as MCP.`, `API key required`, and `Unlock`.
+- Viewer tests passed. The write contract is `window writes journal only`.
+- `pnpm test` exited 0. `skills-layout.test: ok`. Server tests that need `DATABASE_URL` skipped.
 
-What was driven instead, as the skill allows when launch is blocked:
+Nothing that run started. Cleanup left evidence at `.cursor/skills/verify-foundation/evidence/20260901Tproof1/`.
 
-- Feature id `unlock-door`. Built Viewer bundle contains `Unlock the vault window`, `Same key as MCP`, `API key required`, and `Unlock`.
-- `pnpm --filter @foundation/viewer test` — 47 passed, including `window stays GET-only except unlock`.
-- `pnpm test` — exit 0. `skills-layout.test: ok`. Server tests that need `DATABASE_URL` skipped (including the live read-only window suite).
+## Maintain run (20260901Tmaintain)
 
-## Cleanup
+Launch refused again. Same Postgres gap. Same rule: do not guess an installer.
 
-- Nothing this run started. `cleanup` left evidence in place.
+What that run drove:
 
-## Evidence
+- `verify-foundation.test.sh` exited 0.
+- `pnpm --filter @foundation/viewer test` passed 50 tests, including `journal page is a document; today is the start path` and `window writes journal only`.
+- Viewer build succeeded. Doctor then reported Viewer dist present.
+- The built dist contained Unlock copy, Home empty copy, Search idle and empty copy, Detail `Not found.`, and the journal invite `Write a first sentence.`
 
-Run folder (gitignored bodies): `.cursor/skills/verify-foundation/evidence/20260901Tproof1/`
-
-Journal write was not driven. It is not on this branch.
+Live `/view` unlock, session, and journal POST/PATCH were not driven. Cleanup left evidence at `.cursor/skills/verify-foundation/evidence/20260901Tmaintain/`.
