@@ -35,7 +35,7 @@ export function journalDayLabel(iso?: string, now = new Date()): string {
 }
 
 export function journalPayloadBody(source: string): string {
-  return source;
+  return source.replace(/<br\s*\/?>\n?/gi, "\n").replace(/\n{3,}/g, "\n\n");
 }
 
 export function relativeTime(iso: string, now = new Date()): string {

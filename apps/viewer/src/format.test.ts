@@ -5,6 +5,10 @@ import { dueTone, isUuid, journalDayLabel, journalPayloadBody, parseSearchSnippe
 test("journal day label and payload stay one markdown body", () => {
   assert.equal(journalDayLabel("2026-09-01T16:00:00.000Z"), "Tuesday, September 1, 2026");
   assert.equal(journalPayloadBody("# Morning\n\nHi."), "# Morning\n\nHi.");
+  assert.equal(
+    journalPayloadBody("Hi.\n\n<br />\n\n## Light\n"),
+    "Hi.\n\n## Light\n",
+  );
 });
 
 test("dueTone: overdue, today, future", () => {
