@@ -26,4 +26,4 @@ What was driven instead, as the skill allows when launch is blocked:
 
 Run folder (gitignored bodies): `.cursor/skills/verify-foundation/evidence/20260901Tproof1/`
 
-Journal write was not driven. It is not on this branch.
+Journal write was not driven on this first proof. The map now treats it as live (`POST /view/api/journals/today` and `PATCH`). First-day Home still has no Today.

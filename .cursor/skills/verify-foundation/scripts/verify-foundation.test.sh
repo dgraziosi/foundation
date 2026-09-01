@@ -552,4 +552,28 @@ kill -KILL "${last_leftover_pid}" "${last_success_pid}" 2>/dev/null || true
 
 rm -rf -- "${real_bin}"
 
+skill_root="$(cd "${script_dir}/.." && pwd)"
+journal_write="${skill_root}/features/journal-write.md"
+if [[ ! -f "${journal_write}" ]]; then
+  fail "missing ${journal_write}"
+fi
+if grep -Eiq -- 'forthcoming|not on this branch' "${journal_write}"; then
+  fail "journal-write.md still treats write as forthcoming"
+fi
+if ! grep -Fq -- 'POST /view/api/journals/today' "${journal_write}"; then
+  fail "journal-write.md does not name POST /view/api/journals/today"
+fi
+if ! grep -Fq -- 'PATCH' "${journal_write}"; then
+  fail "journal-write.md does not name PATCH"
+fi
+if ! grep -Fq -- 'First-day Home still has no Today' "${journal_write}"; then
+  fail "journal-write.md must not pretend Today is on first-day Home"
+fi
+if ! grep -Fq -- 'does not open MCP' "${journal_write}"; then
+  fail "journal-write.md does not say the cookie still does not open MCP"
+fi
+if grep -Eiq -- 'forthcoming|not on this branch' "${skill_root}/SKILL.md" "${skill_root}/features/README.md"; then
+  fail "verify-foundation still treats journal write as forthcoming"
+fi
+
 echo "verify-foundation.test: ok"
