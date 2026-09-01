@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { ApiError, fetchNode, saveJournal } from "../api";
-import { isUuid, journalDayLabel, journalPayloadBody } from "../format";
+import { isUuid, journalDayLabel, journalDraftQuiet, journalPayloadBody } from "../format";
 import { LoadError, Placeholders, Quiet } from "../ui/States";
 
 const LiveMarkdown = lazy(async () => {
@@ -44,7 +44,7 @@ export function JournalPage() {
     if (!id || !base || !title.trim()) {
       return;
     }
-    if (title === skip.current.title && body === skip.current.body) {
+    if (journalDraftQuiet({ title, body }, skip.current)) {
       return;
     }
     const handle = window.setTimeout(() => {
