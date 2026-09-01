@@ -32,7 +32,7 @@ export function UnlockPage() {
         <CardContent className="flex flex-col gap-md p-xl">
           <form className="flex flex-col gap-md" onSubmit={(event) => void onSubmit(event)}>
             <h1 className="text-display-m">Unlock the vault window</h1>
-            <p className="text-muted-foreground">Same key as MCP. This window is read-only.</p>
+            <p className="text-muted-foreground">Same key as MCP.</p>
             <Input type="password" name="api_key" autoComplete="current-password" required />
             {error ? <p className="text-removed">{error}</p> : null}
             <Button type="submit" disabled={busy}>

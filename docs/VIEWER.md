@@ -1,6 +1,6 @@
 # Viewer
 
-Read-only window on a running vault. Same ontology as MCP. Same objects. Same types. Same relations. The window does not write.
+Window on a running vault. Same ontology as MCP. Same objects. Same types. Same relations. The window writes journal title and markdown body only. Other types stay read-only.
 
 Live at `/view`. Unlock with the MCP API key. Session is an HttpOnly cookie, `Path=/view`. That cookie does not unlock `/mcp` or `/blobs/:id`. Ports: `8787` MCP, `8788` `/view`. Off-box unlock and session.
 
@@ -8,7 +8,7 @@ Live at `/view`. Unlock with the MCP API key. Session is an HttpOnly cookie, `Pa
 
 ## What the window is
 
-One chrome. A content host. Three surfaces. The ontology owns identity and which layouts a type may use. The window never writes.
+One chrome. A content host. Three surfaces. The ontology owns identity and which layouts a type may use. Journal is the only write.
 
 | Surface | What it is |
 | --- | --- |
@@ -24,9 +24,9 @@ The window has no docked inspector. Properties live on the detail page.
 
 ## Scope
 
-**In the window:** Home, Collection, Detail, Recents, Search.
+**In the window:** Home, Collection, Detail, Recents, Search, today's journal page.
 
-**Not in the window:** onboarding, settings, capture, composer, Today, Focus, Inbox, check-ins, health, library, trash, an ontology editor.
+**Not in the window:** onboarding, settings, capture, composer, Focus, Inbox, check-ins, health, library, trash, an ontology editor.
 
 ---
 
@@ -103,9 +103,15 @@ Empty collection: **Nothing yet.** Filtered to zero: **Nothing matches your filt
 
 ---
 
+## Journal
+
+A dated reflection. Opening a journal record opens a writing page, not the inspector. The day sits above the title. The title is the first line. The body is a live markdown document (shortcuts resolve in place, slash menu, block handles). One `text/markdown` payload. Autosave. Properties stay off the page.
+
+**Today.** From the Journal collection, **Today** opens today's entry. If none exists, the window creates one (writer is the user) and puts the cursor in the body. Same record a bot can `get`. Updates use if-match. A clash does not overwrite. The cookie still does not unlock `/mcp`.
+
 ## Detail
 
-A page in the content host. Not a docked inspector. Two columns fill the pane under the view strip.
+A page in the content host. Not a docked inspector. Two columns fill the pane under the view strip. Journal uses the writing page instead.
 
 **Document column.** Title. Body, rendered: headings, lists, quotes, code, callouts, dividers. Callout kinds: note, info, tip, warning, danger. Then Structure, when the object has children (or an ancestor chain, when the type asks for that): an embedded collection, height at most half the viewport, only when there is something to show. Opening a child or ancestor opens that object's detail page.
 
@@ -170,9 +176,9 @@ Widget cards, collection chrome, and the detail page use these tokens. The graph
 
 ---
 
-## Read-only
+## Writes
 
-The window does not create, edit, complete, drag, pin, or accept a link.
+Journal title and markdown body only. Same if-match as MCP. Writer is the user. The window does not complete, drag, pin, or accept a link. Other types do not edit.
 
 ---
 

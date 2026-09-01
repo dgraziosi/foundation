@@ -23,6 +23,21 @@ export function dueTone(due: string, today = todayInNewYork()): DueTone {
   return "future";
 }
 
+export function journalDayLabel(iso?: string, now = new Date()): string {
+  const stamp = iso && !Number.isNaN(Date.parse(iso)) ? new Date(iso) : now;
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(stamp);
+}
+
+export function journalPayloadBody(source: string): string {
+  return source;
+}
+
 export function relativeTime(iso: string, now = new Date()): string {
   const then = Date.parse(iso);
   if (Number.isNaN(then)) {

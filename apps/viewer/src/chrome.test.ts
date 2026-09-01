@@ -72,6 +72,33 @@ test("Home is Recents, open tasks, and type folders — not the graph", async ()
   assert.match(frame, /GRAPH_FLOOR_PX = 460/);
 });
 
+test("journal page is a document; today is the start path", async () => {
+  const journal = await src("pages/JournalPage.tsx");
+  assert.match(journal, /data-surface="journal-page"/);
+  assert.match(journal, /journal-day/);
+  assert.match(journal, /journal-title/);
+  assert.match(journal, /LiveMarkdown/);
+  assert.match(journal, /saveJournal/);
+  assert.match(journal, /draftId !== id/);
+  assert.doesNotMatch(journal, /Properties/);
+  assert.doesNotMatch(journal, /StatusTag/);
+  const live = await src("journal/LiveMarkdown.tsx");
+  assert.match(live, /Write a first sentence/);
+  assert.match(live, /Crepe.Feature.BlockEdit/);
+  assert.match(live, /Crepe.Feature.Placeholder/);
+  assert.doesNotMatch(live, /Crepe.Feature.AI]: true/);
+  const today = await src("pages/TodayJournalPage.tsx");
+  assert.match(today, /fetchTodayJournal/);
+  assert.match(today, /openDetail/);
+  const typeView = await src("pages/TypeViewPage.tsx");
+  assert.match(typeView, /slug === "journal"/);
+  assert.match(typeView, /\/journal\/today/);
+  const detail = await src("pages/DetailPage.tsx");
+  assert.match(detail, /JournalPage/);
+  const app = await src("App.tsx");
+  assert.match(app, /path="\/journal\/today"/);
+});
+
 test("click from graph / Recents / collection / search opens a detail page", async () => {
   const home = await src("pages/HomePage.tsx");
   assert.match(home, /openDetail/);
@@ -238,11 +265,15 @@ test("graph canvas marks use Lucide glyph fill, not a first-letter circle", asyn
   assert.doesNotMatch(`${canvas}\n${marks}`, /slice\(\s*0\s*,\s*1\s*\)/);
 });
 
-test("window stays GET-only except unlock", async () => {
+test("window writes journal only", async () => {
   const api = await src("api.ts");
   const posts = [...api.matchAll(/method:\s*"POST"/g)];
-  assert.equal(posts.length, 1);
+  assert.equal(posts.length, 2);
   assert.match(api, /\/view\/unlock/);
+  assert.match(api, /\/view\/api\/journals\/today/);
+  assert.match(api, /method:\s*"PATCH"/);
+  assert.match(api, /saveJournal/);
+  assert.doesNotMatch(api, /manage_type/);
 });
 
 test("no-views copy is honest and Home is the landing surface", async () => {

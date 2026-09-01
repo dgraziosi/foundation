@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.6",
+    "@milkdown/crepe": "^7.22.1",
+    "@milkdown/kit": "^7.22.1",
     "@radix-ui/react-dialog": "^1.1.23",
     "@radix-ui/react-scroll-area": "^1.2.18",
     "@radix-ui/react-select": "^2.3.7",

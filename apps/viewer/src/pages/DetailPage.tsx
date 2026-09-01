@@ -13,6 +13,7 @@ import { useThemeLane } from "../theme";
 import { typeColors, typeIcon } from "../type-meta";
 import { StatusTag } from "../ui/Tags";
 import { LoadError, Placeholders, Quiet } from "../ui/States";
+import { JournalPage } from "./JournalPage";
 
 function formatValue(value: unknown): string {
   if (typeof value === "string") {
@@ -81,6 +82,9 @@ export function DetailPage() {
   }
   if (node.isError) {
     return <LoadError onRetry={() => void node.refetch()} />;
+  }
+  if (node.data?.node.type === "journal" && node.data.node.payload.media_type === "text/markdown" && node.data.node.payload.storage === "inline") {
+    return <JournalPage />;
   }
   const detail = node.data;
   if (!detail) {

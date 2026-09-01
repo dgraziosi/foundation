@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { dueTone, isUuid, parseSearchSnippet, relativeTime, truncate, compareOpenTasks, compareRecentRows, HOME_WIDGET_LIMIT } from "./format";
+import { dueTone, isUuid, journalDayLabel, journalPayloadBody, parseSearchSnippet, relativeTime, truncate, compareOpenTasks, compareRecentRows, HOME_WIDGET_LIMIT } from "./format";
+
+test("journal day label and payload stay one markdown body", () => {
+  assert.equal(journalDayLabel("2026-09-01T16:00:00.000Z"), "Tuesday, September 1, 2026");
+  assert.equal(journalPayloadBody("# Morning\n\nHi."), "# Morning\n\nHi.");
+});
 
 test("dueTone: overdue, today, future", () => {
   assert.equal(dueTone("2026-08-01", "2026-08-19"), "overdue");
