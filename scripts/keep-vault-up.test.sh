@@ -970,42 +970,70 @@ socket_got="$(foundation_keep_vault_up_socket_dir /tmp/vault-data)"
 if [[ "${socket_got}" != "/tmp/vault-data/pg-sock" ]]; then
   fail "socket dir should be under the data folder (got: ${socket_got})"
 fi
-listen_got="$(foundation_keep_vault_up_postgres_listen_args /tmp/vault-data/pg-sock)"
-if [[ "${listen_got}" != "-h 127.0.0.1 -p 5432 -k /tmp/vault-data/pg-sock" ]]; then
-  fail "listen args must include -k under the data folder (got: ${listen_got})"
+listen_got="$(foundation_keep_vault_up_postgres_listen_args "/tmp/vault data/pg-sock")"
+if [[ "${listen_got}" != "-h 127.0.0.1 -p 5432 -k '/tmp/vault data/pg-sock'" ]]; then
+  fail "listen args must quote -k as one directory (got: ${listen_got})"
 fi
 
-# start_postgres mkdir's pg-sock and passes -k. Fake pg_ctl; no live cluster.
+# start_postgres mkdir's pg-sock and passes -k as one directory.
+# Fake pg_ctl; no live cluster. Data folder path has a space.
 sock_tmp="$(mktemp -d)"
-mkdir -p "${sock_tmp}/bin" "${sock_tmp}/data/postgres"
-printf '%s\n' '16' >"${sock_tmp}/data/postgres/PG_VERSION"
+data_dir="${sock_tmp}/vault data"
+mkdir -p "${sock_tmp}/bin" "${data_dir}/postgres"
+printf '%s\n' '16' >"${data_dir}/postgres/PG_VERSION"
 cat >"${sock_tmp}/bin/pg_ctl" <<'EOF'
 #!/bin/sh
-printf '%s\n' "$*" >> "${PG_CTL_LOG:?}"
-case " $* " in
-  *" status "*) exit 1 ;;
-  *) exit 0 ;;
-esac
+# Record the -o string as one argv. status means not running.
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o)
+      printf 'O=%s\n' "$2" >> "${PG_CTL_LOG:?}"
+      shift 2
+      ;;
+    status)
+      exit 1
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+exit 0
 EOF
 chmod +x "${sock_tmp}/bin/pg_ctl"
 export PG_CTL_LOG="${sock_tmp}/pg_ctl.log"
 set +e
-PATH="${sock_tmp}/bin:${PATH}" foundation_keep_vault_up_start_postgres "${sock_tmp}/data"
+PATH="${sock_tmp}/bin:${PATH}" foundation_keep_vault_up_start_postgres "${data_dir}"
 start_rc=$?
 set -e
 if ((start_rc != 0)); then
   fail "start_postgres failed (rc ${start_rc}; log: $(cat "${PG_CTL_LOG}" 2>/dev/null || true))"
 fi
-if [[ ! -d "${sock_tmp}/data/pg-sock" ]]; then
+want_sock="${data_dir}/pg-sock"
+if [[ ! -d "${want_sock}" ]]; then
   fail "start_postgres must mkdir the data-folder socket dir"
 fi
-if ! grep -Fq -- '-k' "${sock_tmp}/pg_ctl.log"; then
-  fail "start_postgres must pass -k to pg_ctl (got: $(cat "${sock_tmp}/pg_ctl.log"))"
+if [[ ! -f "${PG_CTL_LOG}" ]]; then
+  fail "fake pg_ctl did not record -o"
 fi
-if ! grep -Fq -- "${sock_tmp}/data/pg-sock" "${sock_tmp}/pg_ctl.log"; then
-  fail "start_postgres must pass the data-folder socket dir (got: $(cat "${sock_tmp}/pg_ctl.log"))"
+o="$(sed -n 's/^O=//p' "${PG_CTL_LOG}" | tail -n 1)"
+if [[ -z "${o}" ]]; then
+  fail "start_postgres must pass -o (got: $(cat "${PG_CTL_LOG}"))"
 fi
-if grep -Fq -- '/var/run/postgresql' "${sock_tmp}/pg_ctl.log"; then
+# pg_ctl feeds -o through a shell. -k must stay one directory.
+eval "set -- ${o}"
+k_dir=""
+while (($# > 0)); do
+  if [[ "$1" == "-k" ]]; then
+    k_dir="${2-}"
+    break
+  fi
+  shift
+done
+if [[ "${k_dir}" != "${want_sock}" ]]; then
+  fail "pg_ctl -o -k must be one directory with a space (got: '${k_dir}'; -o: ${o})"
+fi
+if grep -Fq -- '/var/run/postgresql' <<<"${o}"; then
   fail "start_postgres must not pass /var/run/postgresql"
 fi
 rm -rf -- "${sock_tmp}"

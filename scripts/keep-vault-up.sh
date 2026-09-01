@@ -392,9 +392,16 @@ foundation_keep_vault_up_socket_dir() {
   printf '%s/pg-sock\n' "${data_dir}"
 }
 
+# Single-quote for the shell pg_ctl uses when it applies -o.
+foundation_keep_vault_up_shell_quote() {
+  local s="$1"
+  printf "'%s'" "${s//\'/\'\\\'\'}"
+}
+
+# -k must stay one directory after pg_ctl feeds -o through a shell.
 foundation_keep_vault_up_postgres_listen_args() {
   local socket_dir="$1"
-  printf '%s\n' "-h 127.0.0.1 -p 5432 -k ${socket_dir}"
+  printf '%s\n' "-h 127.0.0.1 -p 5432 -k $(foundation_keep_vault_up_shell_quote "${socket_dir}")"
 }
 
 # Local socket into this cluster (OS superuser from initdb). Not DATABASE_URL.
