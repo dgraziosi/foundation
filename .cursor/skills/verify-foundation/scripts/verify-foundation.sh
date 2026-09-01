@@ -5,9 +5,13 @@
 #   launch       — disposable first-day folder + scripts/keep-vault-up.sh
 #   cleanup      — stop what launch started; keep evidence
 #   evidence-dir — print the evidence path for this run
+#   run-id       — print the resolved run id (VERIFY_RUN_ID or last launch)
+#   key-file     — print the path of this run's key file (not the key)
+#   backup-root  — print the disposable BACKUP_ROOT launch will pass
 #
 # Env: VERIFY_RUN_ID, VERIFY_DATA_DIR, VERIFY_STATE_FILE, VERIFY_EVIDENCE_DIR,
-#      FOUNDATION_HEALTH_URL, FOUNDATION_VIEW_URL, FOUNDATION_API_KEY.
+#      VERIFY_BACKUP_ROOT, VERIFY_LAST_RUN_FILE, FOUNDATION_HEALTH_URL,
+#      FOUNDATION_VIEW_URL, FOUNDATION_API_KEY.
 # Does not guess a Postgres installer. Does not write the graph.
 # Does not print the API key.
 set -euo pipefail
@@ -18,13 +22,49 @@ verify_repo_root() {
   (cd "${script_dir}/../../../../" && pwd)
 }
 
-verify_run_id() {
-  printf '%s\n' "${VERIFY_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
+verify_run_id_ok() {
+  [[ "${1:-}" =~ ^[A-Za-z0-9._-]+$ ]]
+}
+
+verify_last_run_file() {
+  printf '%s\n' "${VERIFY_LAST_RUN_FILE:-/tmp/foundation-verify-last-run}"
+}
+
+verify_mint_run_id() {
+  date -u +%Y%m%dT%H%M%SZ
+}
+
+# VERIFY_RUN_ID wins. Else the id launch wrote. Else a fresh stamp (not stored).
+verify_resolve_run_id() {
+  local last id
+  if [[ -n "${VERIFY_RUN_ID:-}" ]]; then
+    printf '%s\n' "${VERIFY_RUN_ID}"
+    return
+  fi
+  last="$(verify_last_run_file)"
+  if [[ -f "${last}" ]]; then
+    id="$(tr -d '[:space:]' <"${last}")"
+    if [[ -n "${id}" ]]; then
+      printf '%s\n' "${id}"
+      return
+    fi
+  fi
+  verify_mint_run_id
+}
+
+verify_remember_run_id() {
+  local id="$1"
+  printf '%s\n' "${id}" >"$(verify_last_run_file)"
+}
+
+verify_run_root() {
+  local id="$1"
+  printf '%s\n' "/tmp/foundation-verify-${id}"
 }
 
 verify_data_dir() {
   local id="$1"
-  local raw="${VERIFY_DATA_DIR:-/tmp/foundation-verify-${id}/data}"
+  local raw="${VERIFY_DATA_DIR:-$(verify_run_root "${id}")/data}"
   raw="${raw%/}"
   if [[ "${raw}" != /* ]]; then
     printf '%s\n' "$(verify_repo_root)/${raw#./}"
@@ -35,7 +75,17 @@ verify_data_dir() {
 
 verify_state_file() {
   local id="$1"
-  printf '%s\n' "${VERIFY_STATE_FILE:-/tmp/foundation-verify-${id}/state}"
+  printf '%s\n' "${VERIFY_STATE_FILE:-$(verify_run_root "${id}")/state}"
+}
+
+verify_api_key_file() {
+  local id="$1"
+  printf '%s\n' "$(dirname -- "$(verify_state_file "${id}")")/api_key"
+}
+
+verify_backup_root() {
+  local id="$1"
+  printf '%s\n' "${VERIFY_BACKUP_ROOT:-$(verify_run_root "${id}")/backups}"
 }
 
 verify_evidence_dir() {
@@ -49,6 +99,61 @@ verify_evidence_dir() {
   else
     printf '%s\n' "${raw}"
   fi
+}
+
+# Only /tmp/foundation-verify-<id> when data is that folder or its /data child.
+# Never /tmp. Never a path that contains ..
+verify_disposable_run_root() {
+  local id="$1"
+  local data_dir="${2%/}"
+  local root
+  verify_run_id_ok "${id}" || return 1
+  root="$(verify_run_root "${id}")"
+  if [[ "${root}" == "/tmp" || "${root}" == "/" || "${root}" == "${HOME:-}" ]]; then
+    return 1
+  fi
+  if [[ "${data_dir}" == *..* ]]; then
+    return 1
+  fi
+  if [[ "${data_dir}" == "${root}" || "${data_dir}" == "${root}/data" ]]; then
+    printf '%s\n' "${root}"
+    return 0
+  fi
+  return 1
+}
+
+verify_load_api_key() {
+  local repo_root="$1"
+  local id="$2"
+  local key_file line raw
+  if [[ -n "${FOUNDATION_API_KEY:-}" ]]; then
+    printf '%s\n' "env"
+    return 0
+  fi
+  key_file="$(verify_api_key_file "${id}")"
+  if [[ -f "${key_file}" && -s "${key_file}" ]]; then
+    FOUNDATION_API_KEY="$(tr -d '\r\n' <"${key_file}")"
+    export FOUNDATION_API_KEY
+    printf '%s\n' "run-file"
+    return 0
+  fi
+  if [[ -f "${repo_root}/.env" ]]; then
+    line="$(grep -E '^[[:space:]]*FOUNDATION_API_KEY=' "${repo_root}/.env" | tail -n 1 || true)"
+    raw="${line#*FOUNDATION_API_KEY=}"
+    raw="${raw%$'\r'}"
+    if [[ "${raw}" == \"*\" && "${raw}" == *\" ]]; then
+      raw="${raw#\"}"
+      raw="${raw%\"}"
+    fi
+    if [[ -n "${raw}" ]]; then
+      FOUNDATION_API_KEY="${raw}"
+      export FOUNDATION_API_KEY
+      printf '%s\n' "clone-env"
+      return 0
+    fi
+  fi
+  printf '%s\n' "missing"
+  return 1
 }
 
 verify_health_url() {
@@ -91,10 +196,6 @@ verify_state_get() {
   printf '%s\n' "${line#*"${key}"=}"
 }
 
-verify_last_run_file() {
-  printf '%s\n' "${VERIFY_LAST_RUN_FILE:-/tmp/foundation-verify-last-run}"
-}
-
 verify_write_state() {
   local file="$1"
   local id="$2"
@@ -106,7 +207,7 @@ RUN_ID=${id}
 DATA_DIR=${data_dir}
 STARTED=1
 EOF
-  printf '%s\n' "${id}" >"$(verify_last_run_file)"
+  verify_remember_run_id "${id}"
 }
 
 verify_toolchain() {
@@ -135,15 +236,17 @@ verify_toolchain() {
 }
 
 verify_cmd_doctor() {
-  local repo_root id state health_url view_url body view_code view_body dist
+  local repo_root id state health_url view_url body view_code view_body dist key_source
   repo_root="$(verify_repo_root)"
-  id="$(verify_run_id)"
+  id="$(verify_resolve_run_id)"
   state="$(verify_state_file "${id}")"
   health_url="$(verify_health_url)"
   view_url="$(verify_view_url)"
   dist="${repo_root}/apps/viewer/dist/index.html"
+  key_source="$(verify_load_api_key "${repo_root}" "${id}" || true)"
 
   echo "doctor: repo ${repo_root}"
+  echo "doctor: run ${id}"
   echo "doctor: health ${health_url}"
   echo "doctor: view ${view_url}"
   echo "doctor: evidence $(verify_evidence_dir "${id}")"
@@ -151,7 +254,7 @@ verify_cmd_doctor() {
   if [[ -f "${state}" ]]; then
     echo "doctor: state ${state} (this run launched)"
   else
-    echo "doctor: no state file for VERIFY_RUN_ID=${id} (this run did not launch)"
+    echo "doctor: no state file for run ${id} (this run did not launch)"
   fi
 
   if verify_toolchain; then
@@ -166,13 +269,12 @@ verify_cmd_doctor() {
     echo "doctor: Viewer dist missing (${dist}). Full window chrome needs: pnpm --filter @foundation/viewer build"
   fi
 
-  if [[ -n "${FOUNDATION_API_KEY:-}" ]]; then
-    echo "doctor: FOUNDATION_API_KEY is set (not printed)"
-  elif [[ -f "${repo_root}/.env" ]] && grep -Eq '^[[:space:]]*FOUNDATION_API_KEY=.' "${repo_root}/.env"; then
-    echo "doctor: FOUNDATION_API_KEY is in the clone .env (not printed)"
-  else
-    echo "doctor: FOUNDATION_API_KEY is not set"
-  fi
+  case "${key_source}" in
+    env) echo "doctor: FOUNDATION_API_KEY is set (not printed)" ;;
+    run-file) echo "doctor: FOUNDATION_API_KEY is in this run's key file $(verify_api_key_file "${id}") (not printed)" ;;
+    clone-env) echo "doctor: FOUNDATION_API_KEY is in the clone .env (not printed)" ;;
+    *) echo "doctor: FOUNDATION_API_KEY is not set" ;;
+  esac
 
   body="$(curl -fsS --max-time 5 "${health_url}" 2>/dev/null || true)"
   if verify_body_is_green "${body}"; then
@@ -202,13 +304,15 @@ verify_cmd_doctor() {
 }
 
 verify_cmd_launch() {
-  local repo_root id data_dir state parent keep
+  local repo_root id data_dir state keep backup_root key_file key_source
   repo_root="$(verify_repo_root)"
-  id="$(verify_run_id)"
+  id="$(verify_resolve_run_id)"
+  verify_remember_run_id "${id}"
   data_dir="$(verify_data_dir "${id}")"
   state="$(verify_state_file "${id}")"
   keep="${repo_root}/scripts/keep-vault-up.sh"
-  parent="$(dirname -- "${data_dir}")"
+  backup_root="$(verify_backup_root "${id}")"
+  key_file="$(verify_api_key_file "${id}")"
 
   if [[ ! -x "${keep}" ]]; then
     echo "launch: missing ${keep}" >&2
@@ -231,27 +335,31 @@ verify_cmd_launch() {
     return 1
   fi
 
-  if [[ -z "${FOUNDATION_API_KEY:-}" ]]; then
-    # Verification scaffolding only. Not a personal key. Not written to the clone.
-    FOUNDATION_API_KEY="verify-scaffold-$(verify_run_id)-$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
+  key_source="$(verify_load_api_key "${repo_root}" "${id}" || true)"
+  if [[ "${key_source}" == "missing" ]]; then
+    FOUNDATION_API_KEY="verify-scaffold-${id}-$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
     export FOUNDATION_API_KEY
     echo "launch: minted a verification FOUNDATION_API_KEY (not printed; not a personal key)"
   fi
 
   mkdir -p -- "${data_dir}"
+  mkdir -p -- "${backup_root}"
   mkdir -p -- "$(verify_evidence_dir "${id}")"
   verify_write_state "${state}" "${id}" "${data_dir}"
-  # Key file stays under /tmp. Not evidence. Not git. Mode 0600.
   umask 077
-  printf '%s\n' "${FOUNDATION_API_KEY}" >"$(dirname -- "${state}")/api_key"
+  printf '%s\n' "${FOUNDATION_API_KEY}" >"${key_file}"
 
+  echo "launch: run ${id}"
   echo "launch: disposable data dir ${data_dir}"
+  echo "launch: backup root ${backup_root}"
   echo "launch: state ${state}"
+  echo "launch: key file ${key_file}"
   echo "launch: evidence $(verify_evidence_dir "${id}")"
 
   if ! FOUNDATION_DATA="${data_dir}" \
     FOUNDATION_API_KEY="${FOUNDATION_API_KEY}" \
     DATABASE_URL="${DATABASE_URL:-postgres://foundation:foundation@127.0.0.1:5432/foundation}" \
+    BACKUP_ROOT="${backup_root}" \
     FOUNDATION_HEALTH_URL="$(verify_health_url)" \
     "${keep}"; then
     echo "launch: keep-vault-up failed" >&2
@@ -268,17 +376,16 @@ verify_cmd_launch() {
 }
 
 verify_cmd_cleanup() {
-  local repo_root id data_dir state keep evidence last
+  local repo_root id data_dir state keep evidence disposable
   repo_root="$(verify_repo_root)"
-  id="$(verify_run_id)"
-  last="$(verify_last_run_file)"
-  if [[ -z "${VERIFY_RUN_ID:-}" && -f "${last}" ]]; then
-    id="$(tr -d '[:space:]' <"${last}")"
-    echo "cleanup: using last run ${id}"
-  fi
+  id="$(verify_resolve_run_id)"
   state="$(verify_state_file "${id}")"
   evidence="$(verify_evidence_dir "${id}")"
   keep="${repo_root}/scripts/keep-vault-up.sh"
+
+  if [[ -z "${VERIFY_RUN_ID:-}" && -f "$(verify_last_run_file)" ]]; then
+    echo "cleanup: using last run ${id}"
+  fi
 
   if [[ ! -f "${state}" ]]; then
     echo "cleanup: no state file ${state} — nothing this run started"
@@ -292,11 +399,12 @@ verify_cmd_cleanup() {
     FOUNDATION_DATA="${data_dir}" "${keep}" stop || true
   fi
 
-  if [[ -n "${data_dir}" && "${data_dir}" == /tmp/foundation-verify-* ]]; then
-    echo "cleanup: removing disposable ${data_dir}"
-    rm -rf -- "$(dirname -- "${data_dir}")"
-  elif [[ -n "${data_dir}" && -f "${state}" ]]; then
-    echo "cleanup: left data dir in place (not a /tmp/foundation-verify-* folder)"
+  disposable="$(verify_disposable_run_root "${id}" "${data_dir}" || true)"
+  if [[ -n "${disposable}" ]]; then
+    echo "cleanup: removing disposable run root ${disposable}"
+    rm -rf -- "${disposable}"
+  else
+    echo "cleanup: left data dir in place (not this run's disposable root)"
     rm -f -- "${state}"
   fi
 
@@ -311,13 +419,25 @@ verify_cmd_cleanup() {
 
 verify_cmd_evidence_dir() {
   local id
-  id="$(verify_run_id)"
+  id="$(verify_resolve_run_id)"
   mkdir -p -- "$(verify_evidence_dir "${id}")"
   verify_evidence_dir "${id}"
 }
 
+verify_cmd_run_id() {
+  verify_resolve_run_id
+}
+
+verify_cmd_key_file() {
+  verify_api_key_file "$(verify_resolve_run_id)"
+}
+
+verify_cmd_backup_root() {
+  verify_backup_root "$(verify_resolve_run_id)"
+}
+
 usage() {
-  echo "usage: verify-foundation.sh doctor|launch|cleanup|evidence-dir" >&2
+  echo "usage: verify-foundation.sh doctor|launch|cleanup|evidence-dir|run-id|key-file|backup-root" >&2
   return 2
 }
 
@@ -327,8 +447,13 @@ main() {
     launch) verify_cmd_launch ;;
     cleanup) verify_cmd_cleanup ;;
     evidence-dir) verify_cmd_evidence_dir ;;
+    run-id) verify_cmd_run_id ;;
+    key-file) verify_cmd_key_file ;;
+    backup-root) verify_cmd_backup_root ;;
     *) usage ;;
   esac
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "$@"
+fi

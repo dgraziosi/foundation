@@ -56,8 +56,10 @@ That script:
 1. Refuses if `GET /health` is already green and this run did not start it — do not drive a shared instance.
 2. Requires Node 22, `pnpm`, and Postgres 16 on PATH (`initdb`, `pg_ctl`, `psql`). If any are missing, it prints the gap and exits. It does not guess a package installer.
 3. Makes an empty first-day folder under `$VERIFY_DATA_DIR` (default `/tmp/foundation-verify-$RUN_ID/data`).
-4. Starts through `scripts/keep-vault-up.sh` with env overrides only (no clone `.env` unless one already exists and you pass through `FOUNDATION_API_KEY`).
-5. Waits until `/health` is green, or fails with the keep-vault-up nag.
+4. Starts through `scripts/keep-vault-up.sh` with env overrides only. Always passes a disposable `BACKUP_ROOT` under that run folder (`/tmp/foundation-verify-$RUN_ID/backups`) so an empty first-day vault does not see the clone's dumps.
+5. Writes the API key this instance will use to `/tmp/foundation-verify-$RUN_ID/api_key` (mode 0600). Not evidence. Not git. Doctor and Unlock read that file when `FOUNDATION_API_KEY` is unset.
+6. Remembers the run id in `/tmp/foundation-verify-last-run` so later `doctor`, `evidence-dir`, and `cleanup` hit the same folders when `VERIFY_RUN_ID` is unset.
+7. Waits until `/health` is green, or fails with the keep-vault-up nag.
 
 Default ports (`8787`, `8788`, `5432`) are one-instance. Two side-by-side vaults need different `PORT`, `VIEW_PORT`, and a Postgres port in `DATABASE_URL`, plus a second data folder. This skill does not do that. Refuse a second drive on a shared instance.
 
@@ -86,7 +88,7 @@ Worth driving only when all of these hold:
 | `GET http://127.0.0.1:8787/health` | HTTP 200 and `{ "ok": true, "service": "foundation", "db": "up" }` |
 | `GET http://127.0.0.1:8788/view` | HTTP 200 HTML. Body contains `Foundation` (built app) or `Unlock the vault window` (fallback or unlock gate) |
 | Ports | MCP/health on `8787`, Viewer on `8788`. If this run launched, the state file names the data dir and app pid we started |
-| Auth | `FOUNDATION_API_KEY` is set in the environment or the clone `.env`. Do not print the key |
+| Auth | `FOUNDATION_API_KEY` is set in the environment, else this run's key file (`verify-foundation.sh key-file`), else the clone `.env`. Do not print the key |
 | Build | For a full window drive: `apps/viewer/dist/index.html` exists |
 
 If health is down, the instance is not worth driving. Do not invent graph rows to make Home look populated. An empty first-day vault is a valid Viewer: Recents **Nothing yet.** and open tasks **No open tasks.**
@@ -124,19 +126,22 @@ Routes (basename `/view`):
 HTTP the window already uses (cookie `foundation_key` with `Path=/view`, or `Authorization: ApiKey <key>`):
 
 ```bash
+# Key this vault actually accepted. Path only. Do not print the file body.
+KEY_FILE="$(.cursor/skills/verify-foundation/scripts/verify-foundation.sh key-file)"
+
 # unlock (same door as the form; JSON so you get { ok: true } + Set-Cookie)
 curl -sS -D - http://127.0.0.1:8788/view/unlock \
   -H "content-type: application/json" -H "accept: application/json" \
-  -d "{\"api_key\":\"${FOUNDATION_API_KEY}\"}"
+  -d "{\"api_key\":\"$(cat "${KEY_FILE}")\"}"
 
 # session / Home widgets / collection / detail / search
-curl -sS http://127.0.0.1:8788/view/api/session -H "Authorization: ApiKey ${FOUNDATION_API_KEY}"
-curl -sS http://127.0.0.1:8788/view/api/recents -H "Authorization: ApiKey ${FOUNDATION_API_KEY}"
-curl -sS http://127.0.0.1:8788/view/api/tasks -H "Authorization: ApiKey ${FOUNDATION_API_KEY}"
-curl -sS http://127.0.0.1:8788/view/api/ontology -H "Authorization: ApiKey ${FOUNDATION_API_KEY}"
-curl -sS "http://127.0.0.1:8788/view/api/types/task" -H "Authorization: ApiKey ${FOUNDATION_API_KEY}"
-curl -sS "http://127.0.0.1:8788/view/api/nodes/<UUID>" -H "Authorization: ApiKey ${FOUNDATION_API_KEY}"
-curl -sS "http://127.0.0.1:8788/view/api/search?q=Fixture" -H "Authorization: ApiKey ${FOUNDATION_API_KEY}"
+curl -sS http://127.0.0.1:8788/view/api/session -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
+curl -sS http://127.0.0.1:8788/view/api/recents -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
+curl -sS http://127.0.0.1:8788/view/api/tasks -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
+curl -sS http://127.0.0.1:8788/view/api/ontology -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
+curl -sS "http://127.0.0.1:8788/view/api/types/task" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
+curl -sS "http://127.0.0.1:8788/view/api/nodes/<UUID>" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
+curl -sS "http://127.0.0.1:8788/view/api/search?q=Fixture" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
 ```
 
 The cookie does not unlock `/mcp` or `/blobs/:id`. Do not post writes through Viewer — the window has no create/edit/complete. Do not call MCP `upsert` to fake a Viewer write.
@@ -165,7 +170,7 @@ Named location (survives Cleanup):
 .cursor/skills/verify-foundation/evidence/<run-id>/
 ```
 
-`<run-id>` is the `VERIFY_RUN_ID` the helper printed (or a UTC stamp you chose). Cleanup deletes host programs and the disposable data dir. It must not delete this folder.
+`<run-id>` is `verify-foundation.sh run-id` (your `VERIFY_RUN_ID`, or the last launch). Cleanup deletes host programs and the disposable run root. It must not delete this folder. It must not delete `/tmp`.
 
 Capture:
 
@@ -192,7 +197,7 @@ Proof standards:
 
 Stops only what **this run** started (pid from the helper state file, then `scripts/keep-vault-up.sh stop` with that `FOUNDATION_DATA`). Never `pkill` by process name. Does not delete `./data` on the clone. Does not delete evidence.
 
-If launch created `$VERIFY_DATA_DIR`, cleanup removes that disposable folder after stop. If you pointed launch at an existing folder the user already had, cleanup stops programs and leaves the folder.
+Cleanup may `rm -rf` only `/tmp/foundation-verify-<run-id>` when the recorded data dir is that folder or its `data/` child. A `VERIFY_DATA_DIR` that is a direct child of `/tmp` is that run root. Its parent is `/tmp` and is never removed. Any other data dir is left in place after stop.
 
 After cleanup, confirm `.cursor/skills/verify-foundation/evidence/<run-id>/` still exists.
 
@@ -205,26 +210,33 @@ Executable helper (from the clone root):
 .cursor/skills/verify-foundation/scripts/verify-foundation.sh launch
 .cursor/skills/verify-foundation/scripts/verify-foundation.sh cleanup
 .cursor/skills/verify-foundation/scripts/verify-foundation.sh evidence-dir
+.cursor/skills/verify-foundation/scripts/verify-foundation.sh run-id
+.cursor/skills/verify-foundation/scripts/verify-foundation.sh key-file
+.cursor/skills/verify-foundation/scripts/verify-foundation.sh backup-root
 ```
 
 | Command | What it does |
 | --- | --- |
-| `doctor` | Read-only health, window GET, toolchain, optional state-file check |
-| `launch` | Disposable first-day folder + `keep-vault-up.sh`. Writes a state file |
-| `cleanup` | Stop what launch started; remove disposable folder; keep evidence |
-| `evidence-dir` | Print the evidence path for this `VERIFY_RUN_ID` |
+| `doctor` | Read-only health, window GET, toolchain, optional state-file check. Loads this run's key file when env is unset |
+| `launch` | Disposable first-day folder + `keep-vault-up.sh`. Writes state, last-run id, key file, and a disposable backup root |
+| `cleanup` | Stop what launch started; remove only a safe run root; keep evidence |
+| `evidence-dir` | Print the evidence path for the resolved run id |
+| `run-id` | Print the resolved run id |
+| `key-file` | Print the key file path. Not the key |
+| `backup-root` | Print the disposable `BACKUP_ROOT` launch passes |
 
 Env the helper reads (all optional except as noted):
 
 | Variable | Default |
 | --- | --- |
-| `VERIFY_RUN_ID` | UTC stamp |
+| `VERIFY_RUN_ID` | Last launch id, else a UTC stamp |
 | `VERIFY_DATA_DIR` | `/tmp/foundation-verify-$VERIFY_RUN_ID/data` |
 | `VERIFY_STATE_FILE` | `/tmp/foundation-verify-$VERIFY_RUN_ID/state` |
 | `VERIFY_EVIDENCE_DIR` | `.cursor/skills/verify-foundation/evidence/$VERIFY_RUN_ID` |
+| `VERIFY_BACKUP_ROOT` | `/tmp/foundation-verify-$VERIFY_RUN_ID/backups` |
 | `FOUNDATION_HEALTH_URL` | `http://127.0.0.1:8787/health` |
 | `FOUNDATION_VIEW_URL` | `http://127.0.0.1:8788/view` |
-| `FOUNDATION_API_KEY` | required for launch; verification scaffold only — not a personal key |
+| `FOUNDATION_API_KEY` | Env, else this run's key file, else clone `.env`, else launch mints a scaffold key |
 
 ## Feature map
 
