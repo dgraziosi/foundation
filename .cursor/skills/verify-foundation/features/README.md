@@ -2,7 +2,7 @@
 
 This directory is the maintained source for verifying the user-facing Viewer. Read the index before driving the window, then use the matching feature file as the recipe.
 
-Foundation is a life graph. Viewer is the human window on one vault. It does not write. Bots write through MCP. Do not treat this map as a personal-knowledge-management checklist or a harness memory test.
+Foundation is a life graph. Viewer is the human window on one vault. It writes journal only (Today + autosave). Bots write everything else through MCP. Do not treat this map as a personal-knowledge-management checklist or a harness memory test.
 
 ## Baseline preconditions
 
@@ -18,8 +18,8 @@ Foundation is a life graph. Viewer is the human window on one vault. It does not
 - Start every recipe from Unlock unless the instance is already unlocked in that browser session.
 - Prefer headings, button names, `aria-label`, and `data-surface` over CSS position.
 - Browser first. Same-path HTTP (`/view/unlock`, `/view/api/*`) when a browser cannot run. Say which you used.
-- Viewer is read-only. Do not upsert through MCP to simulate a Viewer write.
-- Restore nothing after a Viewer drive (there is no mutation). Keep proof artifacts.
+- Viewer writes journal only. Do not upsert through MCP to simulate a Viewer write. Do not PATCH other types.
+- Restore nothing after a read drive. Journal Today creates today's journal — that mutation is the proof, not something to undo. Keep proof artifacts.
 
 ## Proof and skip reporting
 
@@ -48,4 +48,4 @@ Keep implementation details out of the map. Name only user paths, stable handles
 - [Collection](./collection.md) covers a type's declared layouts, empty/filtered copy, and Show completed.
 - [Detail](./detail.md) covers opening one record as a page from Home, collection, Recents, search, or graph.
 - [Search](./search.md) covers the rail overlay, query, type/status filters, and opening a hit.
-- [Journal write](./journal-write.md) is forthcoming — not on this branch.
+- [Journal write](./journal-write.md) covers Today, the journal page, and autosave. Other types stay display-only.

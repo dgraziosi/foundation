@@ -38,5 +38,5 @@ Preconditions:
 
 - The window does not add a ninth layout. Declared set: list, card, table, board, calendar, timeline, outline, graph.
 - Count in the heading is after the active view's filter, not always the live type count on Home folders.
-- `journal` as a collection is a list of journal records. It is not journal write (forthcoming).
+- `journal` as a collection is a list of journal records. **Today** on that heading leaves the list for [Journal write](./journal-write.md). Do not treat the list as the write page.
 - Do not treat MCP `search { type }` as a collection proof. Drive `/view/types/<slug>` or `GET /view/api/types/<slug>`.

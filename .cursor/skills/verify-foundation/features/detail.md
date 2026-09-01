@@ -1,10 +1,10 @@
 # Detail
 
-Detail is one record as a page in the content host. It is not a docked inspector. A click on a record or a graph node opens this page. Title, body, structure, and properties display. Values do not edit.
+Detail is one non-journal record as a page in the content host. It is not a docked inspector. A click on a record or a graph node opens `/view/nodes/<uuid>`. For a note, task, or other display type: title, body, structure, and properties show. Values do not edit. A journal with inline markdown is [Journal write](./journal-write.md), not this chrome.
 
 ## Sub-features
 
-- `detail-open` fills the main pane at `/view/nodes/<uuid>` with `[data-surface="detail-page"]` and the record title as the heading.
+- `detail-open` fills the main pane at `/view/nodes/<uuid>` with `[data-surface="detail-page"]` and the record title as the heading (non-journal, or a journal that is not inline markdown).
 - `detail-missing` shows **Not found.** for a bad or unknown id.
 - `detail-properties` shows type, status, fields, related records, location, and timestamps. **Open** appears only when `data.url` is a well-formed https address.
 - `detail-structure` shows Structure when there are children, or an ancestor chain the type asks for.
@@ -36,3 +36,4 @@ Preconditions:
 - **Open** is `data.url` (https). It is not which Drive / Gmail / Calendar object. That identity is upsert `url { system, id }`, looked up with MCP `search { url }`.
 - Blob body in the window is `GET /view/blobs/:id` (cookie or Authorization). Agents still use `GET /blobs/:id` with the header.
 - Do not prove detail by calling MCP `get` only. The user path is the page or `/view/api/nodes/:id`.
+- A journal with inline `text/markdown` does not get this chrome. The same `/view/nodes/:id` route renders [Journal write](./journal-write.md) (`[data-surface="journal-page"]`, no Properties). Do not score that as a failed `detail-open`.
