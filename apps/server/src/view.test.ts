@@ -960,12 +960,14 @@ test(
   },
 );
 
-test("view window is GET-only except unlock; still 14 tools", async () => {
+test("view window writes journal only; still 14 tools", async () => {
   const here = dirname(fileURLToPath(import.meta.url));
   const view = await readFile(join(here, "view.ts"), "utf8");
   const posts = [...view.matchAll(/app\.post\(/g)];
-  assert.equal(posts.length, 1);
+  assert.equal(posts.length, 2);
   assert.match(view, /app\.post\(`\$\{VIEW_PATH\}\/unlock`/);
+  assert.match(view, /app\.post\(`\$\{VIEW_PATH\}\/api\/journals\/today`/);
+  assert.match(view, /app\.patch\(`\$\{VIEW_PATH\}\/api\/nodes\/:id`/);
   assert.match(view, /app\.get\(`\$\{VIEW_PATH\}\/api\/graph`/);
   assert.match(view, /app\.get\(`\$\{VIEW_PATH\}\/api\/recents`/);
   const register = await readFile(join(here, "tools/register.ts"), "utf8");

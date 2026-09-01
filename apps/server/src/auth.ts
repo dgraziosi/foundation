@@ -3,8 +3,8 @@ import type { NextFunction, Request, Response } from "express";
 /**
  * Authorization: ApiKey <FOUNDATION_API_KEY>
  * Bearer <FOUNDATION_API_KEY> is accepted as a documented equivalent.
- * Cookie `foundation_key` unlocks the read-only `/view` window only (`Path=/view`).
- * `/mcp` and `/blobs` require the Authorization header — the cookie is not a write credential.
+ * Cookie `foundation_key` unlocks the `/view` window only (`Path=/view`).
+ * `/mcp` and `/blobs` require the Authorization header — the cookie is not an MCP credential.
  */
 export const API_KEY_COOKIE = "foundation_key";
 
@@ -37,7 +37,7 @@ function headerApiKey(req: Request): string | undefined {
   return match?.[2];
 }
 
-/** Header first; cookie only for the read-only window. */
+/** Header first; cookie only for the `/view` window. */
 export function providedApiKey(req: Request): string | undefined {
   return headerApiKey(req) ?? cookieValue(req.header("cookie") ?? "", API_KEY_COOKIE);
 }

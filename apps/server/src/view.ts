@@ -16,6 +16,7 @@ import {
   viewTasks,
   viewType,
 } from "./view-data.js";
+import { viewJournalToday, viewJournalWrite } from "./view-journal.js";
 
 export const VIEW_PATH = "/view";
 
@@ -60,7 +61,7 @@ function unlockFallback(error?: string): string {
 <main>
   <form method="post" action="${VIEW_PATH}/unlock">
     <h1>Unlock the vault window</h1>
-    <p class="quiet">Same key as MCP. This window is read-only.</p>
+    <p class="quiet">Same key as MCP.</p>
     ${notice}
     <input type="password" name="api_key" autocomplete="current-password" required>
     <button type="submit">Unlock</button>
@@ -106,6 +107,28 @@ function isApiPath(path: string): boolean {
 
 function isBlobPath(path: string): boolean {
   return path.startsWith(`${VIEW_PATH}/blobs/`);
+}
+
+function sendJournalResult(res: Response, got: unknown): void {
+  if (got && typeof got === "object" && "node" in got) {
+    res.json(got);
+    return;
+  }
+  const message =
+    got && typeof got === "object" && "error" in got && typeof (got as { error: unknown }).error === "string"
+      ? (got as { error: string }).error
+      : "Could not write.";
+  const status =
+    message === "Not found"
+      ? 404
+      : message === "Journal writes only."
+        ? 403
+        : message === "Title is required."
+          ? 400
+          : /base_updated_at/.test(message)
+            ? 409
+            : 400;
+  res.status(status).json({ error: message });
 }
 
 export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings): void {
@@ -227,6 +250,35 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings
     } catch (error) {
       console.error("View node failed", error);
       res.status(500).json({ error: "Could not load." });
+    }
+  });
+
+  app.post(`${VIEW_PATH}/api/journals/today`, gate, async (_req, res) => {
+    try {
+      sendJournalResult(res, await viewJournalToday(pool, config.FOUNDATION_DATA));
+    } catch (error) {
+      console.error("View journal today failed", error);
+      res.status(500).json({ error: "Could not write." });
+    }
+  });
+
+  app.patch(`${VIEW_PATH}/api/nodes/:id`, gate, async (req, res) => {
+    try {
+      const title = typeof req.body?.title === "string" ? req.body.title : "";
+      const body = typeof req.body?.body === "string" ? req.body.body : "";
+      const base = typeof req.body?.base_updated_at === "string" ? req.body.base_updated_at : "";
+      sendJournalResult(
+        res,
+        await viewJournalWrite(pool, config.FOUNDATION_DATA, {
+          id: String(req.params.id ?? ""),
+          title,
+          body,
+          base_updated_at: base,
+        }),
+      );
+    } catch (error) {
+      console.error("View journal write failed", error);
+      res.status(500).json({ error: "Could not write." });
     }
   });
 
