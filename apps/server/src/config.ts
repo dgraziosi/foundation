@@ -12,11 +12,12 @@ const EnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(8787),
   HOST: z.string().default("127.0.0.1"),
   VIEW_PORT: z.coerce.number().int().positive().default(8788),
-  VIEW_HOST: z.string().default("0.0.0.0"),
+  VIEW_HOST: z.string().default("127.0.0.1"),
 });
 
 export type AppConfig = z.infer<typeof EnvSchema>;
-export type AppBindings = Pick<AppConfig, "FOUNDATION_API_KEY" | "FOUNDATION_DATA">;
+export type AppBindings = Pick<AppConfig, "FOUNDATION_API_KEY" | "FOUNDATION_DATA"> &
+  Partial<Pick<AppConfig, "HOST" | "PORT" | "VIEW_HOST" | "VIEW_PORT">>;
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = EnvSchema.safeParse(env);
