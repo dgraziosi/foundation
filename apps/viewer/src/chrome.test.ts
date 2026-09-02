@@ -108,6 +108,9 @@ test("journal page is a document; today is the start path", async () => {
   assert.match(journal, /journalMayPaintSaved/);
   assert.match(journal, /journalShouldRetryDirty/);
   assert.match(journal, /journalShouldAdoptVault/);
+  assert.match(journal, /journalEditorMountKey/);
+  assert.match(journal, /setEditorKey/);
+  assert.doesNotMatch(journal, /<LiveMarkdown\s+key=\{id\}/);
   assert.match(journal, /paintIfCurrent\(saved\)/);
   assert.match(journal, /kickDirtyRetry\(clash\)/);
   assert.match(journal, /rememberLanded/);

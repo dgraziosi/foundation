@@ -137,6 +137,11 @@ export function journalShouldAdoptVault(input: {
   return journalDraftQuiet(input.draft, input.skip);
 }
 
+/** Remount the writing box when an adopted vault snapshot replaces the on-screen draft. */
+export function journalEditorMountKey(id: string, adopted: number): string {
+  return `${id}:${adopted}`;
+}
+
 export function journalFirstSentence(body: string): string {
   const text = journalPayloadBody(body)
     .replace(/^#{1,6}\s+/gm, "")

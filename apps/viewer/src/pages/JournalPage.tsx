@@ -8,6 +8,7 @@ import {
   journalApplyLandedWrite,
   journalDayLabel,
   journalDraftQuiet,
+  journalEditorMountKey,
   journalEntryDayTitle,
   journalMayPaintSaved,
   journalPayloadBody,
@@ -45,6 +46,7 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
   const [draftId, setDraftId] = useState<string | null>(() => (seeded && id ? id : null));
   const [saveStatus, setSaveStatus] = useState<JournalSaveStatus>("quiet");
   const [kick, setKick] = useState(0);
+  const [editorKey, setEditorKey] = useState(0);
   const skip = useRef(
     seeded
       ? {
@@ -84,6 +86,9 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
       ) {
         return;
       }
+      setEditorKey((n) => n + 1);
+    } else {
+      setEditorKey(0);
     }
     setTitle(incoming.title);
     setBody(incoming.body);
@@ -379,7 +384,7 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
         ) : null}
         <Suspense fallback={<p className="journal-loading">Opening the page…</p>}>
           <LiveMarkdown
-            key={id}
+            key={journalEditorMountKey(id, editorKey)}
             value={shownBody}
             onChange={setBody}
             autofocus={shownBody.trim() === ""}

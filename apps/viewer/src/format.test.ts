@@ -7,6 +7,7 @@ import {
   journalApplyLandedWrite,
   journalDayTitle,
   journalDraftQuiet,
+  journalEditorMountKey,
   journalEntryDayTitle,
   journalMayPaintSaved,
   journalShouldAdoptVault,
@@ -218,6 +219,11 @@ test("reopen after leave flush adopts the vault body, not the stale cache", () =
     false,
   );
   assert.equal(journalShouldAdoptVault({ draft, skip: flushed, incoming: flushed }), false);
+});
+
+test("the writing box remounts when an adopted vault snapshot replaces the draft", () => {
+  assert.equal(journalEditorMountKey("a", 0), "a:0");
+  assert.notEqual(journalEditorMountKey("a", 1), journalEditorMountKey("a", 0));
 });
 
 test("autosave stays quiet when only editor breaks differ from the stored body", () => {
