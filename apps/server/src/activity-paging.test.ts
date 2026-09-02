@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createPool, migrate, seedSystemOntology, type Pool } from "@foundation/db";
+import { createPool, insertActivity, migrate, seedSystemOntology, type Pool } from "@foundation/db";
 import {
   LIST_CURSOR_INVALID_SUGGESTION,
   ListActivityInputSchema,
   isToolError,
+  parseActivityCursor,
 } from "@foundation/schema";
 import { listGraphActivity, upsertGraphNode } from "./graph.js";
 
@@ -122,6 +123,57 @@ test(
           return;
         }
         assert.equal(junk.suggestion, LIST_CURSOR_INVALID_SUGGESTION);
+      });
+
+      await t.test("page two keeps rows that share a millisecond", async () => {
+        const target = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+        const newest = "2026-09-02T12:00:00.100500Z";
+        const middle = "2026-09-02T12:00:00.100200Z";
+        const oldest = "2026-09-02T12:00:00.099000Z";
+        const ids = [];
+        for (const stamp of [newest, middle, oldest]) {
+          const inserted = await insertActivity(pool, {
+            action: "update",
+            target_kind: "node",
+            target_id: target,
+            after: { stamp },
+          });
+          await pool.query("UPDATE activity SET created_at = $2::timestamptz WHERE id = $1", [
+            inserted.id,
+            stamp,
+          ]);
+          ids.push(inserted.id);
+        }
+        const [newestId, middleId, oldestId] = ids;
+
+        const first = await listGraphActivity(pool, { target, limit: 1 });
+        assert.equal(isToolError(first), false);
+        if (isToolError(first)) {
+          return;
+        }
+        assert.equal(first.count, 3);
+        assert.equal(first.activities.length, 1);
+        assert.equal(first.activities[0]?.id, newestId);
+        const cursor = parseActivityCursor(first.next ?? "");
+        assert.equal(cursor?.created_at.includes("100500"), true);
+
+        const second = await listGraphActivity(pool, { target, limit: 1, cursor: first.next });
+        assert.equal(isToolError(second), false);
+        if (isToolError(second)) {
+          return;
+        }
+        assert.equal(second.activities.length, 1);
+        assert.equal(second.activities[0]?.id, middleId);
+        assert.notEqual(second.activities[0]?.id, oldestId);
+
+        const third = await listGraphActivity(pool, { target, limit: 1, cursor: second.next });
+        assert.equal(isToolError(third), false);
+        if (isToolError(third)) {
+          return;
+        }
+        assert.equal(third.activities.length, 1);
+        assert.equal(third.activities[0]?.id, oldestId);
+        assert.equal(third.next, undefined);
       });
     } finally {
       await pool.end();

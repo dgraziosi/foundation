@@ -25,3 +25,9 @@ test("activity cursor round-trips and refuses junk", () => {
   assert.equal(parseActivityCursor("a1.%%%"), undefined);
   assert.equal(parseActivityCursor(encodeSearchCursor({ rank: 0, updated_at: STAMP, id: NODE_ID })), undefined);
 });
+
+test("activity cursor keeps microsecond created_at", () => {
+  const created_at = "2026-09-02T12:00:00.100500Z";
+  const encoded = encodeActivityCursor({ created_at, id: NODE_ID });
+  assert.deepEqual(parseActivityCursor(encoded), { created_at, id: NODE_ID });
+});
