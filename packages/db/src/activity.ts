@@ -27,6 +27,10 @@ type ActivityRow = {
   created_at: Date;
 };
 
+type ActivityListRow = ActivityRow & {
+  created_at_keyset: string;
+};
+
 export function mapActivity(row: ActivityRow): Activity {
   return {
     id: row.id,
@@ -145,8 +149,9 @@ export async function listActivity(
        AND ($3::timestamptz IS NULL OR created_at >= $3)`;
   const [countResult, pageResult] = await Promise.all([
     db.query<{ count: string }>(`SELECT COUNT(*)::text AS count ${filterSql}`, filterParams),
-    db.query<ActivityRow>(
-      `SELECT ${ACTIVITY_COLUMNS}
+    db.query<ActivityListRow>(
+      `SELECT ${ACTIVITY_COLUMNS},
+       to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at_keyset
      ${filterSql}
        AND (
          $5::uuid IS NULL
@@ -170,7 +175,7 @@ export async function listActivity(
     activities: rows.map(mapActivity),
     count,
     ...(last
-      ? { next: { created_at: iso(last.created_at), id: last.id } }
+      ? { next: { created_at: last.created_at_keyset, id: last.id } }
       : {}),
   };
 }
