@@ -37,7 +37,7 @@ Do not commit personal life data, documents, or secrets to this repository. Thos
 - [`docs/HARNESS.md`](docs/HARNESS.md) — attach the vault MCP from a named harness
 - [`docs/AGENTS.md`](docs/AGENTS.md) — starter recipes (Chief of Staff, Vault Keeper, Executive Assistant)
 - [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md) — keep the vault up on the machine (`scripts/keep-vault-up.sh`); weekday 9:15 written report
-- [`docs/BACKUP.md`](docs/BACKUP.md) — nightly backup script and throwaway restore
+- [`docs/BACKUP.md`](docs/BACKUP.md) — encrypted nightly dump, off-site folder, throwaway restore, and in-place restore on this vault
 - [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md) — weekly graph report
 - [`docs/VIEWER.md`](docs/VIEWER.md) — user window contract: surfaces, shell, tokens, states
 

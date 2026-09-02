@@ -32,7 +32,7 @@ Keeping the vault up is the host script on this machine’s own schedule. Not th
 1. GET /health — HTTP 200 and { ok: true, service: "foundation", db: "up" }. If this fails, ping. Do not start the host programs.
 2. FOUNDATION_DATA is the real vault: not an agent profile or memory directory, and not an empty leftover Postgres cluster (missing/empty postgres dir, no PG_VERSION, host cannot read PG_VERSION, empty live next to a backup or second tree that has people). Do not mkdir the live path on that miss. A first-day vault with seed types and 0 user records is healthy unless well-known nodes were configured.
 3. If well-known nodes are configured, get/search them and confirm they exist (not soft-deleted). If none configured, skip.
-4. Backup path defaults to BACKUP_ROOT. Skip only if the user unset it. If set, the path is present and the newest artifact is newer than 48 hours. Health checks; it does not dump. Nag if the dump is missing or old.
+4. Backup path defaults to BACKUP_ROOT. Skip only if the user unset it. If set, the path is present and the newest artifact is newer than 48 hours. Newest artifact may be `foundation-YYYYMMDD.sql.age`. Health checks; it does not dump. Nag if the dump is missing or old.
 
 This pass is the weekday written report. The host script, Dream, the weekly graph report, and product updates have their own schedules.
 

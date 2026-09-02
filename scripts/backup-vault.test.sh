@@ -24,13 +24,31 @@ fi
 if grep -Fq -- 'postgres://foundation:foundation@' "${backup_script}"; then
   fail "backup-vault.sh still ships a default URL with password foundation"
 fi
+if ! grep -Fq -- 'age -r' "${backup_script}"; then
+  fail "backup-vault.sh must encrypt dumps with age"
+fi
+if ! grep -Fq -- 'BACKUP_AGE_RECIPIENT' "${backup_script}"; then
+  fail "backup-vault.sh must require BACKUP_AGE_RECIPIENT"
+fi
+if ! grep -Fq -- 'foundation-${day}.sql.age' "${backup_script}"; then
+  fail "backup-vault.sh must install foundation-YYYYMMDD.sql.age"
+fi
+if grep -Fq -- 'dump_path="${backup_abs}/sql/foundation-${day}.sql"' "${backup_script}"; then
+  fail "backup-vault.sh still installs a plaintext .sql dump"
+fi
+if grep -Fq -- 'FOUNDATION_BACKUP_KEEP_DAYS=14' "${backup_script}"; then
+  fail "retention is still a hard 14 with no override"
+fi
+if ! grep -Fq -- 'BACKUP_KEEP_DAYS' "${backup_script}"; then
+  fail "backup-vault.sh must read BACKUP_KEEP_DAYS"
+fi
 
 # shellcheck source=backup-vault.sh
 source "${backup_script}"
 
 # Contract fixtures. No live vault. Drop leftover host env so clone .env
 # resolution is not shadowed by a cluster this run did not create.
-unset FOUNDATION_DATA BACKUP_ROOT DATABASE_URL
+unset FOUNDATION_DATA BACKUP_ROOT DATABASE_URL BACKUP_AGE_RECIPIENT BACKUP_AGE_IDENTITY BACKUP_KEEP_DAYS BACKUP_OFFSITE
 
 empty_clone="$(mktemp -d)"
 if url="$(foundation_backup_database_url "${empty_clone}" 2>"${empty_clone}/nag")"; then
@@ -39,11 +57,17 @@ fi
 if ! grep -Fq -- '.env.example' "${empty_clone}/nag"; then
   fail "unset DATABASE_URL nag must mention .env.example (got: $(cat "${empty_clone}/nag"))"
 fi
+if recipient="$(foundation_backup_age_recipient "${empty_clone}" 2>"${empty_clone}/age-nag")"; then
+  fail "unset BACKUP_AGE_RECIPIENT must refuse, not invent a recipient (got: ${recipient})"
+fi
+if ! grep -Fq -- 'BACKUP_AGE_RECIPIENT' "${empty_clone}/age-nag"; then
+  fail "unset BACKUP_AGE_RECIPIENT nag must name BACKUP_AGE_RECIPIENT (got: $(cat "${empty_clone}/age-nag"))"
+fi
 rm -rf -- "${empty_clone}"
 
 # Single dated dump older than 14 days must survive prune.
 tmp_one="$(mktemp -d)"
-trap 'rm -rf -- "${tmp_one}" "${tmp_two:-}" "${tmp_fail:-}" "${tmp_blobs:-}" "${tmp_abort:-}" "${tmp_swap:-}" "${tmp_env:-}"' EXIT
+trap 'rm -rf -- "${tmp_one}" "${tmp_two:-}" "${tmp_fail:-}" "${tmp_blobs:-}" "${tmp_abort:-}" "${tmp_swap:-}" "${tmp_env:-}" "${tmp_plain:-}" "${tmp_keep:-}" "${tmp_off:-}" "${tmp_after:-}" "${tmp_man:-}"' EXIT
 printf '%s\n' '-- fixture dump, not a vault' >"${tmp_one}/foundation-20000101.sql"
 foundation_backup_prune_sql "${tmp_one}"
 if [[ ! -f "${tmp_one}/foundation-20000101.sql" ]]; then
@@ -66,7 +90,7 @@ fi
 tmp_fail="$(mktemp -d)"
 fail_day="$(date +%Y%m%d)"
 mkdir -p "${tmp_fail}/backup/sql" "${tmp_fail}/backup/blobs" "${tmp_fail}/data/blobs"
-printf '%s\n' '-- last good dump' >"${tmp_fail}/backup/sql/foundation-${fail_day}.sql"
+printf '%s\n' '-- last good dump' >"${tmp_fail}/backup/sql/foundation-${fail_day}.sql.age"
 printf '%s\n' 'date=good' >"${tmp_fail}/backup/MANIFEST"
 printf '%s\n' '-- fixture blob' >"${tmp_fail}/data/blobs/fixture"
 printf '%s\n' '-- new dump temp' >"${tmp_fail}/dump.tmp"
@@ -87,7 +111,7 @@ set -e
 if ((fail_rc == 0)); then
   fail "install should fail when a later step fails"
 fi
-if ! grep -qx -- '-- last good dump' "${tmp_fail}/backup/sql/foundation-${fail_day}.sql"; then
+if ! grep -qx -- '-- last good dump' "${tmp_fail}/backup/sql/foundation-${fail_day}.sql.age"; then
   fail "failed later step replaced the same-day dump"
 fi
 if ! grep -qx 'date=good' "${tmp_fail}/backup/MANIFEST"; then
@@ -106,7 +130,7 @@ fi
 tmp_blobs="$(mktemp -d)"
 blobs_day="$(date +%Y%m%d)"
 mkdir -p "${tmp_blobs}/backup/sql" "${tmp_blobs}/backup/blobs" "${tmp_blobs}/data/blobs"
-printf '%s\n' '-- last good dump' >"${tmp_blobs}/backup/sql/foundation-${blobs_day}.sql"
+printf '%s\n' '-- last good dump' >"${tmp_blobs}/backup/sql/foundation-${blobs_day}.sql.age"
 printf '%s\n' 'date=good' >"${tmp_blobs}/backup/MANIFEST"
 printf '%s\n' 'keep-original' >"${tmp_blobs}/backup/blobs/keep-me"
 printf '%s\n' 'live-only' >"${tmp_blobs}/data/blobs/live-only"
@@ -146,7 +170,7 @@ fi
 if [[ -e "${tmp_blobs}/backup/blobs/live-only" ]]; then
   fail "failed later step wrote live blobs into BACKUP_ROOT/blobs"
 fi
-if ! grep -qx -- '-- last good dump' "${tmp_blobs}/backup/sql/foundation-${blobs_day}.sql"; then
+if ! grep -qx -- '-- last good dump' "${tmp_blobs}/backup/sql/foundation-${blobs_day}.sql.age"; then
   fail "failed later step replaced the same-day dump while leaving blobs"
 fi
 if ! grep -qx 'date=good' "${tmp_blobs}/backup/MANIFEST"; then
@@ -161,7 +185,7 @@ fi
 tmp_abort="$(mktemp -d)"
 abort_day="$(date +%Y%m%d)"
 mkdir -p "${tmp_abort}/backup/sql" "${tmp_abort}/backup/blobs" "${tmp_abort}/data/blobs"
-printf '%s\n' '-- last good dump' >"${tmp_abort}/backup/sql/foundation-${abort_day}.sql"
+printf '%s\n' '-- last good dump' >"${tmp_abort}/backup/sql/foundation-${abort_day}.sql.age"
 printf '%s\n' 'date=good' >"${tmp_abort}/backup/MANIFEST"
 printf '%s\n' 'keep-original' >"${tmp_abort}/backup/blobs/keep-me"
 printf '%s\n' '-- new dump temp' >"${tmp_abort}/dump.tmp"
@@ -205,7 +229,7 @@ fi
 if [[ ! -f "${tmp_abort}/backup/blobs/keep-me" ]] || ! grep -qx 'keep-original' "${tmp_abort}/backup/blobs/keep-me"; then
   fail "mid-install abort mutated BACKUP_ROOT/blobs"
 fi
-if ! grep -qx -- '-- last good dump' "${tmp_abort}/backup/sql/foundation-${abort_day}.sql"; then
+if ! grep -qx -- '-- last good dump' "${tmp_abort}/backup/sql/foundation-${abort_day}.sql.age"; then
   fail "mid-install abort replaced the same-day dump"
 fi
 if ! grep -qx 'date=good' "${tmp_abort}/backup/MANIFEST"; then
@@ -242,7 +266,7 @@ set -e
 if ((swap_rc == 0)); then
   fail "install should fail when blob swap fails after dump/MANIFEST commit"
 fi
-if [[ -e "${tmp_swap}/backup/sql/foundation-${swap_day}.sql" ]]; then
+if [[ -e "${tmp_swap}/backup/sql/foundation-${swap_day}.sql.age" ]]; then
   fail "first-of-day swap failure left a new dump"
 fi
 if [[ -e "${tmp_swap}/backup/MANIFEST" ]]; then
@@ -309,6 +333,131 @@ backup_env="$(
 )"
 if [[ "${backup_env}" != "${override_backups}" ]]; then
   fail "process BACKUP_ROOT must win over clone .env (got: ${backup_env})"
+fi
+
+tmp_plain="$(mktemp -d)"
+plain_day="$(date +%Y%m%d)"
+mkdir -p "${tmp_plain}/backup/sql" "${tmp_plain}/backup/blobs" "${tmp_plain}/data/blobs"
+printf '%s\n' "INSERT INTO nodes (id, title) VALUES ('00000000-0000-0000-0000-000000000001', 'Fixture person');" \
+  >"${tmp_plain}/plain.sql"
+printf '%s\n' 'keep' >"${tmp_plain}/data/blobs/keep"
+enc_out="${tmp_plain}/dump.tmp"
+foundation_backup_encrypt() {
+  printf '%s\n' 'age-encryption.org/v1' >"$2"
+  printf '%s\n' 'ciphertext-not-sql' >>"$2"
+}
+if ! foundation_backup_encrypt "${tmp_plain}/plain.sql" "${enc_out}" "age1fixture"; then
+  fail "encrypt stub should succeed"
+fi
+if grep -Fq -- 'INSERT INTO nodes' "${enc_out}"; then
+  fail "encrypted dump still contains plaintext SQL"
+fi
+foundation_backup_stage_blobs() {
+  mkdir -p -- "$2"
+  if [[ -d "$1/blobs" ]]; then
+    cp -a -- "$1/blobs/." "$2/"
+  fi
+}
+if ! foundation_backup_install \
+  "${tmp_plain}/backup" \
+  "${tmp_plain}/data" \
+  "${plain_day}" \
+  "${enc_out}" \
+  "" \
+  "yes"; then
+  fail "install of encrypted dump should succeed"
+fi
+if [[ ! -f "${tmp_plain}/backup/sql/foundation-${plain_day}.sql.age" ]]; then
+  fail "install did not write foundation-YYYYMMDD.sql.age"
+fi
+if [[ -f "${tmp_plain}/backup/sql/foundation-${plain_day}.sql" ]]; then
+  fail "install wrote a plaintext .sql dump"
+fi
+if grep -Fq -- 'INSERT INTO nodes' "${tmp_plain}/backup/sql/foundation-${plain_day}.sql.age"; then
+  fail "installed dump stayed plaintext SQL"
+fi
+if ! grep -Fq -- 'has_people=yes' "${tmp_plain}/backup/MANIFEST"; then
+  fail "MANIFEST missing has_people=yes"
+fi
+if ! grep -Fq -- "dump=sql/foundation-${plain_day}.sql.age" "${tmp_plain}/backup/MANIFEST"; then
+  fail "MANIFEST dump path is not .sql.age"
+fi
+
+tmp_keep="$(mktemp -d)"
+if ! old20="$(date -d '20 days ago' +%Y%m%d 2>/dev/null || date -v-20d +%Y%m%d 2>/dev/null)"; then
+  fail "cannot compute a date 20 days ago"
+fi
+today="$(date +%Y%m%d)"
+printf '%s\n' 'age-old' >"${tmp_keep}/foundation-${old20}.sql.age"
+printf '%s\n' 'age-today' >"${tmp_keep}/foundation-${today}.sql.age"
+unset BACKUP_KEEP_DAYS
+foundation_backup_prune_sql "${tmp_keep}"
+if [[ -f "${tmp_keep}/foundation-${old20}.sql.age" ]]; then
+  fail "default prune left a dump older than 14 days"
+fi
+if [[ ! -f "${tmp_keep}/foundation-${today}.sql.age" ]]; then
+  fail "default prune deleted the last remaining dump"
+fi
+
+printf '%s\n' 'age-old' >"${tmp_keep}/foundation-${old20}.sql.age"
+printf '%s\n' 'age-today' >"${tmp_keep}/foundation-${today}.sql.age"
+BACKUP_KEEP_DAYS=40
+foundation_backup_prune_sql "${tmp_keep}"
+if [[ ! -f "${tmp_keep}/foundation-${old20}.sql.age" ]]; then
+  fail "BACKUP_KEEP_DAYS=40 deleted a 20-day-old dump"
+fi
+if [[ ! -f "${tmp_keep}/foundation-${today}.sql.age" ]]; then
+  fail "BACKUP_KEEP_DAYS=40 deleted today's dump"
+fi
+unset BACKUP_KEEP_DAYS
+
+printf '%s\n' '-- leftover plaintext' >"${tmp_keep}/foundation-${today}.sql"
+foundation_backup_prune_sql "${tmp_keep}"
+if [[ ! -f "${tmp_keep}/foundation-${today}.sql" ]]; then
+  fail "prune wiped leftover plaintext on the same night as an encrypted dump"
+fi
+
+tmp_off="$(mktemp -d)"
+data_abs="$(foundation_backup_abs "${tmp_off}/data")"
+backup_abs="$(foundation_backup_abs "${tmp_off}/backups")"
+if ! foundation_backup_offsite_is_forbidden "${data_abs}" "${backup_abs}" "${data_abs}/offsite"; then
+  fail "BACKUP_OFFSITE inside FOUNDATION_DATA must be forbidden"
+fi
+if ! foundation_backup_offsite_is_forbidden "${data_abs}" "${backup_abs}" "${backup_abs}/copy"; then
+  fail "BACKUP_OFFSITE inside BACKUP_ROOT must be forbidden"
+fi
+if foundation_backup_offsite_is_forbidden "${data_abs}" "${backup_abs}" "${tmp_off}/offsite"; then
+  fail "BACKUP_OFFSITE beside the vault must be allowed"
+fi
+
+tmp_after="$(mktemp -d)"
+mkdir -p "${tmp_after}/sql"
+printf '%s\n' 'age-old' >"${tmp_after}/sql/foundation-${old20}.sql.age"
+printf '%s\n' 'age-today' >"${tmp_after}/sql/foundation-${today}.sql.age"
+unset BACKUP_KEEP_DAYS
+foundation_backup_copy_offsite() { return 1; }
+set +e
+foundation_backup_after_install "${tmp_after}" "${tmp_after}/offsite"
+after_rc=$?
+set -e
+if ((after_rc == 0)); then
+  fail "failed off-site copy must still return an error"
+fi
+if [[ -f "${tmp_after}/sql/foundation-${old20}.sql.age" ]]; then
+  fail "off-site failure skipped dump retention"
+fi
+if [[ ! -f "${tmp_after}/sql/foundation-${today}.sql.age" ]]; then
+  fail "off-site failure pruned the last remaining dump"
+fi
+
+tmp_man="$(mktemp -d)"
+printf '%s\n' 'CREATE TABLE nodes (id text);' >"${tmp_man}/empty.sql"
+if foundation_backup_sql_has_people "${tmp_man}/empty.sql"; then
+  fail "schema-only dump must not count as people"
+fi
+printf '%s\n' "INSERT INTO nodes (id) VALUES ('1');" >"${tmp_man}/people.sql"
+if ! foundation_backup_sql_has_people "${tmp_man}/people.sql"; then
+  fail "INSERT INTO nodes must count as people"
 fi
 
 echo "backup-vault.test: ok"

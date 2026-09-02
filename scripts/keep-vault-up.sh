@@ -31,6 +31,7 @@
 #   scripts/keep-vault-up.sh        — start if needed, then check
 #   scripts/keep-vault-up.sh stop   — stop the app, then Postgres.
 #                                     Does not delete the data folder.
+# Refuses start while .restore-lock is live or .restore-failed is present.
 set -euo pipefail
 
 foundation_keep_vault_up_repo_root() {
@@ -174,18 +175,46 @@ foundation_keep_vault_up_sql_has_people() {
   return 1
 }
 
+foundation_keep_vault_up_manifest_has_people() {
+  local backup_root="$1"
+  local manifest="${backup_root%/}/MANIFEST"
+  local raw=""
+  local line
+
+  if [[ ! -f "${manifest}" || ! -r "${manifest}" ]]; then
+    return 0
+  fi
+  line="$(grep -E '^[[:space:]]*has_people=' "${manifest}" | tail -n 1 || true)"
+  raw="${line#*has_people=}"
+  raw="${raw%$'\r'}"
+  if [[ "${raw}" == "no" ]]; then
+    return 1
+  fi
+  return 0
+}
+
 # Backup dumps under BACKUP_ROOT (and default sibling) that have people.
 foundation_keep_vault_up_backup_has_people() {
   local backup_root="$1"
   local f
+  local age_dump=""
   [[ -d "${backup_root}" ]] || return 1
   while IFS= read -r f; do
     [[ -n "${f}" ]] || continue
     if foundation_keep_vault_up_sql_has_people "${f}"; then
       return 0
     fi
-  done < <(find "${backup_root}" -type f \( -name 'foundation-*.sql' -o -name '*.sql' \) 2>/dev/null | LC_ALL=C sort)
-  return 1
+  done < <(find "${backup_root}" -type f \( -name 'foundation-*.sql' -o -name '*.sql' \) ! -name '*.age' 2>/dev/null | LC_ALL=C sort)
+
+  while IFS= read -r f; do
+    [[ -n "${f}" ]] || continue
+    age_dump="${f}"
+    break
+  done < <(find "${backup_root}" -type f -name 'foundation-*.sql.age' 2>/dev/null | LC_ALL=C sort)
+  if [[ -z "${age_dump}" ]]; then
+    return 1
+  fi
+  foundation_keep_vault_up_manifest_has_people "${backup_root}"
 }
 
 # Another data-dir/postgres/PG_VERSION under the parent of the live
@@ -583,6 +612,13 @@ foundation_keep_vault_up_start() {
   local data_dir="$2"
   local postgres="${data_dir%/}/postgres"
 
+  if ! foundation_keep_vault_up_refuse_restore_lock "${data_dir}"; then
+    return 1
+  fi
+  if ! foundation_keep_vault_up_refuse_restore_failed "${data_dir}"; then
+    return 1
+  fi
+
   if foundation_keep_vault_up_may_init "${data_dir}"; then
     if ! foundation_keep_vault_up_init_postgres "${data_dir}"; then
       return 1
@@ -620,37 +656,90 @@ foundation_keep_vault_up_stop_pid_tree() {
   kill "-${sig}" "${pid}" 2>/dev/null || true
 }
 
-# Stop the app, then Postgres. Does not delete the data folder.
+# Stop this vault's app only (this FOUNDATION_DATA app.pid). Leaves Postgres up.
 # Kills the pnpm wrapper and the Node listener (process group + tree).
 # Does not wait(1) a pid from another process.
+foundation_keep_vault_up_stop_app() {
+  local data_dir="$1"
+  local pid_file pid i
+  pid_file="$(foundation_keep_vault_up_app_pid_file "${data_dir}")"
+
+  if [[ ! -f "${pid_file}" ]]; then
+    return 0
+  fi
+  pid="$(tr -d '[:space:]' <"${pid_file}")"
+  if [[ "${pid}" =~ ^[0-9]+$ ]] && kill -0 "${pid}" 2>/dev/null; then
+    kill -- "-${pid}" 2>/dev/null || true
+    foundation_keep_vault_up_stop_pid_tree "${pid}" TERM
+    i=0
+    while ((i < 5)) && kill -0 "${pid}" 2>/dev/null; do
+      sleep 1
+      i=$((i + 1))
+    done
+    if kill -0 "${pid}" 2>/dev/null; then
+      kill -9 -- "-${pid}" 2>/dev/null || true
+      foundation_keep_vault_up_stop_pid_tree "${pid}" KILL
+    fi
+  fi
+  if [[ "${pid}" =~ ^[0-9]+$ ]] && kill -0 "${pid}" 2>/dev/null; then
+    return 1
+  fi
+  rm -f -- "${pid_file}"
+  return 0
+}
+
 foundation_keep_vault_up_stop() {
-  local repo_root data_dir postgres pid_file pid i
+  local repo_root data_dir postgres
   repo_root="$(foundation_keep_vault_up_repo_root)"
   data_dir="$(foundation_keep_vault_up_data_dir "${repo_root}")"
   postgres="${data_dir%/}/postgres"
-  pid_file="$(foundation_keep_vault_up_app_pid_file "${data_dir}")"
 
-  if [[ -f "${pid_file}" ]]; then
-    pid="$(tr -d '[:space:]' <"${pid_file}")"
-    if [[ "${pid}" =~ ^[0-9]+$ ]] && kill -0 "${pid}" 2>/dev/null; then
-      kill -- "-${pid}" 2>/dev/null || true
-      foundation_keep_vault_up_stop_pid_tree "${pid}" TERM
-      i=0
-      while ((i < 5)) && kill -0 "${pid}" 2>/dev/null; do
-        sleep 1
-        i=$((i + 1))
-      done
-      if kill -0 "${pid}" 2>/dev/null; then
-        kill -9 -- "-${pid}" 2>/dev/null || true
-        foundation_keep_vault_up_stop_pid_tree "${pid}" KILL
-      fi
-    fi
-    rm -f -- "${pid_file}"
-  fi
+  foundation_keep_vault_up_stop_app "${data_dir}" || true
   if command -v pg_ctl >/dev/null 2>&1 && [[ -d "${postgres}" ]]; then
     pg_ctl -D "${postgres}" stop -m fast >/dev/null 2>&1 || true
   fi
   return 0
+}
+
+foundation_keep_vault_up_restore_lock_path() {
+  printf '%s/.restore-lock\n' "${1%/}"
+}
+
+foundation_keep_vault_up_restore_lock_pid_is_live() {
+  local pid="$1"
+  [[ "${pid}" =~ ^[0-9]+$ ]] || return 1
+  kill -0 "${pid}" 2>/dev/null
+}
+
+foundation_keep_vault_up_refuse_restore_lock() {
+  local data_dir="$1"
+  local lock pid
+  lock="$(foundation_keep_vault_up_restore_lock_path "${data_dir}")"
+  if [[ ! -e "${lock}" ]]; then
+    return 0
+  fi
+  pid="$(tr -d '[:space:]' < "${lock}" 2>/dev/null || true)"
+  if foundation_keep_vault_up_restore_lock_pid_is_live "${pid}"; then
+    foundation_keep_vault_up_nag "restore is running for this vault. Wait until restore finishes."
+    return 1
+  fi
+  rm -f -- "${lock}"
+  return 0
+}
+
+foundation_keep_vault_up_restore_failed_path() {
+  printf '%s/.restore-failed\n' "${1%/}"
+}
+
+foundation_keep_vault_up_refuse_restore_failed() {
+  local data_dir="$1"
+  local marker
+  marker="$(foundation_keep_vault_up_restore_failed_path "${data_dir}")"
+  if [[ ! -e "${marker}" ]]; then
+    return 0
+  fi
+  foundation_keep_vault_up_nag "in-place restore did not finish. Run restore-vault.sh --in-place --confirm again. Do not start."
+  return 1
 }
 
 foundation_keep_vault_up_main() {
@@ -660,6 +749,12 @@ foundation_keep_vault_up_main() {
   data_dir="$(foundation_keep_vault_up_data_dir "${repo_root}")"
   backup_root="$(foundation_keep_vault_up_backup_root "${data_dir}")"
 
+  if ! foundation_keep_vault_up_refuse_restore_lock "${data_dir}"; then
+    return 1
+  fi
+  if ! foundation_keep_vault_up_refuse_restore_failed "${data_dir}"; then
+    return 1
+  fi
   if ! foundation_keep_vault_up_refuse_missing_folder "${data_dir}"; then
     return 1
   fi

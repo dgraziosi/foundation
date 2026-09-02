@@ -21,6 +21,10 @@ Driven by env, else the clone `.env` (same as keep-up). Relative paths are under
 
 - `FOUNDATION_DATA` — the vault (default `./data` under the clone)
 - `BACKUP_ROOT` — optional. Also read from the clone `.env`. Default: sibling of the data dir
+- `BACKUP_AGE_RECIPIENT` — required for dump
+- `BACKUP_AGE_IDENTITY` — required for restore
+- `BACKUP_KEEP_DAYS` — optional. Default 14
+- `BACKUP_OFFSITE` — optional. A folder on this machine that the user copies or syncs
 
 ## Steps
 
@@ -31,6 +35,6 @@ set -a && source .env && set +a
 ./scripts/backup-vault.sh
 ```
 
-Otherwise nag if the dump is missing or older than 48 hours.
+Otherwise nag if the dump is missing or older than 48 hours. Newest artifact may be `foundation-YYYYMMDD.sql.age`.
 
-How to restore into a throwaway instance: [`docs/BACKUP.md`](../../../docs/BACKUP.md). Do not restore into a live vault.
+Throwaway restore for practice: [`docs/BACKUP.md`](../../../docs/BACKUP.md). In-place restore on this vault: [`scripts/restore-vault.sh`](../../../scripts/restore-vault.sh) with `--in-place --confirm YYYYMMDD`. That script stops this vault's app, then loads the dump. A leftover `$FOUNDATION_DATA/.restore-failed` means restore did not finish; keep-up will not start until you run restore again. Do not invent another machine.
