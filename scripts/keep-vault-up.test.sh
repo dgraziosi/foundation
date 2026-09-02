@@ -77,6 +77,9 @@ fi
 if ! grep -Fq -- 'pnpm start' "${keep_script}"; then
   fail "keep-vault-up.sh must start the app with pnpm start"
 fi
+if ! grep -Fq -- '.restore-failed' "${keep_script}"; then
+  fail "keep-vault-up.sh must refuse start when .restore-failed is present"
+fi
 if ! grep -Fq -- 'CREATE ROLE' "${keep_script}"; then
   fail "keep-vault-up.sh must create the app database role after initdb"
 fi
@@ -1184,6 +1187,43 @@ if [[ -e "${dead_lock}/.restore-lock" ]]; then
 fi
 if ((rc != 0)); then
   fail "dead restore-lock PID should let keep-up continue (got ${rc}: ${out})"
+fi
+
+crashed_drop="${tmp_root}/crashed-drop"
+mkdir -p "${crashed_drop}/postgres" "${crashed_drop}/blobs"
+printf '%s\n' '16' >"${crashed_drop}/postgres/PG_VERSION"
+printf '%s\n' 'leftover-blob' >"${crashed_drop}/blobs/x"
+printf '%s\n' '999999' >"${crashed_drop}/.restore-lock"
+printf '%s\n' 'in-place restore did not finish' >"${crashed_drop}/.restore-failed"
+: >"${start_log}"
+set +e
+out="$(
+  FOUNDATION_DATA="${crashed_drop}"
+  BACKUP_ROOT="${tmp_root}/backups-empty"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_health_ok() { return 1; }
+  foundation_keep_vault_up_live_user_record_count() { return 1; }
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
+    return 0
+  }
+  foundation_keep_vault_up_wait_health() { return 0; }
+  foundation_keep_vault_up_cluster_ok() { return 0; }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+set -e
+if ((rc == 0)); then
+  fail "leftover .restore-failed after a dead lock must stop keep-up from starting"
+fi
+if ! grep -Fq -- 'restore did not finish' <<<"${out}"; then
+  fail "crashed restore drop did not nag (got: ${out})"
+fi
+if [[ -s "${start_log}" ]]; then
+  fail ".restore-failed must not start"
+fi
+if [[ ! -e "${crashed_drop}/.restore-failed" ]]; then
+  fail "keep-up must not remove .restore-failed"
 fi
 
 echo "keep-vault-up.test: ok"

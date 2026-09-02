@@ -40,6 +40,12 @@ fi
 if ! grep -Fq -- 'FOUNDATION_RESTORE_LOCK' "${restore_script}"; then
   fail "restore-vault.sh EXIT trap must keep lock path after foundation_restore_main returns"
 fi
+if ! grep -Fq -- 'app.pid' "${restore_script}"; then
+  fail "in-place restore must stop this vault's app (app.pid under this FOUNDATION_DATA) before DROP"
+fi
+if ! grep -Fq -- '.restore-failed' "${restore_script}"; then
+  fail "in-place restore must write .restore-failed under this FOUNDATION_DATA before DROP"
+fi
 if ! grep -Eq -- 'DROP DATABASE|dropdb' "${restore_script}"; then
   fail "in-place restore must drop this vault's app database before load"
 fi
@@ -55,6 +61,12 @@ if ! grep -Fq -- 'restore-vault.sh --in-place --confirm' "${backup_doc}"; then
 fi
 if ! grep -Fq -- 'throwaway' "${backup_doc}"; then
   fail "docs/BACKUP.md dropped throwaway restore"
+fi
+if ! grep -Fq -- '.restore-failed' "${backup_doc}"; then
+  fail "docs/BACKUP.md must say leftover .restore-failed means restore did not finish"
+fi
+if ! grep -Fq -- 'app.pid' "${backup_doc}"; then
+  fail "docs/BACKUP.md must say in-place restore stops this vault's app"
 fi
 
 if [[ ! -f "${skill}" ]]; then
@@ -151,6 +163,9 @@ fi
 if [[ -e "${tmp}/data/.restore-lock" ]]; then
   fail "failed decrypt left .restore-lock"
 fi
+if [[ -e "${tmp}/data/.restore-failed" ]]; then
+  fail "failed decrypt wrote .restore-failed before DROP"
+fi
 if compgen -G "${tmp}/data/restore.plain.*" >/dev/null; then
   fail "failed decrypt left a plaintext temp"
 fi
@@ -185,6 +200,111 @@ if [[ -e "${tmp}/data/blobs/from-dump" ]]; then
 fi
 if [[ -e "${tmp}/data/.restore-lock" ]]; then
   fail "failed load left .restore-lock"
+fi
+if [[ ! -e "${tmp}/data/.restore-failed" ]]; then
+  fail "failed load after DROP must leave .restore-failed"
+fi
+
+printf '%s\n' "$$" >"${tmp}/data/.restore-lock"
+set +e
+out="$(
+  FOUNDATION_DATA="${tmp}/data"
+  BACKUP_ROOT="${tmp}/backups"
+  DATABASE_URL='postgres://foundation:change-me@localhost:1/foundation'
+  BACKUP_AGE_IDENTITY="${tmp}/identity"
+  foundation_restore_decrypt() { printf '%s\n' '-- decrypted fixture' >"$3"; }
+  foundation_restore_recreate_database() { return 0; }
+  foundation_restore_load_sql() { return 0; }
+  foundation_backup_swap_blobs() { return 0; }
+  foundation_restore_main --in-place --confirm 20000101 2>&1
+)"
+rc=$?
+set -e
+if ((rc == 0)); then
+  fail "live restore-lock PID must block a second restore"
+fi
+if ! grep -Fq -- 'already running' <<<"${out}"; then
+  fail "live restore-lock must nag already running (got: ${out})"
+fi
+
+printf '%s\n' '999999' >"${tmp}/data/.restore-lock"
+rm -f -- "${tmp}/data/.restore-failed"
+set +e
+out="$(
+  FOUNDATION_DATA="${tmp}/data"
+  BACKUP_ROOT="${tmp}/backups"
+  DATABASE_URL='postgres://foundation:change-me@localhost:1/foundation'
+  BACKUP_AGE_IDENTITY="${tmp}/identity"
+  foundation_restore_decrypt() { printf '%s\n' '-- decrypted fixture' >"$3"; }
+  foundation_restore_recreate_database() { return 0; }
+  foundation_restore_load_sql() { return 0; }
+  foundation_backup_swap_blobs() { return 0; }
+  foundation_restore_main --in-place --confirm 20000101 2>&1
+)"
+rc=$?
+set -e
+if grep -Fq -- 'already running' <<<"${out}"; then
+  fail "dead restore-lock PID must not block restore retry (got: ${out})"
+fi
+if ((rc != 0)); then
+  fail "dead restore-lock PID should let restore continue (got ${rc}: ${out})"
+fi
+if [[ -e "${tmp}/data/.restore-lock" ]]; then
+  fail "successful restore left .restore-lock"
+fi
+if [[ -e "${tmp}/data/.restore-failed" ]]; then
+  fail "successful restore left .restore-failed"
+fi
+
+(
+  sleep 120
+) &
+app_pid=$!
+echo "${app_pid}" >"${tmp}/data/app.pid"
+app_state="${tmp}/app-state"
+: >"${app_state}"
+set +e
+out="$(
+  FOUNDATION_DATA="${tmp}/data"
+  BACKUP_ROOT="${tmp}/backups"
+  DATABASE_URL='postgres://foundation:change-me@localhost:1/foundation'
+  BACKUP_AGE_IDENTITY="${tmp}/identity"
+  foundation_restore_decrypt() { printf '%s\n' '-- decrypted fixture' >"$3"; }
+  foundation_restore_recreate_database() {
+    if [[ -f "${tmp}/data/app.pid" ]] && kill -0 "$(tr -d '[:space:]' <"${tmp}/data/app.pid")" 2>/dev/null; then
+      echo APP_STILL_UP >>"${app_state}"
+    else
+      echo APP_STOPPED >>"${app_state}"
+    fi
+    if kill -0 "${app_pid}" 2>/dev/null; then
+      echo APP_PID_LIVE >>"${app_state}"
+    else
+      echo APP_PID_DEAD >>"${app_state}"
+    fi
+    return 0
+  }
+  foundation_restore_load_sql() { return 0; }
+  foundation_backup_swap_blobs() { return 0; }
+  foundation_restore_main --in-place --confirm 20000101 2>&1
+)"
+rc=$?
+set -e
+if grep -Fq -- 'APP_STILL_UP' "${app_state}"; then
+  fail "in-place restore dropped while this vault's app was still running"
+fi
+if grep -Fq -- 'APP_PID_LIVE' "${app_state}"; then
+  fail "in-place restore must stop this vault's app before DROP"
+fi
+if ! grep -Fq -- 'APP_PID_DEAD' "${app_state}"; then
+  fail "recreate must run after this vault's app is stopped (got: $(cat "${app_state}") out=${out})"
+fi
+if ((rc != 0)); then
+  fail "restore after stopping this vault's app should finish (got ${rc}: ${out})"
+fi
+if kill -0 "${app_pid}" 2>/dev/null; then
+  kill "${app_pid}" 2>/dev/null || true
+  wait "${app_pid}" 2>/dev/null || true
+  fail "restore left this vault's app running"
 fi
 
 mkdir -p "${tmp}/sys"
