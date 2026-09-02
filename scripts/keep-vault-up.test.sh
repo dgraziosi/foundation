@@ -1125,7 +1125,7 @@ fi
 lock_live="${tmp_root}/lock-live"
 mkdir -p "${lock_live}/postgres"
 printf '%s\n' '16' >"${lock_live}/postgres/PG_VERSION"
-printf '%s\n' '1' >"${lock_live}/.restore-lock"
+printf '%s\n' "$$" >"${lock_live}/.restore-lock"
 : >"${start_log}"
 set +e
 out="$(
@@ -1149,6 +1149,41 @@ if ! grep -Fq -- 'restore is running for this vault' <<<"${out}"; then
 fi
 if [[ -s "${start_log}" ]]; then
   fail "restore lock must not start"
+fi
+
+dead_lock="${tmp_root}/dead-lock"
+mkdir -p "${dead_lock}/postgres"
+printf '%s\n' '16' >"${dead_lock}/postgres/PG_VERSION"
+printf '%s\n' '999999' >"${dead_lock}/.restore-lock"
+: >"${start_log}"
+set +e
+out="$(
+  FOUNDATION_DATA="${dead_lock}"
+  BACKUP_ROOT="${tmp_root}/backups-empty"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_health_ok() { return 1; }
+  foundation_keep_vault_up_live_user_record_count() { printf '%s\n' '1'; }
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
+    return 0
+  }
+  foundation_keep_vault_up_wait_health() { return 0; }
+  foundation_keep_vault_up_cluster_ok() { return 0; }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+set -e
+if grep -Fq -- 'restore is running for this vault' <<<"${out}"; then
+  fail "dead restore-lock PID must not look like an in-progress restore (got: ${out})"
+fi
+if [[ ! -s "${start_log}" ]]; then
+  fail "dead restore-lock PID must not block start"
+fi
+if [[ -e "${dead_lock}/.restore-lock" ]]; then
+  fail "dead restore-lock PID must be removed"
+fi
+if ((rc != 0)); then
+  fail "dead restore-lock PID should let keep-up continue (got ${rc}: ${out})"
 fi
 
 echo "keep-vault-up.test: ok"

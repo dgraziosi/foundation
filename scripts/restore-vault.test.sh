@@ -37,6 +37,15 @@ fi
 if ! grep -Fq -- '.restore-lock' "${restore_script}"; then
   fail "restore-vault.sh must write .restore-lock under this FOUNDATION_DATA"
 fi
+if ! grep -Fq -- 'FOUNDATION_RESTORE_LOCK' "${restore_script}"; then
+  fail "restore-vault.sh EXIT trap must keep lock path after foundation_restore_main returns"
+fi
+if ! grep -Eq -- 'DROP DATABASE|dropdb' "${restore_script}"; then
+  fail "in-place restore must drop this vault's app database before load"
+fi
+if ! grep -Eq -- 'CREATE DATABASE|createdb' "${restore_script}"; then
+  fail "in-place restore must recreate this vault's app database before load"
+fi
 
 if [[ ! -f "${backup_doc}" ]]; then
   fail "missing docs/BACKUP.md"
@@ -119,6 +128,71 @@ if ! grep -Fq -- 'BACKUP_AGE_IDENTITY' <<<"${out}"; then
 fi
 if [[ -e "${tmp}/data/.restore-lock" ]]; then
   fail "failed restore left .restore-lock"
+fi
+
+printf '%s\n' 'not-a-real-key' >"${tmp}/identity"
+set +e
+out="$(
+  FOUNDATION_DATA="${tmp}/data"
+  BACKUP_ROOT="${tmp}/backups"
+  DATABASE_URL='postgres://foundation:change-me@localhost:1/foundation'
+  BACKUP_AGE_IDENTITY="${tmp}/identity"
+  foundation_restore_decrypt() { return 1; }
+  foundation_restore_main --in-place --confirm 20000101 2>&1
+)"
+rc=$?
+set -e
+if ((rc == 0)); then
+  fail "decrypt failure must fail restore"
+fi
+if grep -Fq -- 'unbound variable' <<<"${out}"; then
+  fail "EXIT trap must still see lock and plaintext temp (got: ${out})"
+fi
+if [[ -e "${tmp}/data/.restore-lock" ]]; then
+  fail "failed decrypt left .restore-lock"
+fi
+if compgen -G "${tmp}/data/restore.plain.*" >/dev/null; then
+  fail "failed decrypt left a plaintext temp"
+fi
+
+mkdir -p "${tmp}/data/blobs" "${tmp}/backups/blobs"
+printf '%s\n' 'live-blob' >"${tmp}/data/blobs/keep-me"
+printf '%s\n' 'backup-blob' >"${tmp}/backups/blobs/from-dump"
+set +e
+out="$(
+  FOUNDATION_DATA="${tmp}/data"
+  BACKUP_ROOT="${tmp}/backups"
+  DATABASE_URL='postgres://foundation:change-me@localhost:1/foundation'
+  BACKUP_AGE_IDENTITY="${tmp}/identity"
+  foundation_restore_decrypt() { printf '%s\n' '-- decrypted fixture' >"$3"; }
+  foundation_restore_recreate_database() { return 0; }
+  foundation_restore_load_sql() { return 1; }
+  foundation_restore_copy_blobs() {
+    fail "live blobs must not be rsync --delete before SQL succeeds"
+  }
+  foundation_restore_main --in-place --confirm 20000101 2>&1
+)"
+rc=$?
+set -e
+if ((rc == 0)); then
+  fail "load failure must fail restore"
+fi
+if ! grep -qx 'live-blob' "${tmp}/data/blobs/keep-me"; then
+  fail "failed load replaced live blobs"
+fi
+if [[ -e "${tmp}/data/blobs/from-dump" ]]; then
+  fail "failed load wrote backup blobs into live blobs"
+fi
+if [[ -e "${tmp}/data/.restore-lock" ]]; then
+  fail "failed load left .restore-lock"
+fi
+
+mkdir -p "${tmp}/sys"
+if foundation_restore_recreate_database "postgres://foundation:change-me@localhost:1/postgres" "${tmp}/data" 2>"${tmp}/sys/nag"; then
+  fail "recreate must refuse a postgres maintenance database"
+fi
+if ! grep -Fq -- 'postgres' "${tmp}/sys/nag"; then
+  fail "refused system database nag must name postgres (got: $(cat "${tmp}/sys/nag"))"
 fi
 
 echo "restore-vault.test: ok"

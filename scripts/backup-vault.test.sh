@@ -67,7 +67,7 @@ rm -rf -- "${empty_clone}"
 
 # Single dated dump older than 14 days must survive prune.
 tmp_one="$(mktemp -d)"
-trap 'rm -rf -- "${tmp_one}" "${tmp_two:-}" "${tmp_fail:-}" "${tmp_blobs:-}" "${tmp_abort:-}" "${tmp_swap:-}" "${tmp_env:-}" "${tmp_plain:-}" "${tmp_keep:-}" "${tmp_off:-}" "${tmp_man:-}"' EXIT
+trap 'rm -rf -- "${tmp_one}" "${tmp_two:-}" "${tmp_fail:-}" "${tmp_blobs:-}" "${tmp_abort:-}" "${tmp_swap:-}" "${tmp_env:-}" "${tmp_plain:-}" "${tmp_keep:-}" "${tmp_off:-}" "${tmp_after:-}" "${tmp_man:-}"' EXIT
 printf '%s\n' '-- fixture dump, not a vault' >"${tmp_one}/foundation-20000101.sql"
 foundation_backup_prune_sql "${tmp_one}"
 if [[ ! -f "${tmp_one}/foundation-20000101.sql" ]]; then
@@ -428,6 +428,26 @@ if ! foundation_backup_offsite_is_forbidden "${data_abs}" "${backup_abs}" "${bac
 fi
 if foundation_backup_offsite_is_forbidden "${data_abs}" "${backup_abs}" "${tmp_off}/offsite"; then
   fail "BACKUP_OFFSITE beside the vault must be allowed"
+fi
+
+tmp_after="$(mktemp -d)"
+mkdir -p "${tmp_after}/sql"
+printf '%s\n' 'age-old' >"${tmp_after}/sql/foundation-${old20}.sql.age"
+printf '%s\n' 'age-today' >"${tmp_after}/sql/foundation-${today}.sql.age"
+unset BACKUP_KEEP_DAYS
+foundation_backup_copy_offsite() { return 1; }
+set +e
+foundation_backup_after_install "${tmp_after}" "${tmp_after}/offsite"
+after_rc=$?
+set -e
+if ((after_rc == 0)); then
+  fail "failed off-site copy must still return an error"
+fi
+if [[ -f "${tmp_after}/sql/foundation-${old20}.sql.age" ]]; then
+  fail "off-site failure skipped dump retention"
+fi
+if [[ ! -f "${tmp_after}/sql/foundation-${today}.sql.age" ]]; then
+  fail "off-site failure pruned the last remaining dump"
 fi
 
 tmp_man="$(mktemp -d)"
