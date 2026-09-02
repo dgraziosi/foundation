@@ -1,0 +1,51 @@
+name: verify
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        # Official postgres:16 does not ship vector.
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: foundation
+          POSTGRES_PASSWORD: ci-verify
+          POSTGRES_DB: foundation
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U foundation -d foundation"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://foundation:ci-verify@127.0.0.1:5432/foundation
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: echo "FOUNDATION_API_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+      - name: Create required extensions
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+            -c "CREATE EXTENSION IF NOT EXISTS pgcrypto" \
+            -c "CREATE EXTENSION IF NOT EXISTS unaccent" \
+            -c "CREATE EXTENSION IF NOT EXISTS pg_trgm" \
+            -c "CREATE EXTENSION IF NOT EXISTS vector"
+      - run: pnpm --filter @foundation/schema test
+      - run: pnpm --filter @foundation/viewer test
+      - run: bash scripts/skills-layout.test.sh
+      - run: pnpm --filter @foundation/viewer build
+      - run: pnpm --filter @foundation/server test
