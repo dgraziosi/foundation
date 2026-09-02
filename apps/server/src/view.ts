@@ -19,6 +19,7 @@ import {
 import { viewJournalToday, viewJournalTodayPeek, viewJournalWrite } from "./view-journal.js";
 
 export const VIEW_PATH = "/view";
+const UNLOCK_REJECT = "That key did not unlock.";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -145,10 +146,10 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings
     if (key !== config.FOUNDATION_API_KEY) {
       res.setHeader("WWW-Authenticate", 'ApiKey realm="foundation"');
       if (wantsJson(req)) {
-        res.status(401).json({ error: "API key required" });
+        res.status(401).json({ error: UNLOCK_REJECT });
         return;
       }
-      res.status(401).type("html").send(unlockFallback("That key did not unlock."));
+      res.status(401).type("html").send(unlockFallback(UNLOCK_REJECT));
       return;
     }
     res.setHeader("Set-Cookie", apiKeyCookieHeader(key));

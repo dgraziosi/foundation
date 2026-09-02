@@ -216,6 +216,14 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       assert.equal(denied.status, 401);
       assert.match(await denied.text(), /That key did not unlock/);
 
+      const deniedJson = await fetch(`${origin}/view/unlock`, {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ api_key: "nope" }),
+      });
+      assert.equal(deniedJson.status, 401);
+      assert.deepEqual(await deniedJson.json(), { error: "That key did not unlock." });
+
       const unlock = await fetch(`${origin}/view/unlock`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
