@@ -34,3 +34,22 @@ What that run drove:
 - The built dist contained Unlock copy, Home empty copy, Search idle and empty copy, Detail `Not found.`, and the journal invite `Write a first sentence.`
 
 Live `/view` unlock, session, and journal POST/PATCH were not driven. Cleanup left evidence at `.cursor/skills/verify-foundation/evidence/20260901Tmaintain/`.
+
+## Maintain run (20260902Tmaintain)
+
+Launch refused. Postgres 16 was not on PATH. Same rule: do not guess an installer. Doctor reported health down and Viewer dist missing until the Viewer build.
+
+Map corrections this run (source + Viewer tests; not a live `/view` drive):
+
+- Cookie-scope recipe now POSTs `/mcp` and GETs agent `/blobs/:id` with the accept cookie. `GET /mcp` is never a tools call.
+- Skill Drive HTTP now includes Home's Today peek `GET /view/api/journals/today` (does not create).
+
+What that run drove:
+
+- `verify-foundation.test.sh` exited 0 (including the cookie-scope and peek GET locks).
+- `pnpm --filter @foundation/viewer test` passed 75 tests, including Home Today at empty body, Unlock vault-key copy, journal page, leave-flush, and `window writes journal only`.
+- Viewer build succeeded. Doctor then reported Viewer dist present. The built dist contained Unlock copy, Home **Write today**, Search idle and empty copy, Detail **Not found.**, **Keep a title**, and the journal invite **Write a first sentence.**
+- `pnpm test` exited 0. Server tests that need `DATABASE_URL` skipped. `skills-layout.test: ok`.
+- Live `/view` unlock, session, peek GET, and journal POST/PATCH were not driven.
+
+Cleanup left evidence at `.cursor/skills/verify-foundation/evidence/20260902Tmaintain/`.
