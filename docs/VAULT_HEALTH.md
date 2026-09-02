@@ -125,7 +125,7 @@ The product ships `scripts/backup-vault.sh` as a host cron/script. Default backu
 
 If the user unset `BACKUP_ROOT`, **skip**. Do not nag.
 
-How to take a dump and how to restore into a throwaway instance: [`BACKUP.md`](./BACKUP.md).
+How to take a dump, restore into a throwaway instance, or restore in place on this vault: [`BACKUP.md`](./BACKUP.md).
 
 ## How to check (existing surface)
 
