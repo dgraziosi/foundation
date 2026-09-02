@@ -174,18 +174,46 @@ foundation_keep_vault_up_sql_has_people() {
   return 1
 }
 
+foundation_keep_vault_up_manifest_has_people() {
+  local backup_root="$1"
+  local manifest="${backup_root%/}/MANIFEST"
+  local raw=""
+  local line
+
+  if [[ ! -f "${manifest}" || ! -r "${manifest}" ]]; then
+    return 0
+  fi
+  line="$(grep -E '^[[:space:]]*has_people=' "${manifest}" | tail -n 1 || true)"
+  raw="${line#*has_people=}"
+  raw="${raw%$'\r'}"
+  if [[ "${raw}" == "no" ]]; then
+    return 1
+  fi
+  return 0
+}
+
 # Backup dumps under BACKUP_ROOT (and default sibling) that have people.
 foundation_keep_vault_up_backup_has_people() {
   local backup_root="$1"
   local f
+  local age_dump=""
   [[ -d "${backup_root}" ]] || return 1
   while IFS= read -r f; do
     [[ -n "${f}" ]] || continue
     if foundation_keep_vault_up_sql_has_people "${f}"; then
       return 0
     fi
-  done < <(find "${backup_root}" -type f \( -name 'foundation-*.sql' -o -name '*.sql' \) 2>/dev/null | LC_ALL=C sort)
-  return 1
+  done < <(find "${backup_root}" -type f \( -name 'foundation-*.sql' -o -name '*.sql' \) ! -name '*.age' 2>/dev/null | LC_ALL=C sort)
+
+  while IFS= read -r f; do
+    [[ -n "${f}" ]] || continue
+    age_dump="${f}"
+    break
+  done < <(find "${backup_root}" -type f -name 'foundation-*.sql.age' 2>/dev/null | LC_ALL=C sort)
+  if [[ -z "${age_dump}" ]]; then
+    return 1
+  fi
+  foundation_keep_vault_up_manifest_has_people "${backup_root}"
 }
 
 # Another data-dir/postgres/PG_VERSION under the parent of the live
@@ -583,6 +611,10 @@ foundation_keep_vault_up_start() {
   local data_dir="$2"
   local postgres="${data_dir%/}/postgres"
 
+  if ! foundation_keep_vault_up_refuse_restore_lock "${data_dir}"; then
+    return 1
+  fi
+
   if foundation_keep_vault_up_may_init "${data_dir}"; then
     if ! foundation_keep_vault_up_init_postgres "${data_dir}"; then
       return 1
@@ -653,6 +685,21 @@ foundation_keep_vault_up_stop() {
   return 0
 }
 
+foundation_keep_vault_up_restore_lock_path() {
+  printf '%s/.restore-lock\n' "${1%/}"
+}
+
+foundation_keep_vault_up_refuse_restore_lock() {
+  local data_dir="$1"
+  local lock
+  lock="$(foundation_keep_vault_up_restore_lock_path "${data_dir}")"
+  if [[ -e "${lock}" ]]; then
+    foundation_keep_vault_up_nag "restore is running for this vault. Wait until restore finishes."
+    return 1
+  fi
+  return 0
+}
+
 foundation_keep_vault_up_main() {
   local repo_root data_dir backup_root
 
@@ -660,6 +707,9 @@ foundation_keep_vault_up_main() {
   data_dir="$(foundation_keep_vault_up_data_dir "${repo_root}")"
   backup_root="$(foundation_keep_vault_up_backup_root "${data_dir}")"
 
+  if ! foundation_keep_vault_up_refuse_restore_lock "${data_dir}"; then
+    return 1
+  fi
   if ! foundation_keep_vault_up_refuse_missing_folder "${data_dir}"; then
     return 1
   fi

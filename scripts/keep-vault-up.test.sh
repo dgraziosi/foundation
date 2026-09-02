@@ -1064,4 +1064,91 @@ if grep -Fq -- '/var/run/postgresql' <<<"${o}"; then
 fi
 rm -rf -- "${sock_tmp}"
 
+age_live="${tmp_root}/empty-live-age"
+mkdir -p "${age_live}/postgres" "${tmp_root}/backups-age/sql"
+printf '%s\n' '16' >"${age_live}/postgres/PG_VERSION"
+printf '%s\n' 'age-encryption.org/v1' >"${tmp_root}/backups-age/sql/foundation-20000101.sql.age"
+printf '%s\n' 'has_people=yes' >"${tmp_root}/backups-age/MANIFEST"
+: >"${start_log}"
+set +e
+out="$(
+  FOUNDATION_DATA="${age_live}"
+  BACKUP_ROOT="${tmp_root}/backups-age"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_health_ok() { return 0; }
+  foundation_keep_vault_up_live_user_record_count() { printf '%s\n' '0'; }
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
+    return 0
+  }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+set -e
+if ((rc == 0)); then
+  fail "empty live next to a .sql.age dump with people should fail"
+fi
+if ! grep -Fq -- 'empty cluster next to a real one' <<<"${out}"; then
+  fail "empty-live-next-to-.sql.age did not nag (got: ${out})"
+fi
+if [[ -s "${start_log}" ]]; then
+  fail "empty-live-next-to-.sql.age must not start"
+fi
+
+age_unknown="${tmp_root}/empty-live-age-unknown"
+mkdir -p "${age_unknown}/postgres" "${tmp_root}/backups-age-unknown/sql"
+printf '%s\n' '16' >"${age_unknown}/postgres/PG_VERSION"
+printf '%s\n' 'age-encryption.org/v1' >"${tmp_root}/backups-age-unknown/sql/foundation-20000101.sql.age"
+: >"${start_log}"
+set +e
+out="$(
+  FOUNDATION_DATA="${age_unknown}"
+  BACKUP_ROOT="${tmp_root}/backups-age-unknown"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_health_ok() { return 0; }
+  foundation_keep_vault_up_live_user_record_count() { printf '%s\n' '0'; }
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
+    return 0
+  }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+set -e
+if ((rc == 0)); then
+  fail "empty live next to a .sql.age dump without MANIFEST should fail"
+fi
+if ! grep -Fq -- 'empty cluster next to a real one' <<<"${out}"; then
+  fail "empty-live-next-to-.sql.age-unknown did not nag (got: ${out})"
+fi
+
+lock_live="${tmp_root}/lock-live"
+mkdir -p "${lock_live}/postgres"
+printf '%s\n' '16' >"${lock_live}/postgres/PG_VERSION"
+printf '%s\n' '1' >"${lock_live}/.restore-lock"
+: >"${start_log}"
+set +e
+out="$(
+  FOUNDATION_DATA="${lock_live}"
+  BACKUP_ROOT="${tmp_root}/backups-empty"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_health_ok() { return 1; }
+  foundation_keep_vault_up_start() {
+    echo start >>"${start_log}"
+    return 0
+  }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+set -e
+if ((rc == 0)); then
+  fail "restore lock must stop keep-up from starting"
+fi
+if ! grep -Fq -- 'restore is running for this vault' <<<"${out}"; then
+  fail "restore lock did not nag (got: ${out})"
+fi
+if [[ -s "${start_log}" ]]; then
+  fail "restore lock must not start"
+fi
+
 echo "keep-vault-up.test: ok"
