@@ -176,12 +176,12 @@ export type JournalLeaveRecord = {
   status: "clash" | "failed";
 };
 
-/** A later landed write wins. Do not restore or store an older leave draft. */
+/** Our later landed write wins. A newer vault snapshot from a clash does not drop the draft. */
 export function journalShouldKeepLeave(input: {
   leaveSkip: JournalSnapshot;
-  incoming: JournalSnapshot;
+  landedAt?: string;
 }): boolean {
-  if (input.incoming.base && input.leaveSkip.base && input.incoming.base > input.leaveSkip.base) {
+  if (input.landedAt && input.leaveSkip.base && input.landedAt > input.leaveSkip.base) {
     return false;
   }
   return true;

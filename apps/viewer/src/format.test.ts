@@ -251,9 +251,21 @@ test("leave flush writes the journal we left when the draft is still dirty", () 
 
 test("a later landed write drops an older leave draft", () => {
   const leaveSkip = { title: "Morning", body: "Old leave.", base: "2026-09-01T12:00:00.000Z" };
-  const later = { title: "Morning", body: "Newer save.", base: "2026-09-01T12:00:03.000Z" };
-  assert.equal(journalShouldKeepLeave({ leaveSkip, incoming: later }), false);
-  assert.equal(journalShouldKeepLeave({ leaveSkip, incoming: leaveSkip }), true);
+  assert.equal(
+    journalShouldKeepLeave({ leaveSkip, landedAt: "2026-09-01T12:00:03.000Z" }),
+    false,
+  );
+  assert.equal(journalShouldKeepLeave({ leaveSkip }), true);
+  assert.equal(journalShouldKeepLeave({ leaveSkip, landedAt: leaveSkip.base }), true);
+});
+
+test("a newer vault snapshot still keeps a clash leave draft", () => {
+  const leaveSkip = { title: "Morning", body: "Kept after clash.", base: "2026-09-01T12:00:00.000Z" };
+  assert.equal(journalShouldKeepLeave({ leaveSkip }), true);
+  assert.equal(
+    journalShouldKeepLeave({ leaveSkip, landedAt: "2026-09-01T11:59:00.000Z" }),
+    true,
+  );
 });
 
 test("the writing box remounts when an adopted vault snapshot replaces the draft", () => {

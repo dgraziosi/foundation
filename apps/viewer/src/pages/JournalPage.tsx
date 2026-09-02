@@ -93,15 +93,7 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
     const leave = queryClient.getQueryData<JournalLeaveRecord>(["journal-leave", id]);
     if (leave) {
       queryClient.removeQueries({ queryKey: ["journal-leave", id] });
-      if (
-        journalShouldKeepLeave({
-          leaveSkip: leave.skip,
-          incoming: {
-            ...incoming,
-            base: landedAt && landedAt > incoming.base ? landedAt : incoming.base,
-          },
-        })
-      ) {
+      if (journalShouldKeepLeave({ leaveSkip: leave.skip, landedAt })) {
         setTitle(leave.draft.title);
         setBody(leave.draft.body);
         setBase(leave.skip.base);
@@ -251,14 +243,8 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
     skipSnap: JournalSnapshot,
     status: "clash" | "failed",
   ) {
-    const current = queryClient.getQueryData<NodeDetail>(["node", journalId]);
     const landedAt = queryClient.getQueryData<string>(["journal-landed", journalId]);
-    const incoming = {
-      title: current?.node.title ?? "",
-      body: current?.node.payload.body ?? "",
-      base: landedAt && landedAt > (current?.node.updated_at ?? "") ? landedAt : (current?.node.updated_at ?? ""),
-    };
-    if (!journalShouldKeepLeave({ leaveSkip: skipSnap, incoming })) {
+    if (!journalShouldKeepLeave({ leaveSkip: skipSnap, landedAt })) {
       return;
     }
     queryClient.setQueryData<JournalLeaveRecord>(["journal-leave", journalId], {

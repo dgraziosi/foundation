@@ -221,6 +221,51 @@ test("a clash on leave keeps the draft and offers Reload when the person comes b
   assert.ok(root!.root.findAll((node) => node.props.children === "Reload").length > 0);
 });
 
+test("a clash leave still keeps the draft when the vault snapshot is newer", async () => {
+  const patches: PatchCall[] = [];
+  installFetch({
+    patches,
+    onPatch: () =>
+      new Response(JSON.stringify({ error: "base_updated_at is stale." }), {
+        status: 409,
+        headers: { "content-type": "application/json" },
+      }),
+  });
+  if (!globalThis.window) {
+    Object.assign(globalThis, { window: { setTimeout, clearTimeout } });
+  }
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+  });
+  const tree = createElement(QueryClientProvider, { client }, createElement(LeaveAndReturn));
+  let root: ReturnType<typeof createRenderer>;
+  await act(async () => {
+    root = createRenderer(tree);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  await act(() => {
+    root!.root.findByProps({ "aria-label": "Title" }).props.onChange({ target: { value: "Kept after clash" } });
+  });
+  await act(async () => {
+    findByData(root!, "data-nav", "leave").props.onClick();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  assert.equal(patches.length, 1);
+  const newerVault = journalDetail(idA, "Morning", "Someone else wrote.", "2026-09-01T12:00:09.000Z");
+  vault[idA] = newerVault;
+  client.setQueryData(["node", idA], newerVault);
+  await act(async () => {
+    findByData(root!, "data-nav", "back").props.onClick();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  assert.equal(root!.root.findByProps({ "aria-label": "Title" }).props.value, "Kept after clash");
+  assert.ok(root!.root.findByProps({ "data-save": "clash" }));
+  assert.ok(root!.root.findAll((node) => node.props.children === "Reload").length > 0);
+});
+
 test("a later save is not replaced by a stale leave draft", async () => {
   const patches: PatchCall[] = [];
   let failLeave: ((response: Response) => void) | undefined;

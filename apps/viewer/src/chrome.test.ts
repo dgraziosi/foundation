@@ -114,6 +114,8 @@ test("journal page is a document; today is the start path", async () => {
   assert.match(journal, /journalLeaveWrite/);
   assert.match(journal, /journalLeaveKeepDraft/);
   assert.match(journal, /journalShouldKeepLeave/);
+  assert.match(journal, /leaveSkip: leave.skip, landedAt/);
+  assert.match(journal, /leaveSkip: skipSnap, landedAt/);
   assert.match(journal, /leaveSnap/);
   assert.match(journal, /journal-leave/);
   assert.match(journal, /journal-landed/);
@@ -140,6 +142,8 @@ test("journal page is a document; today is the start path", async () => {
   assert.match(saveCopy, /Saving/);
   assert.match(saveCopy, /Saved/);
   assert.match(saveCopy, /Couldn't save/);
+  assert.match(saveCopy, /landedAt\?: string/);
+  assert.doesNotMatch(saveCopy, /incoming\.base > input\.leaveSkip\.base/);
   const typeView = await src("pages/TypeViewPage.tsx");
   assert.match(typeView, /slug === "journal"/);
   assert.match(typeView, /\/journal\/today/);
