@@ -21,6 +21,9 @@ fi
 if ! grep -Fq -- 'localhost' "${backup_script}"; then
   fail "backup-vault.sh must name localhost Postgres"
 fi
+if grep -Fq -- 'postgres://foundation:foundation@' "${backup_script}"; then
+  fail "backup-vault.sh still ships a default URL with password foundation"
+fi
 
 # shellcheck source=backup-vault.sh
 source "${backup_script}"
@@ -28,6 +31,15 @@ source "${backup_script}"
 # Contract fixtures. No live vault. Drop leftover host env so clone .env
 # resolution is not shadowed by a cluster this run did not create.
 unset FOUNDATION_DATA BACKUP_ROOT DATABASE_URL
+
+empty_clone="$(mktemp -d)"
+if url="$(foundation_backup_database_url "${empty_clone}" 2>"${empty_clone}/nag")"; then
+  fail "unset DATABASE_URL must nag, not invent a URL (got: ${url})"
+fi
+if ! grep -Fq -- '.env.example' "${empty_clone}/nag"; then
+  fail "unset DATABASE_URL nag must mention .env.example (got: $(cat "${empty_clone}/nag"))"
+fi
+rm -rf -- "${empty_clone}"
 
 # Single dated dump older than 14 days must survive prune.
 tmp_one="$(mktemp -d)"

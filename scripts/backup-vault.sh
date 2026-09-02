@@ -6,8 +6,8 @@
 # Relative paths are under the clone.
 #
 #   FOUNDATION_DATA  — the vault (default ./data under the clone)
-#   DATABASE_URL     — optional. Also read from the clone .env.
-#                      Default postgres://foundation:foundation@localhost:5432/foundation
+#   DATABASE_URL     — required. Environment, else the clone .env.
+#                      No silent default. Copy .env.example and fill it.
 #   BACKUP_ROOT      — optional. Also read from the clone .env.
 #                      Default: sibling of the data dir
 #                      (./foundation-backups when FOUNDATION_DATA is ./data).
@@ -325,7 +325,11 @@ foundation_backup_database_url() {
   local repo_root="$1"
   local raw
   raw="$(foundation_backup_env_value "${repo_root}" DATABASE_URL)"
-  printf '%s\n' "${raw:-postgres://foundation:foundation@localhost:5432/foundation}"
+  if [[ -z "${raw}" ]]; then
+    echo "backup-vault: DATABASE_URL is unset. Copy .env.example to .env and fill it." >&2
+    return 1
+  fi
+  printf '%s\n' "${raw}"
 }
 
 # FOUNDATION_DATA from the environment, else the clone .env, else ./data.
