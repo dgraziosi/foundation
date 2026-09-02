@@ -292,8 +292,8 @@ test(
         INSERT INTO node_types (
           slug, label, description, kind, parent_types, json_schema, is_system
         ) VALUES (
-          'place', 'Place', 'Office, home, and the places we actually go.',
-          'artifact', '{}', NULL, true
+          'place', 'Places we go', 'Office, home, and the places we actually go.',
+          'spine', '{area}', NULL, true
         )
         `,
       );
@@ -303,9 +303,9 @@ test(
       const place = (await listNodeTypes(pool)).find((type) => type.slug === "place");
       assert.equal(place?.is_system, true);
       assert.equal(place?.description, "Office, home, and the places we actually go.");
-      assert.equal(place?.label, "Place");
-      assert.equal(place?.kind, "artifact");
-      assert.deepEqual(place?.parent_types, []);
+      assert.equal(place?.label, "Places we go");
+      assert.equal(place?.kind, "spine");
+      assert.deepEqual(place?.parent_types, ["area"]);
     } finally {
       await pool.end();
     }
@@ -313,7 +313,7 @@ test(
 );
 
 test(
-  "seed apply takes the seed row when a seed slug already exists as authored",
+  "seed apply leaves an authored collision that matches a later seed",
   { skip: !databaseUrl },
   async () => {
     if (!databaseUrl) {
@@ -360,20 +360,20 @@ test(
 
       const after = await listNodeTypes(pool);
       const place = after.find((type) => type.slug === "place");
-      assert.equal(place?.is_system, true);
-      assert.equal(place?.label, "Place");
-      assert.equal(place?.description, "A location (home, office, city, venue, …).");
+      assert.equal(place?.is_system, false);
+      assert.equal(place?.label, "Authored Place");
+      assert.equal(place?.description, "User-created place before it was a seed.");
       assert.equal(place?.kind, "artifact");
-      assert.deepEqual(place?.parent_types, []);
-      assert.equal(place?.json_schema, null);
+      assert.deepEqual(place?.parent_types, ["area"]);
+      assert.deepEqual(place?.json_schema, { type: "object" });
 
       const company = after.find((type) => type.slug === "company");
-      assert.equal(company?.is_system, true);
-      assert.equal(company?.label, "Company");
-      assert.equal(company?.description, "An organization (employer, vendor, school, …).");
+      assert.equal(company?.is_system, false);
+      assert.equal(company?.label, "Authored Company");
+      assert.equal(company?.description, "User-created company before it was a seed.");
       assert.equal(company?.kind, "artifact");
-      assert.deepEqual(company?.parent_types, []);
-      assert.equal(company?.json_schema, null);
+      assert.deepEqual(company?.parent_types, ["area"]);
+      assert.deepEqual(company?.json_schema, { type: "object" });
 
       const meeting = after.find((type) => type.slug === "meeting");
       assert.equal(meeting?.is_system, false);

@@ -40,13 +40,12 @@ export async function seedSystemOntology(pool: pg.Pool): Promise<void> {
       { hue: type.hue, glyph: type.glyph },
     );
     const compiled = compileJsonSchemaFromFields(fields);
-    const jsonSchema =
-      fields.length > 0 ? compiled : existing.is_system ? existing.json_schema : type.json_schema;
+    const jsonSchema = fields.length > 0 ? compiled : existing.json_schema;
     await updateNodeType(pool, type.slug, {
-      label: type.label,
-      description: existing.is_system ? existing.description : type.description,
-      kind: type.kind,
-      parent_types: type.parent_types,
+      label: existing.label,
+      description: existing.description,
+      kind: existing.kind,
+      parent_types: existing.parent_types,
       json_schema: jsonSchema,
       views,
       default_view: existing.default_view ?? type.default_view,
@@ -54,9 +53,6 @@ export async function seedSystemOntology(pool: pg.Pool): Promise<void> {
       hue: identity.hue,
       glyph: identity.glyph,
     });
-    await pool.query(`UPDATE node_types SET is_system = true, updated_at = now() WHERE slug = $1`, [
-      type.slug,
-    ]);
   }
 
   for (const relation of SEED_RELATION_TYPES) {
