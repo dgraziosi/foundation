@@ -271,8 +271,9 @@ test("a newer vault snapshot still keeps a clash leave draft", () => {
 
 test("leave restore does not start a write on that paint", () => {
   assert.equal(journalLeaveHoldWrite({ holdLeave: true, saveStatus: "quiet" }), "keep");
-  assert.equal(journalLeaveHoldWrite({ holdLeave: true, saveStatus: "clash" }), "keep");
   assert.equal(journalLeaveHoldWrite({ holdLeave: true, saveStatus: "failed" }), "consume");
+  assert.equal(journalLeaveHoldWrite({ holdLeave: true, saveStatus: "clash" }), "release");
+  assert.equal(journalLeaveHoldWrite({ holdLeave: true, saveStatus: "saved" }), "release");
   assert.equal(journalLeaveHoldWrite({ holdLeave: false, saveStatus: "quiet" }), null);
 });
 

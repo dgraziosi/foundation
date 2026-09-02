@@ -115,6 +115,8 @@ test("journal page is a document; today is the start path", async () => {
   assert.match(journal, /journalLeaveKeepDraft/);
   assert.match(journal, /journalShouldKeepLeave/);
   assert.match(journal, /journalLeaveHoldWrite/);
+  assert.match(journal, /holdLeave.current = false/);
+  assert.match(journal, /leaveHold === "release"/);
   assert.match(journal, /leaveSkip: leave.skip, landedAt/);
   assert.match(journal, /leaveSkip: skipSnap, landedAt/);
   assert.match(journal, /leaveSnap/);

@@ -124,6 +124,7 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
     } else {
       setEditorKey(0);
     }
+    holdLeave.current = false;
     setTitle(incoming.title);
     setBody(incoming.body);
     setBase(incoming.base);
@@ -317,14 +318,14 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
     if (!id || !base || draftId !== id) {
       return;
     }
+    const leaveHold = journalLeaveHoldWrite({ holdLeave: holdLeave.current, saveStatus });
+    if (leaveHold === "consume" || leaveHold === "release") {
+      holdLeave.current = false;
+    }
     if (saveStatus === "clash") {
       return;
     }
-    const leaveHold = journalLeaveHoldWrite({ holdLeave: holdLeave.current, saveStatus });
-    if (leaveHold === "consume") {
-      holdLeave.current = false;
-    }
-    if (leaveHold) {
+    if (leaveHold === "keep" || leaveHold === "consume") {
       return;
     }
     const inFlight = writesInFlight.current > 0;

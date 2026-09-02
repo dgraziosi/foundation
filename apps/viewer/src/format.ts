@@ -187,15 +187,21 @@ export function journalShouldKeepLeave(input: {
   return true;
 }
 
-/** Leave restore must not start a write on that paint. Failed consumes the hold so a later edit can save. */
+/** Hold only the restore paint. Clash and Saved release so later typing can write. Failed releases and skips that tick. */
 export function journalLeaveHoldWrite(input: {
   holdLeave: boolean;
   saveStatus: JournalSaveStatus;
-}): "keep" | "consume" | null {
+}): "keep" | "consume" | "release" | null {
   if (!input.holdLeave) {
     return null;
   }
-  return input.saveStatus === "failed" ? "consume" : "keep";
+  if (input.saveStatus === "quiet") {
+    return "keep";
+  }
+  if (input.saveStatus === "failed") {
+    return "consume";
+  }
+  return "release";
 }
 
 /** Remount the writing box when an adopted vault snapshot replaces the on-screen draft. */
