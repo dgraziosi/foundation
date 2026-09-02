@@ -641,13 +641,21 @@ foundation_backup_main() {
   FOUNDATION_BACKUP_MAIN_ENC_TMP=""
   trap - EXIT
 
-  if [[ -n "${offsite_abs:-}" ]]; then
-    if ! foundation_backup_copy_offsite "${backup_abs}" "${offsite_abs}"; then
-      return 1
-    fi
+  if ! foundation_backup_after_install "${backup_abs}" "${offsite_abs:-}"; then
+    return 1
   fi
+}
+
+foundation_backup_after_install() {
+  local backup_abs="$1"
+  local offsite_abs="${2:-}"
+  local offsite_rc=0
 
   foundation_backup_prune_sql "${backup_abs}/sql"
+  if [[ -n "${offsite_abs}" ]]; then
+    foundation_backup_copy_offsite "${backup_abs}" "${offsite_abs}" || offsite_rc=$?
+  fi
+  return "${offsite_rc}"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

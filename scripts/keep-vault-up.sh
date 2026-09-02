@@ -689,14 +689,25 @@ foundation_keep_vault_up_restore_lock_path() {
   printf '%s/.restore-lock\n' "${1%/}"
 }
 
+foundation_keep_vault_up_restore_lock_pid_is_live() {
+  local pid="$1"
+  [[ "${pid}" =~ ^[0-9]+$ ]] || return 1
+  kill -0 "${pid}" 2>/dev/null
+}
+
 foundation_keep_vault_up_refuse_restore_lock() {
   local data_dir="$1"
-  local lock
+  local lock pid
   lock="$(foundation_keep_vault_up_restore_lock_path "${data_dir}")"
-  if [[ -e "${lock}" ]]; then
+  if [[ ! -e "${lock}" ]]; then
+    return 0
+  fi
+  pid="$(tr -d '[:space:]' < "${lock}" 2>/dev/null || true)"
+  if foundation_keep_vault_up_restore_lock_pid_is_live "${pid}"; then
     foundation_keep_vault_up_nag "restore is running for this vault. Wait until restore finishes."
     return 1
   fi
+  rm -f -- "${lock}"
   return 0
 }
 

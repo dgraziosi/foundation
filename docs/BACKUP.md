@@ -75,7 +75,7 @@ set -a && source .env && set +a
 ./scripts/restore-vault.sh --in-place --confirm YYYYMMDD
 ```
 
-The script writes `$FOUNDATION_DATA/.restore-lock` so `scripts/keep-vault-up.sh` will not start this instance while restore runs. Decrypt uses `BACKUP_AGE_IDENTITY`. Confirm is the dump day (`YYYYMMDD`).
+The script writes `$FOUNDATION_DATA/.restore-lock` (this process id) so `scripts/keep-vault-up.sh` will not start this instance while restore runs. A leftover lock whose process is gone is not an in-progress restore. Decrypt uses `BACKUP_AGE_IDENTITY`. Confirm is the dump day (`YYYYMMDD`). In-place drops and recreates this `DATABASE_URL` database only, then loads the dump. Blobs stage first and swap only after that load succeeds.
 
 Then check `/health`, `get` a node you expect, and one blob.
 
