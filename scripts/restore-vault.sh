@@ -6,6 +6,8 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=backup-vault.sh
 source "${script_dir}/backup-vault.sh"
+# shellcheck source=keep-vault-up.sh
+source "${script_dir}/keep-vault-up.sh"
 
 FOUNDATION_RESTORE_LOCK=""
 FOUNDATION_RESTORE_PLAIN_TMP=""
@@ -17,6 +19,18 @@ foundation_restore_usage() {
 
 foundation_restore_lock_path() {
   printf '%s/.restore-lock\n' "${1%/}"
+}
+
+foundation_restore_failed_path() {
+  printf '%s/.restore-failed\n' "${1%/}"
+}
+
+foundation_restore_lock_pid_is_live() {
+  foundation_keep_vault_up_restore_lock_pid_is_live "$1"
+}
+
+foundation_restore_stop_app() {
+  foundation_keep_vault_up_stop_app "$1"
 }
 
 foundation_restore_cleanup() {
@@ -137,7 +151,7 @@ foundation_restore_main() {
   local in_place=0
   local confirm=""
   local repo_root data_dir backup_root data_abs backup_abs
-  local url identity dump_path lock plain_tmp staging
+  local url identity dump_path lock pid plain_tmp staging
 
   while (($# > 0)); do
     case "$1" in
@@ -196,8 +210,12 @@ foundation_restore_main() {
 
   lock="$(foundation_restore_lock_path "${data_abs}")"
   if [[ -e "${lock}" ]]; then
-    echo "restore-vault: restore is already running for this vault" >&2
-    return 1
+    pid="$(tr -d '[:space:]' < "${lock}" 2>/dev/null || true)"
+    if foundation_restore_lock_pid_is_live "${pid}"; then
+      echo "restore-vault: restore is already running for this vault" >&2
+      return 1
+    fi
+    rm -f -- "${lock}"
   fi
 
   (
@@ -220,6 +238,12 @@ foundation_restore_main() {
       echo "restore-vault: blob stage failed" >&2
       exit 1
     fi
+    if ! foundation_restore_stop_app "${data_abs}"; then
+      echo "restore-vault: could not stop this vault's app" >&2
+      exit 1
+    fi
+    failed="$(foundation_restore_failed_path "${data_abs}")"
+    printf '%s\n' "in-place restore did not finish" >"${failed}"
     if ! foundation_restore_recreate_database "${url}"; then
       echo "restore-vault: recreate failed" >&2
       exit 1
@@ -236,6 +260,7 @@ foundation_restore_main() {
 
     rm -f -- "${plain_tmp}"
     FOUNDATION_RESTORE_PLAIN_TMP=""
+    rm -f -- "${failed}"
     rm -f -- "${lock}"
     FOUNDATION_RESTORE_LOCK=""
     trap - EXIT

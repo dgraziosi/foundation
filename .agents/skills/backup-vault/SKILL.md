@@ -37,4 +37,4 @@ set -a && source .env && set +a
 
 Otherwise nag if the dump is missing or older than 48 hours. Newest artifact may be `foundation-YYYYMMDD.sql.age`.
 
-Throwaway restore for practice: [`docs/BACKUP.md`](../../../docs/BACKUP.md). In-place restore on this vault: [`scripts/restore-vault.sh`](../../../scripts/restore-vault.sh) with `--in-place --confirm YYYYMMDD`. Do not invent another machine.
+Throwaway restore for practice: [`docs/BACKUP.md`](../../../docs/BACKUP.md). In-place restore on this vault: [`scripts/restore-vault.sh`](../../../scripts/restore-vault.sh) with `--in-place --confirm YYYYMMDD`. That script stops this vault's app, then loads the dump. A leftover `$FOUNDATION_DATA/.restore-failed` means restore did not finish; keep-up will not start until you run restore again. Do not invent another machine.

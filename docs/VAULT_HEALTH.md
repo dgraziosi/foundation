@@ -2,7 +2,7 @@
 
 Two quiet jobs for a running Foundation **vault** (the instance). Quiet if green. Not the graph. Not an MCP tool. Not a bot wake to keep the process up.
 
-1. **Keep the vault up** — a small script on this machine’s own schedule. Starts Postgres and the app when they are down. Curls `/health`. First-day 0 user records is healthy. Nags when the data folder is missing, `PG_VERSION` is gone, start fails, health still fails, or the live folder looks like an empty cluster next to a real one. `/health` green is not enough.
+1. **Keep the vault up** — a small script on this machine’s own schedule. Starts Postgres and the app when they are down. Curls `/health`. First-day 0 user records is healthy. Nags when the data folder is missing, `PG_VERSION` is gone, start fails, health still fails, the live folder looks like an empty cluster next to a real one, or in-place restore did not finish (`.restore-failed`). `/health` green is not enough.
 2. **Weekday 9:15 written report** — Vault Keeper. Process + db, the data dir is the real vault, optional canaries, backup freshness. Does not start Postgres or the app.
 
 ## Glossary

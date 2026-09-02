@@ -40,8 +40,8 @@ fi
 if ! grep -Fq -- 'FOUNDATION_RESTORE_LOCK' "${restore_script}"; then
   fail "restore-vault.sh EXIT trap must keep lock path after foundation_restore_main returns"
 fi
-if ! grep -Fq -- 'app.pid' "${restore_script}"; then
-  fail "in-place restore must stop this vault's app (app.pid under this FOUNDATION_DATA) before DROP"
+if ! grep -Fq -- 'foundation_restore_stop_app' "${restore_script}"; then
+  fail "in-place restore must stop this vault's app before DROP"
 fi
 if ! grep -Fq -- '.restore-failed' "${restore_script}"; then
   fail "in-place restore must write .restore-failed under this FOUNDATION_DATA before DROP"
