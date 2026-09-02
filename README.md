@@ -33,7 +33,7 @@ Do not commit personal life data, documents, or secrets to this repository. Thos
 
 - [`docs/SPEC.md`](docs/SPEC.md) — product contract
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — vault and graph
-- [`docs/MCP_TOOLS.md`](docs/MCP_TOOLS.md) — 14-tool MCP surface
+- [`docs/MCP_TOOLS.md`](docs/MCP_TOOLS.md) — current MCP tools
 - [`docs/HARNESS.md`](docs/HARNESS.md) — attach the vault MCP from a named harness
 - [`docs/AGENTS.md`](docs/AGENTS.md) — starter recipes (Chief of Staff, Vault Keeper, Executive Assistant)
 - [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md) — keep the vault up on the machine (`scripts/keep-vault-up.sh`); weekday 9:15 written report

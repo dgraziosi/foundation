@@ -33,8 +33,6 @@ Do not call the graph “the Vault.”
 
 Feature brands only: Dream, Vault. Url, repo, and link are ordinary words.
 
-Do not mint Replay, Reconcile, Hygiene, Living, Code, Present, Current picture, or Pointer.
-
 Do not use “origin” as a Foundation key, search filter, or shape name. Cursor Origin is source control. It is not a vault word.
 
 Starter recipes: [`AGENTS.md`](./AGENTS.md).
@@ -66,7 +64,7 @@ Store the ref only. A Drive id cannot derive the https address (no `kind`; Docs,
 
 Indexes: `nodes_url_live_uidx`, `nodes_repo_live_uidx`. Leftover `nodes_living_live_uidx`, `nodes_code_live_uidx`, `nodes_link_live_uidx`, and `nodes_origin_live_uidx` are gone.
 
-Fixtures only: `file-fixture-1`, `repo-fixture-1`, `https://example.test/drive/file-fixture-1`. No file, mail, event, or repository bodies. No new MCP tool. No new store.
+Fixtures only: `file-fixture-1`, `repo-fixture-1`, `https://example.test/drive/file-fixture-1`. No file, mail, event, or repository bodies. Url and repo use `search`, `get`, and `upsert`. No new store.
 
 Write (fixture ids only):
 
@@ -120,9 +118,9 @@ A `spend` is one recorded money line. Prefer hanging it under a project with `ch
 
 Agents can add types and relations over time. No approval inbox.
 
-## Agent API (14 tools)
+## Agent API
 
-These names are the current surface. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md). Rewrite one record with `get`, `upsert`, and `list_activity`. It does not add a tool. A further tool still needs a SPEC amendment.
+These names are the current surface. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md). Rewrite one record with `get`, `upsert`, and `list_activity`.
 
 `bootstrap`, `search`, `lookup`, `get`, `working_set`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`.
 
@@ -164,7 +162,7 @@ A named **bot** rewrites the record on purpose. One record at a time. Not a back
 
 A bad body is rebuilt the same way. Activity already holds the snapshots. The bot reads them, writes a short body, and `get` shows that record. `undo` of the rewrite restores the previous body while that row is reversible.
 
-`working_set` is not this loop. It stays the open-work agenda around one id. Age-decay on that agenda is **out** of this amendment. The walk already loads each neighbor as a full node, so `updated_at` is already in memory. A later stale bound would be the same cheap class as the spine-root 14-day due window: no new column, no new query, no new tool. This pass does not invent that window. The rewrite loop does not need it.
+`working_set` is not this loop. It stays the open-work agenda around one id. Age-decay on that agenda is **out** of this amendment. The walk already loads each neighbor as a full node, so `updated_at` is already in memory. A later stale bound would be the same cheap class as the spine-root 14-day due window. This pass does not invent that window. The rewrite loop does not need it.
 
 ## Mail and calendar receipt
 
@@ -186,7 +184,7 @@ Url plus activity do not make done. Do not hang `kind` on url. Do not treat an a
 
 ### Shape
 
-One optional key on `data`, same JSONB bag as due. Not a column. Not a table. Not a new MCP tool.
+One optional key on `data`, same JSONB bag as due. Not a column. Not a table. Receipt uses `get`, `search`, and `upsert`.
 
 ```text
 data.receipt: { system, id, kind }
@@ -234,7 +232,7 @@ FTS already walks string values in `data`, so a query of that id or kind can hit
 
 ### Out
 
-No new MCP tool. No new store. No mail or event bodies in the vault. No `kind` on url. No embeddings.
+No new store. No mail or event bodies in the vault. No `kind` on url. No embeddings.
 
 ## Project spend
 
@@ -289,7 +287,6 @@ One type, one line, one envelope on the project. Agents record validated fields 
 
 ## Locked (do not reopen)
 
-- **14 tools** — names above. This amendment adds no tool. Rewrite one record with `get` / `upsert` / `list_activity`. A further tool still needs a SPEC amendment
 - **FTS now** — embeddings/hybrid search is later optional work, not current search
 
 ## Non-goals (v1)

@@ -6,7 +6,7 @@ After `/health` is green, the user (the human who runs this vault on this machin
 
 1. **MCP URL:** `http://127.0.0.1:8787/mcp`
 2. **API key:** send `Authorization: ApiKey YOUR_KEY`. Replace `YOUR_KEY` with `FOUNDATION_API_KEY` from `.env`. `Authorization: Bearer YOUR_KEY` is accepted. Do not commit the key.
-3. **Confirm it works:** in the harness, call `bootstrap`, or a simple `search` (for example `{ "type": "area" }`). `bootstrap` returns the starter spine. A connected harness can reach the fourteen tools already on the server.
+3. **Confirm it works:** in the harness, call `bootstrap`, or a simple `search` (for example `{ "type": "area" }`). `bootstrap` returns the starter spine. A connected harness can reach the tools already on the server.
 
 Health: `GET http://127.0.0.1:8787/health` (no key: `{ ok, service, db }`). Window: `http://127.0.0.1:8788/view` (same API key; unlock, then Home, search, recents, type views). After unlock the window can write today’s journal. Other types stay read-only. The cookie still does not open MCP. Off-box: set `VIEW_HOST=0.0.0.0`, then `http://<this-host>:8788/view`.
 

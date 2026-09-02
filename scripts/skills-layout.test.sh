@@ -144,10 +144,6 @@ fi
 if grep -Eiq -- 'current picture' "${dream_skill}"; then
   fail "Dream skill must not write current picture"
 fi
-# Do not mint these as Dream product words. The graph-hygiene folder path may stay.
-if grep -Eiq -- '(^|[^[:alnum:]./_-])(replay|reconcile|hygiene|living|code|present|pointer)([^[:alnum:]./_-]|$)' "${dream_skill}"; then
-  fail "Dream skill must not mint Replay, Reconcile, Hygiene, Living, Code, Present, or Pointer"
-fi
 if ! grep -Fq -- "rewrites the record from today's activity" "${dream_skill}"; then
   fail "Dream skill does not say it rewrites the record from today's activity"
 fi
@@ -387,6 +383,20 @@ fi
 if ! grep -Fq -- 'Merge keeps due and the other live keys' "${spec_doc}"; then
   fail "docs/SPEC.md receipt write does not say merge keeps due and the other live keys"
 fi
+spec_freeze_needles=(
+  '## Agent API (14 tools)'
+  'A further tool still needs a SPEC amendment'
+  'This amendment adds no tool'
+  'It does not add a tool.'
+  'No new MCP tool'
+  'no new tool'
+  '**14 tools**'
+)
+for needle in "${spec_freeze_needles[@]}"; do
+  if grep -Fq -- "${needle}" "${spec_doc}"; then
+    fail "docs/SPEC.md still contains freeze phrase: ${needle}"
+  fi
+done
 if [[ ! -f "${mcp_tools_doc}" ]]; then
   fail "missing ${mcp_tools_doc}"
 fi

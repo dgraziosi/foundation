@@ -1,6 +1,6 @@
 # Starter recipes
 
-After `/health` is green, paste these three bots into your harness. They use the vault MCP and the fourteen tools already on the server.
+After `/health` is green, paste these three bots into your harness. They use the vault MCP and the tools already on the server.
 
 `GET http://127.0.0.1:8787/health` should return `{ "ok": true, "service": "foundation", "db": "up" }`. How to attach MCP (URL, API key, confirm with `bootstrap` or a simple `search`): [`HARNESS.md`](./HARNESS.md).
 
@@ -62,7 +62,5 @@ Write everyday English. Tester fails a new glossary word that is not a feature n
 - **activity** — the audit log
 - **user** — the human who runs this vault on this machine
 - **bot** — a named role
-
-Do not mint Replay, Reconcile, Hygiene, Living, Code, Present, Current picture, or Pointer.
 
 If you touch MCP or these words, every skill that cites the vault ships in the same PR. Tester fails a skill that still uses a retired word, same as OPERATIONS voice.
