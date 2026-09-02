@@ -10,6 +10,7 @@ import {
   journalDraftQuiet,
   journalEditorMountKey,
   journalEntryDayTitle,
+  journalLeaveHoldWrite,
   journalLeaveKeepDraft,
   journalLeaveWrite,
   journalShouldKeepLeave,
@@ -319,8 +320,11 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
     if (saveStatus === "clash") {
       return;
     }
-    if (holdLeave.current && saveStatus === "failed") {
+    const leaveHold = journalLeaveHoldWrite({ holdLeave: holdLeave.current, saveStatus });
+    if (leaveHold === "consume") {
       holdLeave.current = false;
+    }
+    if (leaveHold) {
       return;
     }
     const inFlight = writesInFlight.current > 0;

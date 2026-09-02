@@ -9,6 +9,7 @@ import {
   journalDraftQuiet,
   journalEditorMountKey,
   journalEntryDayTitle,
+  journalLeaveHoldWrite,
   journalLeaveKeepDraft,
   journalLeaveWrite,
   journalShouldKeepLeave,
@@ -266,6 +267,13 @@ test("a newer vault snapshot still keeps a clash leave draft", () => {
     journalShouldKeepLeave({ leaveSkip, landedAt: "2026-09-01T11:59:00.000Z" }),
     true,
   );
+});
+
+test("leave restore does not start a write on that paint", () => {
+  assert.equal(journalLeaveHoldWrite({ holdLeave: true, saveStatus: "quiet" }), "keep");
+  assert.equal(journalLeaveHoldWrite({ holdLeave: true, saveStatus: "clash" }), "keep");
+  assert.equal(journalLeaveHoldWrite({ holdLeave: true, saveStatus: "failed" }), "consume");
+  assert.equal(journalLeaveHoldWrite({ holdLeave: false, saveStatus: "quiet" }), null);
 });
 
 test("the writing box remounts when an adopted vault snapshot replaces the draft", () => {

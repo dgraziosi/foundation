@@ -187,6 +187,17 @@ export function journalShouldKeepLeave(input: {
   return true;
 }
 
+/** Leave restore must not start a write on that paint. Failed consumes the hold so a later edit can save. */
+export function journalLeaveHoldWrite(input: {
+  holdLeave: boolean;
+  saveStatus: JournalSaveStatus;
+}): "keep" | "consume" | null {
+  if (!input.holdLeave) {
+    return null;
+  }
+  return input.saveStatus === "failed" ? "consume" : "keep";
+}
+
 /** Remount the writing box when an adopted vault snapshot replaces the on-screen draft. */
 export function journalEditorMountKey(id: string, adopted: number): string {
   return `${id}:${adopted}`;
