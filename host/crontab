@@ -1,0 +1,5 @@
+# Foundation host jobs. Replace /path/to/the/clone with this machine's clone.
+# Do not commit a home path.
+*/15 * * * * /path/to/the/clone/scripts/keep-vault-up.sh
+@reboot /path/to/the/clone/scripts/keep-vault-up.sh
+0 3 * * * /path/to/the/clone/scripts/backup-vault.sh

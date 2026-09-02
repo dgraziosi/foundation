@@ -36,7 +36,7 @@ Do not commit personal life data, documents, or secrets to this repository. Thos
 - [`docs/MCP_TOOLS.md`](docs/MCP_TOOLS.md) — current MCP tools
 - [`docs/HARNESS.md`](docs/HARNESS.md) — attach the vault MCP from a named harness
 - [`docs/AGENTS.md`](docs/AGENTS.md) — starter recipes (Chief of Staff, Vault Keeper, Executive Assistant)
-- [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md) — keep the vault up on the machine (`scripts/keep-vault-up.sh`); weekday 9:15 written report
+- [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md) — first-day init (`scripts/foundation-init.sh`), keep the vault up (`scripts/keep-vault-up.sh`); weekday 9:15 written report
 - [`docs/BACKUP.md`](docs/BACKUP.md) — encrypted nightly dump, off-site folder, throwaway restore, and in-place restore on this vault
 - [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md) — weekly graph report
 - [`docs/VIEWER.md`](docs/VIEWER.md) — user window contract: surfaces, shell, tokens, states
@@ -52,16 +52,16 @@ Mac and Linux. Clone this repo. Node 22 + pnpm. Postgres 16. PATH must include `
    # set FOUNDATION_API_KEY to a long random string
    ```
 
-2. Create an empty first-day data folder if it is not there yet (default `./data`). Then start Postgres (the data folder’s `postgres` tree), then the app. Durable files go under `FOUNDATION_DATA`. Empty first-day folder may init. Missing folder, or `postgres/` without `PG_VERSION`: refuse.
+2. Init the first-day vault, then start. Official init is `./scripts/foundation-init.sh` (copies `.env` when it is missing, mkdir the data folder, then keep-up). Official app start is `pnpm start` (wait for the database, migrate, seed). Keep-up starts Postgres from the data folder’s `postgres` tree, then `pnpm start`. Durable files go under `FOUNDATION_DATA`. Empty first-day folder may init. Missing folder, or `postgres/` without `PG_VERSION`: refuse.
 
    ```bash
    mkdir -p ./data
-   ./scripts/keep-vault-up.sh
+   ./scripts/foundation-init.sh
    ```
 
-   Official app start is `pnpm start` (wait for the database, migrate, seed). Wait until `GET /health` is green. Paste the starter recipes in [`docs/AGENTS.md`](docs/AGENTS.md). What “healthy” means: [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md). Graph report: [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md).
+   Wait until `GET /health` is green. Paste the starter recipes in [`docs/AGENTS.md`](docs/AGENTS.md). What “healthy” means: [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md). Graph report: [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md).
 
-   Host schedules (keep-up, nightly dump, start-on-boot) stay on this machine. Do not commit home paths. Already on Compose: dump, stop Compose, host Postgres, restore — [`docs/BACKUP.md`](docs/BACKUP.md).
+   Host schedules (keep-up, nightly dump, start-on-boot) stay on this machine. Fragments in [`host/`](host/) use `/path/to/the/clone` only. Do not commit home paths. Already on Compose: dump, stop Compose, host Postgres, restore — [`docs/BACKUP.md`](docs/BACKUP.md).
 
 3. Point an MCP client at `http://127.0.0.1:8787/mcp` with:
 

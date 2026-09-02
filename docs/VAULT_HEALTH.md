@@ -24,7 +24,7 @@ The user can run the written report, or attach it to Vault Keeper ([`AGENTS.md`]
 
 The vault is one data folder, Postgres 16, and the Foundation process. PATH must include `initdb`, `pg_ctl`, and `psql`. Migrations create `pgcrypto`, `unaccent`, `pg_trgm`, and `vector`. If a package name is not already in this repo, it is unknown here — do not guess an installer. Both programs run as the same user. Backup and the app both see that folder. Official app start is `pnpm start` (wait for the database, migrate, seed).
 
-Create an empty first-day folder (`mkdir` the data dir, default `./data`) before the first keep-up. A missing folder still refuses. Do not mkdir an empty live cluster over a miss.
+Create an empty first-day folder (`mkdir` the data dir, default `./data`) before the first keep-up. `scripts/foundation-init.sh` mkdir's that folder, then runs keep-up. A missing folder still refuses keep-up. Do not mkdir an empty live cluster over a miss.
 
 The host script starts those two programs, curls `/health`, and fails on the empty-cluster case below. Quiet when green and the live folder is the intended real cluster.
 
@@ -64,7 +64,7 @@ Run in order:
 
 Nag on stderr. Say what failed and the smallest next look (start Postgres, then from the clone: `pnpm start`; or point the script at the data dir that still holds the graph). Leave the graph and `FOUNDATION_DATA` as they are. The product does not send mail. If the machine’s scheduler mails stderr, that is the nag. The weekday 9:15 report also pings in chat if `/health` is still down that morning.
 
-The product ships [`scripts/keep-vault-up.sh`](../scripts/keep-vault-up.sh). Point the machine’s schedule at that file. Use a clone path on that machine; do not commit that path.
+The product ships [`scripts/keep-vault-up.sh`](../scripts/keep-vault-up.sh). Point the machine’s schedule at that file. Use a clone path on that machine; do not commit that path. Fragments in [`host/`](../host/) (`foundation.keep-vault-up.plist` and `crontab`) use that same placeholder.
 
 ```
 */15 * * * * /path/to/the/clone/scripts/keep-vault-up.sh

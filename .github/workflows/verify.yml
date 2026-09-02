@@ -47,5 +47,6 @@ jobs:
       - run: pnpm --filter @foundation/schema test
       - run: pnpm --filter @foundation/viewer test
       - run: bash scripts/skills-layout.test.sh
+      - run: bash scripts/foundation-init.test.sh
       - run: pnpm --filter @foundation/viewer build
       - run: pnpm --filter @foundation/server test
