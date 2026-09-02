@@ -10,7 +10,9 @@ import {
   WorkingSetInputSchema,
   WorkingSetSuccessSchema,
   ManageTypeInputSchema,
+  SEARCH_URL_STRING_SUGGESTION,
   SearchInputSchema,
+  SearchUrlFilterSchema,
   SuggestedLinkSchema,
   UpsertInputSchema,
   UpsertSuccessSchema,
@@ -50,11 +52,31 @@ test("search query is optional when a filter is set", () => {
   SearchInputSchema.parse({
     data_equals: { url: "https://example.test/drive/file-fixture-1" },
   });
-  const noUrlFilter = SearchInputSchema.parse({
+  assert.throws(() =>
+    SearchInputSchema.parse({ url: "https://example.test/drive/file-fixture-1" }),
+  );
+  const refusedUrl = SearchInputSchema.safeParse({
     url: "https://example.test/drive/file-fixture-1",
   });
-  assert.equal(noUrlFilter.url, undefined);
-  assert.equal(searchHasSelector(noUrlFilter), false);
+  assert.equal(refusedUrl.success, false);
+  if (!refusedUrl.success) {
+    assert.equal(refusedUrl.error.issues[0]?.message, SEARCH_URL_STRING_SUGGESTION);
+    assert.deepEqual(refusedUrl.error.issues[0]?.path, ["url"]);
+  }
+  assert.throws(() =>
+    SearchInputSchema.parse({ query: "Ada", url: "https://example.test/drive/file-fixture-1" }),
+  );
+  const refusedUrlWithQuery = SearchInputSchema.safeParse({
+    query: "Ada",
+    url: "https://example.test/drive/file-fixture-1",
+  });
+  assert.equal(refusedUrlWithQuery.success, false);
+  if (!refusedUrlWithQuery.success) {
+    assert.equal(refusedUrlWithQuery.error.issues[0]?.message, SEARCH_URL_STRING_SUGGESTION);
+  }
+  const objectUrl = SearchUrlFilterSchema.parse({ system: "gmail", id: "msg-1" });
+  assert.equal(objectUrl?.system, "gmail");
+  assert.equal(SearchUrlFilterSchema.parse(undefined), undefined);
   assert.ok("url" in SearchInputSchema.shape);
   assert.ok("repo" in SearchInputSchema.shape);
   assert.equal("link" in SearchInputSchema.shape, false);

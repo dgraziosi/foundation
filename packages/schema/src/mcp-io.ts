@@ -18,6 +18,7 @@ import {
   NodeStatusSchema,
   NodeTypeSchema,
   UrlIdentitySchema,
+  type UrlIdentity,
   ReceiptLookupSchema,
   RepoRefSchema,
   PayloadStorageSchema,
@@ -449,6 +450,34 @@ export const IsoDateSchema = z.string().refine(isIsoDate, {
 
 export const SearchDueKindSchema = z.enum(["overdue", "today"]);
 
+/** Shown on an empty lexical miss so agents do not treat it as “create a new node”. */
+export const SEARCH_MISS_SUGGESTION =
+  "No lexical hits. Do not upsert a duplicate. If you already have a UUID, call get. Try a shorter token or a type filter; only upsert if this entity is new.";
+
+export const SEARCH_UUID_SUGGESTION =
+  "This query is a node UUID. Prefer get when you already have an id.";
+
+export const SEARCH_NO_SELECTOR_SUGGESTION =
+  "Pass query for lexical recall, or type, status, under (child_of parent UUID), since, url, repo, receipt, due (overdue|today), due_on_or_before, due_on_or_after, or data_equals to list without a word. Do not add list_nodes.";
+
+export const SEARCH_URL_STRING_SUGGESTION =
+  "Pass { system, id } (gmail | calendar | drive). Use data_equals: { url } for the https address.";
+
+/** `{ system, id }` or omitted. A string (including a https URL) refuses. */
+export const SearchUrlFilterSchema = z
+  .union([z.string(), UrlIdentitySchema])
+  .optional()
+  .transform((value, ctx): UrlIdentity | undefined => {
+    if (typeof value === "string") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: SEARCH_URL_STRING_SUGGESTION,
+      });
+      return z.NEVER;
+    }
+    return value;
+  });
+
 export const SearchInputSchema = z.object({
   /** Lexical query. Optional when a filter is set. */
   query: z.string().optional(),
@@ -460,14 +489,9 @@ export const SearchInputSchema = z.object({
   since: z.string().min(1).optional(),
   /**
    * Unique Drive / Gmail / Calendar lookup `{ system, id }`.
-   * A https string is not a selector — that is data.url / data_equals.
+   * A string is not this filter. Use data_equals: { url } for the https address.
    */
-  url: z.preprocess((value) => {
-    if (typeof value === "string") {
-      return undefined;
-    }
-    return value;
-  }, UrlIdentitySchema.optional()),
+  url: SearchUrlFilterSchema,
   /** Unique GitHub lookup. */
   repo: RepoRefSchema.optional(),
   /** Unique receipt lookup (gmail | calendar). Kind lives on the stored node. */
@@ -494,16 +518,6 @@ export const SearchHitSchema = z.object({
   due: z.string().optional(),
 });
 export type SearchHit = z.infer<typeof SearchHitSchema>;
-
-/** Shown on an empty lexical miss so agents do not treat it as “create a new node”. */
-export const SEARCH_MISS_SUGGESTION =
-  "No lexical hits. Do not upsert a duplicate. If you already have a UUID, call get. Try a shorter token or a type filter; only upsert if this entity is new.";
-
-export const SEARCH_UUID_SUGGESTION =
-  "This query is a node UUID. Prefer get when you already have an id.";
-
-export const SEARCH_NO_SELECTOR_SUGGESTION =
-  "Pass query for lexical recall, or type, status, under (child_of parent UUID), since, url, repo, receipt, due (overdue|today), due_on_or_before, due_on_or_after, or data_equals to list without a word. Do not add list_nodes.";
 
 export function searchHasSelector(input: {
   query?: string;

@@ -9,12 +9,22 @@ import {
   REPO_HIT_SUGGESTION,
   REPO_MISS_SUGGESTION,
   SEARCH_NO_SELECTOR_SUGGESTION,
+  SEARCH_URL_STRING_SUGGESTION,
   SearchInputSchema,
   URL_FIXTURE,
   URL_HIT_SUGGESTION,
   isToolError,
 } from "@foundation/schema";
 import { getGraphNode, searchGraphNodes, upsertGraphNode } from "./graph.js";
+
+test("search.url string refuses with SEARCH_URL_STRING_SUGGESTION", () => {
+  assert.throws(() => SearchInputSchema.parse({ url: URL_FIXTURE }));
+  const hrefOnly = SearchInputSchema.safeParse({ url: URL_FIXTURE });
+  assert.equal(hrefOnly.success, false);
+  if (!hrefOnly.success) {
+    assert.equal(hrefOnly.error.issues[0]?.message, SEARCH_URL_STRING_SUGGESTION);
+  }
+});
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -268,13 +278,11 @@ test(
           assert.equal(leftoverLink.suggestion, LINK_KEY_REFUSED_SUGGESTION);
         }
 
-        const hrefOnly = SearchInputSchema.parse({ url: URL_FIXTURE });
-        assert.equal(hrefOnly.url, undefined);
-        const hrefSearch = await searchGraphNodes(pool, hrefOnly);
-        assert.equal(isToolError(hrefSearch), true);
-        if (isToolError(hrefSearch)) {
-          assert.match(hrefSearch.error, /query or a filter/);
-          assert.equal(hrefSearch.suggestion, SEARCH_NO_SELECTOR_SUGGESTION);
+        assert.throws(() => SearchInputSchema.parse({ url: URL_FIXTURE }));
+        const hrefOnly = SearchInputSchema.safeParse({ url: URL_FIXTURE });
+        assert.equal(hrefOnly.success, false);
+        if (!hrefOnly.success) {
+          assert.equal(hrefOnly.error.issues[0]?.message, SEARCH_URL_STRING_SUGGESTION);
         }
 
         for (const leftover of [
