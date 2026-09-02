@@ -9,6 +9,7 @@ import {
   journalDraftQuiet,
   journalEntryDayTitle,
   journalMayPaintSaved,
+  journalShouldAdoptVault,
   journalShouldRetryDirty,
   journalFirstSentence,
   journalHomeToday,
@@ -197,6 +198,26 @@ test("a failed write still retries a newer draft", () => {
   assert.equal(journalShouldRetryDirty(later, skip, false), true);
   assert.equal(journalShouldRetryDirty(later, skip, true), false);
   assert.equal(journalShouldRetryDirty(skip, skip, false), false);
+});
+
+test("reopen after leave flush adopts the vault body, not the stale cache", () => {
+  const skip = { title: "Morning", body: "First light.", base: "2026-09-01T12:00:00.000Z" };
+  const draft = { title: "Morning", body: "First light." };
+  const flushed = {
+    title: "Morning",
+    body: "First light.\nKept on leave.",
+    base: "2026-09-01T12:00:01.000Z",
+  };
+  assert.equal(journalShouldAdoptVault({ draft, skip, incoming: flushed }), true);
+  assert.equal(
+    journalShouldAdoptVault({
+      draft: { title: "Morning", body: "First light.\nTyped after reopen." },
+      skip,
+      incoming: flushed,
+    }),
+    false,
+  );
+  assert.equal(journalShouldAdoptVault({ draft, skip: flushed, incoming: flushed }), false);
 });
 
 test("autosave stays quiet when only editor breaks differ from the stored body", () => {

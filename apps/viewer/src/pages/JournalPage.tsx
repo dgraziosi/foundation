@@ -14,6 +14,7 @@ import {
   journalSaveCopy,
   journalSaveResultApplies,
   journalSaveWhenQuiet,
+  journalShouldAdoptVault,
   journalShouldRetryDirty,
   journalWriteTitle,
   type JournalSaveStatus,
@@ -65,22 +66,36 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
 
   useEffect(() => {
     const detail = node.data;
-    if (!id || !detail || draftId === id) {
+    if (!id || !detail) {
       return;
     }
-    const nextTitle = detail.node.title;
-    const nextBody = detail.node.payload.body ?? "";
-    setTitle(nextTitle);
-    setBody(nextBody);
-    setBase(detail.node.updated_at ?? "");
-    skip.current = { title: nextTitle, body: nextBody, base: detail.node.updated_at ?? "" };
-    baseRef.current = detail.node.updated_at ?? "";
+    const incoming = {
+      title: detail.node.title,
+      body: detail.node.payload.body ?? "",
+      base: detail.node.updated_at ?? "",
+    };
+    if (draftId === id) {
+      if (
+        !journalShouldAdoptVault({
+          draft: draftRef.current,
+          skip: skip.current,
+          incoming,
+        })
+      ) {
+        return;
+      }
+    }
+    setTitle(incoming.title);
+    setBody(incoming.body);
+    setBase(incoming.base);
+    skip.current = incoming;
+    baseRef.current = incoming.base;
     setDraftId(id);
     saveGen.current += 1;
     retriedKey.current = null;
     flushAfterWrite.current = false;
-    settled.current = "quiet";
-    setSaveStatus("quiet");
+    settled.current = draftId === id ? "saved" : "quiet";
+    setSaveStatus(draftId === id ? "saved" : "quiet");
   }, [id, node.data, draftId]);
 
   const createdAt = seeded?.node.created_at ?? node.data?.node.created_at;
@@ -110,7 +125,20 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
     baseRef.current = applied.skip.base;
     setBase(applied.skip.base);
     settled.current = "saved";
+    rememberLanded(saved);
     return applied.showSaved;
+  }
+
+  function rememberLanded(saved: NodeDetail) {
+    queryClient.setQueryData(["node", saved.node.id], saved);
+    const today = queryClient.getQueryData<NodeDetail>(["journal-today"]);
+    if (today?.node.id === saved.node.id) {
+      queryClient.setQueryData(["journal-today"], saved);
+    }
+    const peek = queryClient.getQueryData<{ node: NodeDetail["node"] | null }>(["journal-today-peek"]);
+    if (peek?.node?.id === saved.node.id) {
+      queryClient.setQueryData(["journal-today-peek"], { node: saved.node });
+    }
   }
 
   function paintIfCurrent(saved: NodeDetail) {
@@ -158,7 +186,11 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
       title: draft.title,
       body: journalPayloadBody(draft.body),
       base_updated_at: baseRef.current,
-    }).catch(() => undefined);
+    })
+      .then((saved) => {
+        rememberLanded(saved);
+      })
+      .catch(() => undefined);
   }
 
   async function refreshLists(journalId: string) {

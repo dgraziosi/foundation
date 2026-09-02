@@ -122,6 +122,21 @@ export function journalShouldRetryDirty(
   return !journalDraftQuiet(draft, skip);
 }
 
+/** Reopen after a leave flush: take the vault body when it is newer and the person has not typed again. */
+export function journalShouldAdoptVault(input: {
+  draft: JournalDraft;
+  skip: JournalSnapshot;
+  incoming: JournalSnapshot;
+}): boolean {
+  if (!input.incoming.base) {
+    return false;
+  }
+  if (input.skip.base && input.incoming.base <= input.skip.base) {
+    return false;
+  }
+  return journalDraftQuiet(input.draft, input.skip);
+}
+
 export function journalFirstSentence(body: string): string {
   const text = journalPayloadBody(body)
     .replace(/^#{1,6}\s+/gm, "")
