@@ -43,17 +43,28 @@ export function LiveMarkdown({
         [Crepe.Feature.Placeholder]: { text: INVITE, mode: "doc" },
       },
     });
+    let ready = false;
+    let cancelled = false;
     crepe.on((listener) => {
       listener.markdownUpdated((_ctx, markdown) => {
+        if (!ready) {
+          return;
+        }
         onChangeRef.current(markdown);
       });
     });
     void crepe.create().then(() => {
+      if (cancelled) {
+        return;
+      }
+      ready = true;
       if (autofocus) {
         host.querySelector<HTMLElement>(".ProseMirror")?.focus();
       }
     });
     return () => {
+      cancelled = true;
+      ready = false;
       void crepe.destroy();
     };
   }, []);

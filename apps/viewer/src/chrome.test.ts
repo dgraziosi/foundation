@@ -94,6 +94,9 @@ test("journal page is a document; today is the start path", async () => {
   assert.match(live, /Write a first sentence/);
   assert.match(live, /Crepe.Feature.BlockEdit/);
   assert.match(live, /Crepe.Feature.Placeholder/);
+  assert.match(live, /if \(!ready\)/);
+  assert.match(live, /if \(cancelled\)/);
+  assert.match(live, /ready = true/);
   assert.doesNotMatch(live, /Crepe.Feature.AI]: true/);
   const today = await src("pages/TodayJournalPage.tsx");
   assert.match(today, /fetchTodayJournal/);
