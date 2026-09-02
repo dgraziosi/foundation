@@ -11,7 +11,9 @@ import {
   WorkingSetSuccessSchema,
   ManageTypeInputSchema,
   SEARCH_URL_STRING_SUGGESTION,
+  SearchInputListedSchema,
   SearchInputSchema,
+  SearchInputWireSchema,
   SearchUrlFilterSchema,
   SuggestedLinkSchema,
   UpsertInputSchema,
@@ -78,6 +80,16 @@ test("search query is optional when a filter is set", () => {
   assert.equal(objectUrl?.system, "gmail");
   assert.equal(SearchUrlFilterSchema.parse(undefined), undefined);
   assert.ok("url" in SearchInputSchema.shape);
+  assert.equal(SearchInputListedSchema.safeParse({ url: "https://example.test/drive/file-fixture-1" }).success, false);
+  const wireHref = SearchInputWireSchema.safeParse({
+    url: "https://example.test/drive/file-fixture-1",
+  });
+  assert.equal(wireHref.success, true);
+  if (wireHref.success) {
+    assert.equal(wireHref.data.url, "https://example.test/drive/file-fixture-1");
+  }
+  const listedObject = SearchInputListedSchema.parse({ url: { system: "gmail", id: "msg-1" } });
+  assert.equal(listedObject.url?.system, "gmail");
   assert.ok("repo" in SearchInputSchema.shape);
   assert.equal("link" in SearchInputSchema.shape, false);
   assert.equal("living" in SearchInputSchema.shape, false);

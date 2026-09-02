@@ -478,7 +478,11 @@ export const SearchUrlFilterSchema = z
     return value;
   });
 
-export const SearchInputSchema = z.object({
+/**
+ * Advertised `tools/list` shape. `url` is `{ system, id }` only.
+ * A `z.string()` union here invites the call search refuses.
+ */
+export const SearchInputListedSchema = z.object({
   /** Lexical query. Optional when a filter is set. */
   query: z.string().optional(),
   type: z.string().min(1).optional(),
@@ -491,7 +495,7 @@ export const SearchInputSchema = z.object({
    * Unique Drive / Gmail / Calendar lookup `{ system, id }`.
    * A string is not this filter. Use data_equals: { url } for the https address.
    */
-  url: SearchUrlFilterSchema,
+  url: UrlIdentitySchema.optional(),
   /** Unique GitHub lookup. */
   repo: RepoRefSchema.optional(),
   /** Unique receipt lookup (gmail | calendar). Kind lives on the stored node. */
@@ -505,6 +509,18 @@ export const SearchInputSchema = z.object({
   /** Top-level data key equality (JSONB @>). One or a few keys, e.g. { kind, status }. */
   data_equals: DataEqualsSchema.optional(),
   limit: z.number().int().min(1).max(100).optional(),
+});
+
+/**
+ * SDK `tools/call` parse. Accepts a string `url` so defineTool can map
+ * `{ error, suggestion }` — the SDK otherwise throws -32602 first.
+ */
+export const SearchInputWireSchema = SearchInputListedSchema.extend({
+  url: z.unknown().optional(),
+});
+
+export const SearchInputSchema = SearchInputListedSchema.extend({
+  url: SearchUrlFilterSchema,
 });
 export type SearchInput = z.infer<typeof SearchInputSchema>;
 
