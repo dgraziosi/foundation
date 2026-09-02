@@ -42,6 +42,7 @@ const rewriteLoop = {
     limit: 50,
   },
   activities: {
+    count: 1,
     activities: [
       {
         id: ACTIVITY_ID,
@@ -98,9 +99,14 @@ test("get returns the record and no activity list", () => {
 
 test("list_activity reads one node's writes by target", () => {
   const keys = Object.keys(ListActivityInputSchema.shape);
-  assert.deepEqual(keys, ["action", "target", "since", "limit"]);
+  assert.deepEqual(keys, ["action", "target", "since", "limit", "cursor"]);
+  assert.deepEqual(Object.keys(ListActivitySuccessSchema.shape), ["activities", "count", "next"]);
   ListActivityInputSchema.parse(rewriteLoop.list_activity);
+  const strippedOffset = ListActivityInputSchema.parse({ target: NODE_ID, offset: 20 });
+  assert.equal("offset" in strippedOffset, false);
+  assert.throws(() => ListActivityInputSchema.parse({ limit: 201 }));
   const page = ListActivitySuccessSchema.parse(rewriteLoop.activities);
+  assert.equal(page.count, 1);
   const row = ActivitySchema.parse(page.activities[0]);
   assert.equal(row.target_id, NODE_ID);
   assert.equal(row.action, "update");

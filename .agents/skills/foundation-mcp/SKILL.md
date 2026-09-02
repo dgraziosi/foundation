@@ -16,9 +16,9 @@ Look up the live schema at call time (`bootstrap`, `inspect_ontology`, or the se
 - `bootstrap` — first attach / what tools and spine exist
 - `lookup` — a name, not a UUID yet
 - `get` — already have a UUID, need the record (not activity)
-- `list_activity` — already have a UUID, need the diary for that record (`target`)
+- `list_activity` — already have a UUID, need the diary for that record (`target`). After a full page, send `cursor`. Read `count`.
 - `working_set` — already have a UUID, need the open work around it
-- `search` — list or find without a bound id. `search` `{ url }` finds a Gmail, Calendar, or Drive object. `search` `{ repo }` finds a GitHub object. `search` `{ receipt }` looks up a sent-mail or cleared-event receipt, then `get`. Same tool, not a new verb.
+- `search` — list or find without a bound id. After a full page, send `cursor`. Read `count`. `search` `{ url }` finds a Gmail, Calendar, or Drive object. `search` `{ repo }` finds a GitHub object. `search` `{ receipt }` looks up a sent-mail or cleared-event receipt, then `get`. Same tool, not a new verb.
 - `upsert` — write or patch a record; passing `payload` replaces that body. A bot writes `data.receipt` after send or clear. The server does not invent it.
 - `link` — accept a suggested edge or hang a child
 

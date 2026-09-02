@@ -34,19 +34,19 @@ A first-day vault (seed types, zero user nodes) is **healthy**. Zero user nodes 
 
 ## Weekly checks (report only)
 
-Intent only — call `bootstrap` if you need the current tool surface. Prefer MCP. A read-only SQL look via `psql` on localhost is allowed when MCP cannot enumerate the whole graph (there is no `list_nodes` tool). Do not add one. `search` can list by `type` / `status` / `under` / `due` without a query (limit 100); that is a sample, not a full dump.
+Intent only — call `bootstrap` if you need the current tool list. Prefer MCP. Page `search` by type (no query) until `count` is done. There is no `list_nodes` tool. Do not add one. `since` is a time window, not a page.
 
 ### 1. Duplicate titles
 
 Live nodes (`deleted_at` is null) that share the same title (case-insensitive is enough). Report id, type, title. Do not merge them.
 
-If you cannot scan (no SQL), use `search` with type filters (no query) as a sample, say so, and stop a full-graph check — do not invent a tool.
+Page `search` `{ type }` with `cursor` until `next` is omitted. `count` is the live total for that type.
 
 ### 2. Nodes with zero edges
 
 Live nodes with no incident edges. Seed-only / empty graph: skip. Person/note/trip with no links yet can be real; report them, don’t delete them.
 
-`get` returns incident edges for a node you already know. For a full pass, read-only SQL on localhost is OK.
+`get` returns incident edges for a node you already know. For a full pass, page `search` by type, then `get` each id.
 
 ### 3. Type soup
 
@@ -64,8 +64,8 @@ Report slug, kind, parent_types. Do not `manage_type` on this routine.
 | --- | --- |
 | Types vs spine | `bootstrap` / `inspect_ontology` |
 | A known node’s edges | `get` |
-| Title recall or list by type/status/under | `search` (query optional when a filter is set; not a dump of the whole graph) |
-| Full duplicate / zero-edge scan | Read-only SQL on localhost, if needed |
+| Title recall or list by type/status/under | `search` (query optional when a filter is set; page with `cursor` until `count` is done) |
+| Full duplicate / zero-edge scan | `search` by type, follow `next`, read `count` |
 | Recent writes (context, not a fail) | `list_activity` |
 
 ## Failure / findings ping

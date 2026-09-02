@@ -196,6 +196,7 @@ export {
   type LinkSuccess,
   type NormalizedLinkEdges,
   type ListActivityInput,
+  type ListActivitySuccess,
   type DuplicatePreflightError,
   type DuplicateWarning,
   type LookupCandidate,
@@ -210,6 +211,7 @@ export {
   type NeighborRef,
   type SearchHit,
   type SearchInput,
+  type SearchSuccess,
   type SuggestedLink,
   type ToolError,
   type UndoInput,
@@ -373,6 +375,15 @@ export {
   type TypeHueName,
   type TypeIdentity,
 } from "./type-identity.js";
+export {
+  LIST_CURSOR_INVALID_SUGGESTION,
+  encodeActivityCursor,
+  encodeSearchCursor,
+  parseActivityCursor,
+  parseSearchCursor,
+  type ActivityCursorValue,
+  type SearchCursorValue,
+} from "./list-page.js";
 export {
   ActivityActionSchema,
   ActivityActorSchema,

@@ -190,6 +190,18 @@ fi
 if ! grep -Fq -- 'Skip `type` and `relation`' "${dream_skill}"; then
   fail "Dream skill does not skip type and relation activity rows"
 fi
+if grep -Fq -- 'Raise `limit`' "${dream_skill}"; then
+  fail "Dream skill still says Raise limit as the page recipe"
+fi
+if grep -Fq -- 'Raise `limit`' "${repo_root}/docs/SPEC.md"; then
+  fail "docs/SPEC.md still says Raise limit as the page recipe"
+fi
+if grep -Eiq -- 'read-only SQL look|Read-only SQL on localhost|psql on localhost is allowed|SQL look on localhost is allowed' "${repo_root}/docs/GRAPH_HYGIENE.md"; then
+  fail "docs/GRAPH_HYGIENE.md still allows a SQL graph scan"
+fi
+if grep -Eiq -- 'read-only SQL look|SQL look on localhost is allowed|psql on localhost is allowed' "${skills_root}/graph-hygiene/SKILL.md"; then
+  fail "graph-hygiene skill still allows a SQL graph scan"
+fi
 
 # Product files this Dream PR touches. Do not scan this test file:
 # the assertion itself names the locked words.

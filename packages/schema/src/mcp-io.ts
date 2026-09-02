@@ -509,6 +509,7 @@ export const SearchInputListedSchema = z.object({
   /** Top-level data key equality (JSONB @>). One or a few keys, e.g. { kind, status }. */
   data_equals: DataEqualsSchema.optional(),
   limit: z.number().int().min(1).max(100).optional(),
+  cursor: z.string().min(1).optional(),
 });
 
 /**
@@ -548,6 +549,8 @@ export function searchHasSelector(input: {
   due_on_or_before?: string;
   due_on_or_after?: string;
   data_equals?: Record<string, string>;
+  limit?: number;
+  cursor?: string;
 }): boolean {
   return Boolean(
     input.query?.trim() ||
@@ -597,8 +600,11 @@ export const RECEIPT_HIT_SUGGESTION =
 
 export const SearchSuccessSchema = z.object({
   nodes: z.array(SearchHitSchema),
+  count: z.number().int().min(0),
+  next: z.string().min(1).optional(),
   suggestion: z.string().optional(),
 });
+export type SearchSuccess = z.infer<typeof SearchSuccessSchema>;
 
 export const LOOKUP_BATCH_MAX = 20;
 export const LOOKUP_NAME_MAX = 200;
@@ -704,12 +710,16 @@ export const ListActivityInputSchema = z.object({
   target: z.string().min(1).optional(),
   since: z.string().min(1).optional(),
   limit: z.number().int().min(1).max(200).optional(),
+  cursor: z.string().min(1).optional(),
 });
 export type ListActivityInput = z.infer<typeof ListActivityInputSchema>;
 
 export const ListActivitySuccessSchema = z.object({
   activities: z.array(ActivitySchema),
+  count: z.number().int().min(0),
+  next: z.string().min(1).optional(),
 });
+export type ListActivitySuccess = z.infer<typeof ListActivitySuccessSchema>;
 
 export const UndoInputSchema = z.object({
   id: z.string().uuid(),
