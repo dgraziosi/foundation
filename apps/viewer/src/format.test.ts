@@ -9,6 +9,8 @@ import {
   journalDraftQuiet,
   journalEditorMountKey,
   journalEntryDayTitle,
+  journalLeaveKeepDraft,
+  journalLeaveWrite,
   journalMayPaintSaved,
   journalShouldAdoptVault,
   journalShouldRetryDirty,
@@ -219,6 +221,31 @@ test("reopen after leave flush adopts the vault body, not the stale cache", () =
     false,
   );
   assert.equal(journalShouldAdoptVault({ draft, skip: flushed, incoming: flushed }), false);
+});
+
+test("leave flush writes the journal we left when the draft is still dirty", () => {
+  const draft = { title: "Morning", body: "Kept on leave." };
+  const skip = { title: "Morning", body: "First light." };
+  assert.deepEqual(
+    journalLeaveWrite({ id: "a", draft, skip, base: "2026-09-01T12:00:00.000Z" }),
+    {
+      id: "a",
+      title: "Morning",
+      body: "Kept on leave.",
+      base: "2026-09-01T12:00:00.000Z",
+    },
+  );
+  assert.equal(
+    journalLeaveWrite({
+      id: "a",
+      draft: skip,
+      skip,
+      base: "2026-09-01T12:00:00.000Z",
+    }),
+    null,
+  );
+  assert.equal(journalLeaveKeepDraft(true), "clash");
+  assert.equal(journalLeaveKeepDraft(false), "failed");
 });
 
 test("the writing box remounts when an adopted vault snapshot replaces the draft", () => {

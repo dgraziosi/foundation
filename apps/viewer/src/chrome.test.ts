@@ -111,6 +111,13 @@ test("journal page is a document; today is the start path", async () => {
   assert.match(journal, /journalMayPaintSaved/);
   assert.match(journal, /journalShouldRetryDirty/);
   assert.match(journal, /journalShouldAdoptVault/);
+  assert.match(journal, /journalLeaveWrite/);
+  assert.match(journal, /journalLeaveKeepDraft/);
+  assert.match(journal, /journal-leave/);
+  assert.match(journal, /flushLeave/);
+  assert.match(journal, /leavePending/);
+  assert.match(journal, /holdLeave/);
+  assert.match(journal, /saveStatus === "clash"/);
   assert.match(journal, /journalEditorMountKey/);
   assert.match(journal, /setEditorKey/);
   assert.doesNotMatch(journal, /<LiveMarkdown\s+key=\{id\}/);
@@ -119,7 +126,8 @@ test("journal page is a document; today is the start path", async () => {
   assert.match(journal, /rememberLanded/);
   assert.match(journal, /setQueryData/);
   assert.match(journal, /writesInFlight/);
-  assert.match(journal, /flushDirty/);
+  assert.match(journal, /\}, \[id\]\);/);
+  assert.doesNotMatch(journal, /flushDirty/);
   assert.doesNotMatch(journal, /writeInFlight: false/);
   assert.doesNotMatch(journal, /todayInNewYork/);
   assert.match(journal, /Keep a title/);
@@ -226,8 +234,10 @@ test("Unlock copy is the vault key, not a staff door", async () => {
   assert.match(fallback, /<h1>Unlock\.<\/h1>/);
   assert.match(fallback, /Vault key/);
   assert.match(fallback, /That key did not unlock\./);
+  assert.match(fallback, /json\(\{ error: UNLOCK_REJECT \}\)/);
   assert.doesNotMatch(fallback, /Same key as MCP/);
   assert.doesNotMatch(fallback, /Unlock the vault window/);
+  assert.doesNotMatch(fallback, /wantsJson\(req\)[\s\S]{0,120}API key required/);
 });
 
 test("chrome uses shadcn primitives, not homemade fields", async () => {

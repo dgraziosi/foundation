@@ -137,6 +137,45 @@ export function journalShouldAdoptVault(input: {
   return journalDraftQuiet(input.draft, input.skip);
 }
 
+export type JournalLeaveWrite = {
+  id: string;
+  title: string;
+  body: string;
+  base: string;
+};
+
+/** Leave flush writes the journal we left, not the one now on screen. */
+export function journalLeaveWrite(input: {
+  id: string;
+  draft: JournalDraft;
+  skip: JournalDraft;
+  base: string;
+}): JournalLeaveWrite | null {
+  if (!input.id || !input.base) {
+    return null;
+  }
+  if (journalDraftQuiet(input.draft, input.skip)) {
+    return null;
+  }
+  return {
+    id: input.id,
+    title: input.draft.title,
+    body: journalPayloadBody(input.draft.body),
+    base: input.base,
+  };
+}
+
+/** A clash or failed leave still keeps the draft. Clash offers Reload. */
+export function journalLeaveKeepDraft(clash: boolean): "clash" | "failed" {
+  return clash ? "clash" : "failed";
+}
+
+export type JournalLeaveRecord = {
+  draft: JournalDraft;
+  skip: JournalSnapshot;
+  status: "clash" | "failed";
+};
+
 /** Remount the writing box when an adopted vault snapshot replaces the on-screen draft. */
 export function journalEditorMountKey(id: string, adopted: number): string {
   return `${id}:${adopted}`;

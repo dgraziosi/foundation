@@ -10,6 +10,8 @@ import {
   journalDraftQuiet,
   journalEditorMountKey,
   journalEntryDayTitle,
+  journalLeaveKeepDraft,
+  journalLeaveWrite,
   journalMayPaintSaved,
   journalPayloadBody,
   journalSaveCopy,
@@ -18,7 +20,10 @@ import {
   journalShouldAdoptVault,
   journalShouldRetryDirty,
   journalWriteTitle,
+  type JournalLeaveRecord,
+  type JournalLeaveWrite,
   type JournalSaveStatus,
+  type JournalSnapshot,
 } from "../format";
 import { LoadError, Placeholders, Quiet } from "../ui/States";
 
@@ -61,6 +66,13 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
   const writesInFlight = useRef(0);
   const retriedKey = useRef<string | null>(null);
   const flushAfterWrite = useRef(false);
+  const leavePending = useRef<{
+    id: string;
+    draft: { title: string; body: string };
+    skip: JournalSnapshot;
+    base: string;
+  } | null>(null);
+  const holdLeave = useRef(false);
   const idRef = useRef(id);
   idRef.current = id;
   const baseRef = useRef(base);
@@ -69,6 +81,24 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
   useEffect(() => {
     const detail = node.data;
     if (!id || !detail) {
+      return;
+    }
+    const leave = queryClient.getQueryData<JournalLeaveRecord>(["journal-leave", id]);
+    if (leave) {
+      queryClient.removeQueries({ queryKey: ["journal-leave", id] });
+      setTitle(leave.draft.title);
+      setBody(leave.draft.body);
+      setBase(leave.skip.base);
+      skip.current = leave.skip;
+      baseRef.current = leave.skip.base;
+      setDraftId(id);
+      setEditorKey((n) => n + 1);
+      saveGen.current += 1;
+      retriedKey.current = null;
+      flushAfterWrite.current = false;
+      settled.current = "quiet";
+      holdLeave.current = true;
+      setSaveStatus(leave.status);
       return;
     }
     const incoming = {
@@ -101,7 +131,7 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
     flushAfterWrite.current = false;
     settled.current = draftId === id ? "saved" : "quiet";
     setSaveStatus(draftId === id ? "saved" : "quiet");
-  }, [id, node.data, draftId]);
+  }, [id, node.data, draftId, queryClient]);
 
   const createdAt = seeded?.node.created_at ?? node.data?.node.created_at;
   const dayTitle = journalEntryDayTitle(createdAt);
@@ -113,6 +143,19 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
   titleRef.current = title;
 
   function applyLanded(mine: number, saved: NodeDetail): boolean {
+    rememberLanded(saved);
+    if (leavePending.current?.id === saved.node.id) {
+      const landed = {
+        title: saved.node.title,
+        body: saved.node.payload.body ?? "",
+        base: saved.node.updated_at ?? "",
+      };
+      leavePending.current = {
+        ...leavePending.current,
+        skip: landed,
+        base: landed.base,
+      };
+    }
     if (saved.node.id !== idRef.current) {
       return false;
     }
@@ -130,7 +173,6 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
     baseRef.current = applied.skip.base;
     setBase(applied.skip.base);
     settled.current = "saved";
-    rememberLanded(saved);
     return applied.showSaved;
   }
 
@@ -177,25 +219,50 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
     return true;
   }
 
-  function flushDirty() {
-    const journalId = idRef.current;
-    if (!journalId || !baseRef.current) {
+  function rememberLeaveDraft(
+    journalId: string,
+    draft: { title: string; body: string },
+    skipSnap: JournalSnapshot,
+    status: "clash" | "failed",
+  ) {
+    queryClient.setQueryData<JournalLeaveRecord>(["journal-leave", journalId], {
+      draft,
+      skip: skipSnap,
+      status,
+    });
+  }
+
+  function flushLeave(snap: {
+    id: string;
+    draft: { title: string; body: string };
+    skip: JournalSnapshot;
+    base: string;
+  }) {
+    const pending = journalLeaveWrite(snap);
+    if (!pending) {
       return;
     }
-    const draft = draftRef.current;
-    if (journalDraftQuiet(draft, skip.current)) {
-      return;
-    }
+    void writeLeave(pending, snap.draft, snap.skip);
+  }
+
+  function writeLeave(
+    pending: JournalLeaveWrite,
+    draft: { title: string; body: string },
+    skipSnap: JournalSnapshot,
+  ) {
     void saveJournal({
-      id: journalId,
-      title: draft.title,
-      body: journalPayloadBody(draft.body),
-      base_updated_at: baseRef.current,
+      id: pending.id,
+      title: pending.title,
+      body: pending.body,
+      base_updated_at: pending.base,
     })
       .then((saved) => {
         rememberLanded(saved);
       })
-      .catch(() => undefined);
+      .catch((error) => {
+        const clash = error instanceof ApiError && error.status === 409;
+        rememberLeaveDraft(pending.id, draft, skipSnap, journalLeaveKeepDraft(clash));
+      });
   }
 
   async function refreshLists(journalId: string) {
@@ -205,17 +272,35 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
   }
 
   useEffect(() => {
+    const journalId = id;
     return () => {
+      if (!journalId) {
+        return;
+      }
+      const snap = {
+        id: journalId,
+        draft: { ...draftRef.current },
+        skip: { ...skip.current },
+        base: baseRef.current,
+      };
       if (writesInFlight.current > 0) {
+        leavePending.current = snap;
         flushAfterWrite.current = true;
         return;
       }
-      flushDirty();
+      flushLeave(snap);
     };
-  }, []);
+  }, [id]);
 
   useEffect(() => {
     if (!id || !base || draftId !== id) {
+      return;
+    }
+    if (saveStatus === "clash") {
+      return;
+    }
+    if (holdLeave.current && saveStatus === "failed") {
+      holdLeave.current = false;
       return;
     }
     const inFlight = writesInFlight.current > 0;
@@ -278,7 +363,11 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
           writesInFlight.current -= 1;
           if (flushAfterWrite.current) {
             flushAfterWrite.current = false;
-            flushDirty();
+            const pending = leavePending.current;
+            leavePending.current = null;
+            if (pending) {
+              flushLeave(pending);
+            }
           }
         }
         if (saved) {
@@ -331,7 +420,11 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
       writesInFlight.current -= 1;
       if (flushAfterWrite.current) {
         flushAfterWrite.current = false;
-        flushDirty();
+        const pending = leavePending.current;
+        leavePending.current = null;
+        if (pending) {
+          flushLeave(pending);
+        }
       }
     }
     if (saved) {
@@ -382,14 +475,22 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
             ) : null}
           </div>
         ) : null}
-        <Suspense fallback={<p className="journal-loading">Opening the page…</p>}>
-          <LiveMarkdown
-            key={journalEditorMountKey(id, editorKey)}
+        {typeof document === "undefined" ? (
+          <textarea
+            data-editor="live-markdown"
             value={shownBody}
-            onChange={setBody}
-            autofocus={shownBody.trim() === ""}
+            onChange={(event) => setBody(event.target.value)}
           />
-        </Suspense>
+        ) : (
+          <Suspense fallback={<p className="journal-loading">Opening the page…</p>}>
+            <LiveMarkdown
+              key={journalEditorMountKey(id, editorKey)}
+              value={shownBody}
+              onChange={setBody}
+              autofocus={shownBody.trim() === ""}
+            />
+          </Suspense>
+        )}
       </div>
     </div>
   );
