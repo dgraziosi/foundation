@@ -12,7 +12,7 @@ What it owns. What it does not own.
 
 How it decides. What it must ask before doing.
 
-Write everyday English. Tester fails a new glossary word that is not a feature name. Feature brands only: Dream, Vault. Url and repo are ordinary words. Link is the edge verb. Record is the node. Activity is the audit log. The user is the human who runs this vault on this machine. A bot is a named role. Do not mint Replay, Reconcile, Hygiene, Living, Code, Present, Current picture, or Pointer.
+Write everyday English. Tester fails a new glossary word that is not a feature name. Feature brands only: Dream, Vault. Url and repo are ordinary words. Link is the edge verb. Record is the node. Activity is the audit log. The user is the human who runs this vault on this machine. A bot is a named role.
 
 ## Routines
 

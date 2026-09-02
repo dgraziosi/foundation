@@ -150,7 +150,7 @@ A blob is a file on a node, stored at `$FOUNDATION_DATA/blobs/<uuid>`. `get` ret
 
 Writes go through the graph and leave **activity**. `undo` reverses a reversible row. This is lost-update protection and a receipt, not an ACL.
 
-- **Rewrite one record:** a named bot rewrites one record on purpose: `get` → `list_activity` `{ target }` → keep what still matters, invent nothing → `upsert` the same id with a short `payload` and `base_updated_at`. One record at a time. Not a background job. The server does not invent the body. A bad body is rebuilt from the `before` / `after` snapshots already on activity. No new tool. Contract: [`SPEC.md`](./SPEC.md#rewrite-one-record).
+- **Rewrite one record:** a named bot rewrites one record on purpose: `get` → `list_activity` `{ target }` → keep what still matters, invent nothing → `upsert` the same id with a short `payload` and `base_updated_at`. One record at a time. Not a background job. The server does not invent the body. A bad body is rebuilt from the `before` / `after` snapshots already on activity. Contract: [`SPEC.md`](./SPEC.md#rewrite-one-record).
 - **Compare-and-swap:** update and `link` are if-match. Pass `base_updated_at` (or endpoint timestamps) from `get`. Compared at millisecond precision so a never-updated node (including rows that still store leftover microseconds from `now()`) can be written when the caller passes `updated_at` from `get`. If the node moved, the vault refuses with stale (get and retry) — a CAS miss is never “node not found.”
 - **Batch link:** `link` accepts one edge or `edges[]` (1–20). The whole batch validates, then one graph transaction writes every edge or none. First error wins. One activity receipt per written edge (`links[]` in input order). Each edge carries both endpoint timestamps; a later edge does not inherit CAS from an earlier edge that named the same node. Several edges that share a node still use one agreed `updated_at`. Linking does not bump `node.updated_at`. `undo` inverts one receipt. This is a graph write (live nodes and edges), not an ontology change.
 - **payload replace:** update replaces `payload` when that field is passed. Omit it and the body stays.
@@ -253,7 +253,7 @@ Agents talk to the vault over MCP. That path is not the architecture — it is t
 
 `/mcp` with `Authorization: ApiKey <FOUNDATION_API_KEY>`. Streamable HTTP on this process. Named harnesses attach with that URL and key: [`HARNESS.md`](./HARNESS.md).
 
-Fourteen tools: `bootstrap`, `search`, `lookup`, `get`, `working_set`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`. `get` is the record. `list_activity` `{ target }` is the diary. `upsert` replaces `payload` when passed.
+The current tools: `bootstrap`, `search`, `lookup`, `get`, `working_set`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`. `get` is the record. `list_activity` `{ target }` is the diary. `upsert` replaces `payload` when passed.
 
 An agent that can reach the vault MCP may read/write; one that cannot does not.
 
@@ -263,7 +263,7 @@ The user opens a window on the view publish: `/view` (`http://127.0.0.1:8788/vie
 
 ```mermaid
 flowchart LR
-  agents["Agents"] -->|"MCP — 14 tools, ApiKey"| vault["Vault"]
+  agents["Agents"] -->|"MCP, ApiKey"| vault["Vault"]
 ```
 
 Two agents may write the same node through that one MCP. Update and `link` are if-match. If the node moved, the vault **refuses**. The caller’s next move is get and retry.

@@ -8,7 +8,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createApp } from "./app.js";
 
-test("the server still registers fourteen tools", async () => {
+test("the server registers the current tools", async () => {
   const register = await readFile(
     join(dirname(fileURLToPath(import.meta.url)), "tools/register.ts"),
     "utf8",
