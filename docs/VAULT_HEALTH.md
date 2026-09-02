@@ -22,7 +22,9 @@ The user can run the written report, or attach it to Vault Keeper ([`AGENTS.md`]
 
 ## Host programs
 
-The vault is one data folder, Postgres 16, and the Foundation process. Both programs run as the same user. Backup and the app both see that folder. Official app start is `pnpm start` (wait for the database, migrate, seed).
+The vault is one data folder, Postgres 16, and the Foundation process. PATH must include `initdb`, `pg_ctl`, and `psql`. Migrations create `pgcrypto`, `unaccent`, `pg_trgm`, and `vector`. If a package name is not already in this repo, it is unknown here — do not guess an installer. Both programs run as the same user. Backup and the app both see that folder. Official app start is `pnpm start` (wait for the database, migrate, seed).
+
+Create an empty first-day folder (`mkdir` the data dir, default `./data`) before the first keep-up. A missing folder still refuses. Do not mkdir an empty live cluster over a miss.
 
 The host script starts those two programs, curls `/health`, and fails on the empty-cluster case below. Quiet when green and the live folder is the intended real cluster.
 
@@ -54,7 +56,7 @@ Run in order:
 
    Fail if the request errors, status is not 200, `ok` is not true, `service` is not `foundation`, or `db` is not `up`.
 
-6. If health is down: start Postgres (the data folder’s postgres tree), then the app (`pnpm start`) **once**. Do not loop. Do not delete the data folder. Do not write the graph. Wait until `GET /health` is green, or about one minute. If start fails: **nag** that start failed. If health still fails: **nag.** After a heal start, a failed count may nag could-not-count. Do not refuse start as empty-next-to-real.
+6. If health is down: start Postgres (the data folder’s postgres tree, unix socket under that data folder), then the app (`pnpm start`) **once**. Do not loop. Do not delete the data folder. Do not write the graph. Wait until `GET /health` is green, or about one minute. If start fails: **nag** that start failed. If health still fails: **nag.** After a heal start, a failed count may nag could-not-count. Do not refuse start as empty-next-to-real.
 
 7. `/health` green is not enough. Version file alone is not enough. A first-day vault with 0 user records is healthy. After start (or on the green path), if the live count is numeric 0 and a backup or second tree has people, **nag** empty cluster next to a real one. Do not stay quiet. Quiet only when health is green **and** the live folder is the intended real cluster (`PG_VERSION` present; not empty-live-next-to-real).
 

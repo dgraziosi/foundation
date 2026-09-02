@@ -17,10 +17,10 @@ Nightly, local time. The host script dumps. Ping the user if the dump is missing
 
 ## User config
 
-Driven only by env:
+Driven by env, else the clone `.env` (same as keep-up). Relative paths are under the clone.
 
-- `FOUNDATION_DATA` — the vault (default `./data`)
-- `BACKUP_ROOT` — optional. Default: sibling of the data dir
+- `FOUNDATION_DATA` — the vault (default `./data` under the clone)
+- `BACKUP_ROOT` — optional. Also read from the clone `.env`. Default: sibling of the data dir
 
 ## Steps
 

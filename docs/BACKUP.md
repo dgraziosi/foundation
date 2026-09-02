@@ -6,11 +6,11 @@ A **vault** is one instance (`FOUNDATION_DATA` + Postgres). Do not call the grap
 
 ## What it writes
 
-Driven only by env:
+Driven by env, else the clone `.env` (same as keep-up). Relative paths are under the clone.
 
-- `FOUNDATION_DATA` — the vault (default `./data`)
+- `FOUNDATION_DATA` — the vault (default `./data` under the clone)
 - `DATABASE_URL` — localhost Postgres (default `postgres://foundation:foundation@localhost:5432/foundation`)
-- `BACKUP_ROOT` — optional. Default: a sibling of the data dir (`./foundation-backups` when `FOUNDATION_DATA` is `./data`). Never inside `FOUNDATION_DATA`.
+- `BACKUP_ROOT` — optional. Also read from the clone `.env`. Default: a sibling of the data dir (`./foundation-backups` when `FOUNDATION_DATA` is `./data`). Relative paths are under the clone. Never inside `FOUNDATION_DATA`.
 
 Each run (the vault stays up):
 

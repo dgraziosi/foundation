@@ -11,6 +11,11 @@ readme="${repo_root}/README.md"
 # shellcheck source=keep-vault-up.sh
 source "${keep_script}"
 
+# Contract fixtures. No live vault. Drop leftover host env so fixtures
+# do not count or start a cluster this run did not create.
+unset FOUNDATION_DATA BACKUP_ROOT DATABASE_URL
+export DATABASE_URL="postgres://foundation:foundation@127.0.0.1:1/foundation"
+
 fail() {
   echo "keep-vault-up.test: $*" >&2
   exit 1
@@ -68,6 +73,30 @@ if ! grep -Fq -- 'CREATE ROLE' "${keep_script}"; then
 fi
 if ! grep -Fq -- 'pg_ctl' "${keep_script}"; then
   fail "keep-vault-up.sh must start Postgres with pg_ctl"
+fi
+if ! grep -Fq -- '-k' "${keep_script}"; then
+  fail "keep-vault-up.sh must pass a unix socket dir with -k"
+fi
+if grep -Eq -- '-k[[:space:]]+/var/run/postgresql' "${keep_script}"; then
+  fail "keep-vault-up.sh must not pass -k /var/run/postgresql"
+fi
+if ! grep -Fq -- 'vector' "${readme}"; then
+  fail "README does not name vector beside the other extensions"
+fi
+if ! grep -Fq -- 'vector' "${health_doc}"; then
+  fail "VAULT_HEALTH.md does not name vector beside the other extensions"
+fi
+if ! grep -Fq -- 'initdb' "${readme}" || ! grep -Fq -- 'pg_ctl' "${readme}" || ! grep -Fq -- 'psql' "${readme}"; then
+  fail "README does not say PATH must include initdb, pg_ctl, and psql"
+fi
+if ! grep -Fq -- 'initdb' "${health_doc}" || ! grep -Fq -- 'pg_ctl' "${health_doc}" || ! grep -Fq -- 'psql' "${health_doc}"; then
+  fail "VAULT_HEALTH.md does not say PATH must include initdb, pg_ctl, and psql"
+fi
+if ! grep -Fq -- 'mkdir -p ./data' "${readme}"; then
+  fail "README does not mkdir the empty first-day data folder"
+fi
+if ! grep -Fq -- '`mkdir` the data dir' "${health_doc}"; then
+  fail "VAULT_HEALTH.md does not say to mkdir the empty first-day data dir"
 fi
 if ! grep -Fq -- 'http://127.0.0.1:8787/health' "${keep_script}"; then
   fail "keep-vault-up.sh does not default to localhost /health"
@@ -919,6 +948,7 @@ fi
 real="${tmp_root}/real-only"
 mkdir -p "${real}/postgres"
 printf '%s\n' '16' >"${real}/postgres/PG_VERSION"
+set +e
 out="$(
   FOUNDATION_DATA="${real}"
   BACKUP_ROOT="${tmp_root}/backups-real"
@@ -928,11 +958,84 @@ out="$(
   foundation_keep_vault_up_main 2>&1
 )"
 rc=$?
+set -e
 if ((rc != 0)); then
   fail "health + real cluster fixture should exit 0 (got ${rc})"
 fi
 if [[ -n "${out}" ]]; then
   fail "health + real cluster fixture should write nothing (got: ${out})"
 fi
+
+socket_got="$(foundation_keep_vault_up_socket_dir /tmp/vault-data)"
+if [[ "${socket_got}" != "/tmp/vault-data/pg-sock" ]]; then
+  fail "socket dir should be under the data folder (got: ${socket_got})"
+fi
+listen_got="$(foundation_keep_vault_up_postgres_listen_args "/tmp/vault data/pg-sock")"
+if [[ "${listen_got}" != "-h 127.0.0.1 -p 5432 -k '/tmp/vault data/pg-sock'" ]]; then
+  fail "listen args must quote -k as one directory (got: ${listen_got})"
+fi
+
+# start_postgres mkdir's pg-sock and passes -k as one directory.
+# Fake pg_ctl; no live cluster. Data folder path has a space.
+sock_tmp="$(mktemp -d)"
+data_dir="${sock_tmp}/vault data"
+mkdir -p "${sock_tmp}/bin" "${data_dir}/postgres"
+printf '%s\n' '16' >"${data_dir}/postgres/PG_VERSION"
+cat >"${sock_tmp}/bin/pg_ctl" <<'EOF'
+#!/bin/sh
+# Record the -o string as one argv. status means not running.
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o)
+      printf 'O=%s\n' "$2" >> "${PG_CTL_LOG:?}"
+      shift 2
+      ;;
+    status)
+      exit 1
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+exit 0
+EOF
+chmod +x "${sock_tmp}/bin/pg_ctl"
+export PG_CTL_LOG="${sock_tmp}/pg_ctl.log"
+set +e
+PATH="${sock_tmp}/bin:${PATH}" foundation_keep_vault_up_start_postgres "${data_dir}"
+start_rc=$?
+set -e
+if ((start_rc != 0)); then
+  fail "start_postgres failed (rc ${start_rc}; log: $(cat "${PG_CTL_LOG}" 2>/dev/null || true))"
+fi
+want_sock="${data_dir}/pg-sock"
+if [[ ! -d "${want_sock}" ]]; then
+  fail "start_postgres must mkdir the data-folder socket dir"
+fi
+if [[ ! -f "${PG_CTL_LOG}" ]]; then
+  fail "fake pg_ctl did not record -o"
+fi
+o="$(sed -n 's/^O=//p' "${PG_CTL_LOG}" | tail -n 1)"
+if [[ -z "${o}" ]]; then
+  fail "start_postgres must pass -o (got: $(cat "${PG_CTL_LOG}"))"
+fi
+# pg_ctl feeds -o through a shell. -k must stay one directory.
+eval "set -- ${o}"
+k_dir=""
+while (($# > 0)); do
+  if [[ "$1" == "-k" ]]; then
+    k_dir="${2-}"
+    break
+  fi
+  shift
+done
+if [[ "${k_dir}" != "${want_sock}" ]]; then
+  fail "pg_ctl -o -k must be one directory with a space (got: '${k_dir}'; -o: ${o})"
+fi
+if grep -Fq -- '/var/run/postgresql' <<<"${o}"; then
+  fail "start_postgres must not pass /var/run/postgresql"
+fi
+rm -rf -- "${sock_tmp}"
 
 echo "keep-vault-up.test: ok"
