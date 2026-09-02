@@ -11,7 +11,7 @@ Unlock is the door to the Viewer. The person types the vault key. A good key set
 
 ## How to get to it (user POV)
 
-- Open `http://127.0.0.1:8788/view` (or `http://<this-host>:8788/view` from another machine on this vault) with no session cookie.
+- Open `http://127.0.0.1:8788/view` with no session cookie. Off-box is `VIEW_HOST=0.0.0.0`, then `http://<this-host>:8788/view`.
 - Open any `/view/...` route while the session is missing; the gate is the same door.
 - Submit the form labeled **Unlock**, password field `name="api_key"` labeled **Vault key**, button **Unlock**.
 
@@ -34,7 +34,7 @@ Preconditions:
 
 ## Gotchas
 
-- MCP bind is `127.0.0.1:8787`. Viewer bind is `0.0.0.0:8788`. Unlock on `:8787/view` is the wrong door.
+- MCP bind is `127.0.0.1:8787`. Viewer bind is `127.0.0.1:8788` by default. Off-box is `VIEW_HOST=0.0.0.0`. Unlock on `:8787/view` is the wrong door.
 - Without `apps/viewer/dist`, `:8788/view` still shows the unlock fallback HTML. That is enough to prove `unlock-door` and the form POST. It is not a React Home proof.
 - `Authorization: Bearer <key>` is accepted as an equivalent of `ApiKey`. The cookie is Viewer-only.
 - Do not write the key into evidence, git, or chat.

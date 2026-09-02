@@ -49,6 +49,15 @@ fi
 if ! grep -Fq -- '0 user records' "${health_doc}"; then
   fail "VAULT_HEALTH.md does not say first-day 0 user records is healthy"
 fi
+if grep -Fq -- ':foundation@' "${repo_root}/.env.example"; then
+  fail ".env.example still ships password foundation"
+fi
+if grep -Fq -- 'u.password or "foundation"' "${keep_script}"; then
+  fail "role SQL generator still defaults password to foundation"
+fi
+if grep -Fq -- 'postgres://foundation:foundation@' "${keep_script}"; then
+  fail "keep-vault-up.sh still ships a default URL with password foundation"
+fi
 if ! grep -Fq -- 'empty cluster next to a real one' "${health_doc}"; then
   fail "VAULT_HEALTH.md does not refuse an empty cluster next to a real one"
 fi
@@ -141,7 +150,7 @@ dump_copy="$(mktemp)"
 dump_bad="$(mktemp)"
 start_log="$(mktemp)"
 tmp_root="$(mktemp -d)"
-trap 'chmod u+r -- "${dump_bad}" 2>/dev/null || true; rm -f -- "${dump_empty}" "${dump_people}" "${dump_copy}" "${dump_bad}" "${start_log}"; rm -rf -- "${tmp_root}"' EXIT
+trap 'chmod u+r -- "${dump_bad}" 2>/dev/null || true; rm -f -- "${dump_empty}" "${dump_people}" "${dump_copy}" "${dump_bad}" "${start_log}"; rm -rf -- "${tmp_root}" "${empty_clone:-}"' EXIT
 
 if awk '/^foundation_keep_vault_up_sql_has_people\(\)/,/^}/' "${keep_script}" | grep -q -- 'python3'; then
   fail "sql_has_people must parse dumps in bash, not python3"
@@ -178,6 +187,23 @@ chmod u+r -- "${dump_bad}"
     fail "empty COPY must stay not-people without python3 on PATH"
   fi
 )
+
+if role_sql="$(foundation_keep_vault_up_app_role_sql 'postgres://foundation@localhost:5432/foundation' role 2>/dev/null)"; then
+  fail "role SQL must refuse a URL with no password (got: ${role_sql})"
+fi
+if grep -Fq -- "PASSWORD 'foundation'" <<<"${role_sql:-}"; then
+  fail "role SQL must not emit PASSWORD 'foundation' when the URL has no password"
+fi
+
+unset DATABASE_URL
+empty_clone="$(mktemp -d)"
+if url="$(foundation_keep_vault_up_database_url "${empty_clone}" 2>"${empty_clone}/nag")"; then
+  fail "unset DATABASE_URL must nag, not invent a URL (got: ${url})"
+fi
+if ! grep -Fq -- '.env.example' "${empty_clone}/nag"; then
+  fail "unset DATABASE_URL nag must mention .env.example (got: $(cat "${empty_clone}/nag"))"
+fi
+export DATABASE_URL="postgres://foundation:foundation@127.0.0.1:1/foundation"
 
 role_sql="$(foundation_keep_vault_up_app_role_sql 'postgres://foundation:foundation@localhost:5432/foundation' role)"
 if ! grep -Fq -- 'CREATE ROLE "foundation"' <<<"${role_sql}"; then

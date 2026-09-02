@@ -31,7 +31,7 @@ export function cookieValue(cookieHeader: string, name: string): string | undefi
   return undefined;
 }
 
-function headerApiKey(req: Request): string | undefined {
+export function headerApiKey(req: Request): string | undefined {
   const header = req.header("authorization") ?? "";
   const match = header.match(/^(ApiKey|Bearer)\s+(\S+)$/i);
   return match?.[2];

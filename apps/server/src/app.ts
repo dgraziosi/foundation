@@ -1,6 +1,6 @@
 import { pingDb, type Pool } from "@foundation/db";
 import express, { type Express } from "express";
-import { requireApiKey } from "./auth.js";
+import { headerApiKey, requireApiKey } from "./auth.js";
 import { sendBlob } from "./blobs-http.js";
 import type { AppBindings } from "./config.js";
 import { handleMcpRequest } from "./mcp.js";
@@ -25,14 +25,31 @@ function refuseAgentPaths(req: express.Request, res: express.Response, next: exp
   next();
 }
 
-function registerHealth(app: Express, pool: Pool): void {
-  app.get("/health", async (_req, res) => {
+function registerHealth(app: Express, pool: Pool, config: AppBindings): void {
+  app.get("/health", async (req, res) => {
     const db = await pingDb(pool);
-    res.status(db ? 200 : 503).json({
+    const body: Record<string, unknown> = {
       ok: db,
       service: "foundation",
       db: db ? "up" : "down",
-    });
+    };
+    const provided = headerApiKey(req);
+    if (provided && provided === config.FOUNDATION_API_KEY) {
+      if (config.HOST !== undefined) {
+        body.host = config.HOST;
+      }
+      if (config.PORT !== undefined) {
+        body.port = config.PORT;
+      }
+      if (config.VIEW_HOST !== undefined) {
+        body.view_host = config.VIEW_HOST;
+      }
+      if (config.VIEW_PORT !== undefined) {
+        body.view_port = config.VIEW_PORT;
+      }
+      body.data = config.FOUNDATION_DATA;
+    }
+    res.status(db ? 200 : 503).json(body);
   });
 }
 
@@ -89,12 +106,12 @@ export function createApp(pool: Pool, config: AppBindings, door: AppDoor = "mcp"
 
   if (door === "view") {
     app.use(refuseAgentPaths);
-    registerHealth(app, pool);
+    registerHealth(app, pool, config);
     registerViewRoutes(app, pool, config);
     return app;
   }
 
-  registerHealth(app, pool);
+  registerHealth(app, pool, config);
   registerViewRoutes(app, pool, config);
   registerMcpAndBlobs(app, pool, config);
   return app;

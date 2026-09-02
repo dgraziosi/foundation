@@ -8,8 +8,8 @@
 #   BACKUP_ROOT           — optional. Also read from the clone .env.
 #                           Default: sibling of the data dir.
 #                           Relative paths are under the clone.
-#   DATABASE_URL          — optional. Also read from the clone .env.
-#                           Default postgres://foundation:foundation@localhost:5432/foundation
+#   DATABASE_URL          — required. Environment, else the clone .env.
+#                           No silent default. Copy .env.example and fill it.
 #
 # Starts Postgres 16 (the data folder's postgres tree) and the app
 # (`pnpm start`) when /health is down. Postgres listens on
@@ -100,7 +100,11 @@ foundation_keep_vault_up_database_url() {
   local repo_root="$1"
   local raw
   raw="$(foundation_keep_vault_up_env_value "${repo_root}" DATABASE_URL)"
-  printf '%s\n' "${raw:-postgres://foundation:foundation@localhost:5432/foundation}"
+  if [[ -z "${raw}" ]]; then
+    foundation_keep_vault_up_nag "DATABASE_URL is unset. Copy .env.example to .env and fill it."
+    return 1
+  fi
+  printf '%s\n' "${raw}"
 }
 
 # HTTP 200 and { ok: true, service: "foundation", db: "up" }.
@@ -359,7 +363,10 @@ def literal(s):
 
 u = urlparse(sys.argv[1])
 user = unquote(u.username or "foundation")
-password = unquote(u.password or "foundation")
+if not u.password:
+    sys.stderr.write("DATABASE_URL has no password. Copy .env.example to .env and fill it.\n")
+    sys.exit(1)
+password = unquote(u.password)
 database = unquote((u.path or "").lstrip("/") or "foundation")
 database = database.split("?", 1)[0].split("/", 1)[0] or "foundation"
 kind = sys.argv[2]

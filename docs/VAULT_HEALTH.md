@@ -48,7 +48,7 @@ Run in order:
 
 4. Empty first-day folder may init when step 3 did not refuse. Existing folder without `PG_VERSION`: refuse.
 
-5. `GET /health` — unauthenticated. Default `http://127.0.0.1:8787/health`. Expect HTTP 200 and:
+5. `GET /health` — unauthenticated. Default `http://127.0.0.1:8787/health`. Expect HTTP 200 and exactly these keys:
 
    ```json
    { "ok": true, "service": "foundation", "db": "up" }
@@ -141,7 +141,7 @@ Intent only — tool JSON schemas change; call `bootstrap` and use what the serv
 | Data dir (the vault) | Host filesystem + `.env` `FOUNDATION_DATA`. Host-read check: `scripts/vault-data-dir.sh` (`foundation_vault_data_dir_health_pg_version`). Do not mkdir on a miss. |
 | Backup | Host filesystem at `BACKUP_ROOT` (skip only if the user unset it) |
 
-Auth for `/mcp`: `Authorization: ApiKey <FOUNDATION_API_KEY>` (Bearer equivalent). `/health` needs no key.
+Auth for `/mcp`: `Authorization: ApiKey <FOUNDATION_API_KEY>` (Bearer equivalent). `/health` needs no key for `{ ok, service, db }`. The same path with that header may add bind hosts, ports, and the data dir. A wrong key or the view cookie stays on the public object.
 
 ## Failure ping
 

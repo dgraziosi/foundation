@@ -43,7 +43,7 @@ curl -fsS http://127.0.0.1:8787/health
 # {"ok":true,"service":"foundation","db":"up"}
 ```
 
-Viewer is then `http://127.0.0.1:8788/view` (from another machine on this vault: `http://<this-host>:8788/view`). MCP / health / agent blobs stay on `127.0.0.1:8787`.
+Viewer is then `http://127.0.0.1:8788/view`. Off-box is `VIEW_HOST=0.0.0.0` (`http://<this-host>:8788/view`). MCP / health / agent blobs stay on `127.0.0.1:8787`.
 
 **Verification launch** (disposable folder, not a personal vault). Prefer the helper so the run records what it started:
 
