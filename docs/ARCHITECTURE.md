@@ -36,7 +36,7 @@ flowchart TB
   product --> other_vault
 ```
 
-The server listens on this process. MCP attach from a named harness is documented in [`HARNESS.md`](./HARNESS.md). The user window is `/view` on the view publish (`8788`) and is meant to work from another machine on this vault.
+The server listens on this process. MCP attach from a named harness is documented in [`HARNESS.md`](./HARNESS.md). The user window is `/view` on the view publish (`8788`). Both doors bind localhost by default. Off-box is `VIEW_HOST=0.0.0.0`.
 
 ## Graph
 
@@ -259,7 +259,7 @@ An agent that can reach the vault MCP may read/write; one that cannot does not.
 
 ## How the user looks at the vault
 
-The user opens a window on the view publish: `/view` (`http://127.0.0.1:8788/view`; from another machine, `http://<this-host>:8788/view`). Same API key as MCP. Same graph — not a second store. Vite + React on this process. One chrome, a content host, three surfaces: Home (Today, Recents, open tasks, type folders for types that have live objects), Collection (the type’s declared views, including graph), Detail (a page — not a docked inspector). A journal opens a writing page; title and markdown body may write (if-match, actor user). Search is a rail overlay. The rail is Home and Search. Types carry hue and glyph; Viewer reads them, with a quiet fallback when missing. Off-box unlock and session use the same key and `Path=/view` cookie. The cookie does not unlock `/mcp`. Blob bytes from the window are `GET /view/blobs/:id` (unlock cookie or Authorization header). Agents still fetch `GET /blobs/:id` with the header. Contract: [`VIEWER.md`](./VIEWER.md).
+The user opens a window on the view publish: `/view` (`http://127.0.0.1:8788/view`). Off-box is `VIEW_HOST=0.0.0.0` (`http://<this-host>:8788/view`). Same API key as MCP. Same graph — not a second store. Vite + React on this process. One chrome, a content host, three surfaces: Home (Today, Recents, open tasks, type folders for types that have live objects), Collection (the type’s declared views, including graph), Detail (a page — not a docked inspector). A journal opens a writing page; title and markdown body may write (if-match, actor user). Search is a rail overlay. The rail is Home and Search. Types carry hue and glyph; Viewer reads them, with a quiet fallback when missing. Off-box unlock and session use the same key and `Path=/view` cookie when `VIEW_HOST=0.0.0.0`. The cookie does not unlock `/mcp`. Blob bytes from the window are `GET /view/blobs/:id` (unlock cookie or Authorization header). Agents still fetch `GET /blobs/:id` with the header. Contract: [`VIEWER.md`](./VIEWER.md).
 
 ```mermaid
 flowchart LR

@@ -102,9 +102,9 @@ Mac and Linux. Clone this repo. Node 22 + pnpm. Postgres 16. PATH must include `
    set -a && source .env && set +a
    ```
 
-   **Health** (no auth): `GET http://127.0.0.1:8787/health` — `{ ok, service, db }`.
+   **Health** (no auth): `GET http://127.0.0.1:8787/health` — `{ ok, service, db }`. The same path with `Authorization: ApiKey` (or Bearer) may add bind hosts, ports, and the data dir.
 
-   **Window:** user window at `/view` (same API key as MCP). On this machine: `http://127.0.0.1:8788/view`. From another machine on this vault: `http://<this-host>:8788/view`. Unlock, then Home (Recents, open tasks, type folders), Collection, and Detail as a page. A journal is a writing page. Search is a rail overlay. The window writes journal title and markdown body only.
+   **Window:** user window at `/view` (same API key as MCP). Default bind is localhost: `http://127.0.0.1:8788/view`. Off-box: set `VIEW_HOST=0.0.0.0`, then `http://<this-host>:8788/view`. Unlock, then Home (Recents, open tasks, type folders), Collection, and Detail as a page. A journal is a writing page. Search is a rail overlay. The window writes journal title and markdown body only.
 
    **Blobs:** large files are `$FOUNDATION_DATA/blobs/<uuid>` (not git, not agent-data). Ingest with `upsert` (`payload.storage = "blob"` plus `bytes_base64`, or drop a file in `$FOUNDATION_DATA/uploads` and pass `source_path`). Cap 20MB. Fetch bytes: `GET /blobs/:id` with the API key. `get` returns blob metadata, not the file body.
 
