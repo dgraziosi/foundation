@@ -7,6 +7,9 @@ export function tabKey(tab: PathTab): string {
   if (tab.kind === "home") {
     return "home";
   }
+  if (tab.kind === "today") {
+    return "today";
+  }
   if (tab.kind === "recents") {
     return "recents";
   }
@@ -17,6 +20,9 @@ export function tabKey(tab: PathTab): string {
 }
 
 export function pathTab(pathname: string, params: { slug?: string; id?: string }): PathTab {
+  if (pathname === "/journal/today" || pathname.startsWith("/journal/today/")) {
+    return { kind: "today", label: "Today" };
+  }
   if (pathname === "/recents" || pathname.startsWith("/recents/")) {
     return { kind: "recents", label: "Recents" };
   }
@@ -32,6 +38,9 @@ export function pathTab(pathname: string, params: { slug?: string; id?: string }
 export function hrefFor(tab: PathTab): string {
   if (tab.kind === "home") {
     return "/";
+  }
+  if (tab.kind === "today") {
+    return "/journal/today";
   }
   if (tab.kind === "recents") {
     return "/recents";

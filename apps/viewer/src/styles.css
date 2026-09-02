@@ -146,6 +146,16 @@
     font-size: 15px;
   }
 
+  .journal-save {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-height: 21px;
+    color: var(--ink-2);
+    font-size: 12px;
+  }
+
   .journal-editor .milkdown {
     background: transparent;
     color: var(--ink);

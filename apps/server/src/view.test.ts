@@ -109,8 +109,11 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       const bundle = await fetch(`${origin}${script[1]}`);
       assert.equal(bundle.status, 200);
       const js = await bundle.text();
-      assert.match(js, /Unlock the vault window/);
-      assert.match(js, /Same key as MCP/);
+      assert.match(js, /Unlock\./);
+      assert.match(js, /That key did not unlock/);
+      assert.match(js, /Write today/);
+      assert.doesNotMatch(js, /Unlock the vault window/);
+      assert.doesNotMatch(js, /Same key as MCP/);
       assert.match(js, /No open tasks/);
       assert.match(js, /No views declared for this type/);
       assert.match(js, /Open tasks/);
@@ -211,7 +214,15 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
         redirect: "manual",
       });
       assert.equal(denied.status, 401);
-      assert.match(await denied.text(), /API key required/i);
+      assert.match(await denied.text(), /That key did not unlock/);
+
+      const deniedJson = await fetch(`${origin}/view/unlock`, {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ api_key: "nope" }),
+      });
+      assert.equal(deniedJson.status, 401);
+      assert.deepEqual(await deniedJson.json(), { error: "That key did not unlock." });
 
       const unlock = await fetch(`${origin}/view/unlock`, {
         method: "POST",
@@ -966,6 +977,7 @@ test("view window writes journal only; still 14 tools", async () => {
   const posts = [...view.matchAll(/app\.post\(/g)];
   assert.equal(posts.length, 2);
   assert.match(view, /app\.post\(`\$\{VIEW_PATH\}\/unlock`/);
+  assert.match(view, /app\.get\(`\$\{VIEW_PATH\}\/api\/journals\/today`/);
   assert.match(view, /app\.post\(`\$\{VIEW_PATH\}\/api\/journals\/today`/);
   assert.match(view, /app\.patch\(`\$\{VIEW_PATH\}\/api\/nodes\/:id`/);
   assert.match(view, /app\.get\(`\$\{VIEW_PATH\}\/api\/graph`/);

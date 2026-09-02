@@ -16,9 +16,10 @@ import {
   viewTasks,
   viewType,
 } from "./view-data.js";
-import { viewJournalToday, viewJournalWrite } from "./view-journal.js";
+import { viewJournalToday, viewJournalTodayPeek, viewJournalWrite } from "./view-journal.js";
 
 export const VIEW_PATH = "/view";
+const UNLOCK_REJECT = "That key did not unlock.";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -44,14 +45,14 @@ function unlockFallback(error?: string): string {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Unlock the vault window</title>
+  <title>Unlock</title>
   <style>
     :root { --canvas: #0a0a0a; --ink: #ffffff; --elevated: #171717; --accent: #ffffff; --on-accent: #0a0a0a; --removed: #ff6467; --secondary: #a1a1a1; color-scheme: dark; }
     html, body { margin: 0; min-height: 100%; background: var(--canvas); color: var(--ink); font: 400 15px/1.6 Inter, ui-sans-serif, system-ui, sans-serif; }
     main { min-height: 100dvh; display: grid; place-items: center; padding: 21px; }
     form { display: flex; flex-direction: column; gap: 13px; width: min(20rem, 100%); background: var(--elevated); border-radius: 21px; padding: 34px; }
     h1 { font-size: 21px; font-weight: 500; line-height: 1.2; letter-spacing: -0.01em; margin: 0; }
-    .quiet { color: var(--secondary); margin: 0; }
+    label { display: flex; flex-direction: column; gap: 8px; color: var(--secondary); font-size: 12px; }
     .notice { color: var(--removed); margin: 0; }
     input { padding: 8px 13px; border: 1px solid #262626; border-radius: 8px; background: var(--canvas); color: var(--ink); font: inherit; }
     button { padding: 8px 13px; border: 0; border-radius: 8px; background: var(--accent); color: var(--on-accent); font: inherit; font-weight: 500; cursor: pointer; }
@@ -60,10 +61,11 @@ function unlockFallback(error?: string): string {
 <body>
 <main>
   <form method="post" action="${VIEW_PATH}/unlock">
-    <h1>Unlock the vault window</h1>
-    <p class="quiet">Same key as MCP.</p>
+    <h1>Unlock.</h1>
+    <label>Vault key
     ${notice}
     <input type="password" name="api_key" autocomplete="current-password" required>
+    </label>
     <button type="submit">Unlock</button>
   </form>
 </main>
@@ -144,10 +146,10 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings
     if (key !== config.FOUNDATION_API_KEY) {
       res.setHeader("WWW-Authenticate", 'ApiKey realm="foundation"');
       if (wantsJson(req)) {
-        res.status(401).json({ error: "API key required" });
+        res.status(401).json({ error: UNLOCK_REJECT });
         return;
       }
-      res.status(401).type("html").send(unlockFallback("API key required"));
+      res.status(401).type("html").send(unlockFallback(UNLOCK_REJECT));
       return;
     }
     res.setHeader("Set-Cookie", apiKeyCookieHeader(key));
@@ -249,6 +251,20 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings
       res.json(got);
     } catch (error) {
       console.error("View node failed", error);
+      res.status(500).json({ error: "Could not load." });
+    }
+  });
+
+  app.get(`${VIEW_PATH}/api/journals/today`, gate, async (_req, res) => {
+    try {
+      const got = await viewJournalTodayPeek(pool, config.FOUNDATION_DATA);
+      if (got && "node" in got && got.node === null) {
+        res.json({ node: null });
+        return;
+      }
+      sendJournalResult(res, got);
+    } catch (error) {
+      console.error("View journal today peek failed", error);
       res.status(500).json({ error: "Could not load." });
     }
   });

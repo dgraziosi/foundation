@@ -243,6 +243,10 @@ export function fetchNode(id: string) {
   return viewFetch<NodeDetail>(`/view/api/nodes/${encodeURIComponent(id)}`);
 }
 
+export function peekTodayJournal() {
+  return viewFetch<{ node: NodeDetail["node"] | null }>("/view/api/journals/today");
+}
+
 export function fetchTodayJournal() {
   return viewFetch<NodeDetail>("/view/api/journals/today", { method: "POST" });
 }

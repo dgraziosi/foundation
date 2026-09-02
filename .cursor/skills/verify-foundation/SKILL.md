@@ -23,7 +23,7 @@ pstack's generic generator writes `.cursor/skills/verify-*`. This repo's product
 
 Do not write a live personal vault into git. Do not reintroduce Compose as install. Host programs: Postgres 16 on PATH (`initdb`, `pg_ctl`, `psql`) plus the app (`pnpm start`). The package name for Postgres is unknown in this repo — do not guess an installer.
 
-Journal write is on this branch. **Today** (or `/view/journal/today`) creates today's journal if none is live, then the page autosaves title and body. Other types stay display-only. Bots still write everything else through MCP.
+Journal write is on this branch. Home always offers **Today**, even at journal count 0. **Today** (or `/view/journal/today`) creates today's journal if none is live, then the page autosaves title and body. An empty title shows **Keep a title**. Unlock title is **Unlock**. The field is the vault key. The error is **That key did not unlock.** Other types stay display-only. Bots still write everything else through MCP.
 
 ## Launch
 
@@ -71,7 +71,7 @@ Viewer assets come from `apps/viewer/dist`. `pnpm start` does not build them. Be
 pnpm --filter @foundation/viewer build
 ```
 
-Without that dist, `/view` still serves the unlock fallback HTML (`Unlock the vault window`). The React Home / collection / detail / search / journal chrome needs the build.
+Without that dist, `/view` still serves the unlock fallback HTML (`Unlock.` / Vault key). The React Home / collection / detail / search / journal chrome needs the build.
 
 ## Doctor
 
@@ -86,12 +86,12 @@ Worth driving only when all of these hold:
 | Check | Expect |
 | --- | --- |
 | `GET http://127.0.0.1:8787/health` | HTTP 200 and `{ "ok": true, "service": "foundation", "db": "up" }` |
-| `GET http://127.0.0.1:8788/view` | HTTP 200 HTML. Body contains `Foundation` (built app) or `Unlock the vault window` (fallback or unlock gate) |
+| `GET http://127.0.0.1:8788/view` | HTTP 200 HTML. Body contains `Foundation` (built app) or `Unlock.` / `Vault key` (fallback or unlock gate) |
 | Ports | MCP/health on `8787`, Viewer on `8788`. If this run launched, the state file names the data dir and app pid we started |
 | Auth | `FOUNDATION_API_KEY` is set in the environment, else this run's key file (`verify-foundation.sh key-file`), else the clone `.env`. Do not print the key |
 | Build | For a full window drive: `apps/viewer/dist/index.html` exists |
 
-If health is down, the instance is not worth driving. Do not invent graph rows to make Home look populated. An empty first-day vault is a valid Viewer: Recents **Nothing yet.** and open tasks **No open tasks.**
+If health is down, the instance is not worth driving. Do not invent graph rows to make Home look populated. An empty first-day vault is a valid Viewer: Today **Write today**, Recents **Nothing yet.** and open tasks **No open tasks.**
 
 ## Drive
 
@@ -101,19 +101,20 @@ Stable handles (prefer these over coordinates):
 
 | Handle | What it is |
 | --- | --- |
-| heading `Unlock the vault window` | Unlock door |
-| password field `name="api_key"` | Unlock key (no accessible name on the input) |
+| heading `Unlock.` | Unlock door |
+| field label `Vault key`, password `name="api_key"` | Vault key |
 | button `Unlock` | Submit unlock |
 | `[data-surface="home"]` | Home |
+| `[data-surface="home-today"]` | Home Today. Empty: **Write today**. |
 | rail text `Home` / `Search` | Left rail. Collapsed Search uses `aria-label="Search"` |
 | `[data-surface="search-overlay"]` | Search overlay. Heading `Search`, search field placeholder `Search the graph`, button `Close` |
 | `[data-surface="view-strip"]` | Content-host strip. Pinned `Home` plus open collection/detail tabs |
 | `[data-surface="detail-page"]` | Detail page |
 | `[data-surface="graph"]` | Collection graph layout |
 | `[data-surface="journal-page"]` | Journal write page (not Properties) |
-| `aria-label="Title"` | Journal title |
+| `aria-label="Title"` | Journal title. Empty title shows **Keep a title** |
 | `[data-editor="live-markdown"]` | Journal body. Placeholder `Write a first sentence.` |
-| button `Today` | Journal collection → `/view/journal/today` |
+| button `Today` | Home Today and journal collection → `/view/journal/today` |
 | `aria-label="View"` | Collection layout switcher |
 | `aria-label="Show completed"` | Collection session chrome (does not write) |
 | `aria-label="Theme"` | Rail Light / Dark / System |

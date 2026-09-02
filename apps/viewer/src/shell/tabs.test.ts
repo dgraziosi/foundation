@@ -9,6 +9,15 @@ import {
 
 const noteId = "11111111-1111-4111-8111-111111111111";
 
+test("today is a content tab, not Home", () => {
+  const today = pathTab("/journal/today", {});
+  assert.equal(today.kind, "today");
+  const added = syncHostTabs([], today);
+  assert.equal(added.length, 1);
+  const again = syncHostTabs(added, today);
+  assert.equal(again, added);
+});
+
 test("opening a collection or detail does not loop setState", () => {
   const collection = pathTab("/types/task", { slug: "task" });
   const added = syncHostTabs([], collection);

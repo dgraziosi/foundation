@@ -1,6 +1,8 @@
 # Proofs
 
-Journal write is on this branch. **Today** (`/view/journal/today`, `POST /view/api/journals/today`) creates today's journal if none is live. The page autosaves title and one markdown body on that record (`PATCH /view/api/nodes/:id`). Unlock quiet copy is `Same key as MCP.` Home has no Today control. Other types stay display-only. The Viewer cookie does not unlock MCP.
+Journal write is on this branch. Home always offers **Today**, even at journal count 0. **Today** (`/view/journal/today`, `POST /view/api/journals/today`) creates today's journal if none is live. The page autosaves title and one markdown body on that record (`PATCH /view/api/nodes/:id`). An empty title shows **Keep a title**. Unlock title is **Unlock.** The field is the vault key. The error is **That key did not unlock.** Other types stay display-only. The Viewer cookie does not unlock MCP.
+
+Historical proof runs below may mention older door copy. The current window is the paragraph above.
 
 Live journal HTTP was not driven on the VMs that ran these proofs. Host Postgres 16 was not on PATH (`initdb`, `pg_ctl`, `psql`). That is a run limitation. The feature is on the branch.
 
@@ -14,7 +16,7 @@ Live Unlock HTTP was not driven. Host programs never started.
 
 What that run drove instead, as the skill allows when launch is blocked:
 
-- Feature id `unlock-door`. The built Viewer bundle contained `Unlock the vault window`, `Same key as MCP.`, `API key required`, and `Unlock`.
+- Feature id `unlock-door`. The built Viewer bundle contained the unlock door and button **Unlock**. Current door copy is **Unlock.** / vault key / **That key did not unlock.**
 - Viewer tests passed. The write contract is `window writes journal only`.
 - `pnpm test` exited 0. `skills-layout.test: ok`. Server tests that need `DATABASE_URL` skipped.
 

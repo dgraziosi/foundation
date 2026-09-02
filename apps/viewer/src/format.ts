@@ -34,6 +34,221 @@ export function journalDayLabel(iso?: string, now = new Date()): string {
   }).format(stamp);
 }
 
+/** Calendar-day title the window writes when the person leaves the first line empty. */
+export function journalDayTitle(day: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
+  if (!match) {
+    return day;
+  }
+  const stamp = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12);
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(stamp));
+}
+
+export type JournalSaveStatus = "quiet" | "saving" | "saved" | "clash" | "failed";
+
+export function journalWriteTitle(title: string, dayTitle: string): { title: string; keepTitle: boolean } {
+  const trimmed = title.trim();
+  if (trimmed) {
+    return { title: trimmed, keepTitle: false };
+  }
+  return { title: dayTitle, keepTitle: true };
+}
+
+/** Calendar-day title for this journal, from its created day, not wall-clock today. */
+export function journalEntryDayTitle(createdAt?: string, now = new Date()): string {
+  const stamp = createdAt && !Number.isNaN(Date.parse(createdAt)) ? new Date(createdAt) : now;
+  return journalDayTitle(todayInNewYork(stamp));
+}
+
+export function journalSaveWhenQuiet(input: {
+  status: JournalSaveStatus;
+  writeInFlight: boolean;
+  settled: "quiet" | "saved";
+}): JournalSaveStatus | null {
+  if (input.writeInFlight) {
+    return null;
+  }
+  if (input.status === "saving" || input.status === "clash" || input.status === "failed") {
+    return input.settled;
+  }
+  return null;
+}
+
+export function journalSaveResultApplies(generation: number, current: number): boolean {
+  return generation === current;
+}
+
+export type JournalDraft = { title: string; body: string };
+export type JournalSnapshot = { title: string; body: string; base: string };
+
+/** A write that landed always becomes the next save's base. Saved only when this write is current and the draft still matches it. */
+export function journalApplyLandedWrite(input: {
+  generation: number;
+  current: number;
+  draft: JournalDraft;
+  landed: JournalSnapshot;
+}): { skip: JournalSnapshot; showSaved: boolean } {
+  return {
+    skip: {
+      title: input.landed.title,
+      body: input.landed.body,
+      base: input.landed.base,
+    },
+    showSaved:
+      journalSaveResultApplies(input.generation, input.current) &&
+      journalDraftQuiet(input.draft, input.landed),
+  };
+}
+
+/** Saved and title rewrite only when the on-screen draft still matches what landed. */
+export function journalMayPaintSaved(draft: JournalDraft, landed: JournalDraft): boolean {
+  return journalDraftQuiet(draft, landed);
+}
+
+/** After a failed write, retry a newer draft once. A clash waits for Reload. */
+export function journalShouldRetryDirty(
+  draft: JournalDraft,
+  skip: JournalDraft,
+  clash: boolean,
+): boolean {
+  if (clash) {
+    return false;
+  }
+  return !journalDraftQuiet(draft, skip);
+}
+
+/** Reopen after a leave flush: take the vault body when it is newer and the person has not typed again. */
+export function journalShouldAdoptVault(input: {
+  draft: JournalDraft;
+  skip: JournalSnapshot;
+  incoming: JournalSnapshot;
+}): boolean {
+  if (!input.incoming.base) {
+    return false;
+  }
+  if (input.skip.base && input.incoming.base <= input.skip.base) {
+    return false;
+  }
+  return journalDraftQuiet(input.draft, input.skip);
+}
+
+export type JournalLeaveWrite = {
+  id: string;
+  title: string;
+  body: string;
+  base: string;
+};
+
+/** Leave flush writes the journal we left, not the one now on screen. */
+export function journalLeaveWrite(input: {
+  id: string;
+  draft: JournalDraft;
+  skip: JournalDraft;
+  base: string;
+}): JournalLeaveWrite | null {
+  if (!input.id || !input.base) {
+    return null;
+  }
+  if (journalDraftQuiet(input.draft, input.skip)) {
+    return null;
+  }
+  return {
+    id: input.id,
+    title: input.draft.title,
+    body: journalPayloadBody(input.draft.body),
+    base: input.base,
+  };
+}
+
+/** A clash or failed leave still keeps the draft. Clash offers Reload. */
+export function journalLeaveKeepDraft(clash: boolean): "clash" | "failed" {
+  return clash ? "clash" : "failed";
+}
+
+export type JournalLeaveRecord = {
+  draft: JournalDraft;
+  skip: JournalSnapshot;
+  status: "clash" | "failed";
+};
+
+/** Our later landed write wins. A newer vault snapshot from a clash does not drop the draft. */
+export function journalShouldKeepLeave(input: {
+  leaveSkip: JournalSnapshot;
+  landedAt?: string;
+}): boolean {
+  if (input.landedAt && input.leaveSkip.base && input.landedAt > input.leaveSkip.base) {
+    return false;
+  }
+  return true;
+}
+
+/** Hold only the restore paint. Clash and Saved release so later typing can write. Failed releases and skips that tick. */
+export function journalLeaveHoldWrite(input: {
+  holdLeave: boolean;
+  saveStatus: JournalSaveStatus;
+}): "keep" | "consume" | "release" | null {
+  if (!input.holdLeave) {
+    return null;
+  }
+  if (input.saveStatus === "quiet") {
+    return "keep";
+  }
+  if (input.saveStatus === "failed") {
+    return "consume";
+  }
+  return "release";
+}
+
+/** Remount the writing box when an adopted vault snapshot replaces the on-screen draft. */
+export function journalEditorMountKey(id: string, adopted: number): string {
+  return `${id}:${adopted}`;
+}
+
+export function journalFirstSentence(body: string): string {
+  const text = journalPayloadBody(body)
+    .replace(/^#{1,6}\s+/gm, "")
+    .trim();
+  if (!text) {
+    return "";
+  }
+  const line = text.split(/\n+/)[0] ?? "";
+  if (line.length <= 160) {
+    return line;
+  }
+  return `${line.slice(0, 159)}…`;
+}
+
+export function journalHomeToday(
+  body: string | undefined,
+  dayTitle: string,
+): { invite: string; day: string; prose: string | null } {
+  const prose = journalFirstSentence(body ?? "");
+  if (!prose) {
+    return { invite: "Write today", day: dayTitle, prose: null };
+  }
+  return { invite: dayTitle, day: dayTitle, prose };
+}
+
+export function journalSaveCopy(
+  status: JournalSaveStatus,
+  keepTitle: boolean,
+): { status: string | null; reload: boolean; keepTitle: boolean } {
+  const label =
+    status === "saving"
+      ? "Saving"
+      : status === "saved"
+        ? "Saved"
+        : status === "clash" || status === "failed"
+          ? "Couldn't save"
+          : null;
+  return { status: label, reload: status === "clash", keepTitle };
+}
+
 export function journalPayloadBody(source: string): string {
   return source.replace(/<br\s*\/?>\n?/gi, "\n").replace(/\n{3,}/g, "\n\n");
 }

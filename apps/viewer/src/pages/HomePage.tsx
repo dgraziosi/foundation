@@ -1,16 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { fetchOntology, fetchRecents, fetchTasks } from "../api";
+import { fetchOntology, fetchRecents, fetchTasks, peekTodayJournal } from "../api";
 import {
   HOME_WIDGET_LIMIT,
   RECENCY_GROUPS,
   TASK_DUE_GROUPS,
   compareOpenTasks,
   compareRecentRows,
+  journalDayTitle,
+  journalHomeToday,
   recencyGroup,
   relativeTime,
   taskDueGroup,
+  todayInNewYork,
 } from "../format";
 import { useShell } from "../shell/context";
 import { useThemeLane } from "../theme";
@@ -20,7 +24,9 @@ import { LoadError, Placeholders, Quiet } from "../ui/States";
 
 export function HomePage() {
   const { openDetail, openCollection, openRecents } = useShell();
+  const navigate = useNavigate();
   const lane = useThemeLane();
+  const todayPeek = useQuery({ queryKey: ["journal-today-peek"], queryFn: peekTodayJournal });
   const ontology = useQuery({ queryKey: ["ontology"], queryFn: fetchOntology });
   const recents = useQuery({
     queryKey: ["recents", HOME_WIDGET_LIMIT],
@@ -35,10 +41,32 @@ export function HomePage() {
     .sort(compareRecentRows)
     .slice(0, HOME_WIDGET_LIMIT);
   const folders = (ontology.data?.types ?? []).filter((type) => type.count > 0);
+  const todayCard = journalHomeToday(todayPeek.data?.node?.payload.body, journalDayTitle(todayInNewYork()));
 
   return (
     <div className="h-full min-h-0 flex-1 overflow-y-auto" data-surface="home">
       <div className="flex flex-col gap-lg p-lg">
+          <Button
+            type="button"
+            variant="outline"
+            size="row"
+            className="h-auto flex-col items-start gap-sm rounded-lg p-md"
+            data-surface="home-today"
+            onClick={() => navigate("/journal/today")}
+          >
+            <span className="text-label text-muted-foreground">Today</span>
+            {todayCard.prose ? (
+              <>
+                <span className="text-display-m font-medium">{todayCard.day}</span>
+                <span className="whitespace-pre-wrap text-left text-body text-muted-foreground">{todayCard.prose}</span>
+              </>
+            ) : (
+              <>
+                <span className="text-display-m font-medium">Write today</span>
+                <span className="text-body text-muted-foreground">{todayCard.day}</span>
+              </>
+            )}
+          </Button>
           <div className="grid grid-cols-1 gap-md xl:grid-cols-2">
             <Card>
               <CardHeader className="flex-row items-center justify-between">

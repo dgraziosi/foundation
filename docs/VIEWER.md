@@ -12,7 +12,7 @@ One chrome. A content host. Three surfaces. The ontology owns identity and which
 
 | Surface | What it is |
 | --- | --- |
-| Home | Recents, open tasks, and type folders. |
+| Home | Today, Recents, open tasks, and type folders. |
 | Collection | One type's objects in the layout that type declared. |
 | Detail | One object, as a page in the content host. Title, body, structure, properties. |
 
@@ -44,7 +44,7 @@ Right-click a graph node: local graph, depth **1–4**, default **2**.
 
 **Left rail.** Logo, then Home, then Search. Collapse to icons. Width **56px** collapsed, **224px** expanded. Theme toggle lives here.
 
-Home opens Recents, open tasks, and type folders. Search opens the search overlay.
+Home opens Today, Recents, open tasks, and type folders. Search opens the search overlay. The rail is Home and Search. Today is not a rail item.
 
 **Content host.** View strip across the top of the main pane. Home is pinned. Opening a collection or a detail is a view in this strip. The active view fills the pane under the strip.
 
@@ -53,6 +53,8 @@ Home opens Recents, open tasks, and type folders. Search opens the search overla
 ---
 
 ## Home
+
+**Today.** Always on Home, even when the journal type has a zero count. Empty: **Write today** and the calendar day. After a first sentence, the first line of that prose. Open: today's journal page. Peek does not create a record.
 
 **Recents.** Last **5** live objects that are not tasks, newest first. No status filter. Open and completed tasks both stay out — Recents is not an agenda. Grouped **Today / Yesterday / Earlier this week / Earlier**. Each row: type glyph, title, relative time. **View all** opens Recents. Empty: **Nothing yet.**
 
@@ -105,9 +107,9 @@ Empty collection: **Nothing yet.** Filtered to zero: **Nothing matches your filt
 
 ## Journal
 
-A dated reflection. Opening a journal record opens a writing page, not the inspector. The day sits above the title. The title is the first line. The body is a live markdown document (shortcuts resolve in place, slash menu, block handles). One `text/markdown` payload. Autosave. Properties stay off the page.
+A dated reflection. Opening a journal record opens a writing page, not the inspector. The day sits above the title. The title is the first line. The body is a live markdown document (shortcuts resolve in place, slash menu, block handles). One `text/markdown` payload. Autosave. Properties stay off the page. Save copy: **Saving**, **Saved**, **Couldn't save**. A clash offers **Reload** and keeps the draft on screen. An empty title shows **Keep a title** and writes the calendar-day title.
 
-**Today.** From the Journal collection, **Today** opens today's entry. If none exists, the window creates one (writer is the user) and puts the cursor in the body. A deleted today entry stays deleted; Today makes a new one. Same record a bot can `get`. Updates use if-match. A clash does not overwrite. The cookie still does not unlock `/mcp`.
+**Today.** From Home or the Journal collection, **Today** opens today's entry as the writing page. If none exists, the window creates one (writer is the user) and puts the cursor in the body. A deleted today entry stays deleted; Today makes a new one. Same record a bot can `get`. Updates use if-match. A clash does not overwrite. The cookie still does not unlock `/mcp`.
 
 ## Detail
 
@@ -143,6 +145,7 @@ Completed tasks on Home Open tasks, while seed `task` still declares `status = a
 
 | Surface | Default filter |
 | --- | --- |
+| Home Today | Live journal for today, if one exists. Peek does not create. Always shown. |
 | Home Recents | Live objects that are not tasks. No status clause. Cap **5**, newest first. |
 | Home Open tasks | The `task` type's `default_view` filter, then urgency, then cap **5**. Seed: `status = active`. |
 | Home Type folders | Types with live objects. Count is live objects of that type. Open uses that type's `default_view`. |
@@ -184,4 +187,4 @@ Journal title and markdown body only. Same if-match as MCP. Writer is the user. 
 
 ## Copy
 
-Empty Recents and empty collections: **Nothing yet.** Empty open-tasks: **No open tasks.** Filtered collection: **Nothing matches your filters.** Unlock errors: the copy already on the door.
+Empty Recents and empty collections: **Nothing yet.** Empty open-tasks: **No open tasks.** Filtered collection: **Nothing matches your filters.** Empty Home Today: **Write today** and the calendar day. Unlock title: **Unlock.** The field is the vault key. Unlock error: **That key did not unlock.**

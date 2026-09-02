@@ -3,7 +3,9 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { AuthError, unlock } from "../api";
+import { unlock } from "../api";
+
+const UNLOCK_ERROR = "That key did not unlock.";
 
 export function UnlockPage() {
   const [error, setError] = useState<string | null>(null);
@@ -19,8 +21,8 @@ export function UnlockPage() {
     try {
       await unlock(apiKey);
       await queryClient.invalidateQueries({ queryKey: ["session"] });
-    } catch (err) {
-      setError(err instanceof AuthError ? err.message : "API key required");
+    } catch {
+      setError(UNLOCK_ERROR);
     } finally {
       setBusy(false);
     }
@@ -31,9 +33,11 @@ export function UnlockPage() {
       <Card className="w-full max-w-[20rem] rounded-2xl">
         <CardContent className="flex flex-col gap-md p-xl">
           <form className="flex flex-col gap-md" onSubmit={(event) => void onSubmit(event)}>
-            <h1 className="text-display-m">Unlock the vault window</h1>
-            <p className="text-muted-foreground">Same key as MCP.</p>
-            <Input type="password" name="api_key" autoComplete="current-password" required />
+            <h1 className="text-display-m">Unlock.</h1>
+            <label className="flex flex-col gap-sm text-label text-muted-foreground">
+              Vault key
+              <Input type="password" name="api_key" autoComplete="current-password" required />
+            </label>
             {error ? <p className="text-removed">{error}</p> : null}
             <Button type="submit" disabled={busy}>
               Unlock
