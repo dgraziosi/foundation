@@ -568,5 +568,15 @@ done
 [[ "${map_blob}" == *"Write today"* ]] || fail "verify-foundation map must show Today on Home"
 [[ "${map_blob}" == *"That key did not unlock"* ]] || fail "verify-foundation map must use person unlock error"
 [[ "${map_blob}" == *"Keep a title"* ]] || fail "verify-foundation map must show Keep a title"
+unlock_map="${map_root}/features/unlock.md"
+unlock_blob="$(cat "${unlock_map}")"
+[[ "${unlock_blob}" == *"-X POST http://127.0.0.1:8787/mcp"* ]] || fail "unlock cookie-scope must POST /mcp"
+[[ "${unlock_blob}" == *"/blobs/"* ]] || fail "unlock cookie-scope must also prove agent /blobs/:id"
+if grep -Fq 'curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:8787/mcp' "${unlock_map}"; then
+  fail "unlock cookie-scope must not use GET /mcp (GET is never a tools call)"
+fi
+skill_blob="$(cat "${map_root}/SKILL.md")"
+[[ "${skill_blob}" == *"curl -sS http://127.0.0.1:8788/view/api/journals/today"* ]] || fail "SKILL Drive must show Today peek GET"
+[[ "${skill_blob}" == *"Does not create"* ]] || fail "SKILL Drive must say the Today peek GET does not create"
 
 echo "verify-foundation.test: ok"

@@ -145,11 +145,13 @@ curl -sS http://127.0.0.1:8788/view/api/session -H "Authorization: ApiKey $(cat 
 curl -sS "http://127.0.0.1:8788/view/api/recents?limit=5" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
 curl -sS "http://127.0.0.1:8788/view/api/tasks?limit=5" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
 curl -sS http://127.0.0.1:8788/view/api/ontology -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
+# Home Today peek. Does not create. First-day: {"node":null}
+curl -sS http://127.0.0.1:8788/view/api/journals/today -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
 curl -sS "http://127.0.0.1:8788/view/api/types/task" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
 curl -sS "http://127.0.0.1:8788/view/api/nodes/<UUID>" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
 curl -sS "http://127.0.0.1:8788/view/api/search?q=Fixture" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
 
-# journal write (the only Viewer mutation)
+# journal write (the only Viewer mutation). POST creates today's journal if none is live.
 curl -sS -X POST http://127.0.0.1:8788/view/api/journals/today \
   -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
 curl -sS -X PATCH http://127.0.0.1:8788/view/api/nodes/<UUID> \
