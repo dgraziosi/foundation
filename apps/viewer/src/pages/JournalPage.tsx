@@ -12,6 +12,7 @@ import {
   journalEntryDayTitle,
   journalLeaveKeepDraft,
   journalLeaveWrite,
+  journalShouldKeepLeave,
   journalMayPaintSaved,
   journalPayloadBody,
   journalSaveCopy,
@@ -83,29 +84,39 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
     if (!id || !detail) {
       return;
     }
-    const leave = queryClient.getQueryData<JournalLeaveRecord>(["journal-leave", id]);
-    if (leave) {
-      queryClient.removeQueries({ queryKey: ["journal-leave", id] });
-      setTitle(leave.draft.title);
-      setBody(leave.draft.body);
-      setBase(leave.skip.base);
-      skip.current = leave.skip;
-      baseRef.current = leave.skip.base;
-      setDraftId(id);
-      setEditorKey((n) => n + 1);
-      saveGen.current += 1;
-      retriedKey.current = null;
-      flushAfterWrite.current = false;
-      settled.current = "quiet";
-      holdLeave.current = true;
-      setSaveStatus(leave.status);
-      return;
-    }
     const incoming = {
       title: detail.node.title,
       body: detail.node.payload.body ?? "",
       base: detail.node.updated_at ?? "",
     };
+    const landedAt = queryClient.getQueryData<string>(["journal-landed", id]);
+    const leave = queryClient.getQueryData<JournalLeaveRecord>(["journal-leave", id]);
+    if (leave) {
+      queryClient.removeQueries({ queryKey: ["journal-leave", id] });
+      if (
+        journalShouldKeepLeave({
+          leaveSkip: leave.skip,
+          incoming: {
+            ...incoming,
+            base: landedAt && landedAt > incoming.base ? landedAt : incoming.base,
+          },
+        })
+      ) {
+        setTitle(leave.draft.title);
+        setBody(leave.draft.body);
+        setBase(leave.skip.base);
+        skip.current = leave.skip;
+        baseRef.current = leave.skip.base;
+        setDraftId(id);
+        setEditorKey((n) => n + 1);
+        saveGen.current += 1;
+        retriedKey.current = null;
+        settled.current = "quiet";
+        holdLeave.current = true;
+        setSaveStatus(leave.status);
+        return;
+      }
+    }
     if (draftId === id) {
       if (
         !journalShouldAdoptVault({
@@ -128,7 +139,6 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
     setDraftId(id);
     saveGen.current += 1;
     retriedKey.current = null;
-    flushAfterWrite.current = false;
     settled.current = draftId === id ? "saved" : "quiet";
     setSaveStatus(draftId === id ? "saved" : "quiet");
   }, [id, node.data, draftId, queryClient]);
@@ -141,6 +151,20 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
   draftRef.current = { title: written.title, body };
   const titleRef = useRef(title);
   titleRef.current = title;
+  const leaveSnap = useRef<{
+    id: string;
+    draft: { title: string; body: string };
+    skip: JournalSnapshot;
+    base: string;
+  } | null>(null);
+  if (id && draftId === id) {
+    leaveSnap.current = {
+      id,
+      draft: { title: written.title, body },
+      skip: { ...skip.current },
+      base: baseRef.current,
+    };
+  }
 
   function applyLanded(mine: number, saved: NodeDetail): boolean {
     rememberLanded(saved);
@@ -177,6 +201,8 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
   }
 
   function rememberLanded(saved: NodeDetail) {
+    queryClient.removeQueries({ queryKey: ["journal-leave", saved.node.id] });
+    queryClient.setQueryData(["journal-landed", saved.node.id], saved.node.updated_at ?? "");
     queryClient.setQueryData(["node", saved.node.id], saved);
     const today = queryClient.getQueryData<NodeDetail>(["journal-today"]);
     if (today?.node.id === saved.node.id) {
@@ -225,6 +251,16 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
     skipSnap: JournalSnapshot,
     status: "clash" | "failed",
   ) {
+    const current = queryClient.getQueryData<NodeDetail>(["node", journalId]);
+    const landedAt = queryClient.getQueryData<string>(["journal-landed", journalId]);
+    const incoming = {
+      title: current?.node.title ?? "",
+      body: current?.node.payload.body ?? "",
+      base: landedAt && landedAt > (current?.node.updated_at ?? "") ? landedAt : (current?.node.updated_at ?? ""),
+    };
+    if (!journalShouldKeepLeave({ leaveSkip: skipSnap, incoming })) {
+      return;
+    }
     queryClient.setQueryData<JournalLeaveRecord>(["journal-leave", journalId], {
       draft,
       skip: skipSnap,
@@ -277,12 +313,10 @@ export function JournalPage({ id: forcedId, initial }: { id?: string; initial?: 
       if (!journalId) {
         return;
       }
-      const snap = {
-        id: journalId,
-        draft: { ...draftRef.current },
-        skip: { ...skip.current },
-        base: baseRef.current,
-      };
+      const snap = leaveSnap.current?.id === journalId ? leaveSnap.current : null;
+      if (!snap) {
+        return;
+      }
       if (writesInFlight.current > 0) {
         leavePending.current = snap;
         flushAfterWrite.current = true;

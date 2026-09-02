@@ -11,6 +11,7 @@ import {
   journalEntryDayTitle,
   journalLeaveKeepDraft,
   journalLeaveWrite,
+  journalShouldKeepLeave,
   journalMayPaintSaved,
   journalShouldAdoptVault,
   journalShouldRetryDirty,
@@ -246,6 +247,13 @@ test("leave flush writes the journal we left when the draft is still dirty", () 
   );
   assert.equal(journalLeaveKeepDraft(true), "clash");
   assert.equal(journalLeaveKeepDraft(false), "failed");
+});
+
+test("a later landed write drops an older leave draft", () => {
+  const leaveSkip = { title: "Morning", body: "Old leave.", base: "2026-09-01T12:00:00.000Z" };
+  const later = { title: "Morning", body: "Newer save.", base: "2026-09-01T12:00:03.000Z" };
+  assert.equal(journalShouldKeepLeave({ leaveSkip, incoming: later }), false);
+  assert.equal(journalShouldKeepLeave({ leaveSkip, incoming: leaveSkip }), true);
 });
 
 test("the writing box remounts when an adopted vault snapshot replaces the draft", () => {

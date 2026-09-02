@@ -176,6 +176,17 @@ export type JournalLeaveRecord = {
   status: "clash" | "failed";
 };
 
+/** A later landed write wins. Do not restore or store an older leave draft. */
+export function journalShouldKeepLeave(input: {
+  leaveSkip: JournalSnapshot;
+  incoming: JournalSnapshot;
+}): boolean {
+  if (input.incoming.base && input.leaveSkip.base && input.incoming.base > input.leaveSkip.base) {
+    return false;
+  }
+  return true;
+}
+
 /** Remount the writing box when an adopted vault snapshot replaces the on-screen draft. */
 export function journalEditorMountKey(id: string, adopted: number): string {
   return `${id}:${adopted}`;

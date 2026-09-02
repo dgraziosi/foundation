@@ -113,7 +113,10 @@ test("journal page is a document; today is the start path", async () => {
   assert.match(journal, /journalShouldAdoptVault/);
   assert.match(journal, /journalLeaveWrite/);
   assert.match(journal, /journalLeaveKeepDraft/);
+  assert.match(journal, /journalShouldKeepLeave/);
+  assert.match(journal, /leaveSnap/);
   assert.match(journal, /journal-leave/);
+  assert.match(journal, /journal-landed/);
   assert.match(journal, /flushLeave/);
   assert.match(journal, /leavePending/);
   assert.match(journal, /holdLeave/);
