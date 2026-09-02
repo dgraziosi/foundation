@@ -552,4 +552,21 @@ kill -KILL "${last_leftover_pid}" "${last_success_pid}" 2>/dev/null || true
 
 rm -rf -- "${real_bin}"
 
+# Current window copy. A cold agent must not learn the old door or Home map.
+map_root="$(cd "${script_dir}/.." && pwd)"
+map_blob="$(cat "${map_root}/SKILL.md" "${map_root}/features/"*.md "${map_root}/PROOF.md")"
+for banned in \
+  "Unlock the vault window" \
+  "Same key as MCP" \
+  "API key required" \
+  "Title is required" \
+  "Home has no Today" \
+  "Home does not link to Today"
+do
+  [[ "${map_blob}" != *"${banned}"* ]] || fail "verify-foundation map still says '${banned}'"
+done
+[[ "${map_blob}" == *"Write today"* ]] || fail "verify-foundation map must show Today on Home"
+[[ "${map_blob}" == *"That key did not unlock"* ]] || fail "verify-foundation map must use person unlock error"
+[[ "${map_blob}" == *"Keep a title"* ]] || fail "verify-foundation map must show Keep a title"
+
 echo "verify-foundation.test: ok"

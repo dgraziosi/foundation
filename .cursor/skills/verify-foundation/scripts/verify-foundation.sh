@@ -420,7 +420,7 @@ verify_cmd_doctor() {
     echo "doctor: view GET ${view_url} -> ${view_code} (want 200)"
     return 1
   fi
-  if [[ "${view_body}" == *"Unlock the vault window"* || "${view_body}" == *"Foundation"* ]]; then
+  if [[ "${view_body}" == *"Foundation"* || "${view_body}" == *"Unlock."* || "${view_body}" == *"Vault key"* ]]; then
     echo "doctor: view GET 200 (unlock door or Foundation chrome)"
   else
     echo "doctor: view GET 200 but body did not look like Viewer"
