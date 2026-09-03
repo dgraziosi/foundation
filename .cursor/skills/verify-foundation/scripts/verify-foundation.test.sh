@@ -621,10 +621,18 @@ workflow_blob="$(cat "${workflow}")"
 redacted="$(printf '%s\n' "Set-Cookie: foundation_key=super-secret; Path=/view; HttpOnly" | verify_http_redact_set_cookie)"
 [[ "${redacted}" == *"foundation_key=<redacted>"* ]] || fail "HTTP drive must redact Set-Cookie values"
 [[ "${redacted}" != *"super-secret"* ]] || fail "HTTP drive left a cookie value in evidence"
+redacted_lc="$(printf '%s\n' "set-cookie: foundation_key=super-secret; Path=/view; HttpOnly" | verify_http_redact_set_cookie)"
+[[ "${redacted_lc}" == *"foundation_key=<redacted>"* ]] || fail "HTTP drive must redact set-cookie case-insensitively"
 verify_http_drive_home_empty '{"rows":[]}' '{"tasks":[]}' '{"node":null}' \
   || fail "HTTP drive must accept first-day empty Home JSON"
 if verify_http_drive_home_empty '{"rows":[{"title":"Fixture"}]}' '{"tasks":[]}' '{"node":null}' 2>/dev/null; then
   fail "HTTP drive must fail when Recents is not empty"
+fi
+if verify_http_drive_home_empty '{"rows":[]}' '{"tasks":[]}' '{"error":"Could not load."}' 2>/dev/null; then
+  fail "HTTP drive must fail when Today peek is an error body"
+fi
+if verify_http_drive_home_empty '{"rows":[]}' '{"tasks":[]}' '{}' 2>/dev/null; then
+  fail "HTTP drive must fail when Today peek omits node"
 fi
 
 echo "verify-foundation.test: ok"

@@ -3,7 +3,10 @@
 set -euo pipefail
 
 verify_http_redact_set_cookie() {
-  sed -E 's/(Set-Cookie:[[:space:]]*[^=]+=)[^;]*/\1<redacted>/I'
+  python3 -c '
+import re, sys
+print(re.sub(r"(Set-Cookie:\s*[^=]+=)[^;]*", r"\1<redacted>", sys.stdin.read(), flags=re.I), end="")
+'
 }
 
 verify_http_drive_fail() {
@@ -25,9 +28,16 @@ if recents.get("rows") != []:
     raise SystemExit("recents.rows is not empty")
 if tasks.get("tasks") != []:
     raise SystemExit("tasks.tasks is not empty")
-if today.get("node") is not None:
+if "node" not in today or today["node"] is not None:
     raise SystemExit("journals/today peek is not empty")
 ' "$1" "$2" "$3"
+}
+
+verify_http_drive_authed_get() {
+  local dest="$1" url="$2" label="$3" key="$4"
+  local code
+  code="$(curl -sS -o "${dest}" -w "%{http_code}" -H "Authorization: ApiKey ${key}" "${url}")"
+  [[ "${code}" == "200" ]] || verify_http_drive_fail "${label} was not HTTP 200"
 }
 
 verify_http_drive() {
@@ -66,14 +76,18 @@ verify_http_drive() {
     verify_http_drive_fail "unlock evidence contains the vault key"
   fi
 
-  session_body="$(curl -sS http://127.0.0.1:8788/view/api/session -H "Authorization: ApiKey ${key}")"
-  recents_body="$(curl -sS "http://127.0.0.1:8788/view/api/recents?limit=5" -H "Authorization: ApiKey ${key}")"
-  tasks_body="$(curl -sS "http://127.0.0.1:8788/view/api/tasks?limit=5" -H "Authorization: ApiKey ${key}")"
-  today_body="$(curl -sS http://127.0.0.1:8788/view/api/journals/today -H "Authorization: ApiKey ${key}")"
-  printf '%s\n' "${session_body}" >"${home_dir}/session.json"
-  printf '%s\n' "${recents_body}" >"${home_dir}/recents.json"
-  printf '%s\n' "${tasks_body}" >"${home_dir}/tasks.json"
-  printf '%s\n' "${today_body}" >"${home_dir}/today.json"
+  verify_http_drive_authed_get "${home_dir}/session.json" \
+    "http://127.0.0.1:8788/view/api/session" "session" "${key}"
+  verify_http_drive_authed_get "${home_dir}/recents.json" \
+    "http://127.0.0.1:8788/view/api/recents?limit=5" "recents" "${key}"
+  verify_http_drive_authed_get "${home_dir}/tasks.json" \
+    "http://127.0.0.1:8788/view/api/tasks?limit=5" "tasks" "${key}"
+  verify_http_drive_authed_get "${home_dir}/today.json" \
+    "http://127.0.0.1:8788/view/api/journals/today" "today peek" "${key}"
+  session_body="$(cat -- "${home_dir}/session.json")"
+  recents_body="$(cat -- "${home_dir}/recents.json")"
+  tasks_body="$(cat -- "${home_dir}/tasks.json")"
+  today_body="$(cat -- "${home_dir}/today.json")"
   verify_http_drive_json_ok "${session_body}" || verify_http_drive_fail "session body is not JSON"
   [[ "${session_body}" == *'"ok":true'* ]] || verify_http_drive_fail "session was not ok"
   verify_http_drive_home_empty "${recents_body}" "${tasks_body}" "${today_body}" \
