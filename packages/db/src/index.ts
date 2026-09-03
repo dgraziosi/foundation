@@ -47,6 +47,7 @@ export {
   isChildOfParent,
   listEdgesAmong,
   listEdgesTouching,
+  listInboundRefPointers,
   listIncidentEdges,
   listIncidentEdgesForNodes,
   listLiveNodesByIds,

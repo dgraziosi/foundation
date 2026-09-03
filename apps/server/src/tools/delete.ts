@@ -10,7 +10,7 @@ export function registerDeleteTool(server: McpServer, pool: Pool, agent: AgentPr
   defineTool(server, {
     name: "delete",
     description:
-      "Soft-delete a node. Needs a key with destructive scope and base_updated_at from get (if-match).",
+      "Soft-delete a node. Needs a key with destructive scope and base_updated_at from get (if-match). Refuses when a live record still points at this id via a declared ref field; clear data.<field> with upsert, then retry.",
     input: DeleteInputSchema.shape,
     output: MutationOkSchema,
     handler: async (input) => deleteGraphNode(pool, input, writeContextOf(agent)),

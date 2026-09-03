@@ -17,9 +17,11 @@ export {
 export {
   findInBatchLinkDuplicate,
   listValidRelationSlugs,
+  validateExistingLink,
   validateLink,
   validateLinkSequence,
   type ExistingEdge,
+  type ExistingLinkPair,
   type LinkBatchDuplicateErr,
   type LinkProposal,
   type LinkSequenceErr,

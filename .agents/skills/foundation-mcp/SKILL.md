@@ -19,8 +19,9 @@ Look up the live schema at call time (`bootstrap`, `inspect_ontology`, or the se
 - `list_activity` — already have a UUID, need the diary for that record (`target`). After a full page, send `cursor`. Read `count`.
 - `working_set` — already have a UUID, need the open work around it
 - `search` — list or find without a bound id. After a full page, send `cursor`. Read `count`. `search` `{ url }` finds a Gmail, Calendar, or Drive object. `search` `{ repo }` finds a GitHub object. `search` `{ receipt }` looks up a sent-mail or cleared-event receipt, then `get`. Same tool, not a new verb.
-- `upsert` — write or patch a record; passing `payload` replaces that body. A bot writes `data.receipt` after send or clear. The server does not invent it.
+- `upsert` — write or patch a record; passing `payload` replaces that body. A bot writes `data.receipt` after send or clear. The server does not invent it. Changing `type` revalidates live incident edges and refuses if one would no longer be allowed (unlink first).
 - `link` — accept a suggested edge or hang a child
+- `delete` — soft-delete a live node. Refuses when a live `ref` field still points at that id (clear the field first).
 
 A record is what is true now, short. History stays in activity. To rewrite one record: `get` → `list_activity` `{ target }` → keep what still matters, invent nothing → `upsert` the same id with a short `payload` and `base_updated_at`. One record at a time. Not a background job. The server does not invent the body.
 

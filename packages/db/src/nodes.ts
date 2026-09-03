@@ -874,6 +874,34 @@ export async function listIncidentEdgesForNodes(
   return result;
 }
 
+export type InboundRefPointer = {
+  node_id: string;
+  title: string;
+  type: string;
+  field: string;
+};
+
+export async function listInboundRefPointers(
+  db: Queryable,
+  targetId: string,
+): Promise<InboundRefPointer[]> {
+  const { rows } = await db.query<InboundRefPointer>(
+    `SELECT n.id AS node_id, n.title, n.type, f.field AS field
+     FROM nodes n
+     JOIN node_types t ON t.slug = n.type
+     CROSS JOIN LATERAL (
+       SELECT elem->>'name' AS field
+       FROM jsonb_array_elements(COALESCE(t.fields, '[]'::jsonb)) elem
+       WHERE elem->>'kind' = 'ref'
+         AND COALESCE(elem->>'name', '') <> ''
+     ) f
+     WHERE n.deleted_at IS NULL
+       AND n.data ->> f.field = $1`,
+    [targetId],
+  );
+  return rows;
+}
+
 /** Live edges only: both endpoints must not be soft-deleted. Used by link validation. */
 export async function listEdgesTouching(
   db: Queryable,

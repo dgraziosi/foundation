@@ -18,6 +18,14 @@ export type LinkProposal = {
   upgrade?: boolean;
 };
 
+export type ExistingLinkPair = {
+  from_id: string;
+  to_id: string;
+  relation_type: string;
+  from_type: string;
+  to_type: string;
+};
+
 export type LinkValidationOk = {
   ok: true;
   relation_type: string;
@@ -143,61 +151,21 @@ export function validateLink(
     }
   }
 
-  const relation = relationTypes.find((item) => item.slug === relationType);
-  if (!relation) {
-    return {
-      ok: false,
-      error: `Unknown relation_type "${relationType}"`,
-      suggestion: `Known relation types: ${known.join(", ")}`,
-    };
+  const typesOk = validateExistingLink(
+    {
+      from_id: proposal.from_id,
+      to_id: proposal.to_id,
+      relation_type: relationType,
+      from_type: proposal.from_type,
+      to_type: proposal.to_type,
+    },
+    { nodeTypes, relationTypes },
+  );
+  if (!typesOk.ok) {
+    return typesOk;
   }
 
-  if (relation.source_types.length > 0 && !relation.source_types.includes(proposal.from_type)) {
-    const swap = listValidRelationSlugs(proposal.to_type, proposal.from_type, {
-      nodeTypes,
-      relationTypes,
-    });
-    return {
-      ok: false,
-      error: `Relation "${relationType}" does not allow source type "${proposal.from_type}"`,
-      suggestion: swap.includes(relationType)
-        ? `Swap source and target. Allowed source types: ${relation.source_types.join(", ")}`
-        : `Allowed source types: ${relation.source_types.join(", ")}. Valid verbs ${proposal.from_type} → ${proposal.to_type}: ${listValidRelationSlugs(proposal.from_type, proposal.to_type, { nodeTypes, relationTypes }).join(", ") || "none"}`,
-    };
-  }
-
-  if (relation.target_types.length > 0 && !relation.target_types.includes(proposal.to_type)) {
-    const swapWorks =
-      (relation.source_types.length === 0 || relation.source_types.includes(proposal.to_type)) &&
-      relation.target_types.includes(proposal.from_type);
-    const valid = listValidRelationSlugs(proposal.from_type, proposal.to_type, {
-      nodeTypes,
-      relationTypes,
-    });
-    return {
-      ok: false,
-      error: `Relation "${relationType}" does not allow target type "${proposal.to_type}"`,
-      suggestion: swapWorks
-        ? `Swap source and target. Allowed target types: ${relation.target_types.join(", ")}`
-        : `Allowed target types: ${relation.target_types.join(", ")}. Valid verbs ${proposal.from_type} → ${proposal.to_type}: ${valid.join(", ") || "none"}`,
-    };
-  }
-
-  if (relationType === "child_of") {
-    if (!canChildOf(proposal.from_type, proposal.to_type, nodeTypes)) {
-      const allowed = getParentTypes(proposal.from_type, nodeTypes);
-      const valid = listValidRelationSlugs(proposal.from_type, proposal.to_type, {
-        nodeTypes,
-        relationTypes,
-      });
-      return {
-        ok: false,
-        error: `"${proposal.from_type}" cannot be child_of "${proposal.to_type}"`,
-        suggestion: allowed.length
-          ? `Allowed parent types for ${proposal.from_type}: ${allowed.join(", ")}. Other valid verbs: ${valid.join(", ") || "none"}`
-          : `${proposal.from_type} does not take a hierarchy parent. Valid verbs: ${valid.join(", ") || "none"}`,
-      };
-    }
+  if (typesOk.relation_type === "child_of") {
     const existingParent = existingEdges.find(
       (edge) => edge.from_id === proposal.from_id && edge.relation_type === "child_of",
     );
@@ -209,19 +177,84 @@ export function validateLink(
     }
   }
 
-  if (relationType === "supports" && !isSpineType(proposal.to_type, nodeTypes)) {
+  return {
+    ok: true,
+    relation_type: typesOk.relation_type,
+    ...(upgradeSuggestion ? { suggestion: upgradeSuggestion } : {}),
+  };
+}
+
+export function validateExistingLink(
+  pair: ExistingLinkPair,
+  ctx: Pick<LinkValidatorContext, "nodeTypes" | "relationTypes"> = {},
+): LinkValidationResult {
+  const nodeTypes = ctx.nodeTypes ?? SEED_NODE_TYPES;
+  const relationTypes = ctx.relationTypes ?? SEED_RELATION_TYPES;
+  const known = relationTypes.map((relation) => relation.slug);
+  const relation = relationTypes.find((item) => item.slug === pair.relation_type);
+  if (!relation) {
     return {
       ok: false,
-      error: `Relation "supports" requires a spine target, not "${proposal.to_type}"`,
+      error: `Unknown relation_type "${pair.relation_type}"`,
+      suggestion: `Known relation types: ${known.join(", ")}`,
+    };
+  }
+
+  if (relation.source_types.length > 0 && !relation.source_types.includes(pair.from_type)) {
+    const swap = listValidRelationSlugs(pair.to_type, pair.from_type, {
+      nodeTypes,
+      relationTypes,
+    });
+    return {
+      ok: false,
+      error: `Relation "${pair.relation_type}" does not allow source type "${pair.from_type}"`,
+      suggestion: swap.includes(pair.relation_type)
+        ? `Swap source and target. Allowed source types: ${relation.source_types.join(", ")}`
+        : `Allowed source types: ${relation.source_types.join(", ")}. Valid verbs ${pair.from_type} → ${pair.to_type}: ${listValidRelationSlugs(pair.from_type, pair.to_type, { nodeTypes, relationTypes }).join(", ") || "none"}`,
+    };
+  }
+
+  if (relation.target_types.length > 0 && !relation.target_types.includes(pair.to_type)) {
+    const swapWorks =
+      (relation.source_types.length === 0 || relation.source_types.includes(pair.to_type)) &&
+      relation.target_types.includes(pair.from_type);
+    const valid = listValidRelationSlugs(pair.from_type, pair.to_type, {
+      nodeTypes,
+      relationTypes,
+    });
+    return {
+      ok: false,
+      error: `Relation "${pair.relation_type}" does not allow target type "${pair.to_type}"`,
+      suggestion: swapWorks
+        ? `Swap source and target. Allowed target types: ${relation.target_types.join(", ")}`
+        : `Allowed target types: ${relation.target_types.join(", ")}. Valid verbs ${pair.from_type} → ${pair.to_type}: ${valid.join(", ") || "none"}`,
+    };
+  }
+
+  if (pair.relation_type === "child_of" && !canChildOf(pair.from_type, pair.to_type, nodeTypes)) {
+    const allowed = getParentTypes(pair.from_type, nodeTypes);
+    const valid = listValidRelationSlugs(pair.from_type, pair.to_type, {
+      nodeTypes,
+      relationTypes,
+    });
+    return {
+      ok: false,
+      error: `"${pair.from_type}" cannot be child_of "${pair.to_type}"`,
+      suggestion: allowed.length
+        ? `Allowed parent types for ${pair.from_type}: ${allowed.join(", ")}. Other valid verbs: ${valid.join(", ") || "none"}`
+        : `${pair.from_type} does not take a hierarchy parent. Valid verbs: ${valid.join(", ") || "none"}`,
+    };
+  }
+
+  if (pair.relation_type === "supports" && !isSpineType(pair.to_type, nodeTypes)) {
+    return {
+      ok: false,
+      error: `Relation "supports" requires a spine target, not "${pair.to_type}"`,
       suggestion: `Allowed target types: ${relation.target_types.join(", ")}`,
     };
   }
 
-  return {
-    ok: true,
-    relation_type: relationType,
-    ...(upgradeSuggestion ? { suggestion: upgradeSuggestion } : {}),
-  };
+  return { ok: true, relation_type: pair.relation_type };
 }
 
 export type LinkBatchDuplicateErr = {
