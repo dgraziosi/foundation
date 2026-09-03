@@ -44,6 +44,7 @@ import {
   type TypeField,
   type UndoInput,
 } from "@foundation/schema";
+import { refuseInvalidRelationEdges } from "./relation-revalidate.js";
 import { removeAuthoredType } from "./retire-type.js";
 import { writerFrom, type WriteContext } from "./write-context.js";
 
@@ -543,7 +544,7 @@ async function invertRelationChange(
     if (!current) {
       return toolError(`Cannot undo relation update: "${before.slug}" not found`);
     }
-    const restored = await updateRelationType(client, before.slug, {
+    const patch = {
       label: current.is_system ? current.label : before.label,
       description: before.description,
       kind: current.is_system ? current.kind : before.kind,
@@ -551,7 +552,16 @@ async function invertRelationChange(
       target_types: before.target_types,
       is_symmetric: current.is_system ? current.is_symmetric : before.is_symmetric,
       semantic_parent_slug: current.is_system ? current.semantic_parent_slug : before.semantic_parent_slug,
-    });
+    };
+    const edgeErr = await refuseInvalidRelationEdges(
+      client,
+      { ...current, ...patch },
+      "undo",
+    );
+    if (edgeErr) {
+      return edgeErr;
+    }
+    const restored = await updateRelationType(client, before.slug, patch);
     if (!restored) {
       return toolError(`Cannot undo relation update: "${before.slug}" not found`);
     }

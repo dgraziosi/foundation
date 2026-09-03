@@ -46,6 +46,7 @@ export {
   insertNode,
   isChildOfParent,
   listEdgesAmong,
+  listEdgesByRelation,
   listEdgesTouching,
   listInboundRefPointers,
   listIncidentEdges,

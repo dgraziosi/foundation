@@ -824,6 +824,38 @@ export async function listIncidentEdges(db: Queryable, nodeId: string): Promise<
   }));
 }
 
+/** Live edges of one relation, with endpoint types. Used when a constraint patch is applied. */
+export async function listEdgesByRelation(
+  db: Queryable,
+  slug: string,
+): Promise<
+  Array<{
+    from_id: string;
+    to_id: string;
+    relation_type: string;
+    from_type: string;
+    to_type: string;
+  }>
+> {
+  const { rows } = await db.query<{
+    from_id: string;
+    to_id: string;
+    relation_type: string;
+    from_type: string;
+    to_type: string;
+  }>(
+    `SELECT e.from_id, e.to_id, e.relation_type,
+            from_node.type AS from_type, to_node.type AS to_type
+     FROM edges e
+     JOIN nodes from_node ON from_node.id = e.from_id AND from_node.deleted_at IS NULL
+     JOIN nodes to_node ON to_node.id = e.to_id AND to_node.deleted_at IS NULL
+     WHERE e.relation_type = $1
+     ORDER BY e.created_at`,
+    [slug],
+  );
+  return rows;
+}
+
 /** Live incident edges for many nodes. An edge between two requested ids appears on both. */
 export async function listIncidentEdgesForNodes(
   db: Queryable,

@@ -5,7 +5,9 @@ import { isToolError } from "@foundation/schema";
 import {
   deleteGraphNode,
   getGraphNode,
+  inspectOntology,
   linkGraphNodes,
+  manageRelation,
   manageType,
   unlinkGraphNodes,
   upsertGraphNode,
@@ -274,6 +276,75 @@ test(
         const gone = await getGraphNode(pool, person.node.id);
         assert.equal(isToolError(gone), true);
       });
+    } finally {
+      await pool.end();
+    }
+  },
+);
+
+test(
+  "manage_relation refuses when a live edge would no longer be allowed",
+  { skip: !databaseUrl },
+  async () => {
+    if (!databaseUrl) {
+      return;
+    }
+    const pool = await poolForSchema("graph_relation_revalidate");
+    try {
+      const person = await upsertGraphNode(pool, { type: "person", title: "Constraint Ada" });
+      const note = await upsertGraphNode(pool, { type: "note", title: "About Constraint Ada" });
+      if (isToolError(person) || isToolError(note)) {
+        assert.fail("upsert failed");
+        return;
+      }
+      const linked = await linkGraphNodes(pool, {
+        from_id: note.node.id,
+        to_id: person.node.id,
+        relation_type: "about",
+        from_base_updated_at: note.node.updated_at,
+        to_base_updated_at: person.node.updated_at,
+      });
+      if (isToolError(linked)) {
+        assert.fail(linked.error);
+        return;
+      }
+
+      const narrowed = await manageRelation(pool, {
+        action: "update",
+        slug: "about",
+        source_types: ["task"],
+      });
+      assert.equal(isToolError(narrowed), true);
+      if (!isToolError(narrowed)) return;
+      assert.match(narrowed.error, /Cannot update relation "about"/);
+      assert.match(narrowed.error, /about/);
+      assert.match(narrowed.suggestion ?? "", /Unlink that about first/);
+
+      const stillOpen = await inspectOntology(pool, "relations");
+      const about = stillOpen.relations.find((relation) => relation.slug === "about");
+      assert.deepEqual(about?.source_types, []);
+
+      const unlinked = await unlinkGraphNodes(
+        pool,
+        {
+          from_id: note.node.id,
+          to_id: person.node.id,
+          relation_type: "about",
+          from_base_updated_at: note.node.updated_at,
+          to_base_updated_at: person.node.updated_at,
+        },
+        DESTRUCTIVE,
+      );
+      assert.equal(isToolError(unlinked), false);
+
+      const allowed = await manageRelation(pool, {
+        action: "update",
+        slug: "about",
+        source_types: ["task"],
+      });
+      assert.equal(isToolError(allowed), false);
+      if (isToolError(allowed)) return;
+      assert.deepEqual(allowed.relation.source_types, ["task"]);
     } finally {
       await pool.end();
     }

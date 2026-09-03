@@ -46,6 +46,10 @@ function targetedReason(relationSlug: string, seedAbout: string | undefined): st
   return `Title matches an allowed ${relationSlug} target.`;
 }
 
+function relationAllowsSource(relation: RelationType, sourceSlug: string): boolean {
+  return relation.source_types.length === 0 || relation.source_types.includes(sourceSlug);
+}
+
 /**
  * Ranked title matches in, live-relation suggestions out.
  * Never invents a type or relation. Caller must not write an edge.
@@ -87,20 +91,27 @@ export function classifySuggestedLinks(
     }
   };
 
+  const hierarchyRelation = hierarchy
+    ? relationTypes.find((relation) => relation.slug === hierarchy)
+    : undefined;
   if (
     !blockedParent &&
-    hierarchy &&
+    hierarchyRelation &&
     sourceType.kind === "spine" &&
-    sourceType.parent_types.length > 0
+    sourceType.parent_types.length > 0 &&
+    relationAllowsSource(hierarchyRelation, sourceType.slug)
   ) {
     take(
-      hierarchy,
+      hierarchyRelation.slug,
       usable.filter((candidate) => sourceType.parent_types.includes(candidate.type)),
       CHILD_OF_SUGGESTION_REASON,
     );
   }
 
   for (const relation of suggestionTargetRelations(relationTypes, nodeTypes)) {
+    if (!relationAllowsSource(relation, sourceType.slug)) {
+      continue;
+    }
     take(
       relation.slug,
       usable.filter((candidate) => relation.target_types.includes(candidate.type)),

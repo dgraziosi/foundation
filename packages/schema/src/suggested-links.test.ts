@@ -104,6 +104,56 @@ test("already has a live child_of: do not suggest a second parent", () => {
   ]);
 });
 
+test("restricted about source_types does not suggest from a disallowed source", () => {
+  const relations = SEED_RELATION_TYPES.map((relation) =>
+    relation.slug === "about" ? { ...relation, source_types: ["note"] } : relation,
+  );
+  const suggestions = classifySuggestedLinks(self.id, seedType("task"), [person], {
+    relationTypes: relations,
+  });
+  assert.equal(suggestions.some((item) => item.kind === "about"), false);
+  assert.deepEqual(suggestions, [
+    {
+      kind: "relates_to",
+      target: person,
+      reason: RELATES_TO_SUGGESTION_REASON,
+    },
+  ]);
+});
+
+test("allowed about source_types still suggests about", () => {
+  const relations = SEED_RELATION_TYPES.map((relation) =>
+    relation.slug === "about" ? { ...relation, source_types: ["note"] } : relation,
+  );
+  const suggestions = classifySuggestedLinks(self.id, seedType("note"), [person], {
+    relationTypes: relations,
+  });
+  assert.deepEqual(suggestions, [
+    {
+      kind: "about",
+      target: person,
+      reason: ABOUT_SUGGESTION_REASON,
+    },
+  ]);
+});
+
+test("restricted child_of source_types does not suggest a parent from a disallowed source", () => {
+  const relations = SEED_RELATION_TYPES.map((relation) =>
+    relation.slug === "child_of" ? { ...relation, source_types: ["goal"] } : relation,
+  );
+  const suggestions = classifySuggestedLinks(self.id, seedType("task"), [project], {
+    relationTypes: relations,
+  });
+  assert.equal(suggestions.some((item) => item.kind === "child_of"), false);
+  assert.deepEqual(suggestions, [
+    {
+      kind: "relates_to",
+      target: project,
+      reason: RELATES_TO_SUGGESTION_REASON,
+    },
+  ]);
+});
+
 test("changing about target_types suggests that type", () => {
   const company = {
     id: "77777777-7777-4777-8777-777777777777",
