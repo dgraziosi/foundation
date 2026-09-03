@@ -1,6 +1,7 @@
 import {
   countLiveNodesGroupedByType,
   getNodeType,
+  getVaultSettings,
   listEdgesAmong,
   listEdgesTouching,
   listLiveNodesByIds,
@@ -25,6 +26,7 @@ import {
   isUuid,
   resolveTypeViews,
   todayInNewYork,
+  todayInVault,
   type SearchHit,
   type TypeField,
   type ViewDeclaration,
@@ -292,10 +294,11 @@ export async function viewType(
   if (!type) {
     return { error: "Not found" };
   }
-  const today = todayInNewYork();
+  const settings = await getVaultSettings(pool);
+  const today = todayInVault(settings.timezone);
   const fields = type.fields ?? [];
   const declarations = asViewDeclarations(type.views);
-  const rows = await listTypeCards(pool, slug);
+  const rows = await listTypeCards(pool, slug, settings.list_limit_default);
   const nodes = rows.map((row) => presentTypeCard(row, fields, today));
   const children = (await listOutlineChildren(pool, nodes.map((node) => node.id))).map((row) => ({
     id: row.id,
@@ -418,6 +421,8 @@ export async function viewNode(pool: Pool, id: string, dataDir: string) {
   if (isToolError(got)) {
     return { error: "Not found" as const };
   }
+  const settings = await getVaultSettings(pool);
+  const today = todayInVault(settings.timezone);
   const type = await getNodeType(pool, got.node.type);
   const fields = type?.fields ?? [];
   const dateField = fieldByRole(fields, "date") ?? fieldByRole(fields, "start");
@@ -492,7 +497,7 @@ export async function viewNode(pool: Pool, id: string, dataDir: string) {
     suggested_links: got.suggested_links,
     resolved_refs,
     due: due ?? null,
-    due_tone: due ? dueTone(due) : null,
+    due_tone: due ? dueTone(due, today) : null,
   };
 }
 
@@ -516,14 +521,15 @@ export async function viewTasks(
   pool: Pool,
   input: { limit?: number } = {},
 ): Promise<{ tasks: ViewTaskCard[] }> {
-  const today = todayInNewYork();
+  const settings = await getVaultSettings(pool);
+  const today = todayInVault(settings.timezone);
   const type = await getNodeType(pool, "task");
   const fields = type?.fields ?? [];
   const view =
     findViewDeclaration(type?.views, type?.default_view ?? "board") ??
     asViewDeclarations(type?.views)[0] ??
     { id: "board" as const };
-  const rows = await listTaskCards(pool);
+  const rows = await listTaskCards(pool, settings.list_limit_default);
   const queried = applyViewQuery(
     rows.map((row) => asQueryNode(row)),
     view,

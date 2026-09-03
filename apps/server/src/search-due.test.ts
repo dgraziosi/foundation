@@ -137,7 +137,7 @@ test(
         assert.equal(undatedHit?.due, undefined);
       });
 
-      await t.test("overdue and today use America/New_York; undated is excluded", async () => {
+      await t.test("overdue and today use the vault timezone; undated is excluded", async () => {
         const late = await searchGraphNodes(pool, { type: "task", due: "overdue" });
         assert.equal(isToolError(late), false);
         if (isToolError(late)) {

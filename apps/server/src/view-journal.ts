@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { findLiveJournalOnDay, getNodeByIdempotencyKey, type Pool } from "@foundation/db";
-import { isToolError, todayInNewYork } from "@foundation/schema";
+import { findLiveJournalOnDay, getNodeByIdempotencyKey, getVaultSettings, type Pool } from "@foundation/db";
+import { isToolError, todayInVault } from "@foundation/schema";
 import { upsertGraphNode } from "./graph.js";
 import { viewNode } from "./view-data.js";
 
@@ -29,8 +29,9 @@ function todayJournalKey(day: string): string {
 }
 
 export async function viewJournalTodayPeek(pool: Pool, dataDir: string) {
-  const day = todayInNewYork();
-  const existing = await findLiveJournalOnDay(pool, day);
+  const settings = await getVaultSettings(pool);
+  const day = todayInVault(settings.timezone);
+  const existing = await findLiveJournalOnDay(pool, day, settings.timezone);
   if (!existing) {
     return { node: null as null };
   }
@@ -38,8 +39,9 @@ export async function viewJournalTodayPeek(pool: Pool, dataDir: string) {
 }
 
 export async function viewJournalToday(pool: Pool, dataDir: string) {
-  const day = todayInNewYork();
-  const existing = await findLiveJournalOnDay(pool, day);
+  const settings = await getVaultSettings(pool);
+  const day = todayInVault(settings.timezone);
+  const existing = await findLiveJournalOnDay(pool, day, settings.timezone);
   if (existing) {
     return viewNode(pool, existing.id, dataDir);
   }

@@ -29,6 +29,7 @@ import {
   resolveBlobFilePath,
   lookupNodeCandidates,
   searchNodes,
+  getVaultSettings,
   softDeleteNode,
   unlinkQuiet,
   updateNode,
@@ -106,7 +107,7 @@ import {
   matchesDueFilters,
   matchesDataEquals,
   searchHasSelector,
-  todayInNewYork,
+  todayInVault,
   validateDataAgainstJsonSchema,
   type Blob,
   type Edge,
@@ -1563,7 +1564,8 @@ export async function searchGraphNodes(
       "Pass a window where due_on_or_after is on or before due_on_or_before, e.g. 2026-08-01 and 2026-08-27.",
     );
   }
-  const today = todayInNewYork();
+  const settings = await getVaultSettings(pool);
+  const today = todayInVault(settings.timezone);
   if (input.type) {
     const type = await getNodeType(pool, input.type);
     if (!type) {
@@ -1676,7 +1678,7 @@ export async function searchGraphNodes(
     dueBefore: input.due === "overdue" ? today : undefined,
     dueExact: input.due === "today" ? today : undefined,
     dataEquals: input.data_equals,
-    limit: input.limit,
+    limit: input.limit ?? settings.search_limit_default,
     cursor,
   });
   const next = page.next ? encodeSearchCursor(page.next) : undefined;
