@@ -3,14 +3,20 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import type { Pool } from "@foundation/db";
 import type { Request, Response } from "express";
 import type { AgentPrincipal } from "./keyring.js";
+import type { JobLeasePolicy } from "@foundation/schema";
 import { registerTools } from "./tools/register.js";
 
-export function createMcpServer(pool: Pool, dataDir: string, agent: AgentPrincipal): McpServer {
+export function createMcpServer(
+  pool: Pool,
+  dataDir: string,
+  agent: AgentPrincipal,
+  policy?: JobLeasePolicy,
+): McpServer {
   const server = new McpServer(
     { name: "foundation", version: "0.1.0" },
     { capabilities: { tools: {} } },
   );
-  registerTools(server, pool, dataDir, agent);
+  registerTools(server, pool, dataDir, agent, policy);
   return server;
 }
 
@@ -20,8 +26,9 @@ export async function handleMcpRequest(
   res: Response,
   dataDir: string,
   agent: AgentPrincipal,
+  policy?: JobLeasePolicy,
 ): Promise<void> {
-  const server = createMcpServer(pool, dataDir, agent);
+  const server = createMcpServer(pool, dataDir, agent, policy);
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
   });

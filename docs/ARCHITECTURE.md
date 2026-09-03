@@ -176,6 +176,23 @@ flowchart LR
 
 `list_activity` `{ target: <node id> }` is the diary for that node. Newest first. Default limit 50, max 200. `since` is a time window (`created_at >=`), not a page. After a full page, send `next` as `cursor`. `count` matches the same filters. `get` does not include these rows.
 
+## Job leases
+
+Bots share one vault. Two wakes of Dream must not rewrite the same records at once. `job` is a one-row-per-name table (`job_leases`) beside the graph. It is not a node, not activity, and not a second vault.
+
+A successful `claim` mints a token and stores only its hash. The API key stamps who holds it. A second `claim` of a live name fails immediately (`Held`), even when it uses the same key. `claim` with that token extends the deadline. `finish` writes last run from the live holder and opens the name. `release` opens the name and leaves last run alone. After expiry or release, another bot can claim. `read` returns holder and last run. It never returns the token.
+
+Postgres `clock_timestamp()` is the clock. Default deadline is 900 seconds (`FOUNDATION_LEASE_TTL_SECONDS`). Graph if-match, named keys, and destructive scope stay on the graph tools. This table does not use `base_updated_at`.
+
+```mermaid
+flowchart LR
+  claim["job claim"] --> token["token"]
+  token --> work["routine"]
+  work --> finish["job finish"]
+  finish --> last_run["last_run"]
+  claim -->|"same name, live"| held["Held"]
+```
+
 ## Search
 
 `search` is Postgres full-text on title, `data` strings, and extracted inline payload text. Latin accents are folded. Not embeddings.
@@ -256,7 +273,7 @@ Agents talk to the vault over MCP. That path is not the architecture — it is t
 
 `/mcp` with `Authorization: ApiKey <key>`. Streamable HTTP on this process. `FOUNDATION_API_KEY` is the bootstrap root key (destructive scope). Named keys live as hashes in `$FOUNDATION_DATA/api-keys.json`. Mint with `scripts/mint-api-key.sh`. Named harnesses attach with that URL and one key: [`HARNESS.md`](./HARNESS.md).
 
-The current tools: `bootstrap`, `search`, `lookup`, `get`, `working_set`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`. `get` is the record. `list_activity` `{ target }` is the diary. `upsert` replaces `payload` when passed.
+The current tools: `bootstrap`, `search`, `lookup`, `get`, `working_set`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`, `job`. `get` is the record. `list_activity` `{ target }` is the diary. `upsert` replaces `payload` when passed. `job` claims a named instance routine.
 
 An agent that can reach the vault MCP may read and write ordinary tools. Delete, unlink, undo, and type-retire need destructive scope on that key.
 

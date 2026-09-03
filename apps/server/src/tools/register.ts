@@ -15,12 +15,16 @@ import { registerUndoTool } from "./undo.js";
 import { registerUnlinkTool } from "./unlink.js";
 import { registerUpsertTool } from "./upsert.js";
 import { registerWorkingSetTool } from "./working-set.js";
+import { registerJobTool } from "./job.js";
+import { DEFAULT_LEASE_TTL_SECONDS, type JobLeasePolicy } from "@foundation/schema";
+import { leasePolicyFromSeconds } from "../leases.js";
 
 export function registerTools(
   server: McpServer,
   pool: Pool,
   dataDir: string,
   agent: AgentPrincipal,
+  policy: JobLeasePolicy = leasePolicyFromSeconds(DEFAULT_LEASE_TTL_SECONDS),
 ): void {
   registerBootstrapTool(server, pool, agent);
   registerSearchTool(server, pool);
@@ -36,4 +40,5 @@ export function registerTools(
   registerManageRelationTool(server, pool, agent);
   registerListActivityTool(server, pool);
   registerUndoTool(server, pool, agent);
+  registerJobTool(server, pool, agent, policy);
 }

@@ -6,6 +6,17 @@ Historical proof runs below may mention older door copy. The current window is t
 
 Live journal HTTP was not driven on the VMs that ran these proofs. Host Postgres 16 was not on PATH (`initdb`, `pg_ctl`, `psql`). That is a run limitation. The feature is on the branch.
 
+## Named proof `jobs-lease-10`
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=jobs-lease-10`). Doctor green. `tools/list` returned 15 tools including `job`.
+
+MCP on `http://127.0.0.1:8787/mcp`:
+
+1. `job` `{ action: "claim", name: "dream" }` held the name and returned a token. Same-key claim without the token → `{ error: "Held" }` and no token.
+2. `claim` with that token heartbeated. `finish` stamped `last_run` from the holder and opened the name. `read` returned last run and never a token.
+3. Claim after finish succeeded with a new token. `release` opened and left `last_run` alone. Claim after release succeeded. Stale finish → `{ error: "Not holding" }`. Read of an unused name was an open virtual row.
+4. Cleanup removed the disposable run root. Evidence stayed under `.cursor/skills/verify-foundation/evidence/jobs-lease-10/`. Tokens and keys were redacted.
+
 ## Named proof `drift-read-9`
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=drift-read-9`). Doctor green. `scripts/drift-read.sh` on the first-day graph printed five empty buckets and `drift-read: quiet`.

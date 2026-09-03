@@ -23,6 +23,7 @@ Look up the live schema at call time (`bootstrap`, `inspect_ontology`, or the se
 - `link` — accept a suggested edge or hang a child. Suggestions and `child_of` placement read live `kind`, `parent_types`, and `target_types`, not a frozen slug list.
 - `manage_relation` — create or update a relation. System relations may edit `source_types` and `target_types`. Slug, kind, label, and symmetry stay locked.
 - `delete` — soft-delete a live node. Refuses when a live `ref` field still points at that id (clear the field first).
+- `job` — claim a named instance routine before a pass (`dream`, `vault-health`, …). Keep the token. A second live claim fails. `finish` records last run. `release` opens without recording. `read` is who and last run. Not a graph write and not `get_vault_health`.
 
 A record is what is true now, short. History stays in activity. To rewrite one record: `get` → `list_activity` `{ target }` → keep what still matters, invent nothing → `upsert` the same id with a short `payload` and `base_updated_at`. One record at a time. Not a background job. The server does not invent the body.
 

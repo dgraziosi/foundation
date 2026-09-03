@@ -122,7 +122,7 @@ Agents can add types and relations over time. No approval inbox.
 
 These names are the current surface. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md). Rewrite one record with `get`, `upsert`, and `list_activity`.
 
-`bootstrap`, `search`, `lookup`, `get`, `working_set`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`.
+`bootstrap`, `search`, `lookup`, `get`, `working_set`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`, `job`.
 
 - Destructive tools (`delete`, `unlink`, `undo`, `manage_type` retire) need a key with destructive scope. Ordinary upsert and link do not. A key without that scope returns `{ error, suggestion }`.
 - Identity is UUID. If you already have a UUID and need the record (payload, data, edges, if-match), call `get`. `get` does not return activity. If you already have a UUID and need the open work around it, call `working_set`. `lookup` then `working_set` is the name → act path. How a bot rewrites one record: [Rewrite one record](#rewrite-one-record).
@@ -141,6 +141,7 @@ These names are the current surface. Full parameters: [`docs/MCP_TOOLS.md`](./MC
 - `data.url` is an optional https address on any type. It is how the Viewer opens a file that stays the source of truth. It is not the Drive / Gmail / Calendar url, and not a second identity.
 - After a bot sends mail or clears a calendar event, the same record holds `data.receipt` `{ system, id, kind }`. That is done after send or clear. [Mail and calendar receipt](#mail-and-calendar-receipt).
 - No `get_vault_health` / `run_maintenance` / `audit_links` tools — those jobs are instance routines the user can run ([`VAULT_HEALTH.md`](./VAULT_HEALTH.md): host script [`scripts/keep-vault-up.sh`](../scripts/keep-vault-up.sh) plus the weekday 9:15 written report, [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md), [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/))
+- `job` is instance coordination, not a graph write. A bot claims a named routine (`dream`, `vault-health`, …) and gets a token. A second claim of the same live name fails (`Held`). The token is the proof; the API key is only who. `finish` records last run and opens the name. `release` opens the name and leaves last run alone. An expired hold can be claimed again. `read` returns holder and last run. Not a queue, not `get_vault_health`, and not if-match on a node. Default hold is 900 seconds (`FOUNDATION_LEASE_TTL_SECONDS`).
 - No rewrite tool. `get` + `list_activity` + `upsert` is the loop. [Rewrite one record](#rewrite-one-record).
 
 ## Rewrite one record
