@@ -117,7 +117,9 @@ test(
           arguments: { query: "Chief note", type: "note" },
         }),
       );
-      assert.ok(Array.isArray(found.hits) && found.hits.length >= 1);
+      const hits = found.nodes as Array<{ id: string; title: string }>;
+      assert.ok(Array.isArray(hits) && hits.length >= 1);
+      assert.ok(hits.some((hit) => hit.id === node.id));
 
       const diary = asObject(
         await chiefClient.callTool({
