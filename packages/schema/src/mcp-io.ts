@@ -241,7 +241,10 @@ export type UpsertInput = z.infer<typeof UpsertInputSchema>;
 
 export const DeleteInputSchema = z.object({
   id: z.string().uuid(),
+  /** Required: node's current `updated_at` from get. */
+  base_updated_at: z.string().min(1).optional(),
 });
+export type DeleteInput = z.infer<typeof DeleteInputSchema>;
 
 export const MutationOkSchema = z.object({
   ok: z.literal(true),
@@ -376,7 +379,12 @@ export const UnlinkInputSchema = z.object({
   from_id: z.string().uuid(),
   to_id: z.string().uuid(),
   relation_type: z.string().min(1),
+  /** Required: `from` node's `updated_at` from get. */
+  from_base_updated_at: z.string().min(1).optional(),
+  /** Required: `to` node's `updated_at` from get. */
+  to_base_updated_at: z.string().min(1).optional(),
 });
+export type UnlinkInput = z.infer<typeof UnlinkInputSchema>;
 
 export const InspectOntologyInputSchema = z.object({
   kind: z.enum(["types", "relations", "all"]).optional(),
@@ -552,18 +560,6 @@ export function searchHasSelector(input: {
   );
 }
 
-export const ORIGIN_KEY_REFUSED_SUGGESTION =
-  "Search { url } for Gmail, Calendar, or Drive. Use data.repo { system, id } for GitHub. There is no origin. Cursor Origin is not a vault word.";
-
-export const LIVING_KEY_REFUSED_SUGGESTION =
-  "Search { url } for Gmail, Calendar, or Drive. There is no living.";
-
-export const CODE_KEY_REFUSED_SUGGESTION =
-  "Use data.repo { system, id } for GitHub. There is no code.";
-
-export const LINK_KEY_REFUSED_SUGGESTION =
-  "Link is the edge tool. Search { url } for Gmail, Calendar, or Drive. There is no data.link.";
-
 export const URL_MISS_SUGGESTION =
   "No live node has that url. You may upsert with url.system and url.id. data.url is the https address the Viewer opens. Foundation stores the ref only — do not fetch or mirror Gmail, Calendar, or Drive bodies.";
 
@@ -709,5 +705,11 @@ export const UndoInputSchema = z.object({
   id: z.string().uuid(),
   /** Permanently drop leftover soft-deleted nodes when undoing a type create. */
   purge_deleted: z.boolean().optional(),
+  /** Required when the invert touches a node: that node's `updated_at` from get. */
+  base_updated_at: z.string().min(1).optional(),
+  /** Required when the invert touches an edge: `from` node's `updated_at` from get. */
+  from_base_updated_at: z.string().min(1).optional(),
+  /** Required when the invert touches an edge: `to` node's `updated_at` from get. */
+  to_base_updated_at: z.string().min(1).optional(),
 });
 export type UndoInput = z.infer<typeof UndoInputSchema>;

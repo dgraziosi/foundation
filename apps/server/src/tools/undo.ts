@@ -10,7 +10,7 @@ export function registerUndoTool(server: McpServer, pool: Pool, agent: AgentPrin
   defineTool(server, {
     name: "undo",
     description:
-      "Reverse a reversible activity row by id. Needs a key with destructive scope. Undoing a type create while deleted nodes of that type remain requires purge_deleted: true. Undo of type retire restores the registry row.",
+      "Reverse a reversible activity row by id. Needs a key with destructive scope. Node and edge inversions require if-match timestamps from get. Undoing a type create while deleted nodes of that type remain requires purge_deleted: true. Undo of type retire restores the registry row.",
     input: UndoInputSchema.shape,
     output: MutationOkSchema,
     handler: async (input) => undoGraphActivity(pool, input, writeContextOf(agent)),

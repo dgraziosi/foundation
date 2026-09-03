@@ -132,6 +132,12 @@ test(
          WHERE schemaname = current_schema() AND indexname = 'nodes_receipt_live_uidx'`,
       );
       assert.equal(receiptIdx[0]?.indexname, "nodes_receipt_live_uidx");
+      const { rows: leftoverFn } = await pool.query<{ proname: string }>(
+        `SELECT proname FROM pg_proc
+         WHERE proname = 'migrate_leftover_identity'
+           AND pronamespace = current_schema()::regnamespace`,
+      );
+      assert.equal(leftoverFn[0]?.proname, "migrate_leftover_identity");
       const { rows: dueIdx } = await pool.query<{ indexname: string }>(
         `SELECT indexname FROM pg_indexes
          WHERE schemaname = current_schema() AND indexname = 'nodes_due_idx'`,
@@ -226,6 +232,44 @@ test(
       assert.equal(place?.kind, "artifact");
       assert.deepEqual(place?.parent_types, []);
       assert.equal(place?.is_system, true);
+
+      await pool.query(
+        `INSERT INTO nodes (type, title, status, payload, data)
+         VALUES (
+           'note',
+           'Throwaway leftover living row',
+           'active',
+           '{"media_type":"text/plain","storage":"inline","body":""}'::jsonb,
+           '{"living":{"system":"drive","id":"file-fixture-1"},"keep":true}'::jsonb
+         )`,
+      );
+      await pool.query(
+        `INSERT INTO nodes (type, title, status, payload, data)
+         VALUES (
+           'note',
+           'Throwaway leftover code row',
+           'active',
+           '{"media_type":"text/plain","storage":"inline","body":""}'::jsonb,
+           '{"code":{"system":"github","id":"repo-fixture-1"}}'::jsonb
+         )`,
+      );
+      await pool.query("SELECT migrate_leftover_identity()");
+      const { rows: leftoverRows } = await pool.query<{
+        title: string;
+        data: Record<string, unknown>;
+        metadata: Record<string, unknown>;
+      }>(
+        `SELECT title, data, metadata FROM nodes
+         WHERE title IN ('Throwaway leftover living row', 'Throwaway leftover code row')
+         ORDER BY title`,
+      );
+      const codeRow = leftoverRows.find((row) => row.title === "Throwaway leftover code row");
+      const livingRow = leftoverRows.find((row) => row.title === "Throwaway leftover living row");
+      assert.deepEqual(livingRow?.metadata.url, { system: "drive", id: "file-fixture-1" });
+      assert.equal(livingRow?.data.living, undefined);
+      assert.equal(livingRow?.data.keep, true);
+      assert.deepEqual(codeRow?.data.repo, { system: "github", id: "repo-fixture-1" });
+      assert.equal(codeRow?.data.code, undefined);
     } finally {
       await pool.end();
     }

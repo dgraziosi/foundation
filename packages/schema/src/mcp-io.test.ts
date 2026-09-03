@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  DeleteInputSchema,
   GetSuccessSchema,
   LINK_BATCH_MAX,
   LinkInputSchema,
@@ -17,6 +18,8 @@ import {
   SearchSuccessSchema,
   SearchUrlFilterSchema,
   SuggestedLinkSchema,
+  UndoInputSchema,
+  UnlinkInputSchema,
   UpsertInputSchema,
   UpsertSuccessSchema,
   isToolError,
@@ -370,6 +373,32 @@ test("manage_type accepts hue and glyph", () => {
   assert.equal(parsed.hue, "green");
   assert.equal(parsed.glyph, "CircleCheck");
   assert.throws(() => ManageTypeInputSchema.parse({ action: "update", slug: "task", hue: "#00ff00" }));
+});
+
+test("delete unlink and undo accept if-match timestamps", () => {
+  const id = "11111111-1111-4111-8111-111111111111";
+  const other = "22222222-2222-4222-8222-222222222222";
+  const stamp = "2026-08-19T00:00:00.000Z";
+  const deleted = DeleteInputSchema.parse({
+    id,
+    base_updated_at: stamp,
+  });
+  assert.equal(deleted.base_updated_at, stamp);
+  const unlinked = UnlinkInputSchema.parse({
+    from_id: id,
+    to_id: other,
+    relation_type: "inspired_by",
+    from_base_updated_at: stamp,
+    to_base_updated_at: stamp,
+  });
+  assert.equal(unlinked.from_base_updated_at, stamp);
+  const undone = UndoInputSchema.parse({
+    id,
+    base_updated_at: stamp,
+    from_base_updated_at: stamp,
+    to_base_updated_at: stamp,
+  });
+  assert.equal(undone.base_updated_at, stamp);
 });
 
 test("manage_type accepts retire with purge_deleted", () => {

@@ -70,4 +70,4 @@ Report slug, kind, parent_types. Do not `manage_type` on this routine.
 
 ## Failure / findings ping
 
-List what you found (duplicates, isolates, soup) with enough ids/titles for the user to decide. Smallest next look — not a silent rewrite. If they ask to repair in this conversation, then you may mutate with the usual confirm gates. Ping in chat.
+List what you found (duplicates, isolates, soup) with enough ids/titles for the user to decide. Smallest next look — not a silent rewrite. If they ask to repair in this conversation, then you may mutate; destructive tools need a key with destructive scope. Ping in chat.

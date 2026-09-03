@@ -9,7 +9,8 @@ import { defineTool } from "./define-tool.js";
 export function registerUnlinkTool(server: McpServer, pool: Pool, agent: AgentPrincipal): void {
   defineTool(server, {
     name: "unlink",
-    description: "Remove a typed edge. Needs a key with destructive scope.",
+    description:
+      "Remove a typed edge. Needs a key with destructive scope and endpoint timestamps from get (if-match).",
     input: UnlinkInputSchema.shape,
     output: MutationOkSchema,
     handler: async (input) => unlinkGraphNodes(pool, input, writeContextOf(agent)),

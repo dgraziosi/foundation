@@ -308,10 +308,14 @@ test(
       assert.equal(results[1]?.outcome, "alias");
       assert.equal(results[2]?.outcome, "no_match");
 
+      const tripBeforeUndo = asObject(await client.callTool({ name: "get", arguments: { id: tripId } }));
       const undone = asObject(
         await client.callTool({
           name: "undo",
-          arguments: { id: tripCreateId },
+          arguments: {
+            id: tripCreateId,
+            base_updated_at: (tripBeforeUndo.node as { updated_at: string }).updated_at,
+          },
         }),
       );
       assert.equal(undone.error, undefined);

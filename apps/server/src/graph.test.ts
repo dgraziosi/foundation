@@ -134,7 +134,10 @@ test(
         const stillThere = await getGraphNode(pool, created.node.id);
         assert.equal(isToolError(stillThere), false);
 
-        const deleted = await deleteGraphNode(pool, { id: created.node.id }, DESTRUCTIVE);
+        const deleted = await deleteGraphNode(pool, {
+          id: created.node.id,
+          base_updated_at: created.node.updated_at,
+        }, DESTRUCTIVE);
         assert.equal(isToolError(deleted), false);
         if (isToolError(deleted)) return;
         assert.equal(deleted.ok, true);
@@ -206,7 +209,10 @@ test(
           return;
         }
 
-        const deleted = await deleteGraphNode(pool, { id: oldArea.node.id }, DESTRUCTIVE);
+        const deleted = await deleteGraphNode(pool, {
+          id: oldArea.node.id,
+          base_updated_at: oldArea.node.updated_at,
+        }, DESTRUCTIVE);
         assert.equal(isToolError(deleted), false);
 
         const orphaned = await getGraphNode(pool, project.node.id);
@@ -279,7 +285,7 @@ test(
         assert.match(linked.suggestion ?? "", /child_of/);
       });
 
-      await t.test("unlink requires confirm and removes the edge", async () => {
+      await t.test("unlink needs destructive scope and removes the edge", async () => {
         const a = await upsertGraphNode(pool, { type: "note", title: "A" });
         const b = await upsertGraphNode(pool, { type: "idea", title: "B" });
         if (isToolError(a) || isToolError(b)) {
@@ -308,6 +314,8 @@ test(
           from_id: a.node.id,
           to_id: b.node.id,
           relation_type: "inspired_by",
+          from_base_updated_at: a.node.updated_at,
+          to_base_updated_at: b.node.updated_at,
         }, DESTRUCTIVE);
         assert.equal(isToolError(gone), false);
         const fetched = await getGraphNode(pool, a.node.id);
@@ -524,7 +532,10 @@ test(
         });
         assert.equal(isToolError(tombNode), false);
         if (isToolError(tombNode)) return;
-        const deleted = await deleteGraphNode(pool, { id: tombNode.node.id }, DESTRUCTIVE);
+        const deleted = await deleteGraphNode(pool, {
+          id: tombNode.node.id,
+          base_updated_at: tombNode.node.updated_at,
+        }, DESTRUCTIVE);
         assert.equal(isToolError(deleted), false);
 
         const blockedTomb = await manageType(pool, {

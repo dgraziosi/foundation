@@ -9,7 +9,8 @@ import { defineTool } from "./define-tool.js";
 export function registerDeleteTool(server: McpServer, pool: Pool, agent: AgentPrincipal): void {
   defineTool(server, {
     name: "delete",
-    description: "Soft-delete a node. Needs a key with destructive scope.",
+    description:
+      "Soft-delete a node. Needs a key with destructive scope and base_updated_at from get (if-match).",
     input: DeleteInputSchema.shape,
     output: MutationOkSchema,
     handler: async (input) => deleteGraphNode(pool, input, writeContextOf(agent)),

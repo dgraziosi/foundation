@@ -151,7 +151,7 @@ A blob is a file on a node, stored at `$FOUNDATION_DATA/blobs/<uuid>`. `get` ret
 Writes go through the graph and leave **activity**. `undo` reverses a reversible row. This is lost-update protection and a receipt, not an ACL.
 
 - **Rewrite one record:** a named bot rewrites one record on purpose: `get` → `list_activity` `{ target }` → keep what still matters, invent nothing → `upsert` the same id with a short `payload` and `base_updated_at`. One record at a time. Not a background job. The server does not invent the body. A bad body is rebuilt from the `before` / `after` snapshots already on activity. Contract: [`SPEC.md`](./SPEC.md#rewrite-one-record).
-- **Compare-and-swap:** update and `link` are if-match. Pass `base_updated_at` (or endpoint timestamps) from `get`. Compared at millisecond precision so a never-updated node (including rows that still store leftover microseconds from `now()`) can be written when the caller passes `updated_at` from `get`. If the node moved, the vault refuses with stale (get and retry) — a CAS miss is never “node not found.”
+- **Compare-and-swap:** update, `link`, `delete`, `unlink`, and node or edge `undo` are if-match. Pass `base_updated_at` (or endpoint timestamps) from `get`. Compared at millisecond precision so a never-updated node (including rows that still store leftover microseconds from `now()`) can be written when the caller passes `updated_at` from `get`. If the node moved, the vault refuses with stale (get and retry) — a CAS miss is never “node not found.” A stale delete leaves the node live. Two connections racing one node leave one winner and one mismatch.
 - **Batch link:** `link` accepts one edge or `edges[]` (1–20). The whole batch validates, then one graph transaction writes every edge or none. First error wins. One activity receipt per written edge (`links[]` in input order). Each edge carries both endpoint timestamps; a later edge does not inherit CAS from an earlier edge that named the same node. Several edges that share a node still use one agreed `updated_at`. Linking does not bump `node.updated_at`. `undo` inverts one receipt. This is a graph write (live nodes and edges), not an ontology change.
 - **payload replace:** update replaces `payload` when that field is passed. Omit it and the body stays.
 - **data merge:** update patches `data` (`JSONB ||`). A partial patch does not wipe other keys.
@@ -216,6 +216,8 @@ flowchart TB
 Gmail, Calendar, and Drive stay the source of truth. The graph holds upsert `url { system, id }` and optional `data.url` as the https address the Viewer opens. Live records are unique on that pair. Look up with `search { url }`, then `get`. There is no `kind` on that url. Link is the edge tool. Open leaves the window for that file.
 
 GitHub stays the source of truth. The graph holds `data.repo { system, id }`. Live records are unique on that pair. Look up with `search { repo }`, then `get`. GitHub is not a Drive/Sheet. Cursor Origin is not a vault key and not a `repo.system` value.
+
+Identity is one registry. Url, repo, and receipt share one `{ system, id }` shape and one unique-index family. Leftover `living` / `code` / `origin` / `link` bags migrate into `url` or `repo` on boot and on write, then those keys are stripped. Search uses only the live bags. There is no leftover refuse path and no second identity store.
 
 Do not fetch or mirror those systems’ bodies into the graph.
 

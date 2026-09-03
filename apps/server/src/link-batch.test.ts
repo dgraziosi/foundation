@@ -421,7 +421,11 @@ test("batch link: two forms, atomic write, shared-node CAS, undo per receipt", {
       const first = linked.links[0]!;
       const second = linked.links[1]!;
 
-      const undone = await undoGraphActivity(pool, { id: first.activity_id }, DESTRUCTIVE);
+      const undone = await undoGraphActivity(pool, {
+        id: first.activity_id,
+        from_base_updated_at: noteA.node.updated_at,
+        to_base_updated_at: idea.node.updated_at,
+      }, DESTRUCTIVE);
       assert.equal(isToolError(undone), false);
 
       const afterA = await getGraphNode(pool, noteA.node.id);

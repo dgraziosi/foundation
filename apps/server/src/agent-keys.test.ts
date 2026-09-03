@@ -153,10 +153,19 @@ test(
       );
       assert.match(String(refusedDelete.error), /destructive scope/);
 
+      const keeperGot = asObject(
+        await keeperClient.callTool({
+          name: "get",
+          arguments: { id: keeperNode.id },
+        }),
+      );
       const deleted = asObject(
         await keeperClient.callTool({
           name: "delete",
-          arguments: { id: keeperNode.id },
+          arguments: {
+            id: keeperNode.id,
+            base_updated_at: (keeperGot.node as { updated_at: string }).updated_at,
+          },
         }),
       );
       assert.equal(deleted.ok, true);

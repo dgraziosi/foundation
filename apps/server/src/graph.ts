@@ -78,10 +78,6 @@ import {
   applyUrlFromPatch,
   classifyLookupResult,
   createPreflightFromLookup,
-  CODE_KEY_REFUSED_SUGGESTION,
-  LINK_KEY_REFUSED_SUGGESTION,
-  LIVING_KEY_REFUSED_SUGGESTION,
-  ORIGIN_KEY_REFUSED_SUGGESTION,
   REPO_HIT_SUGGESTION,
   REPO_MISS_SUGGESTION,
   RECEIPT_HIT_SUGGESTION,
@@ -95,6 +91,8 @@ import {
   urlIdentityConflictError,
   urlIdentityFromMetadata,
   applyUrlIdentityFromUpsert,
+  hasLeftoverIdentityKeys,
+  migrateLeftoverIdentity,
   repoConflictError,
   repoFromData,
   canonicalizeRepoInData,
@@ -129,7 +127,9 @@ import {
   type SearchSuccess,
   type SuggestedLink,
   type ToolError,
+  type DeleteInput,
   type DuplicateWarning,
+  type UnlinkInput,
   type UpsertInput,
   type UpsertPayload,
 } from "@foundation/schema";
@@ -150,25 +150,6 @@ function mergedNodeData(
     return existing?.data ?? {};
   }
   return { ...(existing?.data ?? {}), ...patch };
-}
-
-function refuseLeftoverKeys(patch: Record<string, unknown> | undefined): ToolError | null {
-  if (!patch) {
-    return null;
-  }
-  if (Object.prototype.hasOwnProperty.call(patch, "origin")) {
-    return toolError("data.origin is not a Foundation key", ORIGIN_KEY_REFUSED_SUGGESTION);
-  }
-  if (Object.prototype.hasOwnProperty.call(patch, "living")) {
-    return toolError("data.living is not a Foundation key", LIVING_KEY_REFUSED_SUGGESTION);
-  }
-  if (Object.prototype.hasOwnProperty.call(patch, "code")) {
-    return toolError("data.code is not a Foundation key", CODE_KEY_REFUSED_SUGGESTION);
-  }
-  if (Object.prototype.hasOwnProperty.call(patch, "link")) {
-    return toolError("data.link is not a Foundation key", LINK_KEY_REFUSED_SUGGESTION);
-  }
-  return null;
 }
 
 function validateUpsertData(type: NodeType, data: Record<string, unknown>): ToolError | null {
@@ -613,16 +594,13 @@ export async function upsertGraphNode(
         }
       }
 
-      const leftoverErr = refuseLeftoverKeys(input.data);
-      if (leftoverErr) {
-        return leftoverErr;
-      }
-      const merged = canonicalizeDueInData(
-        canonicalizeReceiptInData(
-          canonicalizeRepoInData(mergedNodeData(existing, input.data)),
-        ),
+      const merged = mergedNodeData(existing, input.data);
+      const leftoverPresent = hasLeftoverIdentityKeys(merged);
+      const migrated = migrateLeftoverIdentity(merged, existing?.metadata ?? {});
+      const canonical = canonicalizeDueInData(
+        canonicalizeReceiptInData(canonicalizeRepoInData(migrated.data)),
       );
-      const aliased = applyAliasesFromPatch(merged, input.data);
+      const aliased = applyAliasesFromPatch(canonical, input.data);
       if (isToolError(aliased)) {
         return aliased;
       }
@@ -631,7 +609,7 @@ export async function upsertGraphNode(
         return nextData;
       }
       const nextMeta = applyUrlIdentityFromUpsert(
-        existing?.metadata,
+        migrated.metadata,
         input.metadata,
         input.url,
       );
@@ -664,9 +642,11 @@ export async function upsertGraphNode(
             title: input.title,
             status: input.status,
             payload: resolved.payload,
-            data: input.data === undefined ? undefined : nextData,
+            data: input.data === undefined && !leftoverPresent ? undefined : nextData,
             metadata:
-              input.metadata === undefined && input.url === undefined ? undefined : nextMeta,
+              input.metadata === undefined && input.url === undefined && !leftoverPresent
+                ? undefined
+                : nextMeta,
             base_updated_at: input.base_updated_at,
           });
           await client.query("RELEASE SAVEPOINT upsert_update");
@@ -804,7 +784,7 @@ export async function upsertGraphNode(
 
 export async function deleteGraphNode(
   pool: Pool,
-  input: { id: string },
+  input: DeleteInput,
   ctx?: WriteContext,
 ): Promise<{ ok: true; activity_id: string } | ToolError> {
   const scopeErr = missingDestructive("delete", ctx?.destructive);
@@ -813,16 +793,31 @@ export async function deleteGraphNode(
   }
   const writer = writerFrom(ctx);
   return withTransaction(pool, async (client) => {
-    const before = await getNodeById(client, input.id);
+    const before = await getNodeById(client, input.id, { includeDeleted: true, forUpdate: true });
     if (!before) {
       return toolError(
         `Node not found: ${input.id}`,
         "delete only soft-deletes a live node. Check the UUID from upsert.",
       );
     }
-    const after = await softDeleteNode(client, input.id);
+    const stale = assertIfMatch("base_updated_at", input.base_updated_at, before.updated_at);
+    if (stale) {
+      return stale;
+    }
+    if (before.deleted_at) {
+      return toolError(
+        `Node ${input.id} is deleted`,
+        "Restore via undo. Use a new id to create another node.",
+      );
+    }
+    const after = await softDeleteNode(client, input.id, {
+      base_updated_at: input.base_updated_at,
+    });
     if (!after) {
-      return toolError(`Node not found: ${input.id}`);
+      return toolError(
+        "base_updated_at does not match current updated_at",
+        LOST_UPDATE_SUGGESTION,
+      );
     }
     const activity = await insertActivity(client, {
       ...writer,
@@ -1052,11 +1047,7 @@ export async function linkGraphNodes(
 
 export async function unlinkGraphNodes(
   pool: Pool,
-  input: {
-    from_id: string;
-    to_id: string;
-    relation_type: string;
-  },
+  input: UnlinkInput,
   ctx?: WriteContext,
 ): Promise<{ ok: true; activity_id: string } | ToolError> {
   const scopeErr = missingDestructive("unlink", ctx?.destructive);
@@ -1065,6 +1056,33 @@ export async function unlinkGraphNodes(
   }
   const writer = writerFrom(ctx);
   return withTransaction(pool, async (client) => {
+    const lockOrder = [...new Set([input.from_id, input.to_id])].sort();
+    const locked = new Map<string, Node>();
+    for (const id of lockOrder) {
+      const node = await getNodeById(client, id, { forUpdate: true });
+      if (!node) {
+        const which = id === input.from_id ? "from_id" : "to_id";
+        return toolError(
+          `${which} not found: ${id}`,
+          "Pass a live node UUID from get.",
+        );
+      }
+      locked.set(id, node);
+    }
+    const from = locked.get(input.from_id)!;
+    const to = locked.get(input.to_id)!;
+    const fromStale = assertIfMatch(
+      "from_base_updated_at",
+      input.from_base_updated_at,
+      from.updated_at,
+    );
+    if (fromStale) {
+      return fromStale;
+    }
+    const toStale = assertIfMatch("to_base_updated_at", input.to_base_updated_at, to.updated_at);
+    if (toStale) {
+      return toStale;
+    }
     const before = await findEdge(client, input.from_id, input.to_id, input.relation_type);
     if (!before) {
       return toolError(

@@ -3,11 +3,15 @@ import { test } from "node:test";
 import { createPool, migrate, seedSystemOntology, type Pool } from "@foundation/db";
 import { isToolError } from "@foundation/schema";
 import {
+  deleteGraphNode,
   getGraphNode,
   linkGraphNodes,
   listGraphActivity,
+  undoGraphActivity,
+  unlinkGraphNodes,
   upsertGraphNode,
 } from "./graph.js";
+import { DESTRUCTIVE } from "./write-context.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -284,6 +288,154 @@ test(
         const row = listed.activities.find((item) => item.id === linked.activity_id);
         assert.equal(row?.actor, "agent");
         assert.equal(row?.actor_label, "agent-a");
+      });
+
+      await t.test("stale base_updated_at refuses a delete and leaves the node live", async () => {
+        const created = await upsertGraphNode(pool, { type: "note", title: "Keep me" });
+        assert.equal(isToolError(created), false);
+        if (isToolError(created)) return;
+
+        const renamed = await upsertGraphNode(pool, {
+          id: created.node.id,
+          type: "note",
+          title: "Keep me still",
+          base_updated_at: created.node.updated_at,
+        });
+        assert.equal(isToolError(renamed), false);
+        if (isToolError(renamed)) return;
+
+        const stale = await deleteGraphNode(
+          pool,
+          {
+            id: created.node.id,
+            base_updated_at: created.node.updated_at,
+          },
+          DESTRUCTIVE,
+        );
+        assert.equal(isToolError(stale), true);
+        if (!isToolError(stale)) return;
+        assert.match(stale.error, /does not match current updated_at/);
+        assert.doesNotMatch(stale.error, /not found/i);
+        assert.match(stale.suggestion ?? "", /get and retry/);
+
+        const got = await getGraphNode(pool, created.node.id);
+        assert.equal(isToolError(got), false);
+        if (isToolError(got)) return;
+        assert.equal(got.node.title, "Keep me still");
+      });
+
+      await t.test("missing base_updated_at refuses a delete", async () => {
+        const created = await upsertGraphNode(pool, { type: "note", title: "Need delete if-match" });
+        assert.equal(isToolError(created), false);
+        if (isToolError(created)) return;
+
+        const missing = await deleteGraphNode(pool, { id: created.node.id }, DESTRUCTIVE);
+        assert.equal(isToolError(missing), true);
+        if (!isToolError(missing)) return;
+        assert.match(missing.error, /Missing base_updated_at/);
+        assert.match(missing.suggestion ?? "", /if-match/);
+      });
+
+      await t.test("stale from_base_updated_at refuses an unlink", async () => {
+        const note = await upsertGraphNode(pool, { type: "note", title: "Linked note" });
+        const idea = await upsertGraphNode(pool, { type: "idea", title: "Linked idea" });
+        assert.equal(isToolError(note), false);
+        assert.equal(isToolError(idea), false);
+        if (isToolError(note) || isToolError(idea)) return;
+
+        const linked = await linkGraphNodes(pool, {
+          from_id: note.node.id,
+          to_id: idea.node.id,
+          relation_type: "inspired_by",
+          from_base_updated_at: note.node.updated_at,
+          to_base_updated_at: idea.node.updated_at,
+        });
+        assert.equal(isToolError(linked), false);
+        if (isToolError(linked)) return;
+
+        const renamed = await upsertGraphNode(pool, {
+          id: note.node.id,
+          type: "note",
+          title: "Linked note renamed",
+          base_updated_at: note.node.updated_at,
+        });
+        assert.equal(isToolError(renamed), false);
+        if (isToolError(renamed)) return;
+
+        const stale = await unlinkGraphNodes(
+          pool,
+          {
+            from_id: note.node.id,
+            to_id: idea.node.id,
+            relation_type: "inspired_by",
+            from_base_updated_at: note.node.updated_at,
+            to_base_updated_at: idea.node.updated_at,
+          },
+          DESTRUCTIVE,
+        );
+        assert.equal(isToolError(stale), true);
+        if (!isToolError(stale)) return;
+        assert.match(stale.error, /from_base_updated_at does not match/);
+
+        const still = await getGraphNode(pool, note.node.id);
+        assert.equal(isToolError(still), false);
+        if (isToolError(still)) return;
+        assert.equal(still.edges.length, 1);
+      });
+
+      await t.test("matching undo of create writes a compensating row that is not reversible", async () => {
+        const created = await upsertGraphNode(pool, { type: "note", title: "Undo if-match" });
+        assert.equal(isToolError(created), false);
+        if (isToolError(created)) return;
+
+        const stale = await undoGraphActivity(
+          pool,
+          {
+            id: created.activity_id,
+            base_updated_at: "2020-01-01T00:00:00.000Z",
+          },
+          DESTRUCTIVE,
+        );
+        assert.equal(isToolError(stale), true);
+        if (!isToolError(stale)) return;
+        assert.match(stale.error, /does not match current updated_at/);
+
+        const live = await getGraphNode(pool, created.node.id);
+        assert.equal(isToolError(live), false);
+
+        const undone = await undoGraphActivity(
+          pool,
+          {
+            id: created.activity_id,
+            base_updated_at: created.node.updated_at,
+          },
+          DESTRUCTIVE,
+        );
+        assert.equal(isToolError(undone), false);
+        if (isToolError(undone)) return;
+
+        const gone = await getGraphNode(pool, created.node.id);
+        assert.equal(isToolError(gone), true);
+
+        const listed = await listGraphActivity(pool, { target: created.node.id });
+        assert.equal(isToolError(listed), false);
+        if (isToolError(listed)) return;
+        const compensate = listed.activities.find((row) => row.id === undone.activity_id);
+        assert.ok(compensate);
+        assert.equal(compensate?.action, "delete");
+        assert.equal(compensate?.reversible, false);
+
+        const second = await undoGraphActivity(
+          pool,
+          {
+            id: undone.activity_id,
+            base_updated_at: created.node.updated_at,
+          },
+          DESTRUCTIVE,
+        );
+        assert.equal(isToolError(second), true);
+        if (!isToolError(second)) return;
+        assert.match(second.error, /not reversible/);
       });
     } finally {
       await pool.end();

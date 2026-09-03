@@ -12,14 +12,14 @@ Destructive tools need a key with destructive scope or they return `{ error, sug
 | `get` | Return the record: payload, data, incident edges with neighbor titles, and `suggested_links` from title FTS. Does not return activity. Blob payloads return metadata, not bytes. |
 | `working_set` | Return the actionable working set around one live node: open work, dues, and the parent chain when the root hangs under something. |
 | `upsert` | Create or update a node (title, type, payload, data, status). Passing `payload` replaces that body; omit it and the body stays. Updates require `base_updated_at`. Create accepts `idempotency_key`. Create (no id) preflights duplicates via `lookup`. Blob ingest via `bytes_base64` or `source_path`. Returns `suggested_links` (proposals only). |
-| `delete` | Soft-delete a node. Needs a key with destructive scope. |
+| `delete` | Soft-delete a node. Needs a key with destructive scope and `base_updated_at` from `get`. |
 | `link` | Create typed edges after validation. One edge or `edges[]` (1–20). Whole batch validates; one transaction writes all or none. Requires endpoint if-match. |
-| `unlink` | Remove a typed edge. Needs a key with destructive scope. |
+| `unlink` | Remove a typed edge. Needs a key with destructive scope and endpoint if-match. |
 | `inspect_ontology` | List type and relation registry rows (system + authored), including each type’s `fields`, view declarations, `default_view`, `hue`, and `glyph`. |
 | `manage_type` | Create, update, or retire a node type (including `fields`, view queries, hue, and glyph). Applies immediately. Retire needs a key with destructive scope. |
 | `manage_relation` | Create or update a relation type. Applies immediately. |
 | `list_activity` | Read the diary (filter by action, target, since). `{ target: <node id> }` is the write history for that node (`before` / `after`). |
-| `undo` | Reverse a reversible activity row by id. Needs a key with destructive scope. Type-create undo with leftover deleted nodes needs `purge_deleted: true`. |
+| `undo` | Reverse a reversible activity row by id. Needs a key with destructive scope. Node and edge inversions require if-match timestamps from `get`. Type-create undo with leftover deleted nodes needs `purge_deleted: true`. |
 
 Handler contract: each tool has one zod input schema and one output schema; JSON Schema on the wire is derived; invalid input never reaches the domain; domain errors are `{ error, suggestion? }`.
 
@@ -118,7 +118,7 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 - **`data` merges** on update (`JSONB ||`, top-level keys). A partial `data` patch does not wipe other keys. Omit `data` to leave it unchanged.
 - **`json_schema`:** compiled from the type’s `fields`. upsert validates the **merged** `data` object against it. Miss → `{ error, suggestion }` (inspect_ontology, fix data or the type fields). Types with no fields skip this check (`json_schema: null`). `additionalProperties` stays true, so extra keys (a voice dump) still write. Seed `task` and `goal` accept optional `data.due` (`YYYY-MM-DD`); omit it and the node still writes. Seed `spend` validates `amount` (number), `currency` (string, e.g. `USD`), `due` (same date rule), `vendor` (string, e.g. `Fixture vendor`), and `stage` (`quoted` | `paid`) the same way. A `ref` field must be a live node UUID of `ref_type` and does not create an edge.
 - **`data.due`:** optional ISO date on `task`, `goal`, and `spend`. Stored on the JSONB `data` object. Pass `due: null` to clear. `get` returns it on `node.data`; search hits also surface `due` so briefs do not have to open every node. On `spend`, display is Date (the calendar day of the line).
-- **`url`:** optional `{ system, id }` on upsert for `gmail` | `calendar` | `drive`. Unique on **live** records. Which Drive, Gmail, or Calendar object. Not sent mail and not a cleared event. `url: null` clears uniqueness. Look up with `search` `{ url }` (or `get` once you have the UUID). Not `data.url` (that key is the https address). Foundation stores the ref only — **never fetch or mirror** those systems' bodies. There is no `kind` on that url. GitHub is `data.repo`. Link is the edge tool. Leftover `data.living`, `data.code`, `data.origin`, and `data.link` writes refuse.
+- **`url`:** optional `{ system, id }` on upsert for `gmail` | `calendar` | `drive`. Unique on **live** records. Which Drive, Gmail, or Calendar object. Not sent mail and not a cleared event. `url: null` clears uniqueness. Look up with `search` `{ url }` (or `get` once you have the UUID). Not `data.url` (that key is the https address). Foundation stores the ref only — **never fetch or mirror** those systems' bodies. There is no `kind` on that url. GitHub is `data.repo`. Link is the edge tool. Leftover `data.living`, `data.code`, `data.origin`, and `data.link` writes migrate into `url` or `repo` and the leftover keys are stripped.
 - **`data.repo`:** optional `{ system, id }` for `github`. Unique on **live** records. Which GitHub object. `repo: null` clears. Look up with `search` `{ repo }` then `get`. Store the ref only. Not a Drive/Sheet. Cursor Origin is not a vault key and not a `repo.system` value.
 - **`data.url`:** optional https address on any type. How the Viewer opens a file that stays the source of truth. Validated only when the incoming `data` patch includes `url`. `data.url: null` clears the https address. Omit the key to leave it unchanged (including a leftover value). Incomplete, non-https, credentialed, or non-string values refuse. Not unique — uniqueness stays on upsert `url` (or repo). Store the href only — no file body, no blob. `get` returns it on `node.data`. Find the Drive / Gmail / Calendar object with `search` `{ url }`, then `get`. Open leaves the window for that file.
 - **`data.receipt`:** optional `{ system, id, kind }` after a bot sends mail or clears a calendar event. `system` is `gmail` | `calendar`. `kind` is `sent` | `cleared`. Pairing is closed: `sent` with `gmail`, `cleared` with `calendar`. Unique on **live** `system`+`id`, independent of url. `receipt: null` clears. Missing is allowed. Incomplete, unknown, or unpaired values refuse. Look up with `search` `{ receipt: { system, id } }` then `get`. The server does not invent the receipt. Store the ref only — no mail or event bodies.
@@ -129,9 +129,9 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 
 ### `delete`
 
-- **In:** `{ id }`
+- **In:** `{ id, base_updated_at }`
 - **Out:** `{ ok, activity_id }` or `{ error, suggestion? }`
-- Soft-delete (`deleted_at`). `get` hides deleted nodes. Incident edges stay in place for undo; `get` and `link` validation ignore edges to deleted endpoints. Reparenting drops a stale `child_of` to a deleted parent so uniqueness matches the live graph, and records an `unlink` activity row with a `before` snapshot of the dropped edge. Restore via `undo` of the delete row. Soft-delete does **not** delete blob bytes (so undo can restore a blob node).
+- Soft-delete (`deleted_at`). Needs a key with destructive scope. Requires `base_updated_at` from `get` (if-match, millisecond precision). Mismatch or omit → `{ error, suggestion }` (get and retry). A CAS miss is stale, never “node not found,” and the node stays live. `get` hides deleted nodes. Incident edges stay in place for undo; `get` and `link` validation ignore edges to deleted endpoints. Reparenting drops a stale `child_of` to a deleted parent so uniqueness matches the live graph, and records an `unlink` activity row with a `before` snapshot of the dropped edge. Restore via `undo` of the delete row. Soft-delete does **not** delete blob bytes (so undo can restore a blob node).
 
 ### `link`
 
@@ -148,8 +148,10 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 
 ### `unlink`
 
-- **In:** `{ from_id, to_id, relation_type }`
+- **In:** `{ from_id, to_id, relation_type, from_base_updated_at, to_base_updated_at }`
 - **Out:** `{ ok, activity_id }` or `{ error, suggestion? }`
+- Needs a key with destructive scope.
+- **If-match:** `from_base_updated_at` and `to_base_updated_at` are required and must match each endpoint's current `updated_at` from `get`. Stale or missing → `{ error, suggestion }` (get the nodes and retry). Unlinking does not change `node.updated_at`. Not a write-ACL.
 
 ### `inspect_ontology`
 
@@ -213,8 +215,10 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 
 ### `undo`
 
-- **In:** `{ id, purge_deleted? }` (`id` is an activity row id)
+- **In:** `{ id, base_updated_at?, from_base_updated_at?, to_base_updated_at?, purge_deleted? }` (`id` is an activity row id)
 - **Out:** `{ ok, activity_id }` or `{ error, suggestion? }`
+- Needs a key with destructive scope.
+- **If-match:** node inversions (`create`, `update`, `delete`) require `base_updated_at` matching that node's current `updated_at` from `get`. Undo of `delete` uses the last live stamp from `get` (the same value `delete` required) because `get` hides tombstones and delete itself bumps `updated_at`. Edge inversions (`link`, `unlink`) require `from_base_updated_at` and `to_base_updated_at` from `get` on both endpoints. Type and relation inversions have no node timestamp. Stale or missing → `{ error, suggestion }` (get and retry). A matching undo still writes a compensating row. Invert stays refused when it is not safe.
 - `activity_id` is the compensating row (`reversible = false`). Invert map:
 
 | action | inverse |

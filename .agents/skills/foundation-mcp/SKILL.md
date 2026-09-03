@@ -26,4 +26,4 @@ A record is what is true now, short. History stays in activity. To rewrite one r
 
 ## Destructive scope
 
-Destructive calls (`delete`, `unlink`, `undo`, `manage_type` retire) need a key with destructive scope. Ordinary upsert and link do not.
+Destructive calls (`delete`, `unlink`, `undo`, `manage_type` retire) need a key with destructive scope. Ordinary upsert and link do not. `delete`, `unlink`, and node or edge `undo` also need if-match timestamps from `get`.
