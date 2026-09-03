@@ -9,7 +9,7 @@
   "scripts": {
     "build": "pnpm --filter @foundation/viewer build && pnpm -r typecheck",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm --filter @foundation/viewer build && pnpm -r test && bash scripts/backup-vault.test.sh && bash scripts/restore-vault.test.sh && bash scripts/keep-vault-up.test.sh && bash scripts/harness-docs.test.sh && bash scripts/skills-layout.test.sh && bash scripts/vault-data-dir.test.sh && bash .cursor/skills/verify-foundation/scripts/verify-foundation.test.sh",
+    "test": "pnpm --filter @foundation/viewer build && pnpm -r test && bash scripts/backup-vault.test.sh && bash scripts/restore-vault.test.sh && bash scripts/keep-vault-up.test.sh && bash scripts/foundation-init.test.sh && bash scripts/harness-docs.test.sh && bash scripts/skills-layout.test.sh && bash scripts/vault-data-dir.test.sh && bash .cursor/skills/verify-foundation/scripts/verify-foundation.test.sh",
     "dev": "pnpm --filter @foundation/server dev",
     "start": "pnpm --filter @foundation/server start",
     "bootstrap": "pnpm --filter @foundation/server bootstrap"
