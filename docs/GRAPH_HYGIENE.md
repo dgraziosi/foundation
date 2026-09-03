@@ -34,7 +34,7 @@ A first-day vault (seed types, zero user nodes) is **healthy**. Zero user nodes 
 
 ## Weekly checks (report only)
 
-Intent only — call `bootstrap` if you need the current tool list. Prefer MCP. Page `search` by type (no query) until `count` is done. There is no `list_nodes` tool. Do not add one. `since` is a time window, not a page.
+Intent only — call `bootstrap` if you need the current tool list. Prefer MCP. Page `search` by type (no query) until `next` is omitted. There is no `list_nodes` tool. Do not add one. `since` is a time window, not a page.
 
 ### 1. Duplicate titles
 
@@ -64,7 +64,7 @@ Report slug, kind, parent_types. Do not `manage_type` on this routine.
 | --- | --- |
 | Types vs spine | `bootstrap` / `inspect_ontology` |
 | A known node’s edges | `get` |
-| Title recall or list by type/status/under | `search` (query optional when a filter is set; page with `cursor` until `count` is done) |
+| Title recall or list by type/status/under | `search` (query optional when a filter is set; page with `cursor` until `next` is omitted) |
 | Full duplicate / zero-edge scan | `search` by type, follow `next`, read `count` |
 | Recent writes (context, not a fail) | `list_activity` |
 

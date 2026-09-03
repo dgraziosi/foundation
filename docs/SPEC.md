@@ -156,7 +156,7 @@ A record is what is true now, short. History stays in activity.
 A named **bot** rewrites the record on purpose. One record at a time. Not a background job. The server does not invent the body.
 
 1. `get` `{ id }` — the record as it stands, plus `updated_at`.
-2. `list_activity` `{ target: <that id> }` — the writes (`before` / `after`). If the page is short of `count`, send `cursor`. `since` is a time window, not a page.
+2. `list_activity` `{ target: <that id> }` — the writes (`before` / `after`). Page until `next` is omitted. `count` is the matching total, not a stop rule. A last page can be shorter than `count` and still be done. `since` is a time window, not a page.
 3. Keep what still matters. Invent nothing.
 4. `upsert` that same id with the new short `payload`, any `data` patch that still belongs, and `base_updated_at` from `get`. The write leaves a new activity row.
 
