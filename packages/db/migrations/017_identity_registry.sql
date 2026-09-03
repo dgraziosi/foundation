@@ -65,6 +65,7 @@ BEGIN
   WITH candidates AS (
     SELECT
       n.id,
+      n.deleted_at,
       leftover_identity_url(n.data) AS url
     FROM nodes n
     WHERE coalesce(n.metadata #>> '{url,system}', '') = ''
@@ -76,7 +77,7 @@ BEGIN
       url,
       row_number() OVER (
         PARTITION BY url ->> 'system', url ->> 'id'
-        ORDER BY id
+        ORDER BY deleted_at IS NOT NULL, id
       ) AS rn
     FROM candidates
   )
@@ -96,6 +97,7 @@ BEGIN
   WITH candidates AS (
     SELECT
       n.id,
+      n.deleted_at,
       leftover_identity_repo(n.data) AS repo
     FROM nodes n
     WHERE coalesce(n.data #>> '{repo,system}', '') = ''
@@ -107,7 +109,7 @@ BEGIN
       repo,
       row_number() OVER (
         PARTITION BY repo ->> 'system', repo ->> 'id'
-        ORDER BY id
+        ORDER BY deleted_at IS NOT NULL, id
       ) AS rn
     FROM candidates
   )
