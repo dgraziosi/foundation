@@ -26,4 +26,4 @@ A record is what is true now, short. History stays in activity. To rewrite one r
 
 ## Confirm
 
-Destructive calls (`delete`, `unlink`, `undo`, `manage_type` retire) need `confirm: true`.
+Destructive calls (`delete`, `unlink`, `undo`, `manage_type` retire) need `confirm: true`. `delete`, `unlink`, and node or edge `undo` also need if-match timestamps from `get`.
