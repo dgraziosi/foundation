@@ -7,7 +7,7 @@ import express from "express";
 import { apiKeyCookieHeader, providedApiKey } from "./auth.js";
 import { sendBlob } from "./blobs-http.js";
 import type { AppBindings } from "./config.js";
-import type { Keyring } from "./keyring.js";
+import { attemptSource, presentedSecret, type ViewDoor } from "./view-door.js";
 import {
   viewGraph,
   viewNode,
@@ -83,10 +83,9 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
-function requireViewAuth(keyring: Keyring) {
+function requireViewAuth(viewDoor: ViewDoor) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const principal = keyring.resolve(providedApiKey(req));
-    if (!principal) {
+    if (!viewDoor.admit(presentedSecret(providedApiKey(req)))) {
       res.setHeader("WWW-Authenticate", 'ApiKey realm="foundation"');
       res.status(401).json({ error: "API key required" });
       return;
@@ -134,8 +133,8 @@ function sendJournalResult(res: Response, got: unknown): void {
   res.status(status).json({ error: message });
 }
 
-export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings, keyring: Keyring): void {
-  const gate = requireViewAuth(keyring);
+export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings, viewDoor: ViewDoor): void {
+  const gate = requireViewAuth(viewDoor);
   const dist = viewerDistDir();
 
   app.get(`${VIEW_PATH}/unlock`, (_req, res) => {
@@ -143,22 +142,27 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings
   });
 
   app.post(`${VIEW_PATH}/unlock`, (req, res) => {
-    const key = typeof req.body?.api_key === "string" ? req.body.api_key : "";
-    if (!keyring.resolve(key)) {
-      res.setHeader("WWW-Authenticate", 'ApiKey realm="foundation"');
+    const presented = presentedSecret(req.body?.api_key);
+    const decision = viewDoor.tryUnlock(presented, attemptSource(req));
+    if (decision.kind === "open") {
+      res.setHeader("Set-Cookie", apiKeyCookieHeader(presented!));
       if (wantsJson(req)) {
-        res.status(401).json({ error: UNLOCK_REJECT });
+        res.json({ ok: true });
         return;
       }
-      res.status(401).type("html").send(unlockFallback(UNLOCK_REJECT));
+      res.redirect(303, VIEW_PATH);
       return;
     }
-    res.setHeader("Set-Cookie", apiKeyCookieHeader(key));
+    res.setHeader("WWW-Authenticate", 'ApiKey realm="foundation"');
+    if (decision.kind === "throttle") {
+      res.setHeader("Retry-After", String(decision.retryAfterSec));
+    }
+    const status = decision.kind === "throttle" ? 429 : 401;
     if (wantsJson(req)) {
-      res.json({ ok: true });
+      res.status(status).json({ error: UNLOCK_REJECT });
       return;
     }
-    res.redirect(303, VIEW_PATH);
+    res.status(status).type("html").send(unlockFallback(UNLOCK_REJECT));
   });
 
   app.get(`${VIEW_PATH}/api/session`, gate, (_req, res) => {

@@ -20,3 +20,17 @@ test("VIEW_HOST=0.0.0.0 is an explicit off-box override", () => {
   assert.equal(config.VIEW_HOST, "0.0.0.0");
   assert.equal(config.HOST, "127.0.0.1");
 });
+
+test("FOUNDATION_VIEW_KEY is optional; blank is unset", () => {
+  const absent = loadConfig(required);
+  assert.equal(absent.FOUNDATION_VIEW_KEY, undefined);
+
+  const blank = loadConfig({ ...required, FOUNDATION_VIEW_KEY: "" });
+  assert.equal(blank.FOUNDATION_VIEW_KEY, undefined);
+
+  const whitespace = loadConfig({ ...required, FOUNDATION_VIEW_KEY: "   " });
+  assert.equal(whitespace.FOUNDATION_VIEW_KEY, undefined);
+
+  const set = loadConfig({ ...required, FOUNDATION_VIEW_KEY: "  vault-secret  " });
+  assert.equal(set.FOUNDATION_VIEW_KEY, "vault-secret");
+});

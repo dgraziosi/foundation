@@ -6,6 +6,7 @@ import type { AppBindings } from "./config.js";
 import { Keyring } from "./keyring.js";
 import { handleMcpRequest } from "./mcp.js";
 import { isAgentPath } from "./security.js";
+import { ViewDoor } from "./view-door.js";
 import { registerViewRoutes } from "./view.js";
 
 /** 20MB blob cap as base64 plus JSON-RPC envelope. */
@@ -112,21 +113,24 @@ export function createApp(
   pool: Pool,
   config: AppBindings,
   door: AppDoor = "mcp",
-  keyring: Keyring = Keyring.fromBindings(config),
+  keyring?: Keyring,
+  viewDoor?: ViewDoor,
 ): Express {
+  const ring = keyring ?? Keyring.fromBindings(config);
+  const window = viewDoor ?? ViewDoor.fromBindings(config, ring);
   const app = express();
   app.use(express.json({ limit: JSON_BODY_LIMIT }));
   app.use(express.urlencoded({ extended: false }));
 
   if (door === "view") {
     app.use(refuseAgentPaths);
-    registerHealth(app, pool, config, keyring);
-    registerViewRoutes(app, pool, config, keyring);
+    registerHealth(app, pool, config, ring);
+    registerViewRoutes(app, pool, config, window);
     return app;
   }
 
-  registerHealth(app, pool, config, keyring);
-  registerViewRoutes(app, pool, config, keyring);
-  registerMcpAndBlobs(app, pool, config, keyring);
+  registerHealth(app, pool, config, ring);
+  registerViewRoutes(app, pool, config, window);
+  registerMcpAndBlobs(app, pool, config, ring);
   return app;
 }

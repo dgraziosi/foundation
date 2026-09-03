@@ -984,6 +984,118 @@ test("view window writes journal only", async () => {
   assert.match(view, /app\.get\(`\$\{VIEW_PATH\}\/api\/recents`/);
 });
 
+test("both publishes share one ViewDoor", async () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const index = await readFile(join(here, "index.ts"), "utf8");
+  assert.match(index, /ViewDoor\.fromBindings/);
+  assert.match(index, /createApp\(pool, config, "mcp", keyring, viewDoor\)/);
+  assert.match(index, /createApp\(pool, config, "view", keyring, viewDoor\)/);
+});
+
+function stubPool(): Pool {
+  return {
+    query: async () => ({ rows: [{ "?column?": 1 }] }),
+  } as unknown as Pool;
+}
+
+test("FOUNDATION_VIEW_KEY is the vault key; MCP keys do not open the window", async () => {
+  const viewKey = "test-viewer-vault-key";
+  const dataDir = await mkdtemp(join(tmpdir(), "foundation-view-exclusive-"));
+  const bindings = {
+    FOUNDATION_API_KEY: apiKey,
+    FOUNDATION_VIEW_KEY: viewKey,
+    FOUNDATION_DATA: dataDir,
+  };
+  const app = createApp(stubPool(), bindings, "mcp");
+  const server = app.listen(0);
+  const origin = await listenOrigin(server);
+
+  try {
+    const mcpUnlock = await fetch(`${origin}/view/unlock`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({ api_key: apiKey }),
+    });
+    assert.equal(mcpUnlock.status, 401);
+    assert.deepEqual(await mcpUnlock.json(), { error: "That key did not unlock." });
+
+    const formUnlock = await fetch(`${origin}/view/unlock`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: `api_key=${encodeURIComponent(viewKey)}`,
+      redirect: "manual",
+    });
+    assert.equal(formUnlock.status, 303);
+    const formCookieHeader = formUnlock.headers.get("set-cookie") ?? "";
+    assert.match(formCookieHeader, /foundation_key=/);
+    assert.match(formCookieHeader, /Path=\/view/i);
+    assert.match(formCookieHeader, /HttpOnly/i);
+    assert.match(formCookieHeader, /SameSite=Strict/i);
+    const formCookie = formCookieHeader.split(";")[0];
+    assert.ok(formCookie);
+
+    const jsonUnlock = await fetch(`${origin}/view/unlock`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({ api_key: viewKey }),
+    });
+    assert.equal(jsonUnlock.status, 200);
+    assert.deepEqual(await jsonUnlock.json(), { ok: true });
+    const jsonCookieHeader = jsonUnlock.headers.get("set-cookie") ?? "";
+    assert.match(jsonCookieHeader, /foundation_key=/);
+    const jsonCookie = jsonCookieHeader.split(";")[0];
+    assert.ok(jsonCookie);
+
+    const mcpSession = await fetch(`${origin}/view/api/session`, {
+      headers: { authorization: `ApiKey ${apiKey}` },
+    });
+    assert.equal(mcpSession.status, 401);
+    assert.match(await mcpSession.text(), /API key required/i);
+
+    const viewSession = await fetch(`${origin}/view/api/session`, {
+      headers: { authorization: `ApiKey ${viewKey}` },
+    });
+    assert.equal(viewSession.status, 200);
+    assert.deepEqual(await viewSession.json(), { ok: true });
+
+    const cookieSession = await fetch(`${origin}/view/api/session`, {
+      headers: { cookie: formCookie },
+    });
+    assert.equal(cookieSession.status, 200);
+
+    const mcpWithCookie = await fetch(`${origin}/mcp`, {
+      method: "POST",
+      headers: {
+        cookie: jsonCookie,
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+      },
+      body: mcpUpsertBody("Cookie must not write"),
+    });
+    assert.equal(mcpWithCookie.status, 401);
+
+    for (let i = 0; i < 5; i += 1) {
+      const refused = await fetch(`${origin}/view/unlock`, {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ api_key: "nope" }),
+      });
+      assert.equal(refused.status, 401, `refuse ${i + 1}`);
+      assert.deepEqual(await refused.json(), { error: "That key did not unlock." });
+    }
+    const throttled = await fetch(`${origin}/view/unlock`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({ api_key: "nope" }),
+    });
+    assert.equal(throttled.status, 429);
+    assert.ok(Number(throttled.headers.get("retry-after")) > 0);
+    assert.deepEqual(await throttled.json(), { error: "That key did not unlock." });
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
 test("viewer CSS ships dark first and a real light lane", async () => {
   const css = await readFile(
     join(dirname(fileURLToPath(import.meta.url)), "../../viewer/src/styles.css"),

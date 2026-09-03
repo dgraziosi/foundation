@@ -6,15 +6,17 @@
 #   cleanup      — stop what launch started; keep evidence
 #   evidence-dir — print the evidence path for this run
 #   run-id       — print the follow-up run id (VERIFY_RUN_ID or last launch)
-#   key-file     — print the path of this run's key file (not the key)
-#   backup-root  — print the disposable BACKUP_ROOT launch will pass
-#   database-url — print the DATABASE_URL launch will pass (never ambient)
+#   key-file      — print the path of this run's API key file (not the key)
+#   view-key-file — print the path of this run's view key file (not the key)
+#   backup-root   — print the disposable BACKUP_ROOT launch will pass
+#   database-url  — print the DATABASE_URL launch will pass (never ambient)
 #
 # Env: VERIFY_RUN_ID, VERIFY_DATA_DIR, VERIFY_STATE_FILE, VERIFY_EVIDENCE_DIR,
 #      VERIFY_BACKUP_ROOT, VERIFY_LAST_RUN_FILE, VERIFY_KEEP_VAULT_UP,
-#      FOUNDATION_HEALTH_URL, FOUNDATION_VIEW_URL, FOUNDATION_API_KEY.
+#      FOUNDATION_HEALTH_URL, FOUNDATION_VIEW_URL, FOUNDATION_API_KEY,
+#      FOUNDATION_VIEW_KEY.
 # Does not guess a Postgres installer. Does not write the graph.
-# Does not print the API key.
+# Does not print the API key or the view key.
 set -euo pipefail
 VERIFY_KEY_SOURCE="missing"
 
@@ -110,6 +112,11 @@ verify_state_file() {
 verify_api_key_file() {
   local id="$1"
   printf '%s\n' "$(dirname -- "$(verify_state_file "${id}")")/api_key"
+}
+
+verify_view_key_file() {
+  local id="$1"
+  printf '%s\n' "$(dirname -- "$(verify_state_file "${id}")")/view_key"
 }
 
 verify_backup_root() {
@@ -360,7 +367,7 @@ verify_toolchain() {
 }
 
 verify_cmd_doctor() {
-  local repo_root id state health_url view_url body view_code view_body dist app_pid
+  local repo_root id state health_url view_url body view_code view_body dist app_pid view_key_file
   repo_root="$(verify_repo_root)"
   id="$(verify_resolve_run_id)"
   state="$(verify_state_file "${id}")"
@@ -404,6 +411,15 @@ verify_cmd_doctor() {
     *) echo "doctor: FOUNDATION_API_KEY is not set" ;;
   esac
 
+  view_key_file="$(verify_view_key_file "${id}")"
+  if [[ -n "${FOUNDATION_VIEW_KEY:-}" ]]; then
+    echo "doctor: view key is set (not printed)"
+  elif [[ -f "${view_key_file}" && -s "${view_key_file}" ]]; then
+    echo "doctor: view key is set (not printed)"
+  else
+    echo "doctor: view key is not set (house key still opens the window)"
+  fi
+
   body="$(curl -fsS --max-time 5 "${health_url}" 2>/dev/null || true)"
   if verify_body_is_green "${body}"; then
     echo "doctor: health green ${body}"
@@ -432,7 +448,7 @@ verify_cmd_doctor() {
 }
 
 verify_cmd_launch() {
-  local repo_root id data_dir state keep backup_root key_file app_pid db_url last_id
+  local repo_root id data_dir state keep backup_root key_file view_key_file app_pid db_url last_id
   repo_root="$(verify_repo_root)"
   id="$(verify_launch_run_id)"
   data_dir="$(verify_data_dir "${id}")"
@@ -440,6 +456,7 @@ verify_cmd_launch() {
   keep="${VERIFY_KEEP_VAULT_UP:-${repo_root}/scripts/keep-vault-up.sh}"
   backup_root="$(verify_backup_root "${id}")"
   key_file="$(verify_api_key_file "${id}")"
+  view_key_file="$(verify_view_key_file "${id}")"
   db_url="$(verify_launch_database_url)"
 
   if [[ ! -x "${keep}" ]]; then
@@ -487,15 +504,22 @@ verify_cmd_launch() {
   mkdir -p -- "$(verify_evidence_dir "${id}")"
   umask 077
   printf '%s\n' "${FOUNDATION_API_KEY}" >"${key_file}"
+  FOUNDATION_VIEW_KEY="verify-view-${id}-$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
+  export FOUNDATION_VIEW_KEY
+  printf '%s\n' "${FOUNDATION_VIEW_KEY}" >"${view_key_file}"
+  chmod 600 -- "${view_key_file}" "${key_file}"
+  echo "launch: minted a verification FOUNDATION_VIEW_KEY (not printed; not a personal key)"
 
   echo "launch: run ${id}"
   echo "launch: disposable data dir ${data_dir}"
   echo "launch: backup root ${backup_root}"
   echo "launch: key file ${key_file}"
+  echo "launch: view key file ${view_key_file}"
   echo "launch: evidence $(verify_evidence_dir "${id}")"
 
   if ! FOUNDATION_DATA="${data_dir}" \
     FOUNDATION_API_KEY="${FOUNDATION_API_KEY}" \
+    FOUNDATION_VIEW_KEY="${FOUNDATION_VIEW_KEY}" \
     DATABASE_URL="${db_url}" \
     BACKUP_ROOT="${backup_root}" \
     FOUNDATION_HEALTH_URL="$(verify_health_url)" \
@@ -603,6 +627,10 @@ verify_cmd_key_file() {
   verify_api_key_file "$(verify_resolve_run_id)"
 }
 
+verify_cmd_view_key_file() {
+  verify_view_key_file "$(verify_resolve_run_id)"
+}
+
 verify_cmd_backup_root() {
   verify_backup_root "$(verify_resolve_run_id)"
 }
@@ -612,7 +640,7 @@ verify_cmd_database_url() {
 }
 
 usage() {
-  echo "usage: verify-foundation.sh doctor|launch|cleanup|evidence-dir|run-id|key-file|backup-root|database-url" >&2
+  echo "usage: verify-foundation.sh doctor|launch|cleanup|evidence-dir|run-id|key-file|view-key-file|backup-root|database-url" >&2
   return 2
 }
 
@@ -624,6 +652,7 @@ main() {
     evidence-dir) verify_cmd_evidence_dir ;;
     run-id) verify_cmd_run_id ;;
     key-file) verify_cmd_key_file ;;
+    view-key-file) verify_cmd_view_key_file ;;
     backup-root) verify_cmd_backup_root ;;
     database-url) verify_cmd_database_url ;;
     *) usage ;;

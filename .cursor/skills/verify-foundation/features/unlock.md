@@ -1,6 +1,6 @@
 # Unlock
 
-Unlock is the door to the Viewer. The person types the vault key. A good key sets an HttpOnly cookie `Path=/view` and shows Home. A bad key stays on the door with **That key did not unlock.** That cookie unlocks Viewer routes (including journal write). It does not unlock MCP or agent blobs.
+Unlock is the door to the Viewer. The person types the vault key. When `FOUNDATION_VIEW_KEY` is set, that is the vault key; MCP keys do not open the window. When unset, the house key still opens it. A good key sets an HttpOnly cookie `Path=/view` and shows Home. A bad key stays on the door with **That key did not unlock.** That cookie unlocks Viewer routes (including journal write). It does not unlock MCP or agent blobs.
 
 ## Sub-features
 
@@ -20,16 +20,18 @@ Unlock is the door to the Viewer. The person types the vault key. A good key set
 Preconditions:
 
 - `verify-foundation.sh doctor` reports health green (or you are proving only the fallback HTML on `:8788` while health is up).
-- The key this vault accepted is in `verify-foundation.sh key-file` (or `FOUNDATION_API_KEY`). Do not print it.
+- The vault key this vault accepted is in `verify-foundation.sh view-key-file` when that file exists (throwaway launch always writes it). Otherwise `verify-foundation.sh key-file` (or `FOUNDATION_API_KEY`). Do not print it.
 - No `foundation_key` cookie in this browser, or use a fresh profile.
 
 - **Open door.** Go to `http://127.0.0.1:8788/view`. The heading reads `Unlock.` The field label is `Vault key`.
 - **Reject.** Type a wrong key and choose **Unlock**. The door stays. Error copy: `That key did not unlock.`
 - **Accept.** Type the real key and choose **Unlock**. Home appears (`[data-surface="home"]`) with Today, Recents, and Open tasks. The rail shows Home and Search.
 - **HTTP reject.** `curl -sS -o /tmp/unlock-bad.json -w "%{http_code}" http://127.0.0.1:8788/view/unlock -H "content-type: application/json" -H "accept: application/json" -d '{"api_key":"wrong"}'`. Status `401`. Body `{"error":"That key did not unlock."}`.
-- **HTTP accept.** `KEY_FILE="$(.cursor/skills/verify-foundation/scripts/verify-foundation.sh key-file)"`. `curl -sS -D - http://127.0.0.1:8788/view/unlock -H "content-type: application/json" -H "accept: application/json" -d "{\"api_key\":\"$(cat "${KEY_FILE}")\"}"`. Status `200`. Body `{"ok":true}`. `Set-Cookie` includes `foundation_key=` and `Path=/view` and `HttpOnly`. Redact the cookie value in evidence.
+- **HTTP accept.** `KEY_FILE="$(.cursor/skills/verify-foundation/scripts/verify-foundation.sh view-key-file)"`. If that file is missing, use `key-file`. `curl -sS -D - http://127.0.0.1:8788/view/unlock -H "content-type: application/json" -H "accept: application/json" -d "{\"api_key\":\"$(cat "${KEY_FILE}")\"}"`. Status `200`. Body `{"ok":true}`. `Set-Cookie` includes `foundation_key=` and `Path=/view` and `HttpOnly`. Redact the cookie value in evidence.
 - **Session.** `curl -sS http://127.0.0.1:8788/view/api/session -H "Authorization: ApiKey $(cat "${KEY_FILE}")"`. Status `200`. Body `{"ok":true}`.
-- **Cookie scope.** Use the `Set-Cookie` name=value pair from HTTP accept (first `;` segment; redact it in evidence). `curl -sS -o /tmp/mcp-cookie.json -w "%{http_code}" -X POST http://127.0.0.1:8787/mcp -H "content-type: application/json" -H "Cookie: foundation_key=<from-accept>" -d '{}'`. Status `401`. `GET http://127.0.0.1:8787/blobs/<id>` with only that cookie is also `401`. MCP still needs `Authorization: ApiKey ...`. Do not use `GET /mcp` — that is never a tools call (405 even with a good header).
+- **MCP key does not unlock** when the view key exists. `API_KEY_FILE="$(.cursor/skills/verify-foundation/scripts/verify-foundation.sh key-file)"`. POST `/view/unlock` with that file's secret. Status `401`. Same copy: `That key did not unlock.`
+- **Rate limit.** Six wrong unlocks from one peer: the fifth is `401`, the sixth is `429` with `Retry-After`. Same copy.
+- **Cookie scope.** Use the `Set-Cookie` name=value pair from HTTP accept (first `;` segment; redact it in evidence). `curl -sS -o /tmp/mcp-cookie.json -w "%{http_code}" -X POST http://127.0.0.1:8787/mcp -H "content-type: application/json" -H "Cookie: foundation_key=<from-accept>" -d '{}'`. Status `401`. `GET http://127.0.0.1:8787/blobs/<id>` with only that cookie is also `401`. MCP still needs `Authorization: ApiKey ...` with the API key file. That header still opens `/mcp`. Do not use `GET /mcp` — that is never a tools call (405 even with a good header).
 - **Proof.** Save the reject status/body and the accept status/headers (redacted) under `evidence/<run-id>/unlock/`. If a browser drove the door, also save a screenshot that shows the heading, then Home after accept.
 
 ## Gotchas

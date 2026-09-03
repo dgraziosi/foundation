@@ -58,8 +58,9 @@ That script:
 3. Makes an empty first-day folder under `$VERIFY_DATA_DIR` (default `/tmp/foundation-verify-$RUN_ID/data`).
 4. Starts through `scripts/keep-vault-up.sh` with env overrides only. Always passes a disposable `BACKUP_ROOT` under that run folder (`/tmp/foundation-verify-$RUN_ID/backups`) so an empty first-day vault does not see the clone's dumps. Always passes `DATABASE_URL=postgres://foundation:foundation@127.0.0.1:5432/foundation`. It does not forward an ambient `DATABASE_URL` onto disposable `FOUNDATION_DATA`.
 5. Loads `FOUNDATION_API_KEY` in this process (env, else this run's key file, else the clone `.env`, else mint). Writes that key to `/tmp/foundation-verify-$RUN_ID/api_key` (mode 0600). Not evidence. Not git. Does not print the key. Doctor and Unlock read that file when `FOUNDATION_API_KEY` is unset.
-6. Mints a new run id unless `VERIFY_RUN_ID` is set. After `keep-vault-up` succeeds and `/health` is green, writes state (`RUN_ID`, `DATA_DIR`, `STARTED=1`, `APP_PID` from the data dir's `app.pid`) and remembers the id in `/tmp/foundation-verify-last-run`. A leftover `STARTED=1` without a live `APP_PID` is not "already this run" — if `/health` is green, launch refuses the shared instance.
-7. Waits until `/health` is green, or fails with the keep-vault-up nag. Does not write `STARTED=1` before that. If keep starts host programs and then fails (health wait, cluster check, missing pid), launch records `STARTED=0` plus the app pid and last-run id, then stops those programs. A later launch does not refuse leftover green `/health` from that failed start as a shared instance — it reclaims (stops) the leftover and continues.
+6. Always mints `FOUNDATION_VIEW_KEY` for the throwaway vault (separate from the API key). Writes `/tmp/foundation-verify-$RUN_ID/view_key` (mode 0600). Not evidence. Not git. Does not print the key. Passes both env vars into `keep-vault-up`. `verify-http-drive.sh` unlocks with that file.
+7. Mints a new run id unless `VERIFY_RUN_ID` is set. After `keep-vault-up` succeeds and `/health` is green, writes state (`RUN_ID`, `DATA_DIR`, `STARTED=1`, `APP_PID` from the data dir's `app.pid`) and remembers the id in `/tmp/foundation-verify-last-run`. A leftover `STARTED=1` without a live `APP_PID` is not "already this run" — if `/health` is green, launch refuses the shared instance.
+8. Waits until `/health` is green, or fails with the keep-vault-up nag. Does not write `STARTED=1` before that. If keep starts host programs and then fails (health wait, cluster check, missing pid), launch records `STARTED=0` plus the app pid and last-run id, then stops those programs. A later launch does not refuse leftover green `/health` from that failed start as a shared instance — it reclaims (stops) the leftover and continues.
 
 Default ports (`8787`, `8788`, `5432`) are one-instance. Two side-by-side vaults need different `PORT`, `VIEW_PORT`, and a Postgres port in `DATABASE_URL`, plus a second data folder. This skill does not do that. Refuse a second drive on a shared instance.
 
@@ -88,7 +89,7 @@ Worth driving only when all of these hold:
 | `GET http://127.0.0.1:8787/health` | HTTP 200 and `{ "ok": true, "service": "foundation", "db": "up" }` |
 | `GET http://127.0.0.1:8788/view` | HTTP 200 HTML. Body contains `Foundation` (built app) or `Unlock.` / `Vault key` (fallback or unlock gate) |
 | Ports | MCP/health on `8787`, Viewer on `8788`. If this run launched, the state file names the data dir and app pid we started |
-| Auth | `FOUNDATION_API_KEY` is set in the environment, else this run's key file (`verify-foundation.sh key-file`), else the clone `.env`. Do not print the key |
+| Auth | `FOUNDATION_API_KEY` is set in the environment, else this run's key file (`verify-foundation.sh key-file`), else the clone `.env`. Do not print the key. Doctor also says whether the view key is set, without printing it |
 | Build | For a full window drive: `apps/viewer/dist/index.html` exists |
 
 If health is down, the instance is not worth driving. Do not invent graph rows to make Home look populated. An empty first-day vault is a valid Viewer: Today **Write today**, Recents **Nothing yet.** and open tasks **No open tasks.**
@@ -132,8 +133,12 @@ Routes (basename `/view`):
 HTTP the window already uses (cookie `foundation_key` with `Path=/view`, or `Authorization: ApiKey <key>`):
 
 ```bash
-# Key this vault actually accepted. Path only. Do not print the file body.
-KEY_FILE="$(.cursor/skills/verify-foundation/scripts/verify-foundation.sh key-file)"
+# Vault key this vault accepted. Path only. Do not print the file body.
+# Prefer view-key-file when present (throwaway launch always writes it).
+KEY_FILE="$(.cursor/skills/verify-foundation/scripts/verify-foundation.sh view-key-file)"
+if [[ ! -f "${KEY_FILE}" ]]; then
+  KEY_FILE="$(.cursor/skills/verify-foundation/scripts/verify-foundation.sh key-file)"
+fi
 
 # unlock (same door as the form; JSON so you get { ok: true } + Set-Cookie)
 curl -sS -D - http://127.0.0.1:8788/view/unlock \
@@ -227,6 +232,7 @@ Executable helper (from the clone root):
 .cursor/skills/verify-foundation/scripts/verify-foundation.sh evidence-dir
 .cursor/skills/verify-foundation/scripts/verify-foundation.sh run-id
 .cursor/skills/verify-foundation/scripts/verify-foundation.sh key-file
+.cursor/skills/verify-foundation/scripts/verify-foundation.sh view-key-file
 .cursor/skills/verify-foundation/scripts/verify-foundation.sh backup-root
 .cursor/skills/verify-foundation/scripts/verify-foundation.sh database-url
 ```
@@ -234,11 +240,12 @@ Executable helper (from the clone root):
 | Command | What it does |
 | --- | --- |
 | `doctor` | Read-only health, window GET, toolchain, optional state-file check. Loads this run's key file when env is unset |
-| `launch` | Mint a run id (unless `VERIFY_RUN_ID` is set). Disposable first-day folder + `keep-vault-up.sh`. After keep succeeds: state with `APP_PID` and `STARTED=1`, last-run id, key file, disposable backup root. A failed start that launched host programs records `STARTED=0` plus the app pid and last-run id, then stops those programs |
+| `launch` | Mint a run id (unless `VERIFY_RUN_ID` is set). Disposable first-day folder + `keep-vault-up.sh`. After keep succeeds: state with `APP_PID` and `STARTED=1`, last-run id, API key file, view key file, disposable backup root. A failed start that launched host programs records `STARTED=0` plus the app pid and last-run id, then stops those programs |
 | `cleanup` | Stop the recorded `APP_PID` (including a failed start), then `keep-vault-up.sh stop`; remove only a safe run root; keep evidence |
 | `evidence-dir` | Print the evidence path for the resolved run id |
 | `run-id` | Print the resolved run id |
-| `key-file` | Print the key file path. Not the key |
+| `key-file` | Print the API key file path. Not the key |
+| `view-key-file` | Print the view key file path. Not the key |
 | `backup-root` | Print the disposable `BACKUP_ROOT` launch passes |
 | `database-url` | Print the disposable `DATABASE_URL` launch passes. Not an ambient value |
 
@@ -246,7 +253,7 @@ Env the helper reads (all optional except as noted):
 
 | Variable | Default |
 | --- | --- |
-| `VERIFY_RUN_ID` | Launch: mint a UTC stamp when unset. Doctor / cleanup / evidence / key-file / backup-root: last launch id, else a UTC stamp |
+| `VERIFY_RUN_ID` | Launch: mint a UTC stamp when unset. Doctor / cleanup / evidence / key-file / view-key-file / backup-root: last launch id, else a UTC stamp |
 | `VERIFY_DATA_DIR` | `/tmp/foundation-verify-$VERIFY_RUN_ID/data` |
 | `VERIFY_STATE_FILE` | `/tmp/foundation-verify-$VERIFY_RUN_ID/state` |
 | `VERIFY_EVIDENCE_DIR` | `.cursor/skills/verify-foundation/evidence/$VERIFY_RUN_ID` |
@@ -255,6 +262,7 @@ Env the helper reads (all optional except as noted):
 | `FOUNDATION_HEALTH_URL` | `http://127.0.0.1:8787/health` |
 | `FOUNDATION_VIEW_URL` | `http://127.0.0.1:8788/view` |
 | `FOUNDATION_API_KEY` | Env, else this run's key file, else clone `.env`, else launch mints a scaffold key |
+| `FOUNDATION_VIEW_KEY` | Launch always mints a throwaway view key (separate from the API key) and writes `view_key`. Do not print it |
 
 ## Feature map
 
