@@ -196,6 +196,27 @@ fi
 if grep -Fq -- 'Raise `limit`' "${repo_root}/docs/SPEC.md"; then
   fail "docs/SPEC.md still says Raise limit as the page recipe"
 fi
+if grep -Fq -- 'short of `count`' "${dream_skill}"; then
+  fail "Dream skill still pages while the page is short of count"
+fi
+if grep -Fq -- 'short of `count`' "${repo_root}/docs/SPEC.md"; then
+  fail "docs/SPEC.md still pages while the page is short of count"
+fi
+if grep -Fq -- 'until `count` is done' "${repo_root}/docs/GRAPH_HYGIENE.md"; then
+  fail "docs/GRAPH_HYGIENE.md still pages until count is done"
+fi
+if grep -Fq -- 'until `count` is done' "${skills_root}/graph-hygiene/SKILL.md"; then
+  fail "graph-hygiene skill still pages until count is done"
+fi
+if grep -Eq -- 'page\.length[[:space:]]*<[[:space:]]*count|length[[:space:]]*<[[:space:]]*`?count' "${dream_skill}" "${repo_root}/docs/SPEC.md" "${repo_root}/docs/GRAPH_HYGIENE.md" "${skills_root}/graph-hygiene/SKILL.md"; then
+  fail "clone copy still teaches while page.length < count"
+fi
+if ! grep -Fq -- 'until `next` is omitted' "${dream_skill}"; then
+  fail "Dream skill does not stop when next is omitted"
+fi
+if ! grep -Fq -- 'until `next` is omitted' "${repo_root}/docs/SPEC.md"; then
+  fail "docs/SPEC.md does not stop when next is omitted"
+fi
 if grep -Eiq -- 'read-only SQL look|Read-only SQL on localhost|psql on localhost is allowed|SQL look on localhost is allowed' "${repo_root}/docs/GRAPH_HYGIENE.md"; then
   fail "docs/GRAPH_HYGIENE.md still allows a SQL graph scan"
 fi
