@@ -50,6 +50,7 @@ jobs:
       - run: bash scripts/foundation-init.test.sh
       - run: bash scripts/mint-api-key.test.sh
       - run: pnpm --filter @foundation/viewer build
+      - run: bash scripts/require-database-url.test.sh
       - run: pnpm --filter @foundation/server test
       - name: Stop CI Postgres so host initdb can bind 5432
         run: |
@@ -82,6 +83,8 @@ jobs:
           .cursor/skills/verify-foundation/scripts/verify-foundation.sh doctor | tee "${evidence}/doctor.log"
       - name: Prove Unlock and Home empty copy
         run: bash .cursor/skills/verify-foundation/scripts/verify-http-drive.sh
+      - name: Prove MCP client round-trip
+        run: bash .cursor/skills/verify-foundation/scripts/verify-mcp-drive.sh
       - name: Cleanup throwaway vault
         if: always()
         run: .cursor/skills/verify-foundation/scripts/verify-foundation.sh cleanup

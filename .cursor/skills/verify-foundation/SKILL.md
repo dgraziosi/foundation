@@ -175,7 +175,7 @@ pnpm --filter @foundation/viewer build
 pnpm test
 ```
 
-Server tests that need `DATABASE_URL` skip when it is unset. That skip is not a live Viewer drive. Record it as a block.
+Server tests that need `DATABASE_URL` fail when it is unset. That failure is not a live Viewer drive. Record it as a block.
 
 ## Evidence
 
