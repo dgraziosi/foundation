@@ -14,6 +14,10 @@ crontab="${repo_root}/host/crontab"
 # shellcheck source=foundation-init.sh
 source "${init_script}"
 
+# Contract fixtures. No live vault. Drop leftover host env so fixtures
+# do not mkdir or prepare a data dir this run did not create.
+unset FOUNDATION_DATA BACKUP_ROOT DATABASE_URL
+
 fail() {
   echo "foundation-init.test: $*" >&2
   exit 1
