@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test src/**/*.test.ts",
+    "test": "bash ../../scripts/require-database-url.sh && tsx --test src/**/*.test.ts",
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "bootstrap": "tsx src/call-bootstrap.ts"

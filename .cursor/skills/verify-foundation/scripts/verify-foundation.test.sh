@@ -579,6 +579,8 @@ skill_blob="$(cat "${map_root}/SKILL.md")"
 [[ "${skill_blob}" == *"curl -sS http://127.0.0.1:8788/view/api/journals/today"* ]] || fail "SKILL Drive must show Today peek GET"
 grep -Fq -- 'curl -sS -L --max-redirs 3' "${helper}" || fail "doctor must follow the /view redirect a browser follows"
 [[ "${skill_blob}" == *"Does not create"* ]] || fail "SKILL Drive must say the Today peek GET does not create"
+[[ "${skill_blob}" == *"fail when it is unset"* ]] || fail "SKILL must fail server tests when DATABASE_URL is unset"
+[[ "${skill_blob}" != *"skip when it is unset"* ]] || fail "SKILL must not skip server tests when DATABASE_URL is unset"
 
 repo_root="$(cd "${script_dir}/../../../.." && pwd)"
 readme="${repo_root}/README.md"
@@ -586,8 +588,11 @@ env_json="${repo_root}/.cursor/environment.json"
 dockerfile="${repo_root}/.cursor/Dockerfile"
 workflow="${repo_root}/.github/workflows/verify.yml"
 drive="${script_dir}/verify-http-drive.sh"
+mcp_drive="${script_dir}/verify-mcp-drive.sh"
 # shellcheck source=verify-http-drive.sh
 source "${drive}"
+# shellcheck source=verify-mcp-drive.sh
+source "${mcp_drive}"
 
 [[ -f "${env_json}" ]] || fail "missing .cursor/environment.json"
 grep -Fq '"dockerfile": "Dockerfile"' "${env_json}" || fail "environment.json must pin .cursor/Dockerfile"
@@ -608,11 +613,14 @@ workflow_blob="$(cat "${workflow}")"
 [[ "${workflow_blob}" == *"pnpm --filter @foundation/schema test"* ]] || fail "verify.yml dropped schema tests"
 [[ "${workflow_blob}" == *"pnpm --filter @foundation/viewer test"* ]] || fail "verify.yml dropped viewer tests"
 [[ "${workflow_blob}" == *"pnpm --filter @foundation/server test"* ]] || fail "verify.yml dropped server tests"
+[[ "${workflow_blob}" == *"pnpm --filter @foundation/db test"* ]] || fail "verify.yml dropped db tests"
+[[ "${workflow_blob}" == *"require-database-url.test.sh"* ]] || fail "verify.yml must fail when DATABASE_URL is unset"
 [[ "${workflow_blob}" == *"pnpm --filter @foundation/viewer build"* ]] || fail "verify.yml dropped the Viewer build"
 [[ "${workflow_blob}" == *"pgvector/pgvector:pg16"* ]] || fail "verify.yml dropped the pgvector service"
 [[ "${workflow_blob}" == *"verify-foundation.sh launch"* ]] || fail "verify.yml must launch a throwaway vault"
 [[ "${workflow_blob}" == *"verify-foundation.sh doctor"* ]] || fail "verify.yml must doctor the throwaway vault"
 [[ "${workflow_blob}" == *"verify-http-drive.sh"* ]] || fail "verify.yml must HTTP-prove Unlock and Home"
+[[ "${workflow_blob}" == *"verify-mcp-drive.sh"* ]] || fail "verify.yml must MCP-prove tools/list"
 [[ "${workflow_blob}" == *"verify-foundation.sh cleanup"* ]] || fail "verify.yml must cleanup the throwaway vault"
 [[ "${workflow_blob}" == *"postgresql-16"* ]] || fail "verify.yml must install host Postgres 16"
 [[ "${workflow_blob}" == *"/usr/lib/postgresql/16/bin"* ]] || fail "verify.yml must put initdb/pg_ctl/psql on PATH"
@@ -626,5 +634,15 @@ verify_http_drive_home_empty '{"rows":[]}' '{"tasks":[]}' '{"node":null}' \
 if verify_http_drive_home_empty '{"rows":[{"title":"Fixture"}]}' '{"tasks":[]}' '{"node":null}' 2>/dev/null; then
   fail "HTTP drive must fail when Recents is not empty"
 fi
+
+listed_ok="$(verify_mcp_tools_list_ok '{"tools":[{"name":"bootstrap"},{"name":"search"},{"name":"get"}]}')" \
+  || fail "MCP drive must accept tools/list with bootstrap, search, and get"
+[[ "${listed_ok}" == *"bootstrap"* ]] || fail "MCP drive summary must name bootstrap"
+if verify_mcp_tools_list_ok '{"tools":[{"name":"search"}]}' 2>/dev/null; then
+  fail "MCP drive must fail when tools/list omits bootstrap"
+fi
+sse_result="$(printf '%s\n' 'event: message' 'data: {"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"bootstrap"}]}}' | verify_mcp_jsonrpc_result)" \
+  || fail "MCP drive must parse SSE JSON-RPC"
+[[ "${sse_result}" == *'"tools"'* ]] || fail "MCP SSE parse dropped the result"
 
 echo "verify-foundation.test: ok"
