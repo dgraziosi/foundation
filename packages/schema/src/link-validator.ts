@@ -1,9 +1,9 @@
 import { canChildOf, getParentTypes } from "./hierarchy.js";
 import {
-  genericAssociativeSlug,
   hasHierarchyParent,
   hierarchySlug,
   isHierarchySlug,
+  isUnconstrainedAssociativeSlug,
 } from "./ontology-roles.js";
 import { SEED_NODE_TYPES, SEED_RELATION_TYPES } from "./seeds.js";
 import type { NodeType, RelationType } from "./types.js";
@@ -141,13 +141,11 @@ export function validateLink(
     }
   }
 
-  const generic = genericAssociativeSlug(relationTypes);
   const hierarchy = hierarchySlug(relationTypes);
   let upgradeSuggestion: string | undefined;
   if (
-    generic &&
     hierarchy &&
-    relationType === generic &&
+    isUnconstrainedAssociativeSlug(relationType, relationTypes) &&
     canChildOf(proposal.from_type, proposal.to_type, nodeTypes)
   ) {
     if (proposal.upgrade) {

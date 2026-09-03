@@ -85,6 +85,14 @@ test("widening about target_types adds a suggestion target", () => {
   assert.ok(suggestionTargetRelations(relations, SEED_NODE_TYPES).some((item) => item.slug === "about"));
 });
 
+test("generic slug prefers unconstrained with no semantic parent, not list order", () => {
+  const shuffled = [
+    ...SEED_RELATION_TYPES.filter((relation) => relation.slug === "inspired_by"),
+    ...SEED_RELATION_TYPES.filter((relation) => relation.slug !== "inspired_by"),
+  ];
+  assert.equal(genericAssociativeSlug(shuffled), "relates_to");
+});
+
 test("supports stays out of title-match suggestion targets", () => {
   const types: NodeType[] = [...SEED_NODE_TYPES];
   assert.equal(

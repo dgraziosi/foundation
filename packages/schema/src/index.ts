@@ -21,6 +21,7 @@ export {
   hierarchySlug,
   hierarchySlugs,
   isHierarchySlug,
+  isUnconstrainedAssociativeSlug,
   suggestionTargetRelations,
   targetedAssociativeRelations,
   targetedRelationsForType,

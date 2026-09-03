@@ -35,6 +35,13 @@ export function unconstrainedAssociativeSlugs(
   return unconstrainedAssociativeRelations(relations).map((relation) => relation.slug);
 }
 
+export function isUnconstrainedAssociativeSlug(
+  slug: string,
+  relations: readonly RelationType[] = SEED_RELATION_TYPES,
+): boolean {
+  return unconstrainedAssociativeRelations(relations).some((relation) => relation.slug === slug);
+}
+
 export function targetedAssociativeRelations(
   relations: readonly RelationType[] = SEED_RELATION_TYPES,
 ): RelationType[] {
@@ -74,7 +81,11 @@ export function hierarchySlug(
 export function genericAssociativeSlug(
   relations: readonly RelationType[] = SEED_RELATION_TYPES,
 ): string | undefined {
-  return unconstrainedAssociativeRelations(relations)[0]?.slug;
+  const unconstrained = unconstrainedAssociativeRelations(relations);
+  return (
+    unconstrained.find((relation) => relation.semantic_parent_slug == null)?.slug ??
+    unconstrained[0]?.slug
+  );
 }
 
 export type HierarchyEdge = {

@@ -310,6 +310,41 @@ test("relates_to does not silently rewrite; it suggests child_of", () => {
   assert.match(result.suggestion ?? "", /child_of/);
 });
 
+test("unconstrained upgrade still fires when relates_to is not first in the list", () => {
+  const relations: RelationType[] = [
+    ...SEED_RELATION_TYPES.filter((relation) => relation.slug === "inspired_by"),
+    ...SEED_RELATION_TYPES.filter((relation) => relation.slug !== "inspired_by"),
+  ];
+  const result = validateLink(
+    {
+      from_id: ids.a,
+      to_id: ids.b,
+      relation_type: "relates_to",
+      from_type: "project",
+      to_type: "area",
+    },
+    { relationTypes: relations },
+  );
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.relation_type, "relates_to");
+  assert.match(result.suggestion ?? "", /child_of/);
+});
+
+test("other unconstrained associatives that fit the spine also suggest hierarchy", () => {
+  const result = validateLink({
+    from_id: ids.a,
+    to_id: ids.b,
+    relation_type: "inspired_by",
+    from_type: "project",
+    to_type: "area",
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.relation_type, "inspired_by");
+  assert.match(result.suggestion ?? "", /child_of/);
+});
+
 test("listValidRelationSlugs includes child_of for project → area", () => {
   const slugs = listValidRelationSlugs("project", "area");
   assert.ok(slugs.includes("child_of"));
