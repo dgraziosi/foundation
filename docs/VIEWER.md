@@ -2,7 +2,7 @@
 
 Window on a running vault. Same ontology as MCP. Same objects. Same types. Same relations. The window writes journal title and markdown body only. Other types stay read-only.
 
-Live at `/view`. Unlock with the MCP API key. Session is an HttpOnly cookie, `Path=/view`. That cookie does not unlock `/mcp` or `/blobs/:id`. Ports: `8787` MCP, `8788` `/view`. Both doors bind localhost by default. Off-box is `VIEW_HOST=0.0.0.0`.
+Live at `/view`. The person types the vault key. When `FOUNDATION_VIEW_KEY` is set, that is the vault key; MCP keys do not open the window. When unset, the house key (`FOUNDATION_API_KEY` / named keys) still opens it. Session is an HttpOnly cookie, `Path=/view`. That cookie does not unlock `/mcp` or `/blobs/:id`. Ports: `8787` MCP, `8788` `/view`. Both doors bind localhost by default. Off-box is `VIEW_HOST=0.0.0.0`.
 
 ---
 
