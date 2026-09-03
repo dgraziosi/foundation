@@ -896,7 +896,7 @@ export async function listInboundRefPointers(
          AND COALESCE(elem->>'name', '') <> ''
      ) f
      WHERE n.deleted_at IS NULL
-       AND n.data ->> f.field = $1`,
+       AND lower(n.data ->> f.field) = lower($1)`,
     [targetId],
   );
   return rows;
