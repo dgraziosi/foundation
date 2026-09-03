@@ -414,6 +414,21 @@ export {
   type DueSearchFilters,
 } from "./due.js";
 export {
+  ACTIVITY_RETENTION_DAYS_DEFAULT,
+  BACKUP_RETENTION_DAYS_DEFAULT,
+  DEFAULT_VAULT_SETTINGS,
+  LIST_LIMIT_DEFAULT,
+  LIST_LIMIT_MAX,
+  RETENTION_DAYS_MAX,
+  SEARCH_LIMIT_DEFAULT,
+  SEARCH_LIMIT_MAX,
+  VAULT_SETTINGS_ID,
+  isIanaTimeZone,
+  resolveVaultTimeZone,
+  todayInVault,
+  type VaultSettings,
+} from "./vault-settings.js";
+export {
   LOST_UPDATE_SUGGESTION,
   MISSING_BASE_SUGGESTION,
   assertIfMatch,

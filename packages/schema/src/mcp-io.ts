@@ -492,7 +492,7 @@ export const SearchInputListedSchema = z.object({
   repo: RepoRefSchema.optional(),
   /** Unique receipt lookup (gmail | calendar). Kind lives on the stored node. */
   receipt: ReceiptLookupSchema.optional(),
-  /** Due before today, or due today, in America/New_York. */
+  /** Due before today, or due today, in the vault settings timezone. */
   due: SearchDueKindSchema.optional(),
   /** Inclusive ISO date YYYY-MM-DD on data.due. */
   due_on_or_before: IsoDateSchema.optional(),
