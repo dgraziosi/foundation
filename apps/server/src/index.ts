@@ -1,6 +1,8 @@
 import { createPool, ensureBlobLayout, migrate, seedSystemOntology, waitForDb } from "@foundation/db";
 import { createApp } from "./app.js";
 import { loadConfig } from "./config.js";
+import { Keyring } from "./keyring.js";
+import { ViewDoor } from "./view-door.js";
 
 const config = loadConfig();
 await ensureBlobLayout(config.FOUNDATION_DATA);
@@ -13,8 +15,11 @@ if (ran.length) {
   console.log(`Applied migrations: ${ran.join(", ")}`);
 }
 
-const mcp = createApp(pool, config, "mcp");
-const view = createApp(pool, config, "view");
+const keyring = Keyring.fromBindings(config);
+const viewDoor = ViewDoor.fromBindings(config, keyring);
+
+const mcp = createApp(pool, config, "mcp", keyring, viewDoor);
+const view = createApp(pool, config, "view", keyring, viewDoor);
 
 const mcpServer = mcp.listen(config.PORT, config.HOST, () => {
   console.log(`Foundation MCP listening on http://${config.HOST}:${config.PORT}/mcp`);
