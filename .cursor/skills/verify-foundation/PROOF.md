@@ -6,6 +6,12 @@ Historical proof runs below may mention older door copy. The current window is t
 
 Live journal HTTP was not driven on the VMs that ran these proofs. Host Postgres 16 was not on PATH (`initdb`, `pg_ctl`, `psql`). That is a run limitation. The feature is on the branch.
 
+## Named proof `drift-read-9`
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=drift-read-9`). Doctor green. `scripts/drift-read.sh` on the first-day graph printed five empty buckets and `drift-read: quiet`.
+
+Planted fixture spend (no amount/currency/stage), isolate note, twin titles, leftover identity bag via SQL, and `mention.who` after a SQL soft-delete of the person (declared ref; extra UUID keys do not count). The report put each in the right bucket. `list_activity` count stayed 7 across a second read. Cleanup removed the disposable run root. Evidence stayed under `.cursor/skills/verify-foundation/evidence/drift-read-9/`.
+
 ## Named proof `revalidate-edges-8`
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=revalidate-edges-8`). Doctor green. Root key had destructive scope. `confirm` was not used.
