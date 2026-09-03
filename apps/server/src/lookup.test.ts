@@ -9,6 +9,7 @@ import {
   searchGraphNodes,
   upsertGraphNode,
 } from "./graph.js";
+import { DESTRUCTIVE } from "./write-context.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -198,9 +199,8 @@ test(
         }
         const deleted = await deleteGraphNode(pool, {
           id: gone.node.id,
-          confirm: true,
           base_updated_at: gone.node.updated_at,
-        });
+        }, DESTRUCTIVE);
         assert.equal(isToolError(deleted), false);
         const miss = await lookupGraphNodes(pool, {
           inputs: [{ name: gone.node.id }, { name: "Temporary Gale", type: "person" }],

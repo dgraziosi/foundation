@@ -619,4 +619,25 @@ for recipe in "${recipe_files[@]}"; do
   assert_skills_vs_tools "${recipe}"
 done
 
+# confirm: true is no longer the destructive gate. Clone copy must not teach it.
+clone_copy_confirm=(
+  "${repo_root}/README.md"
+  "${repo_root}/docs"
+  "${repo_root}/prompts"
+  "${skills_root}"
+)
+confirm_hits="$(grep -RFn -- 'confirm: true' "${clone_copy_confirm[@]}" || true)"
+if [[ -n "${confirm_hits}" ]]; then
+  fail "clone copy still requires confirm: true as the destructive gate"$'\n'"${confirm_hits}"
+fi
+if ! grep -Fq -- 'destructive scope' "${foundation_mcp}"; then
+  fail "foundation-mcp does not teach destructive scope"
+fi
+if ! grep -Fq -- 'destructive scope' "${repo_root}/docs/SPEC.md"; then
+  fail "docs/SPEC.md does not teach destructive scope"
+fi
+if ! grep -Fq -- 'mint-api-key.sh' "${repo_root}/docs/HARNESS.md"; then
+  fail "docs/HARNESS.md does not tell a clone how to mint a named key"
+fi
+
 echo "skills-layout.test: ok"

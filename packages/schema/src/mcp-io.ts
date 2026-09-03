@@ -207,10 +207,10 @@ export const UpsertPayloadSchema = z
   });
 export type UpsertPayload = z.infer<typeof UpsertPayloadSchema>;
 
-/** Who wrote — stored on the activity row. Not a permission gate. */
+/** Server-assigned who-wrote. MCP clients do not send this. */
 export const WriterIdentitySchema = z.object({
-  actor: ActivityActorSchema.optional(),
-  actor_label: z.string().trim().min(1).max(200).optional(),
+  actor: ActivityActorSchema,
+  actor_label: z.string().trim().min(1).max(200).nullable(),
 });
 export type WriterIdentity = z.infer<typeof WriterIdentitySchema>;
 
@@ -231,8 +231,6 @@ export const UpsertInputSchema = z.object({
    * Same-name entities stay allowed with this flag. Ignored on update.
    */
   allow_duplicate: z.boolean().optional(),
-  actor: ActivityActorSchema.optional(),
-  actor_label: z.string().trim().min(1).max(200).optional(),
   /**
    * Unique Drive / Gmail / Calendar identity `{ system, id }`. Not data.url
    * (that key is the https address). `url: null` clears uniqueness.
@@ -243,11 +241,8 @@ export type UpsertInput = z.infer<typeof UpsertInputSchema>;
 
 export const DeleteInputSchema = z.object({
   id: z.string().uuid(),
-  confirm: z.boolean().optional(),
   /** Required: node's current `updated_at` from get. */
   base_updated_at: z.string().min(1).optional(),
-  actor: ActivityActorSchema.optional(),
-  actor_label: z.string().trim().min(1).max(200).optional(),
 });
 export type DeleteInput = z.infer<typeof DeleteInputSchema>;
 
@@ -295,8 +290,6 @@ export const LinkInputSchema = z.object({
   to_base_updated_at: z.string().min(1).optional(),
   /** 1–20 edges. Pass this or the one-edge fields, not both. */
   edges: z.array(LinkEdgeItemSchema).min(1).max(LINK_BATCH_MAX).optional(),
-  actor: ActivityActorSchema.optional(),
-  actor_label: z.string().trim().min(1).max(200).optional(),
 });
 export type LinkInput = z.infer<typeof LinkInputSchema>;
 
@@ -386,13 +379,10 @@ export const UnlinkInputSchema = z.object({
   from_id: z.string().uuid(),
   to_id: z.string().uuid(),
   relation_type: z.string().min(1),
-  confirm: z.boolean().optional(),
   /** Required: `from` node's `updated_at` from get. */
   from_base_updated_at: z.string().min(1).optional(),
   /** Required: `to` node's `updated_at` from get. */
   to_base_updated_at: z.string().min(1).optional(),
-  actor: ActivityActorSchema.optional(),
-  actor_label: z.string().trim().min(1).max(200).optional(),
 });
 export type UnlinkInput = z.infer<typeof UnlinkInputSchema>;
 
@@ -418,12 +408,8 @@ export const ManageTypeInputSchema = z.object({
   fields: z.array(z.unknown()).optional(),
   hue: TypeHueSchema.nullable().optional(),
   glyph: TypeGlyphSchema.nullable().optional(),
-  /** Required when action is retire. */
-  confirm: z.boolean().optional(),
   /** Permanently drop leftover soft-deleted nodes when retiring a type. */
   purge_deleted: z.boolean().optional(),
-  actor: ActivityActorSchema.optional(),
-  actor_label: z.string().trim().min(1).max(200).optional(),
 });
 export type ManageTypeInput = z.infer<typeof ManageTypeInputSchema>;
 
@@ -442,8 +428,6 @@ export const ManageRelationInputSchema = z.object({
   target_types: z.array(z.string()).optional(),
   is_symmetric: z.boolean().optional(),
   semantic_parent_slug: z.string().nullable().optional(),
-  actor: ActivityActorSchema.optional(),
-  actor_label: z.string().trim().min(1).max(200).optional(),
 });
 export type ManageRelationInput = z.infer<typeof ManageRelationInputSchema>;
 
@@ -719,7 +703,6 @@ export type ListActivitySuccess = z.infer<typeof ListActivitySuccessSchema>;
 
 export const UndoInputSchema = z.object({
   id: z.string().uuid(),
-  confirm: z.boolean().optional(),
   /** Permanently drop leftover soft-deleted nodes when undoing a type create. */
   purge_deleted: z.boolean().optional(),
   /** Required when the invert touches a node: that node's `updated_at` from get. */
@@ -728,7 +711,5 @@ export const UndoInputSchema = z.object({
   from_base_updated_at: z.string().min(1).optional(),
   /** Required when the invert touches an edge: `to` node's `updated_at` from get. */
   to_base_updated_at: z.string().min(1).optional(),
-  actor: ActivityActorSchema.optional(),
-  actor_label: z.string().trim().min(1).max(200).optional(),
 });
 export type UndoInput = z.infer<typeof UndoInputSchema>;

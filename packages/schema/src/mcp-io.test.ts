@@ -381,7 +381,6 @@ test("delete unlink and undo accept if-match timestamps", () => {
   const stamp = "2026-08-19T00:00:00.000Z";
   const deleted = DeleteInputSchema.parse({
     id,
-    confirm: true,
     base_updated_at: stamp,
   });
   assert.equal(deleted.base_updated_at, stamp);
@@ -389,14 +388,12 @@ test("delete unlink and undo accept if-match timestamps", () => {
     from_id: id,
     to_id: other,
     relation_type: "inspired_by",
-    confirm: true,
     from_base_updated_at: stamp,
     to_base_updated_at: stamp,
   });
   assert.equal(unlinked.from_base_updated_at, stamp);
   const undone = UndoInputSchema.parse({
     id,
-    confirm: true,
     base_updated_at: stamp,
     from_base_updated_at: stamp,
     to_base_updated_at: stamp,
@@ -404,15 +401,13 @@ test("delete unlink and undo accept if-match timestamps", () => {
   assert.equal(undone.base_updated_at, stamp);
 });
 
-test("manage_type accepts retire with confirm and purge_deleted", () => {
+test("manage_type accepts retire with purge_deleted", () => {
   const retired = ManageTypeInputSchema.parse({
     action: "retire",
     slug: "meeting",
-    confirm: true,
     purge_deleted: true,
   });
   assert.equal(retired.action, "retire");
-  assert.equal(retired.confirm, true);
   assert.equal(retired.purge_deleted, true);
   assert.throws(() => ManageTypeInputSchema.parse({ action: "delete", slug: "meeting" }));
 });

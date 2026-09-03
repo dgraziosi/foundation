@@ -52,7 +52,7 @@ import {
   parseTypeFieldsInput,
   parseTypeIdentity,
   isUuid,
-  missingConfirm,
+  missingDestructive,
   storedBlobPayload,
   toolError,
   validateBlobRelativePath,
@@ -107,7 +107,6 @@ import {
   searchHasSelector,
   todayInNewYork,
   validateDataAgainstJsonSchema,
-  type Activity,
   type Blob,
   type Edge,
   type IncidentEdge,
@@ -138,18 +137,10 @@ import { randomUUID } from "node:crypto";
 import { removeAuthoredType } from "./retire-type.js";
 import { suggestLinksForNode } from "./suggested-links.js";
 import { undoGraphActivity } from "./undo.js";
+import { writerFrom, type WriteContext } from "./write-context.js";
 
 export { undoGraphActivity };
-
-function writerOf(input: { actor?: Activity["actor"]; actor_label?: string }): {
-  actor: Activity["actor"];
-  actor_label: string | null;
-} {
-  return {
-    actor: input.actor ?? "agent",
-    actor_label: input.actor_label ?? null,
-  };
-}
+export type { WriteContext };
 
 function mergedNodeData(
   existing: Node | undefined,
@@ -548,6 +539,7 @@ export async function upsertGraphNode(
   pool: Pool,
   input: UpsertInput,
   blobs?: BlobRuntime,
+  ctx?: WriteContext,
 ): Promise<
   | {
       node: Node;
@@ -568,7 +560,7 @@ export async function upsertGraphNode(
   let createdBlobAbs: string | undefined;
   let pendingUploadUnlink: string | undefined;
   let discardCreatedBlob = false;
-  const writer = writerOf(input);
+  const writer = writerFrom(ctx);
 
   async function applyResolvedPayload(resolved: ResolvedStoredPayload): Promise<void> {
     pendingUploadUnlink = resolved.pendingUploadUnlink;
@@ -793,12 +785,13 @@ export async function upsertGraphNode(
 export async function deleteGraphNode(
   pool: Pool,
   input: DeleteInput,
+  ctx?: WriteContext,
 ): Promise<{ ok: true; activity_id: string } | ToolError> {
-  const confirmErr = missingConfirm("delete", input.confirm);
-  if (confirmErr) {
-    return confirmErr;
+  const scopeErr = missingDestructive("delete", ctx?.destructive);
+  if (scopeErr) {
+    return scopeErr;
   }
-  const writer = writerOf(input);
+  const writer = writerFrom(ctx);
   return withTransaction(pool, async (client) => {
     const before = await getNodeById(client, input.id, { includeDeleted: true, forUpdate: true });
     if (!before) {
@@ -929,32 +922,32 @@ export async function linkGraphNodes(
     metadata?: Record<string, unknown>;
     from_base_updated_at?: string;
     to_base_updated_at?: string;
-    actor?: Activity["actor"];
-    actor_label?: string;
   },
+  ctx?: WriteContext,
 ): Promise<LinkFlatSuccess | ToolError>;
 export async function linkGraphNodes(
   pool: Pool,
   input: {
     edges: LinkEdgeItem[];
-    actor?: Activity["actor"];
-    actor_label?: string;
   },
+  ctx?: WriteContext,
 ): Promise<LinkBatchSuccess | ToolError>;
 export async function linkGraphNodes(
   pool: Pool,
   input: LinkInput,
+  ctx?: WriteContext,
 ): Promise<LinkFlatSuccess | LinkBatchSuccess | ToolError>;
 export async function linkGraphNodes(
   pool: Pool,
   input: LinkInput,
+  ctx?: WriteContext,
 ): Promise<LinkFlatSuccess | LinkBatchSuccess | ToolError> {
   const normalized = normalizeLinkEdges(input);
   if (isToolError(normalized)) {
     return normalized;
   }
   const { form, edges } = normalized;
-  const writer = writerOf(input);
+  const writer = writerFrom(ctx);
   return withTransaction(pool, async (client) => {
     const lockOrder = [...new Set(edges.flatMap((edge) => [edge.from_id, edge.to_id]))].sort();
     const locked = new Map<string, Node>();
@@ -1055,12 +1048,13 @@ export async function linkGraphNodes(
 export async function unlinkGraphNodes(
   pool: Pool,
   input: UnlinkInput,
+  ctx?: WriteContext,
 ): Promise<{ ok: true; activity_id: string } | ToolError> {
-  const confirmErr = missingConfirm("unlink", input.confirm);
-  if (confirmErr) {
-    return confirmErr;
+  const scopeErr = missingDestructive("unlink", ctx?.destructive);
+  if (scopeErr) {
+    return scopeErr;
   }
-  const writer = writerOf(input);
+  const writer = writerFrom(ctx);
   return withTransaction(pool, async (client) => {
     const lockOrder = [...new Set([input.from_id, input.to_id])].sort();
     const locked = new Map<string, Node>();
@@ -1121,8 +1115,9 @@ export async function inspectOntology(
 export async function manageType(
   pool: Pool,
   input: ManageTypeInput,
+  ctx?: WriteContext,
 ): Promise<{ type: NodeType; activity_id: string } | ToolError> {
-  const writer = writerOf(input);
+  const writer = writerFrom(ctx);
   const existing = await getNodeType(pool, input.slug);
 
   if (input.action === "create") {
@@ -1194,7 +1189,7 @@ export async function manageType(
   }
 
   if (input.action === "retire") {
-    const confirmErr = missingConfirm("manage_type retire", input.confirm);
+    const confirmErr = missingDestructive("manage_type retire", ctx?.destructive);
     if (confirmErr) {
       return confirmErr;
     }
@@ -1310,8 +1305,9 @@ export async function manageType(
 export async function manageRelation(
   pool: Pool,
   input: ManageRelationInput,
+  ctx?: WriteContext,
 ): Promise<{ relation: RelationType; activity_id: string } | ToolError> {
-  const writer = writerOf(input);
+  const writer = writerFrom(ctx);
   const existing = await getRelationType(pool, input.slug);
 
   if (input.action === "create") {

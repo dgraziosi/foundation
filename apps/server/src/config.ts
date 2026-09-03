@@ -7,6 +7,7 @@ loadDotenv({ path: resolve(process.cwd(), "../../.env") });
 
 const EnvSchema = z.object({
   FOUNDATION_API_KEY: z.string().min(1, "FOUNDATION_API_KEY is required"),
+  FOUNDATION_API_KEY_LABEL: z.string().trim().min(1).max(200).optional(),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   FOUNDATION_DATA: z.string().default("./data"),
   PORT: z.coerce.number().int().positive().default(8787),
@@ -17,7 +18,7 @@ const EnvSchema = z.object({
 
 export type AppConfig = z.infer<typeof EnvSchema>;
 export type AppBindings = Pick<AppConfig, "FOUNDATION_API_KEY" | "FOUNDATION_DATA"> &
-  Partial<Pick<AppConfig, "HOST" | "PORT" | "VIEW_HOST" | "VIEW_PORT">>;
+  Partial<Pick<AppConfig, "HOST" | "PORT" | "VIEW_HOST" | "VIEW_PORT" | "FOUNDATION_API_KEY_LABEL">>;
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = EnvSchema.safeParse(env);

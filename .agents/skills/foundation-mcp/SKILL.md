@@ -24,6 +24,6 @@ Look up the live schema at call time (`bootstrap`, `inspect_ontology`, or the se
 
 A record is what is true now, short. History stays in activity. To rewrite one record: `get` → `list_activity` `{ target }` → keep what still matters, invent nothing → `upsert` the same id with a short `payload` and `base_updated_at`. One record at a time. Not a background job. The server does not invent the body.
 
-## Confirm
+## Destructive scope
 
-Destructive calls (`delete`, `unlink`, `undo`, `manage_type` retire) need `confirm: true`. `delete`, `unlink`, and node or edge `undo` also need if-match timestamps from `get`.
+Destructive calls (`delete`, `unlink`, `undo`, `manage_type` retire) need a key with destructive scope. Ordinary upsert and link do not. `delete`, `unlink`, and node or edge `undo` also need if-match timestamps from `get`.

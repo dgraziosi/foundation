@@ -9,6 +9,7 @@ import {
   unlinkGraphNodes,
   upsertGraphNode,
 } from "./graph.js";
+import { DESTRUCTIVE } from "./write-context.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -42,16 +43,22 @@ test(
         if (isToolError(created)) return;
 
         const [left, right] = await Promise.all([
-          deleteGraphNode(a, {
-            id: created.node.id,
-            confirm: true,
-            base_updated_at: created.node.updated_at,
-          }),
-          deleteGraphNode(b, {
-            id: created.node.id,
-            confirm: true,
-            base_updated_at: created.node.updated_at,
-          }),
+          deleteGraphNode(
+            a,
+            {
+              id: created.node.id,
+              base_updated_at: created.node.updated_at,
+            },
+            DESTRUCTIVE,
+          ),
+          deleteGraphNode(
+            b,
+            {
+              id: created.node.id,
+              base_updated_at: created.node.updated_at,
+            },
+            DESTRUCTIVE,
+          ),
         ]);
 
         const results = [left, right];
@@ -85,22 +92,28 @@ test(
         if (isToolError(linked)) return;
 
         const [left, right] = await Promise.all([
-          unlinkGraphNodes(a, {
-            from_id: note.node.id,
-            to_id: idea.node.id,
-            relation_type: "inspired_by",
-            confirm: true,
-            from_base_updated_at: note.node.updated_at,
-            to_base_updated_at: idea.node.updated_at,
-          }),
-          unlinkGraphNodes(b, {
-            from_id: note.node.id,
-            to_id: idea.node.id,
-            relation_type: "inspired_by",
-            confirm: true,
-            from_base_updated_at: note.node.updated_at,
-            to_base_updated_at: idea.node.updated_at,
-          }),
+          unlinkGraphNodes(
+            a,
+            {
+              from_id: note.node.id,
+              to_id: idea.node.id,
+              relation_type: "inspired_by",
+              from_base_updated_at: note.node.updated_at,
+              to_base_updated_at: idea.node.updated_at,
+            },
+            DESTRUCTIVE,
+          ),
+          unlinkGraphNodes(
+            b,
+            {
+              from_id: note.node.id,
+              to_id: idea.node.id,
+              relation_type: "inspired_by",
+              from_base_updated_at: note.node.updated_at,
+              to_base_updated_at: idea.node.updated_at,
+            },
+            DESTRUCTIVE,
+          ),
         ]);
 
         const results = [left, right];

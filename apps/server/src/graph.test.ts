@@ -12,6 +12,7 @@ import {
   unlinkGraphNodes,
   upsertGraphNode,
 } from "./graph.js";
+import { DESTRUCTIVE } from "./write-context.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -120,7 +121,7 @@ test(
         }
       });
 
-      await t.test("delete requires confirm and soft-deletes", async () => {
+      await t.test("delete needs destructive scope and soft-deletes", async () => {
         const created = await upsertGraphNode(pool, { type: "note", title: "scratch" });
         assert.equal(isToolError(created), false);
         if (isToolError(created)) return;
@@ -128,16 +129,15 @@ test(
         const refused = await deleteGraphNode(pool, { id: created.node.id });
         assert.equal(isToolError(refused), true);
         if (!isToolError(refused)) return;
-        assert.match(refused.error, /confirm: true/);
+        assert.match(refused.error, /destructive scope/);
 
         const stillThere = await getGraphNode(pool, created.node.id);
         assert.equal(isToolError(stillThere), false);
 
         const deleted = await deleteGraphNode(pool, {
           id: created.node.id,
-          confirm: true,
           base_updated_at: created.node.updated_at,
-        });
+        }, DESTRUCTIVE);
         assert.equal(isToolError(deleted), false);
         if (isToolError(deleted)) return;
         assert.equal(deleted.ok, true);
@@ -211,9 +211,8 @@ test(
 
         const deleted = await deleteGraphNode(pool, {
           id: oldArea.node.id,
-          confirm: true,
           base_updated_at: oldArea.node.updated_at,
-        });
+        }, DESTRUCTIVE);
         assert.equal(isToolError(deleted), false);
 
         const orphaned = await getGraphNode(pool, project.node.id);
@@ -286,7 +285,7 @@ test(
         assert.match(linked.suggestion ?? "", /child_of/);
       });
 
-      await t.test("unlink requires confirm and removes the edge", async () => {
+      await t.test("unlink needs destructive scope and removes the edge", async () => {
         const a = await upsertGraphNode(pool, { type: "note", title: "A" });
         const b = await upsertGraphNode(pool, { type: "idea", title: "B" });
         if (isToolError(a) || isToolError(b)) {
@@ -315,10 +314,9 @@ test(
           from_id: a.node.id,
           to_id: b.node.id,
           relation_type: "inspired_by",
-          confirm: true,
           from_base_updated_at: a.node.updated_at,
           to_base_updated_at: b.node.updated_at,
-        });
+        }, DESTRUCTIVE);
         assert.equal(isToolError(gone), false);
         const fetched = await getGraphNode(pool, a.node.id);
         assert.equal(isToolError(fetched), false);
@@ -335,7 +333,7 @@ test(
           parent_types: ["project"],
           hue: "sky",
           glyph: "Tag",
-        });
+        }, DESTRUCTIVE);
         assert.equal(isToolError(created), false);
         if (isToolError(created)) return;
         assert.equal(created.type.slug, "meeting");
@@ -352,7 +350,7 @@ test(
           kind: "artifact",
           views: ["card", "list"],
           default_view: "card",
-        });
+        }, DESTRUCTIVE);
         assert.equal(isToolError(withViews), false);
         if (isToolError(withViews)) return;
         assert.deepEqual(viewIds(withViews.type.views), ["card", "list"]);
@@ -399,7 +397,7 @@ test(
           action: "update",
           slug: "area",
           kind: "artifact",
-        });
+        }, DESTRUCTIVE);
         assert.equal(isToolError(blocked), true);
         if (!isToolError(blocked)) return;
         assert.match(blocked.error, /system type "area"/);
@@ -408,7 +406,7 @@ test(
           action: "update",
           slug: "area",
           description: "Spine root — updated by an agent",
-        });
+        }, DESTRUCTIVE);
         assert.equal(isToolError(described), false);
         if (isToolError(described)) return;
         assert.equal(described.type.description, "Spine root — updated by an agent");
@@ -429,7 +427,7 @@ test(
           kind: "artifact",
           views: ["board", "list"],
           default_view: "board",
-        });
+        }, DESTRUCTIVE);
         assert.equal(isToolError(created), false);
         if (isToolError(created)) return;
 
@@ -437,7 +435,7 @@ test(
           action: "update",
           slug: "dossier",
           views: ["list", "outline"],
-        });
+        }, DESTRUCTIVE);
         assert.equal(isToolError(dropped), false);
         if (isToolError(dropped)) return;
         assert.deepEqual(viewIds(dropped.type.views), ["list", "outline"]);
@@ -447,7 +445,7 @@ test(
           action: "update",
           slug: "dossier",
           views: [],
-        });
+        }, DESTRUCTIVE);
         assert.equal(isToolError(cleared), false);
         if (isToolError(cleared)) return;
         assert.deepEqual(viewIds(cleared.type.views), []);
@@ -464,7 +462,7 @@ test(
           action: "create",
           slug: "waypoint_retire",
           kind: "artifact",
-        });
+        }, DESTRUCTIVE);
         assert.equal(isToolError(created), false);
         if (isToolError(created)) return;
 
@@ -474,13 +472,12 @@ test(
         });
         assert.equal(isToolError(noConfirm), true);
         if (!isToolError(noConfirm)) return;
-        assert.match(noConfirm.error, /confirm: true/);
+        assert.match(noConfirm.error, /destructive scope/);
 
         const system = await manageType(pool, {
           action: "retire",
           slug: "area",
-          confirm: true,
-        });
+        }, DESTRUCTIVE);
         assert.equal(isToolError(system), true);
         if (!isToolError(system)) return;
         assert.match(system.error, /system type "area"/);
@@ -488,8 +485,7 @@ test(
         const retired = await manageType(pool, {
           action: "retire",
           slug: "waypoint_retire",
-          confirm: true,
-        });
+        }, DESTRUCTIVE);
         assert.equal(isToolError(retired), false);
         if (isToolError(retired)) return;
         assert.equal(retired.type.slug, "waypoint_retire");
@@ -504,7 +500,7 @@ test(
           action: "create",
           slug: "waypoint_live",
           kind: "artifact",
-        });
+        }, DESTRUCTIVE);
         assert.equal(isToolError(liveType), false);
         if (isToolError(liveType)) return;
         const liveNode = await upsertGraphNode(pool, {
@@ -517,8 +513,7 @@ test(
         const blockedLive = await manageType(pool, {
           action: "retire",
           slug: "waypoint_live",
-          confirm: true,
-        });
+        }, DESTRUCTIVE);
         assert.equal(isToolError(blockedLive), true);
         if (!isToolError(blockedLive)) return;
         assert.match(blockedLive.error, /still use it/);
@@ -528,7 +523,7 @@ test(
           action: "create",
           slug: "waypoint_tomb",
           kind: "artifact",
-        });
+        }, DESTRUCTIVE);
         assert.equal(isToolError(tombType), false);
         if (isToolError(tombType)) return;
         const tombNode = await upsertGraphNode(pool, {
@@ -539,16 +534,14 @@ test(
         if (isToolError(tombNode)) return;
         const deleted = await deleteGraphNode(pool, {
           id: tombNode.node.id,
-          confirm: true,
           base_updated_at: tombNode.node.updated_at,
-        });
+        }, DESTRUCTIVE);
         assert.equal(isToolError(deleted), false);
 
         const blockedTomb = await manageType(pool, {
           action: "retire",
           slug: "waypoint_tomb",
-          confirm: true,
-        });
+        }, DESTRUCTIVE);
         assert.equal(isToolError(blockedTomb), true);
         if (!isToolError(blockedTomb)) return;
         assert.match(blockedTomb.error, /deleted node/);
@@ -557,9 +550,8 @@ test(
         const purged = await manageType(pool, {
           action: "retire",
           slug: "waypoint_tomb",
-          confirm: true,
           purge_deleted: true,
-        });
+        }, DESTRUCTIVE);
         assert.equal(isToolError(purged), false);
         const afterPurge = await inspectOntology(pool, "types");
         assert.equal(
@@ -616,7 +608,7 @@ test(
         action: "update",
         slug: "task",
         views: ["board", "list", "calendar", "timeline", "outline"],
-      });
+      }, DESTRUCTIVE);
       assert.equal(isToolError(restated), false);
       if (isToolError(restated)) {
         return;
@@ -635,7 +627,7 @@ test(
             }
           : view,
       );
-      const filtered = await manageType(pool, { action: "update", slug: "task", views: query });
+      const filtered = await manageType(pool, { action: "update", slug: "task", views: query }, DESTRUCTIVE);
       assert.equal(isToolError(filtered), false);
       if (isToolError(filtered)) {
         return;
@@ -653,7 +645,7 @@ test(
           ...(filtered.type.fields ?? []),
           { name: "note", kind: "string", display: "Note" },
         ],
-      });
+      }, DESTRUCTIVE);
       assert.equal(isToolError(withField), false);
       if (isToolError(withField)) {
         return;
@@ -665,7 +657,7 @@ test(
         action: "update",
         slug: "task",
         views: [...(withField.type.views ?? []), { id: "graph" }],
-      });
+      }, DESTRUCTIVE);
       assert.equal(isToolError(addGraph), true);
       if (isToolError(addGraph)) {
         assert.match(addGraph.error, /views/);
@@ -675,7 +667,7 @@ test(
         action: "update",
         slug: "task",
         views: (withField.type.views ?? []).filter((view) => view.id !== "board"),
-      });
+      }, DESTRUCTIVE);
       assert.equal(isToolError(dropBoard), true);
       if (isToolError(dropBoard)) {
         assert.match(dropBoard.error, /views/);
@@ -685,7 +677,7 @@ test(
         action: "update",
         slug: "task",
         description: "Discrete action — user note.",
-      });
+      }, DESTRUCTIVE);
       assert.equal(isToolError(described), false);
       if (isToolError(described)) {
         return;
@@ -698,7 +690,7 @@ test(
         slug: "task",
         hue: "rose",
         glyph: "Star",
-      });
+      }, DESTRUCTIVE);
       assert.equal(isToolError(colored), false);
       if (isToolError(colored)) {
         return;
@@ -708,7 +700,7 @@ test(
       assert.equal(colored.type.slug, "task");
       assert.deepEqual(viewIds(colored.type.views), ["board", "list", "calendar", "timeline", "outline"]);
 
-      const slugBlocked = await manageType(pool, { action: "update", slug: "task", label: "Jobs" });
+      const slugBlocked = await manageType(pool, { action: "update", slug: "task", label: "Jobs" }, DESTRUCTIVE);
       assert.equal(isToolError(slugBlocked), true);
     } finally {
       await pool.end();
@@ -745,7 +737,7 @@ test(
           ...(task.fields ?? []),
           { name: "note", kind: "string", display: "Note" },
         ],
-      });
+      }, DESTRUCTIVE);
       assert.equal(isToolError(edited), false);
       await seedSystemOntology(pool);
       const again = await inspectOntology(pool, "types");
@@ -761,7 +753,7 @@ test(
       assert.equal(seeded?.hue, "green");
       assert.equal(seeded?.glyph, "CircleCheck");
 
-      const recolored = await manageType(pool, { action: "update", slug: "task", hue: "pink", glyph: "Hash" });
+      const recolored = await manageType(pool, { action: "update", slug: "task", hue: "pink", glyph: "Hash" }, DESTRUCTIVE);
       assert.equal(isToolError(recolored), false);
       await seedSystemOntology(pool);
       const kept = (await inspectOntology(pool, "types")).types.find((type) => type.slug === "task");
@@ -791,7 +783,7 @@ test(
         views: (task.views ?? []).map((view) =>
           view.id === "board" ? { id: "board" as const } : view,
         ),
-      });
+      }, DESTRUCTIVE);
       assert.equal(isToolError(cleared), false);
       if (isToolError(cleared)) {
         return;
@@ -827,7 +819,7 @@ test(
         slug: "mention",
         kind: "artifact",
         fields: [{ name: "who", kind: "ref", ref_type: "person", display: "Who" }],
-      });
+      }, DESTRUCTIVE);
       assert.equal(isToolError(created), false);
       const person = await upsertGraphNode(pool, { type: "person", title: "Ada" });
       assert.equal(isToolError(person), false);
@@ -882,7 +874,7 @@ test(
         slug: "empty_fields_schema",
         kind: "artifact",
         fields: [{ name: "label", kind: "string", display: "Label" }],
-      });
+      }, DESTRUCTIVE);
       assert.equal(isToolError(created), false);
       if (isToolError(created)) {
         return;
@@ -900,7 +892,7 @@ test(
         action: "update",
         slug: "empty_fields_schema",
         fields: [],
-      });
+      }, DESTRUCTIVE);
       assert.equal(isToolError(emptied), false);
       if (isToolError(emptied)) {
         return;

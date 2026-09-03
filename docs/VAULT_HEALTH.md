@@ -141,7 +141,7 @@ Intent only — tool JSON schemas change; call `bootstrap` and use what the serv
 | Data dir (the vault) | Host filesystem + `.env` `FOUNDATION_DATA`. Host-read check: `scripts/vault-data-dir.sh` (`foundation_vault_data_dir_health_pg_version`). Do not mkdir on a miss. |
 | Backup | Host filesystem at `BACKUP_ROOT` (skip only if the user unset it) |
 
-Auth for `/mcp`: `Authorization: ApiKey <FOUNDATION_API_KEY>` (Bearer equivalent). `/health` needs no key for `{ ok, service, db }`. The same path with that header may add bind hosts, ports, and the data dir. A wrong key or the view cookie stays on the public object.
+Auth for `/mcp`: `Authorization: ApiKey <key>` (Bearer equivalent). `FOUNDATION_API_KEY` is the bootstrap root. Named keys are hashes in `$FOUNDATION_DATA/api-keys.json`. `/health` needs no key for `{ ok, service, db }`. The same path with a valid key header may add bind hosts, ports, and the data dir. A wrong key or the view cookie stays on the public object.
 
 ## Failure ping
 

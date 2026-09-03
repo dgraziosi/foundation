@@ -11,6 +11,7 @@ import {
   unlinkGraphNodes,
   upsertGraphNode,
 } from "./graph.js";
+import { DESTRUCTIVE } from "./write-context.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -179,22 +180,29 @@ test(
       });
 
       await t.test("retried create with the same idempotency_key does not twin a node", async () => {
-        const first = await upsertGraphNode(pool, {
-          type: "person",
-          title: "Ada",
-          idempotency_key: "create-ada-1",
-          actor: "agent",
-          actor_label: "agent-a",
-        });
+        const first = await upsertGraphNode(
+          pool,
+          {
+            type: "person",
+            title: "Ada",
+            idempotency_key: "create-ada-1",
+          },
+          undefined,
+          { writer: { actor: "agent", actor_label: "agent-a" } },
+        );
         assert.equal(isToolError(first), false);
         if (isToolError(first)) return;
 
-        const retry = await upsertGraphNode(pool, {
-          type: "person",
-          title: "Jordan Lee",
-          idempotency_key: "create-ada-1",
-          actor_label: "agent-b",
-        });
+        const retry = await upsertGraphNode(
+          pool,
+          {
+            type: "person",
+            title: "Jordan Lee",
+            idempotency_key: "create-ada-1",
+          },
+          undefined,
+          { writer: { actor: "agent", actor_label: "agent-b" } },
+        );
         assert.equal(isToolError(retry), false);
         if (isToolError(retry)) return;
         assert.equal(retry.node.id, first.node.id);
@@ -208,12 +216,15 @@ test(
       });
 
       await t.test("activity stores actor / actor_label from the writer", async () => {
-        const created = await upsertGraphNode(pool, {
-          type: "note",
-          title: "Who wrote",
-          actor: "user",
-          actor_label: "user",
-        });
+        const created = await upsertGraphNode(
+          pool,
+          {
+            type: "note",
+            title: "Who wrote",
+          },
+          undefined,
+          { writer: { actor: "user", actor_label: "user" } },
+        );
         assert.equal(isToolError(created), false);
         if (isToolError(created)) return;
 
@@ -242,27 +253,32 @@ test(
         assert.equal(isToolError(renamed), false);
         if (isToolError(renamed)) return;
 
-        const stale = await linkGraphNodes(pool, {
-          from_id: project.node.id,
-          to_id: area.node.id,
-          relation_type: "child_of",
-          from_base_updated_at: project.node.updated_at,
-          to_base_updated_at: area.node.updated_at,
-          actor_label: "agent-a",
-        });
+        const stale = await linkGraphNodes(
+          pool,
+          {
+            from_id: project.node.id,
+            to_id: area.node.id,
+            relation_type: "child_of",
+            from_base_updated_at: project.node.updated_at,
+            to_base_updated_at: area.node.updated_at,
+          },
+          { writer: { actor: "agent", actor_label: "agent-a" } },
+        );
         assert.equal(isToolError(stale), true);
         if (!isToolError(stale)) return;
         assert.match(stale.error, /from_base_updated_at does not match/);
 
-        const linked = await linkGraphNodes(pool, {
-          from_id: project.node.id,
-          to_id: area.node.id,
-          relation_type: "child_of",
-          from_base_updated_at: renamed.node.updated_at,
-          to_base_updated_at: area.node.updated_at,
-          actor: "agent",
-          actor_label: "agent-a",
-        });
+        const linked = await linkGraphNodes(
+          pool,
+          {
+            from_id: project.node.id,
+            to_id: area.node.id,
+            relation_type: "child_of",
+            from_base_updated_at: renamed.node.updated_at,
+            to_base_updated_at: area.node.updated_at,
+          },
+          { writer: { actor: "agent", actor_label: "agent-a" } },
+        );
         assert.equal(isToolError(linked), false);
         if (isToolError(linked)) return;
 
@@ -288,11 +304,14 @@ test(
         assert.equal(isToolError(renamed), false);
         if (isToolError(renamed)) return;
 
-        const stale = await deleteGraphNode(pool, {
-          id: created.node.id,
-          confirm: true,
-          base_updated_at: created.node.updated_at,
-        });
+        const stale = await deleteGraphNode(
+          pool,
+          {
+            id: created.node.id,
+            base_updated_at: created.node.updated_at,
+          },
+          DESTRUCTIVE,
+        );
         assert.equal(isToolError(stale), true);
         if (!isToolError(stale)) return;
         assert.match(stale.error, /does not match current updated_at/);
@@ -310,7 +329,7 @@ test(
         assert.equal(isToolError(created), false);
         if (isToolError(created)) return;
 
-        const missing = await deleteGraphNode(pool, { id: created.node.id, confirm: true });
+        const missing = await deleteGraphNode(pool, { id: created.node.id }, DESTRUCTIVE);
         assert.equal(isToolError(missing), true);
         if (!isToolError(missing)) return;
         assert.match(missing.error, /Missing base_updated_at/);
@@ -343,14 +362,17 @@ test(
         assert.equal(isToolError(renamed), false);
         if (isToolError(renamed)) return;
 
-        const stale = await unlinkGraphNodes(pool, {
-          from_id: note.node.id,
-          to_id: idea.node.id,
-          relation_type: "inspired_by",
-          confirm: true,
-          from_base_updated_at: note.node.updated_at,
-          to_base_updated_at: idea.node.updated_at,
-        });
+        const stale = await unlinkGraphNodes(
+          pool,
+          {
+            from_id: note.node.id,
+            to_id: idea.node.id,
+            relation_type: "inspired_by",
+            from_base_updated_at: note.node.updated_at,
+            to_base_updated_at: idea.node.updated_at,
+          },
+          DESTRUCTIVE,
+        );
         assert.equal(isToolError(stale), true);
         if (!isToolError(stale)) return;
         assert.match(stale.error, /from_base_updated_at does not match/);
@@ -366,11 +388,14 @@ test(
         assert.equal(isToolError(created), false);
         if (isToolError(created)) return;
 
-        const stale = await undoGraphActivity(pool, {
-          id: created.activity_id,
-          confirm: true,
-          base_updated_at: "2020-01-01T00:00:00.000Z",
-        });
+        const stale = await undoGraphActivity(
+          pool,
+          {
+            id: created.activity_id,
+            base_updated_at: "2020-01-01T00:00:00.000Z",
+          },
+          DESTRUCTIVE,
+        );
         assert.equal(isToolError(stale), true);
         if (!isToolError(stale)) return;
         assert.match(stale.error, /does not match current updated_at/);
@@ -378,11 +403,14 @@ test(
         const live = await getGraphNode(pool, created.node.id);
         assert.equal(isToolError(live), false);
 
-        const undone = await undoGraphActivity(pool, {
-          id: created.activity_id,
-          confirm: true,
-          base_updated_at: created.node.updated_at,
-        });
+        const undone = await undoGraphActivity(
+          pool,
+          {
+            id: created.activity_id,
+            base_updated_at: created.node.updated_at,
+          },
+          DESTRUCTIVE,
+        );
         assert.equal(isToolError(undone), false);
         if (isToolError(undone)) return;
 
@@ -397,11 +425,14 @@ test(
         assert.equal(compensate?.action, "delete");
         assert.equal(compensate?.reversible, false);
 
-        const second = await undoGraphActivity(pool, {
-          id: undone.activity_id,
-          confirm: true,
-          base_updated_at: created.node.updated_at,
-        });
+        const second = await undoGraphActivity(
+          pool,
+          {
+            id: undone.activity_id,
+            base_updated_at: created.node.updated_at,
+          },
+          DESTRUCTIVE,
+        );
         assert.equal(isToolError(second), true);
         if (!isToolError(second)) return;
         assert.match(second.error, /not reversible/);

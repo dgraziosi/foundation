@@ -21,7 +21,7 @@ Vault Keeper still does not invent life facts. A bot running Dream may rewrite a
 
 02:00, all 7 nights, user-local. Overnight on purpose. Run Dream before backup when both exist. If a morning brief also exists, that clock is 08:00 user-local. Put these clocks on the bot's Routines. Do not add a live instance cron in git.
 
-Quiet when the pass finished and nothing needs the user. Ping the user when you stopped because the activity does not say what is true, or when a destructive call needs `confirm`.
+Quiet when the pass finished and nothing needs the user. Ping the user when you stopped because the activity does not say what is true, or when a destructive call needs a key with destructive scope.
 
 This pass rewrites records that moved. Vault health, nightly backup, the weekly graph report ([`.agents/skills/graph-hygiene/`](../graph-hygiene/)), and product updates have their own schedules. That weekly report stays a report. Do not turn this pass into that report.
 
@@ -31,7 +31,7 @@ This pass rewrites records that moved. Vault health, nightly backup, the weekly 
 - Not Mem0 chat extract. Do not ingest mail or chat.
 - Do not invent insight records.
 - Do not write dues into standing harness memory. Dues stay on the record.
-- Not a new vault call. Use `get`, `list_activity`, `upsert`, and `search`. Destructive calls (`delete`, `unlink`, `undo`, `manage_type` retire) need `confirm: true`. `delete`, `unlink`, and node or edge `undo` also need if-match timestamps from `get`.
+- Not a new vault call. Use `get`, `list_activity`, `upsert`, and `search`. Destructive calls (`delete`, `unlink`, `undo`, `manage_type` retire) need a key with destructive scope. `delete`, `unlink`, and node or edge `undo` also need if-match timestamps from `get`.
 - Not a Viewer pass.
 
 ## Pass
@@ -47,7 +47,7 @@ One record at a time. Invent nothing. The server does not invent a summary.
    4. If the record is still true, leave it. If it is not, `upsert` the same id with a short `payload` that is still true, any `data` patch that still belongs, and `base_updated_at` from `get`. Omit `payload` when only `data` or `status` changes.
    5. Close what's done. `status: "completed"` is vault work state. Clear `data.due` when the work is done. Do not invent a `receipt`. Do not create a new record to hold a summary.
 
-3. Clean obvious duplicates you meet on this pass (last waking day's moved records). Do not merge. Do not delete a record just because it has no edges. A first-day vault (seed types, zero user records) is healthy — skip. If you cannot confirm a destructive call, skip and ping the user.
+3. Clean obvious duplicates you meet on this pass (last waking day's moved records). Do not merge. Do not delete a record just because it has no edges. A first-day vault (seed types, zero user records) is healthy — skip. If this bot's key lacks destructive scope, skip the destructive call and ping the user.
 
 4. When a step finishes, name who has the work now, or say done. If a due date was added, changed, or cleared, Executive Assistant acts on the calendar in the same motion.
 
