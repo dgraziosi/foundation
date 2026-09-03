@@ -6,6 +6,16 @@ Historical proof runs below may mention older door copy. The current window is t
 
 Live journal HTTP was not driven on the VMs that ran these proofs. Host Postgres 16 was not on PATH (`initdb`, `pg_ctl`, `psql`). That is a run limitation. The feature is on the branch.
 
+## Named proof `revalidate-edges-8`
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=revalidate-edges-8`). Doctor green. Root key had destructive scope. `confirm` was not used.
+
+MCP on `http://127.0.0.1:8787/mcp`:
+
+1. Retype a `task` with a live `child_of` to `note` without if-match → `Missing base_updated_at`. With if-match → `{ error: Cannot retype to "note": live child_of edge would no longer be allowed, suggestion: unlink first }`. `get` still showed `type: task` and the edge.
+2. Delete a `person` that a `mention.who` ref pointed at, without if-match → `Missing base_updated_at`. With if-match → refuse inbound ref fields; the person stayed live. Clear `who`, then delete succeeded.
+3. Cleanup removed the disposable run root. Evidence stayed under `.cursor/skills/verify-foundation/evidence/revalidate-edges-8/`.
+
 ## Generate run (20260901Tproof1)
 
 The generated skill was executed once. Cleanup did not delete evidence.
