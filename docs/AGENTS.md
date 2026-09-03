@@ -51,6 +51,7 @@ Named skill folders under [`.agents/skills/`](../.agents/skills/). Do not paste 
 | [`.agents/skills/dream/`](../.agents/skills/dream/) | Nightly Dream pass (02:00 user-local) |
 | [`.agents/skills/backup-vault/`](../.agents/skills/backup-vault/) | Nightly dump is a host script; bot nags if missing or old |
 | [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/) | Weekly graph-hygiene routine |
+| [`.agents/skills/drift-read/`](../.agents/skills/drift-read/) | On-demand `@drift read:` five-bucket graph report (`scripts/drift-read.sh`) |
 | [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/) | Weekday product-update routine |
 | [`.agents/skills/repo-leak-scan/`](../.agents/skills/repo-leak-scan/) | Optional git-tree scan for secrets (no vault key) |
 

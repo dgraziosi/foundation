@@ -25,6 +25,7 @@ Do not add `get_vault_health`, `run_maintenance`, `propose_reorganize`, `audit_l
 - **Not vault health.** Process, `FOUNDATION_DATA`, canaries, and backup freshness are [`VAULT_HEALTH.md`](./VAULT_HEALTH.md).
 - **Not Dream.** Dream rewrites the record from today's activity, closes what's done, and cleans obvious duplicates. Skill: [`.agents/skills/dream/`](../.agents/skills/dream/). This weekly report stays report-only.
 - **Not applying product updates.** Git pull + restart the app is [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/).
+- **Not the five-bucket drift read.** Missing needed, dangling refs, retired keys, plus isolates and duplicate titles as one command, are [`GRAPH_DRIFT.md`](./GRAPH_DRIFT.md) (`scripts/drift-read.sh`). This weekly report still owns type soup and stays quiet if green.
 - **Not a mutation pass.** No `upsert` / `delete` / `unlink` / `undo` / `manage_type` on the quiet run.
 - **Not email.** No digest. Ping only when there is something to report.
 - **Not a write-ACL.** The API key is the gate.
