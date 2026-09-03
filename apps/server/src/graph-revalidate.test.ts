@@ -350,3 +350,150 @@ test(
     }
   },
 );
+
+test(
+  "manage_relation refuses a hierarchy kind that would leave two parents",
+  { skip: !databaseUrl },
+  async (t) => {
+    if (!databaseUrl) {
+      return;
+    }
+    const pool = await poolForSchema("graph_relation_kind_parents");
+    try {
+      await t.test("child_of plus the authored verb cannot both become hierarchy", async () => {
+        const created = await manageRelation(pool, {
+          action: "create",
+          slug: "hangs_under",
+          kind: "associative",
+        });
+        assert.equal(isToolError(created), false);
+        if (isToolError(created)) return;
+
+        const project = await upsertGraphNode(pool, { type: "project", title: "Kind project" });
+        const other = await upsertGraphNode(pool, { type: "project", title: "Kind other" });
+        const task = await upsertGraphNode(pool, { type: "task", title: "Kind task" });
+        if (isToolError(project) || isToolError(other) || isToolError(task)) {
+          assert.fail("upsert failed");
+          return;
+        }
+        const child = await linkGraphNodes(pool, {
+          from_id: task.node.id,
+          to_id: project.node.id,
+          relation_type: "child_of",
+          from_base_updated_at: task.node.updated_at,
+          to_base_updated_at: project.node.updated_at,
+        });
+        const extra = await linkGraphNodes(pool, {
+          from_id: task.node.id,
+          to_id: other.node.id,
+          relation_type: "hangs_under",
+          from_base_updated_at: task.node.updated_at,
+          to_base_updated_at: other.node.updated_at,
+        });
+        if (isToolError(child) || isToolError(extra)) {
+          assert.fail("creates failed");
+          return;
+        }
+
+        const flipped = await manageRelation(pool, {
+          action: "update",
+          slug: "hangs_under",
+          kind: "hierarchy",
+        });
+        assert.equal(isToolError(flipped), true);
+        if (!isToolError(flipped)) return;
+        assert.match(flipped.error, /Cannot update relation "hangs_under"/);
+        assert.match(flipped.suggestion ?? "", /at most one hierarchy parent/);
+
+        const still = await inspectOntology(pool, "relations");
+        const hangs = still.relations.find((relation) => relation.slug === "hangs_under");
+        assert.equal(hangs?.kind, "associative");
+      });
+
+      await t.test("two edges of the authored verb cannot both become hierarchy", async () => {
+        const created = await manageRelation(pool, {
+          action: "create",
+          slug: "sits_under",
+          kind: "associative",
+        });
+        assert.equal(isToolError(created), false);
+        if (isToolError(created)) return;
+
+        const first = await upsertGraphNode(pool, { type: "project", title: "Sits first" });
+        const second = await upsertGraphNode(pool, { type: "project", title: "Sits second" });
+        const task = await upsertGraphNode(pool, { type: "task", title: "Sits task" });
+        if (isToolError(first) || isToolError(second) || isToolError(task)) {
+          assert.fail("upsert failed");
+          return;
+        }
+        const a = await linkGraphNodes(pool, {
+          from_id: task.node.id,
+          to_id: first.node.id,
+          relation_type: "sits_under",
+          from_base_updated_at: task.node.updated_at,
+          to_base_updated_at: first.node.updated_at,
+        });
+        const b = await linkGraphNodes(pool, {
+          from_id: task.node.id,
+          to_id: second.node.id,
+          relation_type: "sits_under",
+          from_base_updated_at: task.node.updated_at,
+          to_base_updated_at: second.node.updated_at,
+        });
+        if (isToolError(a) || isToolError(b)) {
+          assert.fail("link failed");
+          return;
+        }
+
+        const flipped = await manageRelation(pool, {
+          action: "update",
+          slug: "sits_under",
+          kind: "hierarchy",
+        });
+        assert.equal(isToolError(flipped), true);
+        if (!isToolError(flipped)) return;
+        assert.match(flipped.error, /Cannot update relation "sits_under"/);
+        assert.match(flipped.suggestion ?? "", /at most one hierarchy parent/);
+      });
+
+      await t.test("a single authored edge may become the hierarchy parent", async () => {
+        const created = await manageRelation(pool, {
+          action: "create",
+          slug: "placed_under",
+          kind: "associative",
+        });
+        assert.equal(isToolError(created), false);
+        if (isToolError(created)) return;
+
+        const project = await upsertGraphNode(pool, { type: "project", title: "Placed project" });
+        const task = await upsertGraphNode(pool, { type: "task", title: "Placed task" });
+        if (isToolError(project) || isToolError(task)) {
+          assert.fail("upsert failed");
+          return;
+        }
+        const linked = await linkGraphNodes(pool, {
+          from_id: task.node.id,
+          to_id: project.node.id,
+          relation_type: "placed_under",
+          from_base_updated_at: task.node.updated_at,
+          to_base_updated_at: project.node.updated_at,
+        });
+        if (isToolError(linked)) {
+          assert.fail(linked.error);
+          return;
+        }
+
+        const flipped = await manageRelation(pool, {
+          action: "update",
+          slug: "placed_under",
+          kind: "hierarchy",
+        });
+        assert.equal(isToolError(flipped), false);
+        if (isToolError(flipped)) return;
+        assert.equal(flipped.relation.kind, "hierarchy");
+      });
+    } finally {
+      await pool.end();
+    }
+  },
+);

@@ -154,6 +154,39 @@ test("restricted child_of source_types does not suggest a parent from a disallow
   ]);
 });
 
+test("restricted child_of target_types does not suggest a parent the validator would refuse", () => {
+  const relations = SEED_RELATION_TYPES.map((relation) =>
+    relation.slug === "child_of" ? { ...relation, target_types: ["area"] } : relation,
+  );
+  const suggestions = classifySuggestedLinks(self.id, seedType("task"), [project], {
+    relationTypes: relations,
+  });
+  assert.equal(suggestions.some((item) => item.kind === "child_of"), false);
+  assert.deepEqual(suggestions, [
+    {
+      kind: "relates_to",
+      target: project,
+      reason: RELATES_TO_SUGGESTION_REASON,
+    },
+  ]);
+});
+
+test("allowed child_of target_types still suggests a parent", () => {
+  const relations = SEED_RELATION_TYPES.map((relation) =>
+    relation.slug === "child_of" ? { ...relation, target_types: ["project"] } : relation,
+  );
+  const suggestions = classifySuggestedLinks(self.id, seedType("task"), [project], {
+    relationTypes: relations,
+  });
+  assert.deepEqual(suggestions, [
+    {
+      kind: "child_of",
+      target: project,
+      reason: CHILD_OF_SUGGESTION_REASON,
+    },
+  ]);
+});
+
 test("changing about target_types suggests that type", () => {
   const company = {
     id: "77777777-7777-4777-8777-777777777777",

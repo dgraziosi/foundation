@@ -50,6 +50,10 @@ function relationAllowsSource(relation: RelationType, sourceSlug: string): boole
   return relation.source_types.length === 0 || relation.source_types.includes(sourceSlug);
 }
 
+function relationAllowsTarget(relation: RelationType, targetSlug: string): boolean {
+  return relation.target_types.length === 0 || relation.target_types.includes(targetSlug);
+}
+
 /**
  * Ranked title matches in, live-relation suggestions out.
  * Never invents a type or relation. Caller must not write an edge.
@@ -103,7 +107,11 @@ export function classifySuggestedLinks(
   ) {
     take(
       hierarchyRelation.slug,
-      usable.filter((candidate) => sourceType.parent_types.includes(candidate.type)),
+      usable.filter(
+        (candidate) =>
+          sourceType.parent_types.includes(candidate.type) &&
+          relationAllowsTarget(hierarchyRelation, candidate.type),
+      ),
       CHILD_OF_SUGGESTION_REASON,
     );
   }
