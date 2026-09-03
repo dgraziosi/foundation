@@ -43,7 +43,7 @@ Do not commit personal life data, documents, or secrets to this repository. Thos
 
 ## Install
 
-Mac and Linux. Clone this repo. Node 22 + pnpm. Postgres 16. PATH must include `initdb`, `pg_ctl`, and `psql`. Migrations create `pgcrypto`, `unaccent`, `pg_trgm`, and `vector`. If a package name is not already in this repo, it is unknown here — do not guess an installer. Pull requests against main run the `verify` check.
+Mac and Linux. Clone this repo. Node 22 + pnpm. Postgres 16. PATH must include `initdb`, `pg_ctl`, and `psql`. Migrations create `pgcrypto`, `unaccent`, `pg_trgm`, and `vector`. If a package name is not already in this repo, it is unknown here — do not guess an installer. Pull requests against main run the `verify` check. Cloud agents and GitHub `verify` boot a throwaway vault with the helper.
 
 1. Copy the env file. The human sets the API key (do not commit `.env`):
 
