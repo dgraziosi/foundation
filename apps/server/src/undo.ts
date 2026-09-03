@@ -33,6 +33,7 @@ import {
   SEED_NODE_TYPES,
   SEED_TYPE_VIEWS,
   RelationTypeSchema,
+  assertIfMatch,
   missingConfirm,
   toolError,
   type Activity,
@@ -127,6 +128,112 @@ function expired(row: Activity): boolean {
   return Date.parse(row.token_expires_at) <= Date.now();
 }
 
+async function assertUndoNodeMatch(
+  client: PoolClient,
+  nodeId: string,
+  provided: string | undefined,
+  options: { includeDeleted?: boolean; matchUpdatedAt?: string } = {},
+): Promise<ToolError | null> {
+  const current = await getNodeById(client, nodeId, {
+    includeDeleted: options.includeDeleted === true,
+    forUpdate: true,
+  });
+  if (!current) {
+    return toolError(
+      `Node not found: ${nodeId}`,
+      "Call get and retry with the current updated_at as base_updated_at.",
+    );
+  }
+  return assertIfMatch(
+    "base_updated_at",
+    provided,
+    options.matchUpdatedAt ?? current.updated_at,
+  );
+}
+
+async function assertUndoEndpointMatch(
+  client: PoolClient,
+  fromId: string,
+  toId: string,
+  input: UndoInput,
+): Promise<ToolError | null> {
+  const lockOrder = [...new Set([fromId, toId])].sort();
+  const locked = new Map<string, Node>();
+  for (const id of lockOrder) {
+    const node = await getNodeById(client, id, { forUpdate: true });
+    if (!node) {
+      return toolError(
+        `Node not found: ${id}`,
+        "Call get on both endpoints and retry with their updated_at timestamps.",
+      );
+    }
+    locked.set(id, node);
+  }
+  const fromStale = assertIfMatch(
+    "from_base_updated_at",
+    input.from_base_updated_at,
+    locked.get(fromId)!.updated_at,
+  );
+  if (fromStale) {
+    return fromStale;
+  }
+  return assertIfMatch(
+    "to_base_updated_at",
+    input.to_base_updated_at,
+    locked.get(toId)!.updated_at,
+  );
+}
+
+async function assertUndoIfMatch(
+  client: PoolClient,
+  row: Activity,
+  input: UndoInput,
+): Promise<ToolError | null> {
+  switch (row.action) {
+    case "create": {
+      const created = snapshotNode(row.after);
+      if (!created) {
+        return null;
+      }
+      return assertUndoNodeMatch(client, created.id, input.base_updated_at);
+    }
+    case "update": {
+      const before = snapshotNode(row.before);
+      if (!before) {
+        return null;
+      }
+      return assertUndoNodeMatch(client, before.id, input.base_updated_at);
+    }
+    case "delete": {
+      const deleted = snapshotNode(row.after) ?? snapshotNode(row.before);
+      if (!deleted) {
+        return null;
+      }
+      const live = snapshotNode(row.before);
+      return assertUndoNodeMatch(client, deleted.id, input.base_updated_at, {
+        includeDeleted: true,
+        matchUpdatedAt: live?.updated_at,
+      });
+    }
+    case "link": {
+      const edge = snapshotEdge(row.after);
+      if (!edge) {
+        return null;
+      }
+      return assertUndoEndpointMatch(client, edge.from_id, edge.to_id, input);
+    }
+    case "unlink": {
+      const edge = snapshotEdge(row.before);
+      if (!edge) {
+        return null;
+      }
+      return assertUndoEndpointMatch(client, edge.from_id, edge.to_id, input);
+    }
+    default:
+      return null;
+  }
+}
+
 async function invertCreateNode(
   client: PoolClient,
   row: Activity,
@@ -142,7 +249,9 @@ async function invertCreateNode(
       "Undo of create soft-deletes the node. It may already have been deleted.",
     );
   }
-  const after = await softDeleteNode(client, live.id);
+  const after = await softDeleteNode(client, live.id, {
+    base_updated_at: live.updated_at,
+  });
   if (!after) {
     return toolError(`Node not found: ${live.id}`);
   }
@@ -488,6 +597,11 @@ export async function undoGraphActivity(
         "Undo token expired",
         "The undo window has passed. Recreate or upsert the desired state directly.",
       );
+    }
+
+    const stale = await assertUndoIfMatch(client, row, input);
+    if (stale) {
+      return stale;
     }
 
     let inverted: { before: unknown; after: unknown; action: Activity["action"] } | ToolError;

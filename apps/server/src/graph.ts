@@ -130,7 +130,9 @@ import {
   type SearchSuccess,
   type SuggestedLink,
   type ToolError,
+  type DeleteInput,
   type DuplicateWarning,
+  type UnlinkInput,
   type UpsertInput,
   type UpsertPayload,
 } from "@foundation/schema";
@@ -812,7 +814,7 @@ export async function upsertGraphNode(
 
 export async function deleteGraphNode(
   pool: Pool,
-  input: { id: string; confirm?: boolean; actor?: Activity["actor"]; actor_label?: string },
+  input: DeleteInput,
 ): Promise<{ ok: true; activity_id: string } | ToolError> {
   const confirmErr = missingConfirm("delete", input.confirm);
   if (confirmErr) {
@@ -820,16 +822,31 @@ export async function deleteGraphNode(
   }
   const writer = writerOf(input);
   return withTransaction(pool, async (client) => {
-    const before = await getNodeById(client, input.id);
+    const before = await getNodeById(client, input.id, { includeDeleted: true, forUpdate: true });
     if (!before) {
       return toolError(
         `Node not found: ${input.id}`,
         "delete only soft-deletes a live node. Check the UUID from upsert.",
       );
     }
-    const after = await softDeleteNode(client, input.id);
+    const stale = assertIfMatch("base_updated_at", input.base_updated_at, before.updated_at);
+    if (stale) {
+      return stale;
+    }
+    if (before.deleted_at) {
+      return toolError(
+        `Node ${input.id} is deleted`,
+        "Restore via undo. Use a new id to create another node.",
+      );
+    }
+    const after = await softDeleteNode(client, input.id, {
+      base_updated_at: input.base_updated_at,
+    });
     if (!after) {
-      return toolError(`Node not found: ${input.id}`);
+      return toolError(
+        "base_updated_at does not match current updated_at",
+        LOST_UPDATE_SUGGESTION,
+      );
     }
     const activity = await insertActivity(client, {
       ...writer,
@@ -1059,14 +1076,7 @@ export async function linkGraphNodes(
 
 export async function unlinkGraphNodes(
   pool: Pool,
-  input: {
-    from_id: string;
-    to_id: string;
-    relation_type: string;
-    confirm?: boolean;
-    actor?: Activity["actor"];
-    actor_label?: string;
-  },
+  input: UnlinkInput,
 ): Promise<{ ok: true; activity_id: string } | ToolError> {
   const confirmErr = missingConfirm("unlink", input.confirm);
   if (confirmErr) {
@@ -1074,6 +1084,33 @@ export async function unlinkGraphNodes(
   }
   const writer = writerOf(input);
   return withTransaction(pool, async (client) => {
+    const lockOrder = [...new Set([input.from_id, input.to_id])].sort();
+    const locked = new Map<string, Node>();
+    for (const id of lockOrder) {
+      const node = await getNodeById(client, id, { forUpdate: true });
+      if (!node) {
+        const which = id === input.from_id ? "from_id" : "to_id";
+        return toolError(
+          `${which} not found: ${id}`,
+          "Pass a live node UUID from get.",
+        );
+      }
+      locked.set(id, node);
+    }
+    const from = locked.get(input.from_id)!;
+    const to = locked.get(input.to_id)!;
+    const fromStale = assertIfMatch(
+      "from_base_updated_at",
+      input.from_base_updated_at,
+      from.updated_at,
+    );
+    if (fromStale) {
+      return fromStale;
+    }
+    const toStale = assertIfMatch("to_base_updated_at", input.to_base_updated_at, to.updated_at);
+    if (toStale) {
+      return toStale;
+    }
     const before = await findEdge(client, input.from_id, input.to_id, input.relation_type);
     if (!before) {
       return toolError(

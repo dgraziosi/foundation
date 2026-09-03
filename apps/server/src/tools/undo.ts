@@ -8,7 +8,7 @@ export function registerUndoTool(server: McpServer, pool: Pool): void {
   defineTool(server, {
     name: "undo",
     description:
-      "Reverse a reversible activity row by id. Requires confirm: true. Undoing a type create while deleted nodes of that type remain requires purge_deleted: true. Undo of type retire restores the registry row.",
+      "Reverse a reversible activity row by id. Requires confirm: true. Node and edge inversions require if-match timestamps from get. Undoing a type create while deleted nodes of that type remain requires purge_deleted: true. Undo of type retire restores the registry row.",
     input: UndoInputSchema.shape,
     output: MutationOkSchema,
     handler: async (input) => undoGraphActivity(pool, input),

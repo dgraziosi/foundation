@@ -12,14 +12,14 @@ Destructive tools require `confirm: true` or they return `{ error, suggestion }`
 | `get` | Return the record: payload, data, incident edges with neighbor titles, and `suggested_links` from title FTS. Does not return activity. Blob payloads return metadata, not bytes. |
 | `working_set` | Return the actionable working set around one live node: open work, dues, and the parent chain when the root hangs under something. |
 | `upsert` | Create or update a node (title, type, payload, data, status). Passing `payload` replaces that body; omit it and the body stays. Updates require `base_updated_at`. Create accepts `idempotency_key`. Create (no id) preflights duplicates via `lookup`. Blob ingest via `bytes_base64` or `source_path`. Returns `suggested_links` (proposals only). |
-| `delete` | Soft-delete a node. Requires `confirm: true`. |
+| `delete` | Soft-delete a node. Requires `confirm: true` and `base_updated_at` from `get`. |
 | `link` | Create typed edges after validation. One edge or `edges[]` (1–20). Whole batch validates; one transaction writes all or none. Requires endpoint if-match. |
-| `unlink` | Remove a typed edge. Requires `confirm: true`. |
+| `unlink` | Remove a typed edge. Requires `confirm: true` and endpoint if-match. |
 | `inspect_ontology` | List type and relation registry rows (system + authored), including each type’s `fields`, view declarations, `default_view`, `hue`, and `glyph`. |
 | `manage_type` | Create, update, or retire a node type (including `fields`, view queries, hue, and glyph). Applies immediately. Retire requires `confirm: true`. |
 | `manage_relation` | Create or update a relation type. Applies immediately. |
 | `list_activity` | Read the diary (filter by action, target, since). `{ target: <node id> }` is the write history for that node (`before` / `after`). |
-| `undo` | Reverse a reversible activity row by id. Requires `confirm: true`. Type-create undo with leftover deleted nodes needs `purge_deleted: true`. |
+| `undo` | Reverse a reversible activity row by id. Requires `confirm: true`. Node and edge inversions require if-match timestamps from `get`. Type-create undo with leftover deleted nodes needs `purge_deleted: true`. |
 
 Handler contract: each tool has one zod input schema and one output schema; JSON Schema on the wire is derived; invalid input never reaches the domain; domain errors are `{ error, suggestion? }`.
 
@@ -129,9 +129,9 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 
 ### `delete`
 
-- **In:** `{ id, confirm: true, actor?, actor_label? }`
+- **In:** `{ id, confirm: true, base_updated_at, actor?, actor_label? }`
 - **Out:** `{ ok, activity_id }` or `{ error, suggestion? }`
-- Soft-delete (`deleted_at`). `get` hides deleted nodes. Incident edges stay in place for undo; `get` and `link` validation ignore edges to deleted endpoints. Reparenting drops a stale `child_of` to a deleted parent so uniqueness matches the live graph, and records an `unlink` activity row with a `before` snapshot of the dropped edge. Restore via `undo` of the delete row. Soft-delete does **not** delete blob bytes (so undo can restore a blob node).
+- Soft-delete (`deleted_at`). Requires `base_updated_at` from `get` (if-match, millisecond precision). Mismatch or omit → `{ error, suggestion }` (get and retry). A CAS miss is stale, never “node not found,” and the node stays live. `get` hides deleted nodes. Incident edges stay in place for undo; `get` and `link` validation ignore edges to deleted endpoints. Reparenting drops a stale `child_of` to a deleted parent so uniqueness matches the live graph, and records an `unlink` activity row with a `before` snapshot of the dropped edge. Restore via `undo` of the delete row. Soft-delete does **not** delete blob bytes (so undo can restore a blob node).
 
 ### `link`
 
@@ -148,8 +148,9 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 
 ### `unlink`
 
-- **In:** `{ from_id, to_id, relation_type, confirm: true, actor?, actor_label? }`
+- **In:** `{ from_id, to_id, relation_type, confirm: true, from_base_updated_at, to_base_updated_at, actor?, actor_label? }`
 - **Out:** `{ ok, activity_id }` or `{ error, suggestion? }`
+- **If-match:** `from_base_updated_at` and `to_base_updated_at` are required and must match each endpoint's current `updated_at` from `get`. Stale or missing → `{ error, suggestion }` (get the nodes and retry). Unlinking does not change `node.updated_at`. Not a write-ACL.
 
 ### `inspect_ontology`
 
@@ -213,8 +214,9 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 
 ### `undo`
 
-- **In:** `{ id, confirm: true, purge_deleted?, actor?, actor_label? }` (`id` is an activity row id)
+- **In:** `{ id, confirm: true, base_updated_at?, from_base_updated_at?, to_base_updated_at?, purge_deleted?, actor?, actor_label? }` (`id` is an activity row id)
 - **Out:** `{ ok, activity_id }` or `{ error, suggestion? }`
+- **If-match:** node inversions (`create`, `update`, `delete`) require `base_updated_at` matching that node's current `updated_at` from `get`. Undo of `delete` uses the last live stamp from `get` (the same value `delete` required) because `get` hides tombstones and delete itself bumps `updated_at`. Edge inversions (`link`, `unlink`) require `from_base_updated_at` and `to_base_updated_at` from `get` on both endpoints. Type and relation inversions have no node timestamp. Stale or missing → `{ error, suggestion }` (get and retry). A matching undo still writes a compensating row. Invert stays refused when it is not safe.
 - `activity_id` is the compensating row (`reversible = false`). Invert map:
 
 | action | inverse |

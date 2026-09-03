@@ -7,7 +7,8 @@ import { defineTool } from "./define-tool.js";
 export function registerDeleteTool(server: McpServer, pool: Pool): void {
   defineTool(server, {
     name: "delete",
-    description: "Soft-delete a node. Requires confirm: true.",
+    description:
+      "Soft-delete a node. Requires confirm: true and base_updated_at from get (if-match).",
     input: DeleteInputSchema.shape,
     output: MutationOkSchema,
     handler: async (input) => deleteGraphNode(pool, input),

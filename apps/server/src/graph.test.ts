@@ -133,7 +133,11 @@ test(
         const stillThere = await getGraphNode(pool, created.node.id);
         assert.equal(isToolError(stillThere), false);
 
-        const deleted = await deleteGraphNode(pool, { id: created.node.id, confirm: true });
+        const deleted = await deleteGraphNode(pool, {
+          id: created.node.id,
+          confirm: true,
+          base_updated_at: created.node.updated_at,
+        });
         assert.equal(isToolError(deleted), false);
         if (isToolError(deleted)) return;
         assert.equal(deleted.ok, true);
@@ -205,7 +209,11 @@ test(
           return;
         }
 
-        const deleted = await deleteGraphNode(pool, { id: oldArea.node.id, confirm: true });
+        const deleted = await deleteGraphNode(pool, {
+          id: oldArea.node.id,
+          confirm: true,
+          base_updated_at: oldArea.node.updated_at,
+        });
         assert.equal(isToolError(deleted), false);
 
         const orphaned = await getGraphNode(pool, project.node.id);
@@ -308,6 +316,8 @@ test(
           to_id: b.node.id,
           relation_type: "inspired_by",
           confirm: true,
+          from_base_updated_at: a.node.updated_at,
+          to_base_updated_at: b.node.updated_at,
         });
         assert.equal(isToolError(gone), false);
         const fetched = await getGraphNode(pool, a.node.id);
@@ -527,7 +537,11 @@ test(
         });
         assert.equal(isToolError(tombNode), false);
         if (isToolError(tombNode)) return;
-        const deleted = await deleteGraphNode(pool, { id: tombNode.node.id, confirm: true });
+        const deleted = await deleteGraphNode(pool, {
+          id: tombNode.node.id,
+          confirm: true,
+          base_updated_at: tombNode.node.updated_at,
+        });
         assert.equal(isToolError(deleted), false);
 
         const blockedTomb = await manageType(pool, {
