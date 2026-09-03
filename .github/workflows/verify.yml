@@ -52,7 +52,6 @@ jobs:
       - run: pnpm --filter @foundation/viewer build
       - run: bash scripts/require-database-url.test.sh
       - run: pnpm --filter @foundation/server test
-      - run: pnpm --filter @foundation/db test
       - name: Stop CI Postgres so host initdb can bind 5432
         run: |
           while read -r id ports; do

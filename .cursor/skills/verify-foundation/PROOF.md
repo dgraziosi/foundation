@@ -53,3 +53,18 @@ What that run drove:
 - Live `/view` unlock, session, peek GET, and journal POST/PATCH were not driven.
 
 Cleanup left evidence at `.cursor/skills/verify-foundation/evidence/20260902Tmaintain/`.
+
+## CI Postgres run (`ci-postgres-50`)
+
+Throwaway vault via `verify-foundation.sh launch`. Not a personal vault. Doctor green before MCP. Cleanup removed `/tmp/foundation-verify-ci-postgres-50`.
+
+What that run drove:
+
+- `env -u DATABASE_URL pnpm --filter @foundation/server test` exited 1 with `DATABASE_URL is required; refusing to skip database tests`. Same for `@foundation/db`. No skip-pass.
+- `scripts/require-database-url.test.sh` exited 0.
+- Doctor: health `{ ok: true, service: foundation, db: up }`. Viewer GET 200. Toolchain ok.
+- `verify-http-drive.sh` exited 0 (Unlock accept + Home empty copy).
+- `verify-mcp-drive.sh` exited 0. `POST /mcp` `tools/list` returned HTTP 200 and 14 tools including `bootstrap`, `search`, and `get`. No new tool. No Viewer write.
+- Server tests on the throwaway `DATABASE_URL` ran (0 skipped). One host-cluster FTS snippet assertion missed `fiancée` in the headline. GitHub `verify` runs the same suite against the `pgvector/pgvector:pg16` service.
+
+Evidence: `.cursor/skills/verify-foundation/evidence/ci-postgres-50/` (gitignored).
