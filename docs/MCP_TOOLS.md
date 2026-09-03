@@ -20,6 +20,7 @@ Destructive tools need a key with destructive scope or they return `{ error, sug
 | `manage_relation` | Create or update a relation type. Applies immediately. |
 | `list_activity` | Read the diary (filter by action, target, since). `{ target: <node id> }` is the write history for that node (`before` / `after`). |
 | `undo` | Reverse a reversible activity row by id. Needs a key with destructive scope. Node and edge inversions require if-match timestamps from `get`. Type-create undo with leftover deleted nodes needs `purge_deleted: true`. |
+| `job` | Claim a named instance routine, keep the claim alive, finish or release it, or read who holds it and last run. Not a graph write. |
 
 Handler contract: each tool has one zod input schema and one output schema; JSON Schema on the wire is derived; invalid input never reaches the domain; domain errors are `{ error, suggestion? }`.
 
@@ -236,6 +237,24 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 Live nodes of a type still block type-create undo and `manage_type` retire. Soft-deleted nodes stay restorable via undo-of-delete while the type row exists. If only tombstones remain, undo (or retire) returns `{ error, suggestion }`: restore those nodes first, or pass `purge_deleted: true` to hard-delete the tombstones and their incident edges, write unlink activity, and mark those prior delete rows non-reversible. Type-create undo and type retire never silently purge.
 
 Undo tokens are single-use (`undone_at`; token cleared). Expired tokens refuse. Undo of undo is the compensating row (`reversible = false`).
+
+### `job`
+
+Instance coordination. Not a graph write and not `get_vault_health`.
+
+**Why a new tool.** `upsert` / `get` / `search` are the graph. A named routine (Dream, weekday health) is not a record. Putting the lock on a node would drag if-match, activity, and the Viewer into a mutex. Vault health stays a host routine. `job` only decides who may run that pass.
+
+- **In:** `{ action: "claim"|"finish"|"release"|"read", name, token?, ttl_seconds? }`
+- **Out:** `{ action, job: { name, held, holder, until, last_run }, token? }` or `{ error, suggestion? }`
+- `name` is a slug (`dream`, `vault-health`, `backup-vault`, `graph-hygiene`, `update-foundation`, or another `^[a-z][a-z0-9_-]{0,62}$` name). First successful `claim` inserts the row.
+- `claim` without `token` takes the name if it is open or expired. Success returns `token`. A live name returns `{ error: "Held", suggestion }` (who and until). Same API key without the token is still Held. That is two processes sharing one key.
+- `claim` with the live `token` for that name extends the deadline (heartbeat) and returns the same token.
+- `finish` needs `name` and `token`. It stamps `last_run` from the live holder and opens the name.
+- `release` needs `name` and `token`. It opens the name and leaves `last_run` alone.
+- `read` needs `name` only. A name nobody has claimed is `{ held: false, holder: null, until: null, last_run: null }`. `read` never returns a token.
+- `holder` is `{ name, label }` from the authenticated key. Clients cannot set it.
+- `ttl_seconds` is optional on `claim` (default `FOUNDATION_LEASE_TTL_SECONDS`, 900). Allowed range 30–14400. Out of range refuses.
+- Not destructive. Not if-match. Not activity. Not `undo`.
 
 ## HTTP (not an MCP tool)
 
