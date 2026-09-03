@@ -17,8 +17,8 @@ Look up the live schema at call time (`bootstrap`, `inspect_ontology`, or the se
 - `lookup` — a name, not a UUID yet
 - `get` — already have a UUID, need the record (not activity)
 - `list_activity` — already have a UUID, need the diary for that record (`target`). After a full page, send `cursor`. Read `count`.
-- `working_set` — already have a UUID, need the open work around it
-- `search` — list or find without a bound id. After a full page, send `cursor`. Read `count`. `search` `{ url }` finds a Gmail, Calendar, or Drive object. `search` `{ repo }` finds a GitHub object. `search` `{ receipt }` looks up a sent-mail or cleared-event receipt, then `get`. Same tool, not a new verb.
+- `working_set` — already have a UUID, need the open work around it. Depth, hard cap, and the spine-root due window read the vault settings row.
+- `search` — list or find without a bound id. After a full page, send `cursor`. Read `count`. `search` `{ url }` finds a Gmail, Calendar, or Drive object. `search` `{ repo }` finds a GitHub object. `search` `{ receipt }` looks up a sent-mail or cleared-event receipt, then `get`. Same tool, not a new verb. `due: today` and `overdue` use the vault settings timezone (seed America/New_York). No settings tool.
 - `upsert` — write or patch a record; passing `payload` replaces that body. A bot writes `data.receipt` after send or clear. The server does not invent it. Changing `type` revalidates live incident edges and refuses if one would no longer be allowed (unlink first).
 - `link` — accept a suggested edge or hang a child. Suggestions and `child_of` placement read live `kind`, `parent_types`, and `target_types`, not a frozen slug list.
 - `manage_relation` — create or update a relation. System relations may edit `source_types` and `target_types`. Slug, kind, label, and symmetry stay locked.
