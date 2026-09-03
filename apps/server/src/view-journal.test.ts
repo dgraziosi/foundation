@@ -239,8 +239,13 @@ test("Today after a deleted same-day journal makes a new entry", { skip: !databa
       }),
     });
     assert.equal(written.status, 200);
+    const saved = (await written.json()) as { node: { updated_at: string } };
 
-    const removed = await deleteGraphNode(pool, { id: created.node.id, confirm: true });
+    const removed = await deleteGraphNode(pool, {
+      id: created.node.id,
+      confirm: true,
+      base_updated_at: saved.node.updated_at,
+    });
     assert.equal(isToolError(removed), false);
     const gone = await getGraphNode(pool, created.node.id);
     assert.equal(isToolError(gone), true);

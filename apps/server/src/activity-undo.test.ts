@@ -18,6 +18,17 @@ import {
 
 const databaseUrl = process.env.DATABASE_URL;
 
+function nodeStamp(value: unknown): string {
+  if (!value || typeof value !== "object" || !("updated_at" in value)) {
+    throw new Error("activity snapshot is missing updated_at");
+  }
+  const stamp = (value as { updated_at: unknown }).updated_at;
+  if (typeof stamp !== "string" || stamp.length === 0) {
+    throw new Error("activity snapshot is missing updated_at");
+  }
+  return stamp;
+}
+
 async function poolForSchema(schema: string): Promise<Pool> {
   const admin = createPool(databaseUrl!);
   await admin.query("CREATE EXTENSION IF NOT EXISTS pgcrypto");
@@ -47,7 +58,11 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
       if (!isToolError(refused)) return;
       assert.match(refused.error, /confirm: true/);
 
-      const undone = await undoGraphActivity(pool, { id: created.activity_id, confirm: true });
+      const undone = await undoGraphActivity(pool, {
+        id: created.activity_id,
+        confirm: true,
+        base_updated_at: created.node.updated_at,
+      });
       assert.equal(isToolError(undone), false);
       if (isToolError(undone)) return;
 
@@ -86,7 +101,11 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
       assert.equal(isToolError(updated), false);
       if (isToolError(updated)) return;
 
-      const undone = await undoGraphActivity(pool, { id: updated.activity_id, confirm: true });
+      const undone = await undoGraphActivity(pool, {
+        id: updated.activity_id,
+        confirm: true,
+        base_updated_at: updated.node.updated_at,
+      });
       assert.equal(isToolError(undone), false);
 
       const got = await getGraphNode(pool, created.node.id);
@@ -114,14 +133,26 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
       assert.equal(isToolError(linked), false);
       if (isToolError(linked)) return;
 
-      const deleted = await deleteGraphNode(pool, { id: a.node.id, confirm: true });
+      const deleted = await deleteGraphNode(pool, {
+        id: a.node.id,
+        confirm: true,
+        base_updated_at: a.node.updated_at,
+      });
       assert.equal(isToolError(deleted), false);
       if (isToolError(deleted)) return;
 
       const hidden = await getGraphNode(pool, a.node.id);
       assert.equal(isToolError(hidden), true);
 
-      const restored = await undoGraphActivity(pool, { id: deleted.activity_id, confirm: true });
+      const deleteRows = await listGraphActivity(pool, { target: a.node.id, action: "delete" });
+      assert.equal(isToolError(deleteRows), false);
+      if (isToolError(deleteRows)) return;
+      const deleteRow = deleteRows.activities.find((row) => row.id === deleted.activity_id);
+      const restored = await undoGraphActivity(pool, {
+        id: deleted.activity_id,
+        confirm: true,
+        base_updated_at: nodeStamp(deleteRow?.after),
+      });
       assert.equal(isToolError(restored), false);
 
       const got = await getGraphNode(pool, a.node.id);
@@ -152,6 +183,8 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
       const unlinkedByUndo = await undoGraphActivity(pool, {
         id: linked.activity_id,
         confirm: true,
+        from_base_updated_at: a.node.updated_at,
+        to_base_updated_at: b.node.updated_at,
       });
       assert.equal(isToolError(unlinkedByUndo), false);
       const afterUndoLink = await getGraphNode(pool, a.node.id);
@@ -174,11 +207,18 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
         to_id: b.node.id,
         relation_type: "references",
         confirm: true,
+        from_base_updated_at: a.node.updated_at,
+        to_base_updated_at: b.node.updated_at,
       });
       assert.equal(isToolError(removed), false);
       if (isToolError(removed)) return;
 
-      const restored = await undoGraphActivity(pool, { id: removed.activity_id, confirm: true });
+      const restored = await undoGraphActivity(pool, {
+        id: removed.activity_id,
+        confirm: true,
+        from_base_updated_at: a.node.updated_at,
+        to_base_updated_at: b.node.updated_at,
+      });
       assert.equal(isToolError(restored), false);
       const got = await getGraphNode(pool, a.node.id);
       assert.equal(isToolError(got), false);
@@ -299,7 +339,11 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
       });
       assert.equal(isToolError(linked), false);
       if (isToolError(linked)) return;
-      const deleted = await deleteGraphNode(pool, { id: created.node.id, confirm: true });
+      const deleted = await deleteGraphNode(pool, {
+        id: created.node.id,
+        confirm: true,
+        base_updated_at: created.node.updated_at,
+      });
       assert.equal(isToolError(deleted), false);
       if (isToolError(deleted)) return;
 
@@ -325,7 +369,11 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
         true,
       );
 
-      const restored = await undoGraphActivity(pool, { id: deleted.activity_id, confirm: true });
+      const restored = await undoGraphActivity(pool, {
+        id: deleted.activity_id,
+        confirm: true,
+        base_updated_at: nodeStamp(listed.activities.find((row) => row.id === deleted.activity_id)?.after),
+      });
       assert.equal(isToolError(restored), false);
       const got = await getGraphNode(pool, created.node.id);
       assert.equal(isToolError(got), false);
@@ -368,7 +416,11 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
       });
       assert.equal(isToolError(linked), false);
       if (isToolError(linked)) return;
-      const deleted = await deleteGraphNode(pool, { id: created.node.id, confirm: true });
+      const deleted = await deleteGraphNode(pool, {
+        id: created.node.id,
+        confirm: true,
+        base_updated_at: created.node.updated_at,
+      });
       assert.equal(isToolError(deleted), false);
       if (isToolError(deleted)) return;
 
@@ -421,6 +473,7 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
       const nodeUndone = await undoGraphActivity(pool, {
         id: created.activity_id,
         confirm: true,
+        base_updated_at: created.node.updated_at,
       });
       assert.equal(isToolError(nodeUndone), false);
 
@@ -475,6 +528,8 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
         to_id: b.node.id,
         relation_type: "blocked_by_undo",
         confirm: true,
+        from_base_updated_at: a.node.updated_at,
+        to_base_updated_at: b.node.updated_at,
       });
       assert.equal(isToolError(unlinked), false);
       if (isToolError(unlinked)) return;
@@ -488,6 +543,8 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
       const restored = await undoGraphActivity(pool, {
         id: unlinked.activity_id,
         confirm: true,
+        from_base_updated_at: a.node.updated_at,
+        to_base_updated_at: b.node.updated_at,
       });
       assert.equal(isToolError(restored), true);
       if (!isToolError(restored)) return;
@@ -529,6 +586,7 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
       const restored = await undoGraphActivity(pool, {
         id: retyped.activity_id,
         confirm: true,
+        base_updated_at: retyped.node.updated_at,
       });
       assert.equal(isToolError(restored), true);
       if (!isToolError(restored)) return;
@@ -604,7 +662,11 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
       assert.ok(nrt.nodes.some((node) => node.id === trip.node.id));
       assert.ok(nrt.nodes.every((node) => node.type === "trip"));
 
-      const deleted = await deleteGraphNode(pool, { id: trip.node.id, confirm: true });
+      const deleted = await deleteGraphNode(pool, {
+        id: trip.node.id,
+        confirm: true,
+        base_updated_at: trip.node.updated_at,
+      });
       assert.equal(isToolError(deleted), false);
       const afterDelete = await searchGraphNodes(pool, { query: "Fushimi Inari", type: "trip" });
       assert.equal(isToolError(afterDelete), false);

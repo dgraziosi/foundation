@@ -196,7 +196,11 @@ test(
         if (isToolError(gone)) {
           return;
         }
-        const deleted = await deleteGraphNode(pool, { id: gone.node.id, confirm: true });
+        const deleted = await deleteGraphNode(pool, {
+          id: gone.node.id,
+          confirm: true,
+          base_updated_at: gone.node.updated_at,
+        });
         assert.equal(isToolError(deleted), false);
         const miss = await lookupGraphNodes(pool, {
           inputs: [{ name: gone.node.id }, { name: "Temporary Gale", type: "person" }],
