@@ -413,7 +413,7 @@ verify_cmd_doctor() {
     return 1
   fi
 
-  view_code="$(curl -sS -o /tmp/foundation-verify-view-body.$$ -w "%{http_code}" --max-time 5 "${view_url}" || true)"
+  view_code="$(curl -sS -L --max-redirs 3 -o /tmp/foundation-verify-view-body.$$ -w "%{http_code}" --max-time 5 "${view_url}" || true)"
   view_body="$(cat /tmp/foundation-verify-view-body.$$ 2>/dev/null || true)"
   rm -f /tmp/foundation-verify-view-body.$$
   if [[ "${view_code}" != "200" ]]; then

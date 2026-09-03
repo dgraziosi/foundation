@@ -577,6 +577,54 @@ if grep -Fq 'curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:8787/mcp' 
 fi
 skill_blob="$(cat "${map_root}/SKILL.md")"
 [[ "${skill_blob}" == *"curl -sS http://127.0.0.1:8788/view/api/journals/today"* ]] || fail "SKILL Drive must show Today peek GET"
+grep -Fq -- 'curl -sS -L --max-redirs 3' "${helper}" || fail "doctor must follow the /view redirect a browser follows"
 [[ "${skill_blob}" == *"Does not create"* ]] || fail "SKILL Drive must say the Today peek GET does not create"
+
+repo_root="$(cd "${script_dir}/../../../.." && pwd)"
+readme="${repo_root}/README.md"
+env_json="${repo_root}/.cursor/environment.json"
+dockerfile="${repo_root}/.cursor/Dockerfile"
+workflow="${repo_root}/.github/workflows/verify.yml"
+drive="${script_dir}/verify-http-drive.sh"
+# shellcheck source=verify-http-drive.sh
+source "${drive}"
+
+[[ -f "${env_json}" ]] || fail "missing .cursor/environment.json"
+grep -Fq '"dockerfile": "Dockerfile"' "${env_json}" || fail "environment.json must pin .cursor/Dockerfile"
+grep -Fq '"install": "pnpm install --frozen-lockfile"' "${env_json}" || fail "environment.json install must be idempotent pnpm deps"
+grep -Fq '"start": "true"' "${env_json}" || fail "environment.json start must start nothing persistent"
+
+[[ -f "${dockerfile}" ]] || fail "missing .cursor/Dockerfile"
+grep -Fq 'postgresql-16' "${dockerfile}" || fail "Dockerfile must pin postgresql-16"
+grep -Fq 'postgresql-16-pgvector' "${dockerfile}" || fail "Dockerfile must pin postgresql-16-pgvector"
+grep -Fq 'NODE_VERSION=22.22.2' "${dockerfile}" || fail "Dockerfile must pin Node 22"
+grep -Fq 'pnpm@10.33.3' "${dockerfile}" || fail "Dockerfile must pin pnpm 10.33.3"
+grep -Fq '/usr/lib/postgresql/16/bin' "${dockerfile}" || fail "Dockerfile must put Postgres 16 bins on PATH"
+
+grep -Fq 'Cloud agents and GitHub `verify` boot a throwaway vault with the helper.' "${readme}" \
+  || fail "README must say cloud agents and GitHub verify boot a throwaway vault with the helper"
+
+workflow_blob="$(cat "${workflow}")"
+[[ "${workflow_blob}" == *"pnpm --filter @foundation/schema test"* ]] || fail "verify.yml dropped schema tests"
+[[ "${workflow_blob}" == *"pnpm --filter @foundation/viewer test"* ]] || fail "verify.yml dropped viewer tests"
+[[ "${workflow_blob}" == *"pnpm --filter @foundation/server test"* ]] || fail "verify.yml dropped server tests"
+[[ "${workflow_blob}" == *"pnpm --filter @foundation/viewer build"* ]] || fail "verify.yml dropped the Viewer build"
+[[ "${workflow_blob}" == *"pgvector/pgvector:pg16"* ]] || fail "verify.yml dropped the pgvector service"
+[[ "${workflow_blob}" == *"verify-foundation.sh launch"* ]] || fail "verify.yml must launch a throwaway vault"
+[[ "${workflow_blob}" == *"verify-foundation.sh doctor"* ]] || fail "verify.yml must doctor the throwaway vault"
+[[ "${workflow_blob}" == *"verify-http-drive.sh"* ]] || fail "verify.yml must HTTP-prove Unlock and Home"
+[[ "${workflow_blob}" == *"verify-foundation.sh cleanup"* ]] || fail "verify.yml must cleanup the throwaway vault"
+[[ "${workflow_blob}" == *"postgresql-16"* ]] || fail "verify.yml must install host Postgres 16"
+[[ "${workflow_blob}" == *"/usr/lib/postgresql/16/bin"* ]] || fail "verify.yml must put initdb/pg_ctl/psql on PATH"
+[[ "${workflow_blob}" == *"docker stop"* ]] || fail "verify.yml must free 5432 before host initdb"
+
+redacted="$(printf '%s\n' "Set-Cookie: foundation_key=super-secret; Path=/view; HttpOnly" | verify_http_redact_set_cookie)"
+[[ "${redacted}" == *"foundation_key=<redacted>"* ]] || fail "HTTP drive must redact Set-Cookie values"
+[[ "${redacted}" != *"super-secret"* ]] || fail "HTTP drive left a cookie value in evidence"
+verify_http_drive_home_empty '{"rows":[]}' '{"tasks":[]}' '{"node":null}' \
+  || fail "HTTP drive must accept first-day empty Home JSON"
+if verify_http_drive_home_empty '{"rows":[{"title":"Fixture"}]}' '{"tasks":[]}' '{"node":null}' 2>/dev/null; then
+  fail "HTTP drive must fail when Recents is not empty"
+fi
 
 echo "verify-foundation.test: ok"

@@ -1,0 +1,9 @@
+{
+  "name": "Foundation",
+  "user": "ubuntu",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "install": "pnpm install --frozen-lockfile",
+  "start": "true"
+}

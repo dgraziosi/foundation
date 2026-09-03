@@ -50,3 +50,37 @@ jobs:
       - run: bash scripts/foundation-init.test.sh
       - run: pnpm --filter @foundation/viewer build
       - run: pnpm --filter @foundation/server test
+      - name: Stop CI Postgres so host initdb can bind 5432
+        run: |
+          while read -r id ports; do
+            case "${ports}" in
+              *5432*) docker stop "${id}" ;;
+            esac
+          done < <(docker ps --format '{{.ID}} {{.Ports}}')
+      - name: Host Postgres 16 on PATH
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-16 postgresql-16-pgvector
+          echo "/usr/lib/postgresql/16/bin" >> "${GITHUB_PATH}"
+          export PATH="/usr/lib/postgresql/16/bin:${PATH}"
+          sudo pg_ctlcluster 16 main stop || true
+          command -v initdb
+          command -v pg_ctl
+          command -v psql
+          test -f /usr/share/postgresql/16/extension/pgcrypto.control
+          test -f /usr/share/postgresql/16/extension/unaccent.control
+          test -f /usr/share/postgresql/16/extension/pg_trgm.control
+          test -f /usr/share/postgresql/16/extension/vector.control
+          echo "VERIFY_RUN_ID=gha-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "${GITHUB_ENV}"
+      - name: Launch throwaway vault
+        run: .cursor/skills/verify-foundation/scripts/verify-foundation.sh launch
+      - name: Doctor throwaway vault
+        run: |
+          evidence="$(.cursor/skills/verify-foundation/scripts/verify-foundation.sh evidence-dir)"
+          mkdir -p -- "${evidence}"
+          .cursor/skills/verify-foundation/scripts/verify-foundation.sh doctor | tee "${evidence}/doctor.log"
+      - name: Prove Unlock and Home empty copy
+        run: bash .cursor/skills/verify-foundation/scripts/verify-http-drive.sh
+      - name: Cleanup throwaway vault
+        if: always()
+        run: .cursor/skills/verify-foundation/scripts/verify-foundation.sh cleanup
