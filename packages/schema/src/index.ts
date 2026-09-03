@@ -148,10 +148,6 @@ export {
   LookupOutcomeSchema,
   LookupResultSchema,
   LookupSuccessSchema,
-  CODE_KEY_REFUSED_SUGGESTION,
-  LINK_KEY_REFUSED_SUGGESTION,
-  LIVING_KEY_REFUSED_SUGGESTION,
-  ORIGIN_KEY_REFUSED_SUGGESTION,
   REPO_HIT_SUGGESTION,
   REPO_MISS_SUGGESTION,
   RECEIPT_HIT_SUGGESTION,
@@ -240,6 +236,11 @@ export {
   type SuggestedLinkKind,
   type SuggestedLinkTarget,
 } from "./suggested-links.js";
+export {
+  RETIRED_IDENTITY_DATA_KEYS,
+  hasLeftoverIdentityKeys,
+  migrateLeftoverIdentity,
+} from "./identity.js";
 export {
   URL_IDENTITY_INCOMPLETE_SUGGESTION,
   URL_IDENTITY_UNKNOWN_SYSTEM_SUGGESTION,

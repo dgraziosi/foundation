@@ -217,6 +217,8 @@ Gmail, Calendar, and Drive stay the source of truth. The graph holds upsert `url
 
 GitHub stays the source of truth. The graph holds `data.repo { system, id }`. Live records are unique on that pair. Look up with `search { repo }`, then `get`. GitHub is not a Drive/Sheet. Cursor Origin is not a vault key and not a `repo.system` value.
 
+Identity is one registry. Url, repo, and receipt share one `{ system, id }` shape and one unique-index family. Leftover `living` / `code` / `origin` / `link` bags migrate into `url` or `repo` on boot and on write, then those keys are stripped. Search uses only the live bags. There is no leftover refuse path and no second identity store.
+
 Do not fetch or mirror those systems’ bodies into the graph.
 
 ```mermaid

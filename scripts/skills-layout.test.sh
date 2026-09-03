@@ -395,6 +395,7 @@ fi
 
 spec_doc="${repo_root}/docs/SPEC.md"
 mcp_tools_doc="${repo_root}/docs/MCP_TOOLS.md"
+arch_doc="${repo_root}/docs/ARCHITECTURE.md"
 if [[ ! -f "${spec_doc}" ]]; then
   fail "missing ${spec_doc}"
 fi
@@ -439,8 +440,11 @@ fi
 if grep -Fq -- 'payload?, data?, status?, metadata?, base_updated_at?' "${mcp_tools_doc}"; then
   fail "docs/MCP_TOOLS.md upsert In still omits url?"
 fi
-if ! grep -Fq -- 'Leftover `data.living`, `data.code`, `data.origin`, and `data.link` writes refuse.' "${mcp_tools_doc}"; then
-  fail "docs/MCP_TOOLS.md leftover writes omit data.origin or do not match SPEC"
+if ! grep -Fq -- 'Leftover `data.living`, `data.code`, `data.origin`, and `data.link` writes migrate into `url` or `repo` and the leftover keys are stripped.' "${mcp_tools_doc}"; then
+  fail "docs/MCP_TOOLS.md leftover writes omit migrate-into-url/repo or do not match SPEC"
+fi
+if grep -Fq -- 'writes refuse.' "${mcp_tools_doc}" "${spec_doc}"; then
+  fail "product docs still say leftover writes refuse"
 fi
 if grep -Fq -- 'A bad picture' "${mcp_tools_doc}"; then
   fail "docs/MCP_TOOLS.md still says A bad picture"

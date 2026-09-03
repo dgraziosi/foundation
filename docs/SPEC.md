@@ -41,7 +41,7 @@ Starter recipes: [`AGENTS.md`](./AGENTS.md).
 
 Drive / Gmail / Calendar identity is `search { url }` `{ system, id }`. `system` is `gmail` | `calendar` | `drive`. Refuses `github`. Unique on live records. No `kind`. `url: null` on upsert clears uniqueness. Link is the edge tool. It is not a pointer key, not a search selector, and not a data identity bag.
 
-Because `data.url` is already the https string, that object is not stored as `data.url`. Persist uses a dedicated unique index, parse, and refuse (same family as leftover living). `url.ts` stays the https helper.
+Because `data.url` is already the https string, that object is not stored as `data.url`. Persist uses a dedicated unique index, parse, and refuse (same family as repo and receipt). `url.ts` stays the https helper.
 
 Viewer Open stays `data.url` (https string, not unique). That string is not which Drive / Gmail / Calendar object. `search { url }` is not `data_equals` on the https string. A string `search.url` refuses from `tools/call` with `{ error, suggestion }`. `tools/list` advertises `{ system, id }`, not a string.
 
@@ -49,7 +49,7 @@ GitHub is `data.repo { system, id }` and `search { repo }`. `system` is `github`
 
 Receipt is unchanged: `data.receipt { system, id, kind }` and `search { receipt }`.
 
-Hard cut. No dual-read of leftover `living` / `code` / `origin` / `link`. `search { living }`, `search { code }`, `search { origin }`, and `search { link }` are gone. Leftover `data.living`, `data.code`, `data.origin`, and `data.link` writes refuse.
+Identity registry. One storage shape and one unique-index family: upsert `url`, `data.repo`, and `data.receipt`. No dual-read of leftover `living` / `code` / `origin` / `link`. `search { living }`, `search { code }`, `search { origin }`, and `search { link }` are gone. Leftover rows and leftover writes migrate into `url` or `repo` by system, then the leftover keys are stripped. There is no leftover refuse path. Do not reintroduce `origin` as a vault key.
 
 | Bag | Key | What it is | How an agent finds it |
 | --- | --- | --- | --- |

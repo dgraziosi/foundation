@@ -2,10 +2,6 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createPool, migrate, seedSystemOntology, type Pool } from "@foundation/db";
 import {
-  CODE_KEY_REFUSED_SUGGESTION,
-  LINK_KEY_REFUSED_SUGGESTION,
-  LIVING_KEY_REFUSED_SUGGESTION,
-  ORIGIN_KEY_REFUSED_SUGGESTION,
   REPO_HIT_SUGGESTION,
   REPO_MISS_SUGGESTION,
   SEARCH_NO_SELECTOR_SUGGESTION,
@@ -233,49 +229,80 @@ test(
         }
       });
 
-      await t.test("leftover living / code / origin / link writes refuse; leftover search is not a selector", async () => {
+      await t.test("leftover living / code / origin / link writes migrate; leftover search is not a selector", async () => {
         const leftoverOrigin = await upsertGraphNode(pool, {
           type: "note",
           title: "Throwaway leftover origin",
-          data: { origin: { system: "drive", id: "file-fixture-1" } },
+          data: { origin: { system: "drive", id: "file-fixture-origin" } },
         });
-        assert.equal(isToolError(leftoverOrigin), true);
+        assert.equal(isToolError(leftoverOrigin), false);
         if (isToolError(leftoverOrigin)) {
-          assert.match(leftoverOrigin.error, /data.origin is not a Foundation key/);
-          assert.equal(leftoverOrigin.suggestion, ORIGIN_KEY_REFUSED_SUGGESTION);
+          return;
         }
+        assert.deepEqual(leftoverOrigin.node.metadata.url, {
+          system: "drive",
+          id: "file-fixture-origin",
+        });
+        assert.equal(leftoverOrigin.node.data.origin, undefined);
 
         const leftoverLiving = await upsertGraphNode(pool, {
           type: "note",
           title: "Throwaway leftover living",
-          data: { living: { system: "drive", id: "file-fixture-1" } },
+          data: { living: { system: "gmail", id: "msg-fixture-living" } },
         });
-        assert.equal(isToolError(leftoverLiving), true);
+        assert.equal(isToolError(leftoverLiving), false);
         if (isToolError(leftoverLiving)) {
-          assert.match(leftoverLiving.error, /data.living is not a Foundation key/);
-          assert.equal(leftoverLiving.suggestion, LIVING_KEY_REFUSED_SUGGESTION);
+          return;
         }
+        assert.deepEqual(leftoverLiving.node.metadata.url, {
+          system: "gmail",
+          id: "msg-fixture-living",
+        });
+        assert.equal(leftoverLiving.node.data.living, undefined);
 
         const leftoverCode = await upsertGraphNode(pool, {
           type: "note",
           title: "Throwaway leftover code",
-          data: { code: { system: "github", id: "repo-fixture-1" } },
+          data: { code: { system: "github", id: "repo-fixture-code" } },
         });
-        assert.equal(isToolError(leftoverCode), true);
+        assert.equal(isToolError(leftoverCode), false);
         if (isToolError(leftoverCode)) {
-          assert.match(leftoverCode.error, /data.code is not a Foundation key/);
-          assert.equal(leftoverCode.suggestion, CODE_KEY_REFUSED_SUGGESTION);
+          return;
         }
+        assert.deepEqual(leftoverCode.node.data.repo, {
+          system: "github",
+          id: "repo-fixture-code",
+        });
+        assert.equal(leftoverCode.node.data.code, undefined);
 
         const leftoverLink = await upsertGraphNode(pool, {
           type: "note",
           title: "Throwaway leftover link",
-          data: { link: { system: "drive", id: "file-fixture-1" } },
+          data: { link: { system: "calendar", id: "evt-fixture-link" } },
         });
-        assert.equal(isToolError(leftoverLink), true);
+        assert.equal(isToolError(leftoverLink), false);
         if (isToolError(leftoverLink)) {
-          assert.match(leftoverLink.error, /data.link is not a Foundation key/);
-          assert.equal(leftoverLink.suggestion, LINK_KEY_REFUSED_SUGGESTION);
+          return;
+        }
+        assert.deepEqual(leftoverLink.node.metadata.url, {
+          system: "calendar",
+          id: "evt-fixture-link",
+        });
+        assert.equal(leftoverLink.node.data.link, undefined);
+
+        const originHit = await searchGraphNodes(pool, {
+          url: { system: "drive", id: "file-fixture-origin" },
+        });
+        assert.equal(isToolError(originHit), false);
+        if (!isToolError(originHit)) {
+          assert.equal(originHit.nodes[0]?.id, leftoverOrigin.node.id);
+        }
+        const codeHit = await searchGraphNodes(pool, {
+          repo: { system: "github", id: "repo-fixture-code" },
+        });
+        assert.equal(isToolError(codeHit), false);
+        if (!isToolError(codeHit)) {
+          assert.equal(codeHit.nodes[0]?.id, leftoverCode.node.id);
         }
 
         assert.throws(() => SearchInputSchema.parse({ url: URL_FIXTURE }));
@@ -302,6 +329,36 @@ test(
             assert.match(noSelector.error, /query or a filter/);
             assert.equal(noSelector.suggestion, SEARCH_NO_SELECTOR_SUGGESTION);
           }
+        }
+      });
+
+      await t.test("boot leftover row migrates into url and leftover keys are gone", async () => {
+        await pool.query(
+          `INSERT INTO nodes (type, title, status, payload, data)
+           VALUES (
+             'note',
+             'Throwaway leftover fixture row',
+             'active',
+             '{"media_type":"text/plain","storage":"inline","body":""}'::jsonb,
+             '{"living":{"system":"drive","id":"file-fixture-boot"}}'::jsonb
+           )`,
+        );
+        await pool.query("SELECT migrate_leftover_identity()");
+        const { rows } = await pool.query<{
+          data: Record<string, unknown>;
+          metadata: Record<string, unknown>;
+        }>(
+          `SELECT data, metadata FROM nodes WHERE title = 'Throwaway leftover fixture row'`,
+        );
+        assert.deepEqual(rows[0]?.metadata.url, { system: "drive", id: "file-fixture-boot" });
+        assert.equal(rows[0]?.data.living, undefined);
+        const hit = await searchGraphNodes(pool, {
+          url: { system: "drive", id: "file-fixture-boot" },
+        });
+        assert.equal(isToolError(hit), false);
+        if (!isToolError(hit)) {
+          assert.equal(hit.nodes.length, 1);
+          assert.equal(hit.nodes[0]?.title, "Throwaway leftover fixture row");
         }
       });
     } finally {
