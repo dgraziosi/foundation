@@ -21,6 +21,7 @@ import {
   isChildOfParent,
   listActivity,
   listEdgesTouching,
+  listInboundRefPointers,
   listIncidentEdges,
   listNodeTypes,
   listRelationTypes,
@@ -57,6 +58,7 @@ import {
   toolError,
   validateBlobRelativePath,
   validateInlinePayload,
+  validateExistingLink,
   validateLinkSequence,
   findInBatchLinkDuplicate,
   normalizeLinkEdges,
@@ -635,6 +637,12 @@ export async function upsertGraphNode(
         if (stale) {
           return stale;
         }
+        if (existing.type !== input.type) {
+          const edgeErr = await refuseInvalidIncidentEdges(client, existing, input.type);
+          if (edgeErr) {
+            return edgeErr;
+          }
+        }
         await client.query("SAVEPOINT upsert_update");
         try {
           const node = await updateNode(client, input.id!, {
@@ -810,6 +818,10 @@ export async function deleteGraphNode(
         "Restore via undo. Use a new id to create another node.",
       );
     }
+    const refErr = await refuseInboundRefPointers(client, input.id);
+    if (refErr) {
+      return refErr;
+    }
     const after = await softDeleteNode(client, input.id, {
       base_updated_at: input.base_updated_at,
     });
@@ -829,6 +841,58 @@ export async function deleteGraphNode(
     });
     return { ok: true as const, activity_id: activity.id };
   });
+}
+
+async function refuseInvalidIncidentEdges(
+  db: Queryable,
+  node: Node,
+  nextType: string,
+): Promise<ToolError | null> {
+  const edges = await listIncidentEdges(db, node.id);
+  if (edges.length === 0) {
+    return null;
+  }
+  const [nodeTypes, relationTypes] = await Promise.all([
+    listNodeTypes(db),
+    listRelationTypes(db),
+  ]);
+  for (const edge of edges) {
+    const fromType = edge.from_id === node.id ? nextType : edge.neighbor.type;
+    const toType = edge.to_id === node.id ? nextType : edge.neighbor.type;
+    const result = validateExistingLink(
+      {
+        from_id: edge.from_id,
+        to_id: edge.to_id,
+        relation_type: edge.relation_type,
+        from_type: fromType,
+        to_type: toType,
+      },
+      { nodeTypes, relationTypes },
+    );
+    if (!result.ok) {
+      return toolError(
+        `Cannot retype to "${nextType}": live ${edge.relation_type} edge would no longer be allowed`,
+        `${result.error}. Unlink that ${edge.relation_type} first (unlink with if-match), then retry upsert. Or keep type ${node.type}.`,
+      );
+    }
+  }
+  return null;
+}
+
+async function refuseInboundRefPointers(db: Queryable, targetId: string): Promise<ToolError | null> {
+  const pointers = await listInboundRefPointers(db, targetId);
+  if (pointers.length === 0) {
+    return null;
+  }
+  const listed = pointers
+    .slice(0, 5)
+    .map((pointer) => `${pointer.node_id} (${pointer.title}, data.${pointer.field})`)
+    .join("; ");
+  const extra = pointers.length > 5 ? ` and ${pointers.length - 5} more` : "";
+  return toolError(
+    `Cannot delete: ${pointers.length} live record(s) still point at this id via ref fields`,
+    `Clear those fields with upsert (data.<field>: null) and if-match, then retry delete. Pointing records: ${listed}${extra}.`,
+  );
 }
 
 export type LinkFlatSuccess = LinkItemSuccess & { links: LinkItemSuccess[] };

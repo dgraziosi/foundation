@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   findInBatchLinkDuplicate,
   listValidRelationSlugs,
+  validateExistingLink,
   validateLink,
   validateLinkSequence,
 } from "./link-validator.js";
@@ -409,6 +410,82 @@ test("later edges in a batch see earlier accepted child_of", () => {
   if (upgradedThenChild.ok) return;
   assert.equal(upgradedThenChild.index, 1);
   assert.match(upgradedThenChild.error, /already has a child_of parent/);
+});
+
+test("validateExistingLink checks ontology fit and skips create-only rules", () => {
+  const noteChild = validateExistingLink({
+    from_id: ids.a,
+    to_id: ids.b,
+    relation_type: "child_of",
+    from_type: "note",
+    to_type: "area",
+  });
+  assert.equal(noteChild.ok, false);
+  if (noteChild.ok) return;
+  assert.match(noteChild.error, /cannot be child_of|does not take a hierarchy parent/);
+
+  const projectChild = validateExistingLink({
+    from_id: ids.a,
+    to_id: ids.b,
+    relation_type: "child_of",
+    from_type: "project",
+    to_type: "area",
+  });
+  assert.equal(projectChild.ok, true);
+
+  const aboutNote = validateExistingLink({
+    from_id: ids.a,
+    to_id: ids.b,
+    relation_type: "about",
+    from_type: "task",
+    to_type: "note",
+  });
+  assert.equal(aboutNote.ok, false);
+  if (aboutNote.ok) return;
+  assert.match(aboutNote.error, /does not allow target type "note"/);
+
+  const aboutPerson = validateExistingLink({
+    from_id: ids.a,
+    to_id: ids.b,
+    relation_type: "about",
+    from_type: "task",
+    to_type: "person",
+  });
+  assert.equal(aboutPerson.ok, true);
+
+  const relates = validateExistingLink({
+    from_id: ids.a,
+    to_id: ids.b,
+    relation_type: "relates_to",
+    from_type: "project",
+    to_type: "area",
+  });
+  assert.equal(relates.ok, true);
+  if (!relates.ok) return;
+  assert.equal(relates.relation_type, "relates_to");
+  assert.equal(relates.suggestion, undefined);
+
+  const supportsNote = validateExistingLink({
+    from_id: ids.a,
+    to_id: ids.b,
+    relation_type: "supports",
+    from_type: "habit",
+    to_type: "note",
+  });
+  assert.equal(supportsNote.ok, false);
+  if (supportsNote.ok) return;
+  assert.match(supportsNote.error, /does not allow target type "note"|requires a spine target/);
+
+  const unknown = validateExistingLink({
+    from_id: ids.a,
+    to_id: ids.b,
+    relation_type: "serves_value",
+    from_type: "project",
+    to_type: "area",
+  });
+  assert.equal(unknown.ok, false);
+  if (unknown.ok) return;
+  assert.match(unknown.error, /Unknown relation_type/);
 });
 
 test("types without parent_types still cannot use child_of", () => {
