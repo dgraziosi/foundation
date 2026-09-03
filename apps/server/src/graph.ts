@@ -64,9 +64,14 @@ import {
   MISSING_BASE_SUGGESTION,
   parseTimestampMs,
   timestampsEqual,
+  LIST_CURSOR_INVALID_SUGGESTION,
   SEARCH_MISS_SUGGESTION,
   SEARCH_NO_SELECTOR_SUGGESTION,
   SEARCH_UUID_SUGGESTION,
+  encodeActivityCursor,
+  encodeSearchCursor,
+  parseActivityCursor,
+  parseSearchCursor,
   LOOKUP_NO_SELECTOR_SUGGESTION,
   LOOKUP_CANDIDATE_DEFAULT,
   applyAliasesFromPatch,
@@ -112,6 +117,7 @@ import {
   type LinkInput,
   type LinkItemSuccess,
   type ListActivityInput,
+  type ListActivitySuccess,
   type ManageRelationInput,
   type ManageTypeInput,
   type Node,
@@ -120,8 +126,8 @@ import {
   type RelationType,
   type LookupInput,
   type LookupSuccess,
-  type SearchHit,
   type SearchInput,
+  type SearchSuccess,
   type SuggestedLink,
   type ToolError,
   type DuplicateWarning,
@@ -1432,7 +1438,7 @@ export async function manageRelation(
 export async function listGraphActivity(
   pool: Pool,
   input: ListActivityInput,
-): Promise<{ activities: Activity[] } | ToolError> {
+): Promise<ListActivitySuccess | ToolError> {
   let since: Date | undefined;
   if (input.since) {
     const parsed = Date.parse(input.since);
@@ -1444,22 +1450,45 @@ export async function listGraphActivity(
     }
     since = new Date(parsed);
   }
-  const activities = await listActivity(pool, {
+  let cursor;
+  if (input.cursor) {
+    cursor = parseActivityCursor(input.cursor);
+    if (!cursor) {
+      return toolError("Invalid list_activity cursor", LIST_CURSOR_INVALID_SUGGESTION);
+    }
+  }
+  const page = await listActivity(pool, {
     action: input.action,
     target: input.target,
     since,
     limit: input.limit,
+    cursor,
   });
-  return { activities };
+  return {
+    activities: page.activities,
+    count: page.count,
+    ...(page.next ? { next: encodeActivityCursor(page.next) } : {}),
+  };
+}
+
+function searchMiss(suggestion: string): SearchSuccess {
+  return { nodes: [], count: 0, suggestion };
 }
 
 export async function searchGraphNodes(
   pool: Pool,
   input: SearchInput,
-): Promise<{ nodes: SearchHit[]; suggestion?: string } | ToolError> {
+): Promise<SearchSuccess | ToolError> {
   const query = input.query?.trim() ? input.query.trim() : undefined;
   if (!searchHasSelector(input)) {
     return toolError("search requires a query or a filter", SEARCH_NO_SELECTOR_SUGGESTION);
+  }
+  let cursor;
+  if (input.cursor) {
+    cursor = parseSearchCursor(input.cursor);
+    if (!cursor) {
+      return toolError("Invalid search cursor", LIST_CURSOR_INVALID_SUGGESTION);
+    }
   }
   if (
     input.due_on_or_after &&
@@ -1504,10 +1533,10 @@ export async function searchGraphNodes(
   if (query && isUuid(query)) {
     const node = await getNodeById(pool, query);
     if (!node || (input.type && node.type !== input.type) || (input.status && node.status !== input.status)) {
-      return { nodes: [], suggestion: SEARCH_MISS_SUGGESTION };
+      return searchMiss(SEARCH_MISS_SUGGESTION);
     }
     if (since && Date.parse(node.updated_at) < since.getTime()) {
-      return { nodes: [], suggestion: SEARCH_MISS_SUGGESTION };
+      return searchMiss(SEARCH_MISS_SUGGESTION);
     }
     if (input.url) {
       const url = urlIdentityFromMetadata(node.metadata);
@@ -1517,7 +1546,7 @@ export async function searchGraphNodes(
         url.system !== input.url.system ||
         url.id !== input.url.id
       ) {
-        return { nodes: [], suggestion: URL_MISS_SUGGESTION };
+        return searchMiss(URL_MISS_SUGGESTION);
       }
     }
     if (input.repo) {
@@ -1528,7 +1557,7 @@ export async function searchGraphNodes(
         repo.system !== input.repo.system ||
         repo.id !== input.repo.id
       ) {
-        return { nodes: [], suggestion: REPO_MISS_SUGGESTION };
+        return searchMiss(REPO_MISS_SUGGESTION);
       }
     }
     if (input.receipt) {
@@ -1539,18 +1568,18 @@ export async function searchGraphNodes(
         receipt.system !== input.receipt.system ||
         receipt.id !== input.receipt.id
       ) {
-        return { nodes: [], suggestion: RECEIPT_MISS_SUGGESTION };
+        return searchMiss(RECEIPT_MISS_SUGGESTION);
       }
     }
     if (input.under && !(await isChildOfParent(pool, node.id, input.under))) {
-      return { nodes: [], suggestion: SEARCH_MISS_SUGGESTION };
+      return searchMiss(SEARCH_MISS_SUGGESTION);
     }
     const due = dueFromData(node.data);
     if (!matchesDueFilters(due, input, today)) {
-      return { nodes: [], suggestion: SEARCH_MISS_SUGGESTION };
+      return searchMiss(SEARCH_MISS_SUGGESTION);
     }
     if (!matchesDataEquals(node.data, input.data_equals)) {
-      return { nodes: [], suggestion: SEARCH_MISS_SUGGESTION };
+      return searchMiss(SEARCH_MISS_SUGGESTION);
     }
     return {
       nodes: [
@@ -1563,10 +1592,11 @@ export async function searchGraphNodes(
           ...(due ? { due } : {}),
         },
       ],
+      count: 1,
       suggestion: SEARCH_UUID_SUGGESTION,
     };
   }
-  const nodes = await searchNodes(pool, {
+  const page = await searchNodes(pool, {
     query,
     type: input.type,
     status: input.status,
@@ -1584,32 +1614,34 @@ export async function searchGraphNodes(
     dueExact: input.due === "today" ? today : undefined,
     dataEquals: input.data_equals,
     limit: input.limit,
+    cursor,
   });
-  if (nodes.length === 0) {
+  const next = page.next ? encodeSearchCursor(page.next) : undefined;
+  if (page.hits.length === 0) {
     if (query) {
-      return { nodes: [], suggestion: SEARCH_MISS_SUGGESTION };
+      return { nodes: [], count: page.count, suggestion: SEARCH_MISS_SUGGESTION };
     }
     if (input.url) {
-      return { nodes: [], suggestion: URL_MISS_SUGGESTION };
+      return { nodes: [], count: page.count, suggestion: URL_MISS_SUGGESTION };
     }
     if (input.repo) {
-      return { nodes: [], suggestion: REPO_MISS_SUGGESTION };
+      return { nodes: [], count: page.count, suggestion: REPO_MISS_SUGGESTION };
     }
     if (input.receipt) {
-      return { nodes: [], suggestion: RECEIPT_MISS_SUGGESTION };
+      return { nodes: [], count: page.count, suggestion: RECEIPT_MISS_SUGGESTION };
     }
-    return { nodes: [] };
+    return { nodes: [], count: page.count };
   }
   if (input.url) {
-    return { nodes, suggestion: URL_HIT_SUGGESTION };
+    return { nodes: page.hits, count: page.count, ...(next ? { next } : {}), suggestion: URL_HIT_SUGGESTION };
   }
   if (input.repo) {
-    return { nodes, suggestion: REPO_HIT_SUGGESTION };
+    return { nodes: page.hits, count: page.count, ...(next ? { next } : {}), suggestion: REPO_HIT_SUGGESTION };
   }
   if (input.receipt) {
-    return { nodes, suggestion: RECEIPT_HIT_SUGGESTION };
+    return { nodes: page.hits, count: page.count, ...(next ? { next } : {}), suggestion: RECEIPT_HIT_SUGGESTION };
   }
-  return { nodes };
+  return { nodes: page.hits, count: page.count, ...(next ? { next } : {}) };
 }
 
 export async function lookupGraphNodes(

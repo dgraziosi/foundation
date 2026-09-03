@@ -173,7 +173,7 @@ flowchart LR
   batch_link --> activity
 ```
 
-`list_activity` `{ target: <node id> }` is the diary for that node. Newest first. Default limit 50, max 200. Page older rows with `since`. `get` does not include these rows.
+`list_activity` `{ target: <node id> }` is the diary for that node. Newest first. Default limit 50, max 200. `since` is a time window (`created_at >=`), not a page. After a full page, send `next` as `cursor`. `count` matches the same filters. `get` does not include these rows.
 
 ## Search
 
@@ -191,7 +191,7 @@ flowchart LR
 - `due_on_or_before` / `due_on_or_after` — inclusive ISO date window on `data.due`
 - `data_equals` — one or a few top-level `data` keys equal a string value (JSONB `@>`, same family as `data.url` / `data.due`; not a column per key). Example shape: `{ kind: "…", status: "…" }`. Seed `spend` filters `{ stage: "quoted" }` or `{ currency: "USD" }` this way; `amount` is a number and does not.
 
-Empty `{}` is an error (no `list_nodes` tool). Hits are lean and include `due` when `data.due` is set; `get` loads the record, `data.due`, and neighbor titles.
+Empty `{}` is an error (no `list_nodes` tool). `{ cursor }` with no filter is the same error. Default `limit` 20, max 100. `count` is the total for those filters. After a full page, send `next` as `cursor`. `since` is a time window (`updated_at >=`), not a page. Hits are lean and include `due` when `data.due` is set; `get` loads the record, `data.due`, and neighbor titles.
 
 `lookup` is a separate read-only tool: batch name resolution with a result per input. Unique folded title, unique user alias, or UUID may bind. Token and fuzzy matches are candidates that need user confirmation before a write. Each useful candidate includes `id`, `type`, canonical `title`, `updated_at`, `match`, and `confidence` plus the surrounding `candidates` list. `confidence` ranks; it is not a probability and does not authorize a write. Title folding uses generated `title_norm` / `title_compact` and trigram indexes. Aliases stay on `data.aliases` (JSONB unnest). Create-time `upsert` (no `id`) uses the same matcher: exact/alias hits refuse unless `allow_duplicate` is set; fuzzy hits warn. Not embeddings.
 

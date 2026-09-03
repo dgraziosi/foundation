@@ -28,7 +28,7 @@ A first-day vault (seed types, zero user nodes) is healthy — skip duplicate an
 2. Live nodes with zero edges. Report them; do not delete. Skip if the graph has no user nodes.
 3. Type soup: inspect_ontology / bootstrap types. Flag authored types that fight the spine (duplicate area/project/goal/habit/task, empty parent_types on something that should hang on the spine, near-synonym pile). System seeds are not soup. Do not manage_type on this run.
 
-Prefer MCP (bootstrap, inspect_ontology, get, search, list_activity). There is no list_nodes tool. A read-only SQL look on localhost is allowed if you need a full scan.
+Prefer MCP (bootstrap, inspect_ontology, get, search, list_activity). There is no list_nodes tool. Page `search` by type until `next` is omitted. Do not list the graph around MCP.
 
 This pass is the weekly graph report. Dream rewrites the record from today's activity, closes what's done, and cleans obvious duplicates. Vault health and product updates have their own schedules.
 

@@ -3,6 +3,7 @@ import {
   ActivityActorSchema,
   ActivityTargetKindSchema,
   type Activity,
+  type ActivityCursorValue,
 } from "@foundation/schema";
 import { randomUUID } from "node:crypto";
 import { iso, type Queryable } from "./tx.js";
@@ -24,6 +25,10 @@ type ActivityRow = {
   undone_at: Date | null;
   rationale: string | null;
   created_at: Date;
+};
+
+type ActivityListRow = ActivityRow & {
+  created_at_keyset: string;
 };
 
 export function mapActivity(row: ActivityRow): Activity {
@@ -120,6 +125,12 @@ export async function getActivityById(
   return rows[0] ? mapActivity(rows[0]) : undefined;
 }
 
+export type ListActivityPage = {
+  activities: Activity[];
+  count: number;
+  next?: ActivityCursorValue;
+};
+
 export async function listActivity(
   db: Queryable,
   filters: {
@@ -127,20 +138,46 @@ export async function listActivity(
     target?: string;
     since?: Date;
     limit?: number;
+    cursor?: ActivityCursorValue;
   } = {},
-): Promise<Activity[]> {
+): Promise<ListActivityPage> {
   const limit = filters.limit ?? 50;
-  const { rows } = await db.query<ActivityRow>(
-    `SELECT ${ACTIVITY_COLUMNS}
-     FROM activity
+  const filterParams = [filters.action ?? null, filters.target ?? null, filters.since ?? null];
+  const filterSql = `FROM activity
      WHERE ($1::text IS NULL OR action = $1)
        AND ($2::text IS NULL OR target_id = $2)
-       AND ($3::timestamptz IS NULL OR created_at >= $3)
-     ORDER BY created_at DESC
+       AND ($3::timestamptz IS NULL OR created_at >= $3)`;
+  const [countResult, pageResult] = await Promise.all([
+    db.query<{ count: string }>(`SELECT COUNT(*)::text AS count ${filterSql}`, filterParams),
+    db.query<ActivityListRow>(
+      `SELECT ${ACTIVITY_COLUMNS},
+       to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at_keyset
+     ${filterSql}
+       AND (
+         $5::uuid IS NULL
+         OR (created_at, id) < ($6::timestamptz, $5::uuid)
+       )
+     ORDER BY created_at DESC, id DESC
      LIMIT $4`,
-    [filters.action ?? null, filters.target ?? null, filters.since ?? null, limit],
-  );
-  return rows.map(mapActivity);
+      [
+        ...filterParams,
+        limit + 1,
+        filters.cursor?.id ?? null,
+        filters.cursor?.created_at ?? null,
+      ],
+    ),
+  ]);
+  const count = Number(countResult.rows[0]?.count ?? 0);
+  const extra = pageResult.rows.length > limit;
+  const rows = extra ? pageResult.rows.slice(0, limit) : pageResult.rows;
+  const last = extra ? rows[rows.length - 1] : undefined;
+  return {
+    activities: rows.map(mapActivity),
+    count,
+    ...(last
+      ? { next: { created_at: last.created_at_keyset, id: last.id } }
+      : {}),
+  };
 }
 
 export async function markNodeDeleteActivitiesIrreversible(

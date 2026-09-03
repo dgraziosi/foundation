@@ -8,6 +8,7 @@ import {
   type LookupRawCandidate,
   type Node,
   type Payload,
+  type SearchCursorValue,
   type SearchHit,
 } from "@foundation/schema";
 import type { Queryable } from "./tx.js";
@@ -343,6 +344,12 @@ export async function isChildOfParent(
   return rows.length > 0;
 }
 
+export type SearchNodesPage = {
+  hits: SearchHit[];
+  count: number;
+  next?: SearchCursorValue;
+};
+
 export async function searchNodes(
   db: Queryable,
   input: {
@@ -363,30 +370,32 @@ export async function searchNodes(
     dueExact?: string;
     dataEquals?: Record<string, string>;
     limit?: number;
+    cursor?: SearchCursorValue;
   },
-): Promise<SearchHit[]> {
+): Promise<SearchNodesPage> {
   const limit = input.limit ?? 20;
   const query = input.query?.trim() ? input.query.trim() : null;
-  const { rows } = await db.query<
-    Pick<NodeRow, "id" | "type" | "title" | "status"> & { snippet: string; due: string | null }
-  >(
-    `WITH q AS (
-       SELECT CASE
-         WHEN $1::text IS NULL THEN NULL
-         ELSE plainto_tsquery('english', foundation_unaccent($1))
-       END AS tsq
-     )
-     SELECT id, type, title, status,
-            foundation_iso_date(data #>> '{due}') AS due,
-            CASE
-              WHEN q.tsq IS NULL THEN title
-              ELSE ts_headline(
-                'foundation_english',
-                foundation_node_search_text(title, payload, data),
-                q.tsq,
-                'MaxWords=24, MinWords=5, MaxFragments=1'
-              )
-            END AS snippet
+  const filterParams = [
+    query,
+    input.type ?? null,
+    input.status ?? null,
+    input.since ?? null,
+    input.under ?? null,
+    input.urlSystem ?? null,
+    input.urlId ?? null,
+    input.dueOnOrAfter ?? null,
+    input.dueOnOrBefore ?? null,
+    input.dueBefore ?? null,
+    input.dueExact ?? null,
+    input.dataEquals && Object.keys(input.dataEquals).length > 0
+      ? JSON.stringify(input.dataEquals)
+      : null,
+    input.receiptSystem ?? null,
+    input.receiptId ?? null,
+    input.repoSystem ?? null,
+    input.repoId ?? null,
+  ];
+  const filterSql = `
      FROM nodes CROSS JOIN q
      WHERE deleted_at IS NULL
        AND ($2::text IS NULL OR type = $2)
@@ -405,50 +414,86 @@ export async function searchNodes(
        )
        AND ($6::text IS NULL OR metadata #>> '{url,system}' = $6)
        AND ($7::text IS NULL OR metadata #>> '{url,id}' = $7)
-       AND ($14::text IS NULL OR data #>> '{receipt,system}' = $14)
-       AND ($15::text IS NULL OR data #>> '{receipt,id}' = $15)
-       AND ($16::text IS NULL OR data #>> '{repo,system}' = $16)
-       AND ($17::text IS NULL OR data #>> '{repo,id}' = $17)
+       AND ($13::text IS NULL OR data #>> '{receipt,system}' = $13)
+       AND ($14::text IS NULL OR data #>> '{receipt,id}' = $14)
+       AND ($15::text IS NULL OR data #>> '{repo,system}' = $15)
+       AND ($16::text IS NULL OR data #>> '{repo,id}' = $16)
        AND ($8::text IS NULL OR foundation_iso_date(data #>> '{due}') >= $8)
        AND ($9::text IS NULL OR foundation_iso_date(data #>> '{due}') <= $9)
        AND ($10::text IS NULL OR foundation_iso_date(data #>> '{due}') < $10)
        AND ($11::text IS NULL OR foundation_iso_date(data #>> '{due}') = $11)
        AND ($12::jsonb IS NULL OR data @> $12::jsonb)
-       AND (q.tsq IS NULL OR search_tsv @@ q.tsq)
-     ORDER BY
-       CASE WHEN q.tsq IS NULL THEN 0 ELSE ts_rank_cd(search_tsv, q.tsq) END DESC,
-       updated_at DESC
-     LIMIT $13`,
-    [
-      query,
-      input.type ?? null,
-      input.status ?? null,
-      input.since ?? null,
-      input.under ?? null,
-      input.urlSystem ?? null,
-      input.urlId ?? null,
-      input.dueOnOrAfter ?? null,
-      input.dueOnOrBefore ?? null,
-      input.dueBefore ?? null,
-      input.dueExact ?? null,
-      input.dataEquals && Object.keys(input.dataEquals).length > 0
-        ? JSON.stringify(input.dataEquals)
-        : null,
-      limit,
-      input.receiptSystem ?? null,
-      input.receiptId ?? null,
-      input.repoSystem ?? null,
-      input.repoId ?? null,
-    ],
-  );
-  return rows.map((row) => ({
-    id: row.id,
-    type: row.type,
-    title: row.title,
-    status: row.status,
-    snippet: row.snippet ?? "",
-    ...(row.due && isIsoDate(row.due) ? { due: row.due } : {}),
-  }));
+       AND (q.tsq IS NULL OR search_tsv @@ q.tsq)`;
+  const qCte = `WITH q AS (
+       SELECT CASE
+         WHEN $1::text IS NULL THEN NULL
+         ELSE plainto_tsquery('english', foundation_unaccent($1))
+       END AS tsq
+     )`;
+  const rankExpr =
+    "CASE WHEN q.tsq IS NULL THEN 0::float8 ELSE ts_rank_cd(search_tsv, q.tsq) END";
+  const [countResult, pageResult] = await Promise.all([
+    db.query<{ count: string }>(`${qCte} SELECT COUNT(*)::text AS count ${filterSql}`, filterParams),
+    db.query<
+      Pick<NodeRow, "id" | "type" | "title" | "status" | "updated_at"> & {
+        snippet: string;
+        due: string | null;
+        rank: number;
+      }
+    >(
+      `${qCte}
+     SELECT id, type, title, status, updated_at,
+            foundation_iso_date(data #>> '{due}') AS due,
+            CASE
+              WHEN q.tsq IS NULL THEN title
+              ELSE ts_headline(
+                'foundation_english',
+                foundation_node_search_text(title, payload, data),
+                q.tsq,
+                'MaxWords=24, MinWords=5, MaxFragments=1'
+              )
+            END AS snippet,
+            ${rankExpr} AS rank
+     ${filterSql}
+       AND (
+         $18::uuid IS NULL
+         OR (${rankExpr}, updated_at, id) < ($19::float8, $20::timestamptz, $18::uuid)
+       )
+     ORDER BY ${rankExpr} DESC, updated_at DESC, id DESC
+     LIMIT $17`,
+      [
+        ...filterParams,
+        limit + 1,
+        input.cursor?.id ?? null,
+        input.cursor?.rank ?? null,
+        input.cursor?.updated_at ?? null,
+      ],
+    ),
+  ]);
+  const count = Number(countResult.rows[0]?.count ?? 0);
+  const extra = pageResult.rows.length > limit;
+  const rows = extra ? pageResult.rows.slice(0, limit) : pageResult.rows;
+  const last = extra ? rows[rows.length - 1] : undefined;
+  return {
+    hits: rows.map((row) => ({
+      id: row.id,
+      type: row.type,
+      title: row.title,
+      status: row.status,
+      snippet: row.snippet ?? "",
+      ...(row.due && isIsoDate(row.due) ? { due: row.due } : {}),
+    })),
+    count,
+    ...(last
+      ? {
+          next: {
+            rank: Number(last.rank),
+            updated_at: iso(last.updated_at),
+            id: last.id,
+          },
+        }
+      : {}),
+  };
 }
 
 export type LookupQueryInput = {

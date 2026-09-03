@@ -28,7 +28,7 @@ Dream — 02:00, all 7 nights, user-local — [`.agents/skills/dream/`](../.agen
 
 ## Tools
 
-`GET /health`, the host filesystem, git, Postgres on localhost, and MCP `foundation` at `http://127.0.0.1:8787/mcp`.
+`GET /health`, the host filesystem, git, host Postgres for keep-up / dump / restore (`initdb`, `pg_ctl`, `psql`), and MCP `foundation` at `http://127.0.0.1:8787/mcp`. Graph listing stays on MCP.
 
 ## Handoffs
 

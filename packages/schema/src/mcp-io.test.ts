@@ -14,6 +14,7 @@ import {
   SearchInputListedSchema,
   SearchInputSchema,
   SearchInputWireSchema,
+  SearchSuccessSchema,
   SearchUrlFilterSchema,
   SuggestedLinkSchema,
   UpsertInputSchema,
@@ -121,6 +122,30 @@ test("search query is optional when a filter is set", () => {
   assert.equal(searchHasSelector({ data_equals: { kind: "fixture_alpha" } }), true);
   assert.equal(searchHasSelector({ data_equals: {} }), false);
   assert.equal(searchHasSelector({}), false);
+  assert.equal(searchHasSelector({ cursor: "s1.not-a-page" }), false);
+  assert.deepEqual(Object.keys(SearchInputListedSchema.shape), [
+    "query",
+    "type",
+    "status",
+    "under",
+    "since",
+    "url",
+    "repo",
+    "receipt",
+    "due",
+    "due_on_or_before",
+    "due_on_or_after",
+    "data_equals",
+    "limit",
+    "cursor",
+  ]);
+  assert.deepEqual(Object.keys(SearchSuccessSchema.shape), ["nodes", "count", "next", "suggestion"]);
+  SearchInputSchema.parse({ type: "note", limit: 1 });
+  SearchInputSchema.parse({ type: "note", limit: 100 });
+  assert.throws(() => SearchInputSchema.parse({ type: "note", limit: 101 }));
+  const strippedOffset = SearchInputSchema.parse({ type: "note", offset: 20 });
+  assert.equal("offset" in strippedOffset, false);
+  SearchSuccessSchema.parse({ nodes: [], count: 0 });
 });
 
 test("search still accepts a lexical query", () => {
