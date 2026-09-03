@@ -102,6 +102,12 @@ export {
   type TokenLeaseArgs,
 } from "./leases.js";
 export {
+  getVaultSettings,
+  mapVaultSettings,
+  updateVaultSettings,
+  type VaultSettingsPatch,
+} from "./settings.js";
+export {
   isForeignKeyViolation,
   isUniqueViolation,
   uniqueViolationConstraint,
