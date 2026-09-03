@@ -81,6 +81,16 @@ export function TypeViewPage({ slug: forcedSlug }: { slug?: string }) {
                 </Button>
               ) : null}
             </h1>
+            {(typeQuery.data.type.parent_types?.length ?? 0) > 0 ? (
+              <p className="m-0 text-meta text-muted-foreground" data-constraint="parent_types">
+                May hang under{" "}
+                {(typeQuery.data.type.parent_types ?? [])
+                  .map(
+                    (slug) => ontology.data?.types.find((type) => type.slug === slug)?.label ?? slug,
+                  )
+                  .join(", ")}
+              </p>
+            ) : null}
             {resolved.views.length === 0 ? (
               <Quiet>No views declared for this type.</Quiet>
             ) : (
