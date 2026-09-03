@@ -86,7 +86,7 @@ flowchart TB
 
 ### Spine and artifacts
 
-Hierarchy verb is `child_of`. At most one `child_of` per node. Allowed parents come from the child’s type (`parent_types`).
+Hierarchy verb is the live relation with `kind: hierarchy` (seed `child_of`). At most one hierarchy parent per node. Allowed parents come from the child’s type (`parent_types`).
 
 Spine: **area → project → goal → habit | task** — preferred placement, not a hard gate. `habit` prefers a goal parent and does not need one. `task` may `child_of` `goal` or `project` (prefer goal when there is a real outcome). `task` cannot `child_of` `area`.
 
