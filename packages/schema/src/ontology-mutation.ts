@@ -94,12 +94,6 @@ export function assertSystemRelationPatch(
   if (patch.kind !== undefined && patch.kind !== existing.kind) {
     changed.push("kind");
   }
-  if (patch.source_types !== undefined && !sameJson(patch.source_types, existing.source_types)) {
-    changed.push("source_types");
-  }
-  if (patch.target_types !== undefined && !sameJson(patch.target_types, existing.target_types)) {
-    changed.push("target_types");
-  }
   if (patch.is_symmetric !== undefined && patch.is_symmetric !== existing.is_symmetric) {
     changed.push("is_symmetric");
   }
@@ -114,7 +108,7 @@ export function assertSystemRelationPatch(
   }
   return toolError(
     `Cannot change system relation "${existing.slug}" fields: ${changed.join(", ")}`,
-    "System relations may only have their description updated. Add a new relation with manage_relation action create instead.",
+    "System relations may edit description, source_types, and target_types. Slug, kind, label, symmetry, and semantic_parent_slug stay locked. Add a new relation with manage_relation action create instead.",
   );
 }
 

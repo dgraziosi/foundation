@@ -87,7 +87,7 @@ export const IncidentEdgeSchema = EdgeSchema.extend({
 });
 export type IncidentEdge = z.infer<typeof IncidentEdgeSchema>;
 
-export const SuggestedLinkKindSchema = z.enum(["child_of", "about", "relates_to"]);
+export const SuggestedLinkKindSchema = z.string().min(1);
 
 export const SuggestedLinkSchema = z.object({
   kind: SuggestedLinkKindSchema,

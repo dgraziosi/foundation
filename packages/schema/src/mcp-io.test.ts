@@ -242,9 +242,17 @@ test("suggested_links are seed relations to a live target", () => {
     reason: "Title matches an allowed parent.",
   });
   assert.equal(link.kind, "child_of");
+  assert.equal(
+    SuggestedLinkSchema.parse({
+      kind: "under",
+      target: link.target,
+      reason: "Title matches an allowed parent.",
+    }).kind,
+    "under",
+  );
   assert.throws(() =>
     SuggestedLinkSchema.parse({
-      kind: "supports",
+      kind: "",
       target: link.target,
       reason: "invented",
     }),
