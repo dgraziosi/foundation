@@ -6,6 +6,18 @@ Historical proof runs below may mention older door copy. The current window is t
 
 Live journal HTTP was not driven on the VMs that ran these proofs. Host Postgres 16 was not on PATH (`initdb`, `pg_ctl`, `psql`). That is a run limitation. The feature is on the branch.
 
+## Named proof `vault-settings-11`
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=vault-settings-11`). Doctor green. Fresh `vault_settings` row was timezone `America/New_York`, working-set cap 40, due window 14.
+
+MCP on `http://127.0.0.1:8787/mcp`:
+
+1. `tools/list` returned 15 tools. No settings tool.
+2. `search` `{ due: "today" }` under the seed zone hit tasks dated New York today and missed a Pacific/Auckland date.
+3. `UPDATE vault_settings.timezone` to `Pacific/Auckland`. `due: today` flipped. The New York dates became overdue.
+4. `working_set` on a live area stayed healthy. `walk.due_window.timezone` was `Pacific/Auckland`.
+5. Cleanup removed the disposable run root. Evidence stayed under `.cursor/skills/verify-foundation/evidence/vault-settings-11/`. Keys were redacted.
+
 ## Named proof `jobs-lease-10`
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=jobs-lease-10`). Doctor green. `tools/list` returned 15 tools including `job`.

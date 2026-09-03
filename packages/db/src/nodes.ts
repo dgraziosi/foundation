@@ -1,7 +1,9 @@
 import {
+  DUE_TIMEZONE,
   LOOKUP_FUZZY_MIN_COMPACT_LEN,
   LOOKUP_SIM_FLOOR,
   LOOKUP_TOKEN_MIN_COMPACT_LEN,
+  SEARCH_LIMIT_DEFAULT,
   isIsoDate,
   migrateLeftoverIdentity,
   type IncidentEdge,
@@ -385,7 +387,7 @@ export async function searchNodes(
     cursor?: SearchCursorValue;
   },
 ): Promise<SearchNodesPage> {
-  const limit = input.limit ?? 20;
+  const limit = input.limit ?? SEARCH_LIMIT_DEFAULT;
   const query = input.query?.trim() ? input.query.trim() : null;
   const filterParams = [
     query,
@@ -1059,20 +1061,21 @@ export async function listTypeCards(
   return rows;
 }
 
-/** Live journal whose created day (America/New_York) matches `day` (YYYY-MM-DD). Newest write first. */
+/** Live journal whose created day in `timeZone` matches `day` (YYYY-MM-DD). Newest write first. */
 export async function findLiveJournalOnDay(
   db: Queryable,
   day: string,
+  timeZone: string = DUE_TIMEZONE,
 ): Promise<{ id: string } | undefined> {
   const { rows } = await db.query<{ id: string }>(
     `SELECT id
      FROM nodes
      WHERE deleted_at IS NULL
        AND type = 'journal'
-       AND timezone('America/New_York', created_at)::date = $1::date
+       AND timezone($2, created_at)::date = $1::date
      ORDER BY updated_at DESC
      LIMIT 1`,
-    [day],
+    [day, timeZone],
   );
   return rows[0];
 }

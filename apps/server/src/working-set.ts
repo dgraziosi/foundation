@@ -1,5 +1,6 @@
 import {
   getNodeById,
+  getVaultSettings,
   listIncidentEdgesForNodes,
   listLiveNodesByIds,
   listNodeTypes,
@@ -7,18 +8,14 @@ import {
   type Pool,
 } from "@foundation/db";
 import {
-  WORKING_SET_DEPTH_DEFAULT,
-  WORKING_SET_DUE_WITHIN_DAYS_DEFAULT,
-  WORKING_SET_LIMIT_DEFAULT,
   WORKING_SET_NODE_NOT_FOUND_SUGGESTION,
-  WORKING_SET_TIMEZONE,
   applyWorkingSetCap,
   compareWorkingSetItems,
   datesFromNodeData,
   planWorkingSetWalk,
   preferWorkRelation,
   sortDateOf,
-  todayInNewYork,
+  todayInVault,
   toolError,
   workItemPassesSpineRootWindow,
   type IncidentEdge,
@@ -249,9 +246,10 @@ export async function workingSetGraph(
   input: WorkingSetInput,
 ): Promise<WorkingSetSuccess | ToolError> {
   const includeCompleted = input.include_completed === true;
-  const depth = input.depth ?? WORKING_SET_DEPTH_DEFAULT;
-  const limit = input.limit ?? WORKING_SET_LIMIT_DEFAULT;
-  const dueWithinDays = input.due_within_days ?? WORKING_SET_DUE_WITHIN_DAYS_DEFAULT;
+  const settings = await getVaultSettings(pool);
+  const depth = input.depth ?? settings.working_set_depth_default;
+  const limit = input.limit ?? settings.working_set_limit_default;
+  const dueWithinDays = input.due_within_days ?? settings.working_set_due_within_days;
 
   const root = await getNodeById(pool, input.id);
   if (!root) {
@@ -269,7 +267,7 @@ export async function workingSetGraph(
   }
 
   const plan = planWorkingSetWalk(rootType, types, relations);
-  const today = todayInNewYork();
+  const today = todayInVault(settings.timezone);
   const applyWindow = plan.isSpineRoot;
   const ancestorItems = plan.ancestors ? await walkAncestors(pool, root, plan, typeMap) : [];
   const workItems = (await walkWork(pool, root, plan, typeMap, depth)).filter((item) => {
@@ -305,7 +303,7 @@ export async function workingSetGraph(
       ancestors: plan.ancestors,
       relations: plan.work === "none" && plan.ancestors ? plan.hierarchyRelations : plan.workRelations,
       depth,
-      due_window: applyWindow ? { days: dueWithinDays, timezone: WORKING_SET_TIMEZONE } : null,
+      due_window: applyWindow ? { days: dueWithinDays, timezone: settings.timezone } : null,
     },
     truncated: capped.truncated,
   };

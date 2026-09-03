@@ -1,4 +1,4 @@
-/** Calendar date on `data.due` for task and goal. Stored as JSONB, not a column. */
+/** Seed / fallback IANA zone when the vault settings row is missing or invalid. */
 export const DUE_TIMEZONE = "America/New_York";
 
 export const ISO_DATE_PATTERN = "^[0-9]{4}-[0-9]{2}-[0-9]{2}$";
@@ -55,7 +55,7 @@ export function todayInTimeZone(timeZone: string, now = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
-/** “Today” for overdue / today search filters. */
+/** “Today” in the seed timezone. Search and working_set read the vault settings row. */
 export function todayInNewYork(now = new Date()): string {
   return todayInTimeZone(DUE_TIMEZONE, now);
 }
