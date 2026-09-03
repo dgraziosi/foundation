@@ -3,6 +3,7 @@ import {
   LOOKUP_SIM_FLOOR,
   LOOKUP_TOKEN_MIN_COMPACT_LEN,
   isIsoDate,
+  migrateLeftoverIdentity,
   type IncidentEdge,
   type LookupMatch,
   type LookupRawCandidate,
@@ -185,6 +186,7 @@ export async function restoreNodeSnapshot(
   db: Queryable,
   snapshot: Node,
 ): Promise<Node | undefined> {
+  const migrated = migrateLeftoverIdentity(snapshot.data ?? {}, snapshot.metadata ?? {});
   const { rows } = await db.query<NodeRow>(
     `UPDATE nodes SET
        type = $2,
@@ -202,8 +204,8 @@ export async function restoreNodeSnapshot(
       snapshot.title,
       snapshot.status,
       JSON.stringify(snapshot.payload),
-      JSON.stringify(snapshot.data),
-      JSON.stringify(snapshot.metadata),
+      JSON.stringify(migrated.data),
+      JSON.stringify(migrated.metadata),
     ],
   );
   return rows[0] ? mapNode(rows[0]) : undefined;

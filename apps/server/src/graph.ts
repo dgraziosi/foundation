@@ -78,10 +78,6 @@ import {
   applyUrlFromPatch,
   classifyLookupResult,
   createPreflightFromLookup,
-  CODE_KEY_REFUSED_SUGGESTION,
-  LINK_KEY_REFUSED_SUGGESTION,
-  LIVING_KEY_REFUSED_SUGGESTION,
-  ORIGIN_KEY_REFUSED_SUGGESTION,
   REPO_HIT_SUGGESTION,
   REPO_MISS_SUGGESTION,
   RECEIPT_HIT_SUGGESTION,
@@ -95,6 +91,8 @@ import {
   urlIdentityConflictError,
   urlIdentityFromMetadata,
   applyUrlIdentityFromUpsert,
+  hasLeftoverIdentityKeys,
+  migrateLeftoverIdentity,
   repoConflictError,
   repoFromData,
   canonicalizeRepoInData,
@@ -159,25 +157,6 @@ function mergedNodeData(
     return existing?.data ?? {};
   }
   return { ...(existing?.data ?? {}), ...patch };
-}
-
-function refuseLeftoverKeys(patch: Record<string, unknown> | undefined): ToolError | null {
-  if (!patch) {
-    return null;
-  }
-  if (Object.prototype.hasOwnProperty.call(patch, "origin")) {
-    return toolError("data.origin is not a Foundation key", ORIGIN_KEY_REFUSED_SUGGESTION);
-  }
-  if (Object.prototype.hasOwnProperty.call(patch, "living")) {
-    return toolError("data.living is not a Foundation key", LIVING_KEY_REFUSED_SUGGESTION);
-  }
-  if (Object.prototype.hasOwnProperty.call(patch, "code")) {
-    return toolError("data.code is not a Foundation key", CODE_KEY_REFUSED_SUGGESTION);
-  }
-  if (Object.prototype.hasOwnProperty.call(patch, "link")) {
-    return toolError("data.link is not a Foundation key", LINK_KEY_REFUSED_SUGGESTION);
-  }
-  return null;
 }
 
 function validateUpsertData(type: NodeType, data: Record<string, unknown>): ToolError | null {
@@ -621,16 +600,13 @@ export async function upsertGraphNode(
         }
       }
 
-      const leftoverErr = refuseLeftoverKeys(input.data);
-      if (leftoverErr) {
-        return leftoverErr;
-      }
-      const merged = canonicalizeDueInData(
-        canonicalizeReceiptInData(
-          canonicalizeRepoInData(mergedNodeData(existing, input.data)),
-        ),
+      const merged = mergedNodeData(existing, input.data);
+      const leftoverPresent = hasLeftoverIdentityKeys(merged);
+      const migrated = migrateLeftoverIdentity(merged, existing?.metadata ?? {});
+      const canonical = canonicalizeDueInData(
+        canonicalizeReceiptInData(canonicalizeRepoInData(migrated.data)),
       );
-      const aliased = applyAliasesFromPatch(merged, input.data);
+      const aliased = applyAliasesFromPatch(canonical, input.data);
       if (isToolError(aliased)) {
         return aliased;
       }
@@ -639,7 +615,7 @@ export async function upsertGraphNode(
         return nextData;
       }
       const nextMeta = applyUrlIdentityFromUpsert(
-        existing?.metadata,
+        migrated.metadata,
         input.metadata,
         input.url,
       );
@@ -672,9 +648,11 @@ export async function upsertGraphNode(
             title: input.title,
             status: input.status,
             payload: resolved.payload,
-            data: input.data === undefined ? undefined : nextData,
+            data: input.data === undefined && !leftoverPresent ? undefined : nextData,
             metadata:
-              input.metadata === undefined && input.url === undefined ? undefined : nextMeta,
+              input.metadata === undefined && input.url === undefined && !leftoverPresent
+                ? undefined
+                : nextMeta,
             base_updated_at: input.base_updated_at,
           });
           await client.query("RELEASE SAVEPOINT upsert_update");

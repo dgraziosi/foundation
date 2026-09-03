@@ -568,18 +568,6 @@ export function searchHasSelector(input: {
   );
 }
 
-export const ORIGIN_KEY_REFUSED_SUGGESTION =
-  "Search { url } for Gmail, Calendar, or Drive. Use data.repo { system, id } for GitHub. There is no origin. Cursor Origin is not a vault word.";
-
-export const LIVING_KEY_REFUSED_SUGGESTION =
-  "Search { url } for Gmail, Calendar, or Drive. There is no living.";
-
-export const CODE_KEY_REFUSED_SUGGESTION =
-  "Use data.repo { system, id } for GitHub. There is no code.";
-
-export const LINK_KEY_REFUSED_SUGGESTION =
-  "Link is the edge tool. Search { url } for Gmail, Calendar, or Drive. There is no data.link.";
-
 export const URL_MISS_SUGGESTION =
   "No live node has that url. You may upsert with url.system and url.id. data.url is the https address the Viewer opens. Foundation stores the ref only — do not fetch or mirror Gmail, Calendar, or Drive bodies.";
 
