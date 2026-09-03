@@ -216,7 +216,7 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 
 - **In:** `{ id, confirm: true, base_updated_at?, from_base_updated_at?, to_base_updated_at?, purge_deleted?, actor?, actor_label? }` (`id` is an activity row id)
 - **Out:** `{ ok, activity_id }` or `{ error, suggestion? }`
-- **If-match:** node inversions (`create`, `update`, `delete`) require `base_updated_at` matching that node's current `updated_at` from `get` (deleted nodes compare the tombstone timestamp). Edge inversions (`link`, `unlink`) require `from_base_updated_at` and `to_base_updated_at` from `get` on both endpoints. Type and relation inversions have no node timestamp. Stale or missing → `{ error, suggestion }` (get and retry). A matching undo still writes a compensating row. Invert stays refused when it is not safe.
+- **If-match:** node inversions (`create`, `update`, `delete`) require `base_updated_at` matching that node's current `updated_at` from `get`. Undo of `delete` uses the last live stamp from `get` (the same value `delete` required) because `get` hides tombstones and delete itself bumps `updated_at`. Edge inversions (`link`, `unlink`) require `from_base_updated_at` and `to_base_updated_at` from `get` on both endpoints. Type and relation inversions have no node timestamp. Stale or missing → `{ error, suggestion }` (get and retry). A matching undo still writes a compensating row. Invert stays refused when it is not safe.
 - `activity_id` is the compensating row (`reversible = false`). Invert map:
 
 | action | inverse |

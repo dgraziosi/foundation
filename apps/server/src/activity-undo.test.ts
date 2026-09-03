@@ -18,17 +18,6 @@ import {
 
 const databaseUrl = process.env.DATABASE_URL;
 
-function nodeStamp(value: unknown): string {
-  if (!value || typeof value !== "object" || !("updated_at" in value)) {
-    throw new Error("activity snapshot is missing updated_at");
-  }
-  const stamp = (value as { updated_at: unknown }).updated_at;
-  if (typeof stamp !== "string" || stamp.length === 0) {
-    throw new Error("activity snapshot is missing updated_at");
-  }
-  return stamp;
-}
-
 async function poolForSchema(schema: string): Promise<Pool> {
   const admin = createPool(databaseUrl!);
   await admin.query("CREATE EXTENSION IF NOT EXISTS pgcrypto");
@@ -144,14 +133,10 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
       const hidden = await getGraphNode(pool, a.node.id);
       assert.equal(isToolError(hidden), true);
 
-      const deleteRows = await listGraphActivity(pool, { target: a.node.id, action: "delete" });
-      assert.equal(isToolError(deleteRows), false);
-      if (isToolError(deleteRows)) return;
-      const deleteRow = deleteRows.activities.find((row) => row.id === deleted.activity_id);
       const restored = await undoGraphActivity(pool, {
         id: deleted.activity_id,
         confirm: true,
-        base_updated_at: nodeStamp(deleteRow?.after),
+        base_updated_at: a.node.updated_at,
       });
       assert.equal(isToolError(restored), false);
 
@@ -372,7 +357,7 @@ test("activity undo inverses, filters, and confirm gates", { skip: !databaseUrl 
       const restored = await undoGraphActivity(pool, {
         id: deleted.activity_id,
         confirm: true,
-        base_updated_at: nodeStamp(listed.activities.find((row) => row.id === deleted.activity_id)?.after),
+        base_updated_at: created.node.updated_at,
       });
       assert.equal(isToolError(restored), false);
       const got = await getGraphNode(pool, created.node.id);

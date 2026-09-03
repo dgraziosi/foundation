@@ -132,7 +132,7 @@ async function assertUndoNodeMatch(
   client: PoolClient,
   nodeId: string,
   provided: string | undefined,
-  options: { includeDeleted?: boolean } = {},
+  options: { includeDeleted?: boolean; matchUpdatedAt?: string } = {},
 ): Promise<ToolError | null> {
   const current = await getNodeById(client, nodeId, {
     includeDeleted: options.includeDeleted === true,
@@ -144,7 +144,11 @@ async function assertUndoNodeMatch(
       "Call get and retry with the current updated_at as base_updated_at.",
     );
   }
-  return assertIfMatch("base_updated_at", provided, current.updated_at);
+  return assertIfMatch(
+    "base_updated_at",
+    provided,
+    options.matchUpdatedAt ?? current.updated_at,
+  );
 }
 
 async function assertUndoEndpointMatch(
@@ -205,8 +209,10 @@ async function assertUndoIfMatch(
       if (!deleted) {
         return null;
       }
+      const live = snapshotNode(row.before);
       return assertUndoNodeMatch(client, deleted.id, input.base_updated_at, {
         includeDeleted: true,
+        matchUpdatedAt: live?.updated_at,
       });
     }
     case "link": {
