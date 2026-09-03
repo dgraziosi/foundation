@@ -143,9 +143,12 @@ export function typeViewsFromUpdate(
   return { views: parsed.views, ...(parsed.default_view ? { default_view: parsed.default_view } : {}) };
 }
 
-export function missingConfirm(tool: string, confirm: boolean | undefined): ToolError | null {
-  if (confirm === true) {
+export function missingDestructive(tool: string, destructive: boolean | undefined): ToolError | null {
+  if (destructive === true) {
     return null;
   }
-  return toolError(`${tool} requires confirm: true`, `Retry ${tool} with confirm: true.`);
+  return toolError(
+    `${tool} needs a key with destructive scope`,
+    "Mint or configure a key with destructive scope for this bot, then retry.",
+  );
 }

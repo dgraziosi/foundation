@@ -48,6 +48,7 @@ jobs:
       - run: pnpm --filter @foundation/viewer test
       - run: bash scripts/skills-layout.test.sh
       - run: bash scripts/foundation-init.test.sh
+      - run: bash scripts/mint-api-key.test.sh
       - run: pnpm --filter @foundation/viewer build
       - run: pnpm --filter @foundation/server test
       - name: Stop CI Postgres so host initdb can bind 5432

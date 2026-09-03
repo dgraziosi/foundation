@@ -2,7 +2,7 @@
 
 Product contract: [`docs/SPEC.md`](./SPEC.md). Url, repo, and link: [`SPEC.md`](./SPEC.md#url-repo-and-link).
 
-Destructive tools require `confirm: true` or they return `{ error, suggestion }`. Identity is UUID. A record is what is true now, short. History stays in activity. If you already have a UUID and need the record (payload, data, edges, if-match), call `get`. `get` does not return activity. If you already have a UUID and need the diary for that record, call `list_activity` `{ target }`. If you already have a UUID and need the open work around it, call `working_set`. To resolve one or more entity names, call `lookup`, then `working_set` with that id. Ontology mutations apply immediately (activity log + `undo`; no proposal inbox). A named bot rewrites one record on purpose: `get` → `list_activity` `{ target }` → keep what still matters, invent nothing → `upsert` the same id with a short `payload` and `base_updated_at`. Not a background job. The server does not invent the body. No rewrite tool. Contract: [`SPEC.md`](./SPEC.md#rewrite-one-record).
+Destructive tools need a key with destructive scope or they return `{ error, suggestion }`. Identity is UUID. A record is what is true now, short. History stays in activity. If you already have a UUID and need the record (payload, data, edges, if-match), call `get`. `get` does not return activity. If you already have a UUID and need the diary for that record, call `list_activity` `{ target }`. If you already have a UUID and need the open work around it, call `working_set`. To resolve one or more entity names, call `lookup`, then `working_set` with that id. Ontology mutations apply immediately (activity log + `undo`; no proposal inbox). A named bot rewrites one record on purpose: `get` → `list_activity` `{ target }` → keep what still matters, invent nothing → `upsert` the same id with a short `payload` and `base_updated_at`. Not a background job. The server does not invent the body. No rewrite tool. Contract: [`SPEC.md`](./SPEC.md#rewrite-one-record).
 
 | Tool | Purpose |
 | --- | --- |
@@ -12,14 +12,14 @@ Destructive tools require `confirm: true` or they return `{ error, suggestion }`
 | `get` | Return the record: payload, data, incident edges with neighbor titles, and `suggested_links` from title FTS. Does not return activity. Blob payloads return metadata, not bytes. |
 | `working_set` | Return the actionable working set around one live node: open work, dues, and the parent chain when the root hangs under something. |
 | `upsert` | Create or update a node (title, type, payload, data, status). Passing `payload` replaces that body; omit it and the body stays. Updates require `base_updated_at`. Create accepts `idempotency_key`. Create (no id) preflights duplicates via `lookup`. Blob ingest via `bytes_base64` or `source_path`. Returns `suggested_links` (proposals only). |
-| `delete` | Soft-delete a node. Requires `confirm: true`. |
+| `delete` | Soft-delete a node. Needs a key with destructive scope. |
 | `link` | Create typed edges after validation. One edge or `edges[]` (1–20). Whole batch validates; one transaction writes all or none. Requires endpoint if-match. |
-| `unlink` | Remove a typed edge. Requires `confirm: true`. |
+| `unlink` | Remove a typed edge. Needs a key with destructive scope. |
 | `inspect_ontology` | List type and relation registry rows (system + authored), including each type’s `fields`, view declarations, `default_view`, `hue`, and `glyph`. |
-| `manage_type` | Create, update, or retire a node type (including `fields`, view queries, hue, and glyph). Applies immediately. Retire requires `confirm: true`. |
+| `manage_type` | Create, update, or retire a node type (including `fields`, view queries, hue, and glyph). Applies immediately. Retire needs a key with destructive scope. |
 | `manage_relation` | Create or update a relation type. Applies immediately. |
 | `list_activity` | Read the diary (filter by action, target, since). `{ target: <node id> }` is the write history for that node (`before` / `after`). |
-| `undo` | Reverse a reversible activity row by id. Requires `confirm: true`. Type-create undo with leftover deleted nodes needs `purge_deleted: true`. |
+| `undo` | Reverse a reversible activity row by id. Needs a key with destructive scope. Type-create undo with leftover deleted nodes needs `purge_deleted: true`. |
 
 Handler contract: each tool has one zod input schema and one output schema; JSON Schema on the wire is derived; invalid input never reaches the domain; domain errors are `{ error, suggestion? }`.
 
@@ -103,7 +103,7 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 
 ### `upsert`
 
-- **In:** `{ id?, type, title, payload?, data?, url?, status?, metadata?, base_updated_at?, idempotency_key?, allow_duplicate?, actor?, actor_label? }`
+- **In:** `{ id?, type, title, payload?, data?, url?, status?, metadata?, base_updated_at?, idempotency_key?, allow_duplicate? }`
 - **Out:** `{ node, activity_id, suggested_links, duplicate_warnings? }` or `{ error, suggestion?, outcome?, candidates? }`
 - **`suggested_links`:** Postgres FTS on the new title (create, and update when the title changes) — not embeddings. Each item is `{ kind, target: { id, type, title }, reason }`. `kind` is a seed relation: `child_of`, `about`, or `relates_to`. `target` is a **live** node that already exists. How they are chosen: spine types with `parent_types` → `child_of` a live allowed parent whose title matches; if the title looks like a person already in the graph → `about` that person; otherwise `relates_to` a close title match of any type. Skip self. Skip nodes already linked to this one. A node with a live `child_of` is not offered a second parent (`about` / `relates_to` may still appear). Cap 5. Empty graph or no match → `[]`. **Never creates an edge.** Never adds a type or relation. `link` is how an accepted suggestion becomes an edge. Show non-empty suggestions and ask before calling `link`.
 - `payload`: `{ media_type, storage: "inline"|"blob", body?, blob_id?, bytes_base64?, source_path? }`. On update, passing `payload` **replaces** that body. Omit `payload` and the body stays. A named bot that rewrites a record passes the new short `payload` and `base_updated_at` from `get`.
@@ -125,30 +125,30 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 - **`data.aliases`:** optional string array of user-authored alternate names (any type). Validated only when the incoming `data` patch includes `aliases`. `aliases: []` clears. Explicit malformed values refuse, including values that fold empty after `name_norm` (punctuation-only). A successful aliases patch leaves a well-formed non-empty array, or is `[]`. Omit the key to leave aliases unchanged (including legacy malformed values). `lookup` ignores malformed stored aliases. Alias dedupe uses the same fold as SQL `foundation_name_norm`.
 - **Create duplicate preflight:** when `id` is omitted, `upsert` runs the same matcher as `lookup` on `{ name: title, type }`. Exact title or unique exact alias (or an exact-tier collision) returns `{ error: "duplicate_candidates", suggestion, outcome, candidates }` and does not write. Pass `allow_duplicate: true` to write a same-name entity anyway. Token, fuzzy, and space-compacted matches set `duplicate_warnings` and still write. `confidence` on those candidates ranks only — it does not authorize the write. Updates (`id` present) and CAS are unchanged.
 - **Create idempotency:** `idempotency_key` on create. A retry with the same key returns the existing node and original `activity_id` — it does not twin. A key already used by a deleted node refuses (undo, or a new key).
-- **`actor` / `actor_label`:** optional who-wrote fields stored on the activity row (`actor` is `agent` | `user` | `system`; default `agent`). Not a permission gate.
+- **`actor` / `actor_label`:** the server stamps these on the activity row from the authenticated key. Clients cannot set them. Viewer journal writes stamp the user.
 
 ### `delete`
 
-- **In:** `{ id, confirm: true, actor?, actor_label? }`
+- **In:** `{ id }`
 - **Out:** `{ ok, activity_id }` or `{ error, suggestion? }`
 - Soft-delete (`deleted_at`). `get` hides deleted nodes. Incident edges stay in place for undo; `get` and `link` validation ignore edges to deleted endpoints. Reparenting drops a stale `child_of` to a deleted parent so uniqueness matches the live graph, and records an `unlink` activity row with a `before` snapshot of the dropped edge. Restore via `undo` of the delete row. Soft-delete does **not** delete blob bytes (so undo can restore a blob node).
 
 ### `link`
 
-- **In (one edge):** `{ from_id, to_id, relation_type, upgrade?, metadata?, from_base_updated_at?, to_base_updated_at?, actor?, actor_label? }`
-- **In (batch):** `{ edges: [{ from_id, to_id, relation_type, upgrade?, metadata?, from_base_updated_at?, to_base_updated_at? }], actor?, actor_label? }`
+- **In (one edge):** `{ from_id, to_id, relation_type, upgrade?, metadata?, from_base_updated_at?, to_base_updated_at? }`
+- **In (batch):** `{ edges: [{ from_id, to_id, relation_type, upgrade?, metadata?, from_base_updated_at?, to_base_updated_at? }] }`
 - `edges` is 1–20. Pass either the one-edge fields or `edges[]`, not both.
 - **Out (one-edge form):** `{ edge, activity_id, suggestion?, links: [{ edge, activity_id, suggestion? }] }` or `{ error, suggestion? }`
 - **Out (`edges[]` form):** `{ links: [{ edge, activity_id, suggestion? }] }` or `{ error, suggestion? }`
 - Validation: whole batch before any write. [`packages/schema`](../packages/schema) `validateLink` per edge (unknown relation, self-link, duplicate, symmetric duplicate, constraints, `child_of` uniqueness / `parent_types`). In-batch exact and symmetric duplicates refuse. Later edges see earlier accepted edges in the same call (including a second `child_of` from the same source). `relates_to` that fits the spine **suggests** `child_of`; it does not rewrite unless that edge passes `upgrade: true`. A suggestion does not fail the batch. Duplicate checks run on the proposed relation **before** the optional `relates_to` → `child_of` upgrade.
 - **Atomic write:** one transaction. First error wins; no partial `links` and no new edges on refuse.
 - **If-match:** `from_base_updated_at` and `to_base_updated_at` are required on **each** edge and must match each endpoint's current `updated_at` from `get`. A missing timestamp on any item refuses that edge and writes nothing. A later edge does not inherit CAS from an earlier edge that named the same node. Several edges that share a node still use one agreed timestamp. Disagreeing timestamps refuse the batch. Stale or missing → `{ error, suggestion }` (get the nodes and retry). Linking does not change `updated_at`. Not a write-ACL.
-- Optional `actor` / `actor_label` are stored on each activity row (who wrote). Not a permission gate.
+- The server stamps `actor` / `actor_label` on each activity row from the authenticated key.
 - One activity receipt per written edge. `undo` inverts one receipt. Edges table is the only source of truth.
 
 ### `unlink`
 
-- **In:** `{ from_id, to_id, relation_type, confirm: true, actor?, actor_label? }`
+- **In:** `{ from_id, to_id, relation_type }`
 - **Out:** `{ ok, activity_id }` or `{ error, suggestion? }`
 
 ### `inspect_ontology`
@@ -158,16 +158,16 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 
 ### `manage_type`
 
-- **In:** `{ action: "create"|"update"|"retire", slug, label?, description?, kind?, parent_types?, json_schema?, views?, default_view?, fields?, hue?, glyph?, confirm?, purge_deleted?, actor?, actor_label? }`
+- **In:** `{ action: "create"|"update"|"retire", slug, label?, description?, kind?, parent_types?, json_schema?, views?, default_view?, fields?, hue?, glyph?, purge_deleted? }`
 - **Out:** `{ type, activity_id }` or `{ error, suggestion? }`
 - Applies immediately. System seed types may edit description, `fields`, `hue`, `glyph`, and `filter` / `sort` / `group` on views they already declare. They cannot change slug, kind, parent_types, label, retire, or the ordered view **ids** (no add, drop, or reorder of engines). `default_view` stays a member of those locked ids. Authored types keep the wider patch, including the view id list. Custom types may set `parent_types` so `child_of` placement works. Seed apply fills missing seed hue/glyph and missing seed fields only; it does not overwrite a user edit. Seed `spend` (artifact, `parent_types: ["project"]`) is the type for one money line. `project` has optional `budget_amount` / `budget_currency`. Contract: [`SPEC.md`](./SPEC.md#project-spend).
 - **`fields`:** ordered template `{ name, kind, display?, needed?, role?, enum_values?, ref_type? }`. Kinds: `string`, `date`, `number`, `enum`, `ref`. Roles: `title`, `status`, `date`, `start`, `end`, `subtitle`. At most one of title/status/date/start/end. `end` requires `start`. `status` requires enum. Date roles require kind date. `json_schema` is compiled from fields — pass `fields`, not a hand-written schema, once a template exists. `needed` does not block capture.
 - **`views` / `default_view`:** defining a type includes this choice. `views` is an ordered array of declarations `{ id, filter?, sort?, group? }` (bare ids still parse). `id` is `list` | `card` | `table` | `board` | `calendar` | `timeline` | `outline` | `graph`. Filter/sort/group bind to field roles or node `title` / `status` / `updated_at`. `default_view` must be a member of those ids, or omitted when `views` is empty. Seed types already declare views (`task` defaults to `board`, filter `status = active`). The Viewer reads the same contract from `inspect_ontology`.
-- **Retire:** `action: "retire"` with `confirm: true` drops an authored type that has **zero live nodes**. System seed types refuse. Live nodes refuse with `{ error, suggestion }` (delete or retype, then retry). Soft-deleted nodes of that type stay restorable — same family as undo-of-type-create: restore those deletes first, or pass `purge_deleted: true` (with `confirm: true`) to hard-delete the tombstones and their incident edges. Never a silent vault wipe. Undo of retire restores the registry row.
+- **Retire:** `action: "retire"` drops an authored type that has **zero live nodes**. Needs a key with destructive scope. System seed types refuse. Live nodes refuse with `{ error, suggestion }` (delete or retype, then retry). Soft-deleted nodes of that type stay restorable — same family as undo-of-type-create: restore those deletes first, or pass `purge_deleted: true` to hard-delete the tombstones and their incident edges. Never a silent vault wipe. Undo of retire restores the registry row.
 
 ### `manage_relation`
 
-- **In:** `{ action: "create"|"update", slug, label?, description?, kind?, source_types?, target_types?, is_symmetric?, semantic_parent_slug?, actor?, actor_label? }`
+- **In:** `{ action: "create"|"update", slug, label?, description?, kind?, source_types?, target_types?, is_symmetric?, semantic_parent_slug? }`
 - **Out:** `{ relation, activity_id }` or `{ error, suggestion? }`
 - Applies immediately. System relations: description only.
 
@@ -208,12 +208,12 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 - **In:** `{ action?, target?, since?, limit?, cursor? }`
 - **Out:** `{ activities, count, next? }`
 - `target` is `target_id` (node UUID, edge UUID, or type/relation slug). `{ target: <node id> }` is the diary for that node. Newest first. Default limit 50, max 200. `since` is a time window (`created_at >=`), not a page. After a full page, send `next` as `cursor`. `count` matches the same filters. `get` does not include these rows.
-- `since` is an ISO-8601 timestamp. Rows include `actor`, `actor_label`, `before` / `after`, `reversible`, `undo_token`, `token_expires_at`, and `undone_at`. `actor` / `actor_label` record who wrote; they are not a permission gate. Node write rows store snapshots of `payload`, `data`, title, type, and status. A bad body is rebuilt from those snapshots, then written with `upsert`.
+- `since` is an ISO-8601 timestamp. Rows include `actor`, `actor_label`, `before` / `after`, `reversible`, `undo_token`, `token_expires_at`, and `undone_at`. `actor` / `actor_label` are stamped by the server from the key (or Viewer). Node write rows store snapshots of `payload`, `data`, title, type, and status. A bad body is rebuilt from those snapshots, then written with `upsert`.
 - Blob node snapshots store `payload.blob_id` plus `blob: { blob_id, sha256, byte_size, media_type }` — not PDF/file bytes.
 
 ### `undo`
 
-- **In:** `{ id, confirm: true, purge_deleted?, actor?, actor_label? }` (`id` is an activity row id)
+- **In:** `{ id, purge_deleted? }` (`id` is an activity row id)
 - **Out:** `{ ok, activity_id }` or `{ error, suggestion? }`
 - `activity_id` is the compensating row (`reversible = false`). Invert map:
 
@@ -228,7 +228,7 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 | type/relation update | restore `before` row |
 | type retire | restore registry row from `before` |
 
-Live nodes of a type still block type-create undo and `manage_type` retire. Soft-deleted nodes stay restorable via undo-of-delete while the type row exists. If only tombstones remain, undo (or retire) returns `{ error, suggestion }`: restore those nodes first, or pass `purge_deleted: true` (with `confirm: true`) to hard-delete the tombstones and their incident edges, write unlink activity, and mark those prior delete rows non-reversible. Type-create undo and type retire never silently purge.
+Live nodes of a type still block type-create undo and `manage_type` retire. Soft-deleted nodes stay restorable via undo-of-delete while the type row exists. If only tombstones remain, undo (or retire) returns `{ error, suggestion }`: restore those nodes first, or pass `purge_deleted: true` to hard-delete the tombstones and their incident edges, write unlink activity, and mark those prior delete rows non-reversible. Type-create undo and type retire never silently purge.
 
 Undo tokens are single-use (`undone_at`; token cleared). Expired tokens refuse. Undo of undo is the compensating row (`reversible = false`).
 

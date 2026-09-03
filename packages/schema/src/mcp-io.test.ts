@@ -372,15 +372,13 @@ test("manage_type accepts hue and glyph", () => {
   assert.throws(() => ManageTypeInputSchema.parse({ action: "update", slug: "task", hue: "#00ff00" }));
 });
 
-test("manage_type accepts retire with confirm and purge_deleted", () => {
+test("manage_type accepts retire with purge_deleted", () => {
   const retired = ManageTypeInputSchema.parse({
     action: "retire",
     slug: "meeting",
-    confirm: true,
     purge_deleted: true,
   });
   assert.equal(retired.action, "retire");
-  assert.equal(retired.confirm, true);
   assert.equal(retired.purge_deleted, true);
   assert.throws(() => ManageTypeInputSchema.parse({ action: "delete", slug: "meeting" }));
 });

@@ -5,7 +5,7 @@ import {
   assertSystemRelationPatch,
   assertSystemTypePatch,
   labelFromSlug,
-  missingConfirm,
+  missingDestructive,
 } from "./ontology-mutation.js";
 import { SEED_TYPE_VIEWS } from "./views.js";
 
@@ -81,9 +81,9 @@ test("system relations refuse constraint edits", () => {
   assert.match(err.error, /Cannot change system relation "child_of"/);
 });
 
-test("missingConfirm requires confirm: true", () => {
-  assert.ok(missingConfirm("delete", undefined));
-  assert.ok(missingConfirm("delete", false));
-  assert.equal(missingConfirm("delete", true), null);
-  assert.match(missingConfirm("unlink", false)?.error ?? "", /unlink requires confirm: true/);
+test("missingDestructive requires destructive scope", () => {
+  assert.ok(missingDestructive("delete", undefined));
+  assert.ok(missingDestructive("delete", false));
+  assert.equal(missingDestructive("delete", true), null);
+  assert.match(missingDestructive("unlink", false)?.error ?? "", /unlink needs a key with destructive scope/);
 });

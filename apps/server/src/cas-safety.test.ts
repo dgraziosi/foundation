@@ -176,22 +176,29 @@ test(
       });
 
       await t.test("retried create with the same idempotency_key does not twin a node", async () => {
-        const first = await upsertGraphNode(pool, {
-          type: "person",
-          title: "Ada",
-          idempotency_key: "create-ada-1",
-          actor: "agent",
-          actor_label: "agent-a",
-        });
+        const first = await upsertGraphNode(
+          pool,
+          {
+            type: "person",
+            title: "Ada",
+            idempotency_key: "create-ada-1",
+          },
+          undefined,
+          { writer: { actor: "agent", actor_label: "agent-a" } },
+        );
         assert.equal(isToolError(first), false);
         if (isToolError(first)) return;
 
-        const retry = await upsertGraphNode(pool, {
-          type: "person",
-          title: "Jordan Lee",
-          idempotency_key: "create-ada-1",
-          actor_label: "agent-b",
-        });
+        const retry = await upsertGraphNode(
+          pool,
+          {
+            type: "person",
+            title: "Jordan Lee",
+            idempotency_key: "create-ada-1",
+          },
+          undefined,
+          { writer: { actor: "agent", actor_label: "agent-b" } },
+        );
         assert.equal(isToolError(retry), false);
         if (isToolError(retry)) return;
         assert.equal(retry.node.id, first.node.id);
@@ -205,12 +212,15 @@ test(
       });
 
       await t.test("activity stores actor / actor_label from the writer", async () => {
-        const created = await upsertGraphNode(pool, {
-          type: "note",
-          title: "Who wrote",
-          actor: "user",
-          actor_label: "user",
-        });
+        const created = await upsertGraphNode(
+          pool,
+          {
+            type: "note",
+            title: "Who wrote",
+          },
+          undefined,
+          { writer: { actor: "user", actor_label: "user" } },
+        );
         assert.equal(isToolError(created), false);
         if (isToolError(created)) return;
 
@@ -239,27 +249,32 @@ test(
         assert.equal(isToolError(renamed), false);
         if (isToolError(renamed)) return;
 
-        const stale = await linkGraphNodes(pool, {
-          from_id: project.node.id,
-          to_id: area.node.id,
-          relation_type: "child_of",
-          from_base_updated_at: project.node.updated_at,
-          to_base_updated_at: area.node.updated_at,
-          actor_label: "agent-a",
-        });
+        const stale = await linkGraphNodes(
+          pool,
+          {
+            from_id: project.node.id,
+            to_id: area.node.id,
+            relation_type: "child_of",
+            from_base_updated_at: project.node.updated_at,
+            to_base_updated_at: area.node.updated_at,
+          },
+          { writer: { actor: "agent", actor_label: "agent-a" } },
+        );
         assert.equal(isToolError(stale), true);
         if (!isToolError(stale)) return;
         assert.match(stale.error, /from_base_updated_at does not match/);
 
-        const linked = await linkGraphNodes(pool, {
-          from_id: project.node.id,
-          to_id: area.node.id,
-          relation_type: "child_of",
-          from_base_updated_at: renamed.node.updated_at,
-          to_base_updated_at: area.node.updated_at,
-          actor: "agent",
-          actor_label: "agent-a",
-        });
+        const linked = await linkGraphNodes(
+          pool,
+          {
+            from_id: project.node.id,
+            to_id: area.node.id,
+            relation_type: "child_of",
+            from_base_updated_at: renamed.node.updated_at,
+            to_base_updated_at: area.node.updated_at,
+          },
+          { writer: { actor: "agent", actor_label: "agent-a" } },
+        );
         assert.equal(isToolError(linked), false);
         if (isToolError(linked)) return;
 

@@ -7,6 +7,7 @@ import express from "express";
 import { apiKeyCookieHeader, providedApiKey } from "./auth.js";
 import { sendBlob } from "./blobs-http.js";
 import type { AppBindings } from "./config.js";
+import type { Keyring } from "./keyring.js";
 import {
   viewGraph,
   viewNode,
@@ -82,10 +83,10 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
-function requireViewAuth(expected: string) {
+function requireViewAuth(keyring: Keyring) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const provided = providedApiKey(req);
-    if (!provided || provided !== expected) {
+    const principal = keyring.resolve(providedApiKey(req));
+    if (!principal) {
       res.setHeader("WWW-Authenticate", 'ApiKey realm="foundation"');
       res.status(401).json({ error: "API key required" });
       return;
@@ -133,8 +134,8 @@ function sendJournalResult(res: Response, got: unknown): void {
   res.status(status).json({ error: message });
 }
 
-export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings): void {
-  const gate = requireViewAuth(config.FOUNDATION_API_KEY);
+export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings, keyring: Keyring): void {
+  const gate = requireViewAuth(keyring);
   const dist = viewerDistDir();
 
   app.get(`${VIEW_PATH}/unlock`, (_req, res) => {
@@ -143,7 +144,7 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings
 
   app.post(`${VIEW_PATH}/unlock`, (req, res) => {
     const key = typeof req.body?.api_key === "string" ? req.body.api_key : "";
-    if (key !== config.FOUNDATION_API_KEY) {
+    if (!keyring.resolve(key)) {
       res.setHeader("WWW-Authenticate", 'ApiKey realm="foundation"');
       if (wantsJson(req)) {
         res.status(401).json({ error: UNLOCK_REJECT });

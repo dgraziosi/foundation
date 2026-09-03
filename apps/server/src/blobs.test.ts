@@ -14,6 +14,7 @@ import {
   listGraphActivity,
   upsertGraphNode,
 } from "./graph.js";
+import { DESTRUCTIVE } from "./write-context.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -289,7 +290,7 @@ test("blob nodes: ingest, get metadata, HTTP bytes, snapshots, delete keeps file
       const created = await upsertGraphNode(pool, { type: "note", title: "doomed" });
       assert.equal(isToolError(created), false);
       if (isToolError(created)) return;
-      const deleted = await deleteGraphNode(pool, { id: created.node.id, confirm: true });
+      const deleted = await deleteGraphNode(pool, { id: created.node.id }, DESTRUCTIVE);
       assert.equal(isToolError(deleted), false);
 
       const uniquePdf = Buffer.from(`%PDF-1.1\norphan-${created.node.id}\n%%EOF\n`, "utf8");
@@ -375,7 +376,7 @@ test("blob nodes: ingest, get metadata, HTTP bytes, snapshots, delete keeps file
       }
       const blobId = created.node.payload.blob_id;
       const filePath = join(dataDir, "blobs", blobId);
-      const deleted = await deleteGraphNode(pool, { id: created.node.id, confirm: true });
+      const deleted = await deleteGraphNode(pool, { id: created.node.id }, DESTRUCTIVE);
       assert.equal(isToolError(deleted), false);
       assert.equal((await stat(filePath)).isFile(), true);
       assert.deepEqual(await readFile(filePath), pdf);

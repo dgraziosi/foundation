@@ -16,6 +16,7 @@ import {
   lookupGraphNodes,
   upsertGraphNode,
 } from "./graph.js";
+import { DESTRUCTIVE } from "./write-context.js";
 import { workingSetGraph } from "./working-set.js";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -316,7 +317,7 @@ test(
         }
 
         const doomed = await created(pool, { type: "note", title: "Soon gone" });
-        const deleted = await deleteGraphNode(pool, { id: doomed.id, confirm: true });
+        const deleted = await deleteGraphNode(pool, { id: doomed.id }, DESTRUCTIVE);
         assert.equal(isToolError(deleted), false);
         const gone = await workingSetGraph(pool, { id: doomed.id });
         assert.equal(isToolError(gone), true);

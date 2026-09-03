@@ -1,5 +1,6 @@
 import type { Pool } from "@foundation/db";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { AgentPrincipal } from "../keyring.js";
 import { registerBootstrapTool } from "./bootstrap.js";
 import { registerDeleteTool } from "./delete.js";
 import { registerGetTool } from "./get.js";
@@ -15,19 +16,24 @@ import { registerUnlinkTool } from "./unlink.js";
 import { registerUpsertTool } from "./upsert.js";
 import { registerWorkingSetTool } from "./working-set.js";
 
-export function registerTools(server: McpServer, pool: Pool, dataDir: string): void {
-  registerBootstrapTool(server, pool);
+export function registerTools(
+  server: McpServer,
+  pool: Pool,
+  dataDir: string,
+  agent: AgentPrincipal,
+): void {
+  registerBootstrapTool(server, pool, agent);
   registerSearchTool(server, pool);
   registerLookupTool(server, pool);
   registerGetTool(server, pool, dataDir);
   registerWorkingSetTool(server, pool);
-  registerUpsertTool(server, pool, dataDir);
-  registerDeleteTool(server, pool);
-  registerLinkTool(server, pool);
-  registerUnlinkTool(server, pool);
+  registerUpsertTool(server, pool, dataDir, agent);
+  registerDeleteTool(server, pool, agent);
+  registerLinkTool(server, pool, agent);
+  registerUnlinkTool(server, pool, agent);
   registerInspectOntologyTool(server, pool);
-  registerManageTypeTool(server, pool);
-  registerManageRelationTool(server, pool);
+  registerManageTypeTool(server, pool, agent);
+  registerManageRelationTool(server, pool, agent);
   registerListActivityTool(server, pool);
-  registerUndoTool(server, pool);
+  registerUndoTool(server, pool, agent);
 }

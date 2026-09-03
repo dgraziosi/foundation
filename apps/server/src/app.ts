@@ -3,6 +3,7 @@ import express, { type Express } from "express";
 import { headerApiKey, requireApiKey } from "./auth.js";
 import { sendBlob } from "./blobs-http.js";
 import type { AppBindings } from "./config.js";
+import { Keyring } from "./keyring.js";
 import { handleMcpRequest } from "./mcp.js";
 import { isAgentPath } from "./security.js";
 import { registerViewRoutes } from "./view.js";
@@ -25,7 +26,7 @@ function refuseAgentPaths(req: express.Request, res: express.Response, next: exp
   next();
 }
 
-function registerHealth(app: Express, pool: Pool, config: AppBindings): void {
+function registerHealth(app: Express, pool: Pool, config: AppBindings, keyring: Keyring): void {
   app.get("/health", async (req, res) => {
     const db = await pingDb(pool);
     const body: Record<string, unknown> = {
@@ -33,8 +34,7 @@ function registerHealth(app: Express, pool: Pool, config: AppBindings): void {
       service: "foundation",
       db: db ? "up" : "down",
     };
-    const provided = headerApiKey(req);
-    if (provided && provided === config.FOUNDATION_API_KEY) {
+    if (keyring.resolve(headerApiKey(req))) {
       if (config.HOST !== undefined) {
         body.host = config.HOST;
       }
@@ -53,8 +53,8 @@ function registerHealth(app: Express, pool: Pool, config: AppBindings): void {
   });
 }
 
-function registerMcpAndBlobs(app: Express, pool: Pool, config: AppBindings): void {
-  app.get("/blobs/:id", requireApiKey(config.FOUNDATION_API_KEY), async (req, res) => {
+function registerMcpAndBlobs(app: Express, pool: Pool, config: AppBindings, keyring: Keyring): void {
+  app.get("/blobs/:id", requireApiKey(keyring), async (req, res) => {
     try {
       await sendBlob(pool, config, req, res);
     } catch (error) {
@@ -65,11 +65,20 @@ function registerMcpAndBlobs(app: Express, pool: Pool, config: AppBindings): voi
     }
   });
 
-  app.use("/mcp", requireApiKey(config.FOUNDATION_API_KEY));
+  app.use("/mcp", requireApiKey(keyring));
 
   app.post("/mcp", async (req, res) => {
     try {
-      await handleMcpRequest(pool, req, res, config.FOUNDATION_DATA);
+      const agent = req.agent;
+      if (!agent) {
+        res.status(401).json({
+          jsonrpc: "2.0",
+          error: { code: -32001, message: "Unauthorized" },
+          id: null,
+        });
+        return;
+      }
+      await handleMcpRequest(pool, req, res, config.FOUNDATION_DATA, agent);
     } catch (error) {
       console.error("MCP request failed", error);
       if (!res.headersSent) {
@@ -99,20 +108,25 @@ function registerMcpAndBlobs(app: Express, pool: Pool, config: AppBindings): voi
   });
 }
 
-export function createApp(pool: Pool, config: AppBindings, door: AppDoor = "mcp"): Express {
+export function createApp(
+  pool: Pool,
+  config: AppBindings,
+  door: AppDoor = "mcp",
+  keyring: Keyring = Keyring.fromBindings(config),
+): Express {
   const app = express();
   app.use(express.json({ limit: JSON_BODY_LIMIT }));
   app.use(express.urlencoded({ extended: false }));
 
   if (door === "view") {
     app.use(refuseAgentPaths);
-    registerHealth(app, pool, config);
-    registerViewRoutes(app, pool, config);
+    registerHealth(app, pool, config, keyring);
+    registerViewRoutes(app, pool, config, keyring);
     return app;
   }
 
-  registerHealth(app, pool, config);
-  registerViewRoutes(app, pool, config);
-  registerMcpAndBlobs(app, pool, config);
+  registerHealth(app, pool, config, keyring);
+  registerViewRoutes(app, pool, config, keyring);
+  registerMcpAndBlobs(app, pool, config, keyring);
   return app;
 }

@@ -7,6 +7,7 @@ import { createPool, migrate, seedSystemOntology, type Pool } from "@foundation/
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createApp } from "./app.js";
+import { Keyring } from "./keyring.js";
 
 test("the server registers the current tools", async () => {
   const register = await readFile(
@@ -35,6 +36,7 @@ test("the server registers the current tools", async () => {
 
 const databaseUrl = process.env.DATABASE_URL;
 const apiKey = "test-foundation-key";
+const writeOnlyKey = "test-write-only-key";
 
 function asObject(result: unknown): Record<string, unknown> {
   if (typeof result !== "object" || result === null) {
@@ -75,10 +77,17 @@ test(
       return;
     }
     const pool = await poolForSchema("mcp_graph");
-    const app = createApp(pool, {
-      FOUNDATION_API_KEY: apiKey,
-      FOUNDATION_DATA: "/tmp/foundation-mcp-test",
-    });
+    const app = createApp(
+      pool,
+      {
+        FOUNDATION_API_KEY: apiKey,
+        FOUNDATION_DATA: "/tmp/foundation-mcp-test",
+      },
+      "mcp",
+      Keyring.fromSecrets(apiKey, [
+        { secret: writeOnlyKey, name: "scribe", actor_label: "Scribe" },
+      ]),
+    );
     const httpServer = app.listen(0);
     await new Promise<void>((resolve) => httpServer.on("listening", () => resolve()));
     const address = httpServer.address();
@@ -302,7 +311,7 @@ test(
       const undone = asObject(
         await client.callTool({
           name: "undo",
-          arguments: { id: tripCreateId, confirm: true },
+          arguments: { id: tripCreateId },
         }),
       );
       assert.equal(undone.error, undefined);
@@ -311,13 +320,19 @@ test(
       const missing = asObject(await client.callTool({ name: "get", arguments: { id: tripId } }));
       assert.equal(typeof missing.error, "string");
 
-      const confirmGate = asObject(
-        await client.callTool({
+      const writeOnlyTransport = new StreamableHTTPClientTransport(new URL(url), {
+        requestInit: { headers: { Authorization: `ApiKey ${writeOnlyKey}` } },
+      });
+      const writeOnlyClient = new Client({ name: "foundation-write-only", version: "0.1.0" });
+      await writeOnlyClient.connect(writeOnlyTransport);
+      const scopeGate = asObject(
+        await writeOnlyClient.callTool({
           name: "undo",
           arguments: { id: (project as { activity_id: string }).activity_id },
         }),
       );
-      assert.match(String(confirmGate.error), /confirm: true/);
+      assert.match(String(scopeGate.error), /destructive scope/);
+      await writeOnlyClient.close().catch(() => undefined);
     } finally {
       await client.close().catch(() => undefined);
       await new Promise<void>((resolve) => httpServer.close(() => resolve()));

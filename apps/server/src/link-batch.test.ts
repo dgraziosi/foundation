@@ -9,6 +9,7 @@ import {
   undoGraphActivity,
   upsertGraphNode,
 } from "./graph.js";
+import { DESTRUCTIVE } from "./write-context.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -112,25 +113,28 @@ test("batch link: two forms, atomic write, shared-node CAS, undo per receipt", {
         assert.fail("upsert failed");
         return;
       }
-      const linked = await linkGraphNodes(pool, {
-        actor_label: "batch-agent",
-        edges: [
-          {
-            from_id: noteA.node.id,
-            to_id: person.node.id,
-            relation_type: "about",
-            from_base_updated_at: noteA.node.updated_at,
-            to_base_updated_at: person.node.updated_at,
-          },
-          {
-            from_id: noteB.node.id,
-            to_id: person.node.id,
-            relation_type: "about",
-            from_base_updated_at: noteB.node.updated_at,
-            to_base_updated_at: person.node.updated_at,
-          },
-        ],
-      });
+      const linked = await linkGraphNodes(
+        pool,
+        {
+          edges: [
+            {
+              from_id: noteA.node.id,
+              to_id: person.node.id,
+              relation_type: "about",
+              from_base_updated_at: noteA.node.updated_at,
+              to_base_updated_at: person.node.updated_at,
+            },
+            {
+              from_id: noteB.node.id,
+              to_id: person.node.id,
+              relation_type: "about",
+              from_base_updated_at: noteB.node.updated_at,
+              to_base_updated_at: person.node.updated_at,
+            },
+          ],
+        },
+        { writer: { actor: "agent", actor_label: "batch-agent" } },
+      );
       assert.equal(isToolError(linked), false);
       if (isToolError(linked)) return;
       assert.equal(linked.links.length, 2);
@@ -417,7 +421,7 @@ test("batch link: two forms, atomic write, shared-node CAS, undo per receipt", {
       const first = linked.links[0]!;
       const second = linked.links[1]!;
 
-      const undone = await undoGraphActivity(pool, { id: first.activity_id, confirm: true });
+      const undone = await undoGraphActivity(pool, { id: first.activity_id }, DESTRUCTIVE);
       assert.equal(isToolError(undone), false);
 
       const afterA = await getGraphNode(pool, noteA.node.id);

@@ -55,7 +55,7 @@ export {
   assertSystemRelationPatch,
   assertSystemTypePatch,
   labelFromSlug,
-  missingConfirm,
+  missingDestructive,
   typeViewsFromInput,
   typeViewsFromUpdate,
 } from "./ontology-mutation.js";

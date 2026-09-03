@@ -49,7 +49,8 @@ Mac and Linux. Clone this repo. Node 22 + pnpm. Postgres 16. PATH must include `
 
    ```bash
    cp .env.example .env
-   # set FOUNDATION_API_KEY to a long random string
+   # set FOUNDATION_API_KEY to a long random string (bootstrap / root key)
+   # more bots: scripts/mint-api-key.sh --name chief  (hash under FOUNDATION_DATA)
    ```
 
 2. Init the first-day vault, then start. Official init is `./scripts/foundation-init.sh` (copies `.env` when it is missing, mkdir the data folder, then keep-up). Official app start is `pnpm start` (wait for the database, migrate, seed). Keep-up starts Postgres from the data folder’s `postgres` tree, then `pnpm start`. Durable files go under `FOUNDATION_DATA`. Empty first-day folder may init. Missing folder, or `postgres/` without `PG_VERSION`: refuse.
@@ -88,7 +89,7 @@ Mac and Linux. Clone this repo. Node 22 + pnpm. Postgres 16. PATH must include `
 
 4. Call `bootstrap` first. It returns the starter spine (`area → project → goal → habit | task` — preferred, not a hard gate: a habit does not need a goal parent; `task` may `child_of` `project`), seeded types/relations, and how to extend the ontology.
 
-   After bootstrap, an agent can `upsert` an `area` and `project`, `link` them with `child_of`, store an HTML itinerary on a `trip` node (`payload.media_type = "text/html"`), `search` that itinerary back, list open or overdue tasks with `search` `{ type: "task", status: "active" }` or `{ type: "task", due: "overdue" }` (no query), `upsert` a `spend` under a project (`amount` `12.50`, `currency` `USD`, `vendor` `Fixture vendor`, `stage` `quoted` or `paid`) and list those lines with `search` `{ type: "spend", under }` or `{ type: "spend", data_equals: { stage: "paid" } }`, `lookup` a name then `working_set` for the open work around that node, attach a PDF blob on a `note` (`payload.storage = "blob"`), `manage_type` a custom type (including retire of an unused authored type), `list_activity` for receipts, and `undo` a reversible mutation. Destructive tools (`delete`, `unlink`, `undo`, `manage_type` retire) require `confirm: true`. If you already have a UUID, call `get` for the node or `working_set` for the agenda. An empty lexical `search` is not a reason to upsert a duplicate.
+   After bootstrap, an agent can `upsert` an `area` and `project`, `link` them with `child_of`, store an HTML itinerary on a `trip` node (`payload.media_type = "text/html"`), `search` that itinerary back, list open or overdue tasks with `search` `{ type: "task", status: "active" }` or `{ type: "task", due: "overdue" }` (no query), `upsert` a `spend` under a project (`amount` `12.50`, `currency` `USD`, `vendor` `Fixture vendor`, `stage` `quoted` or `paid`) and list those lines with `search` `{ type: "spend", under }` or `{ type: "spend", data_equals: { stage: "paid" } }`, `lookup` a name then `working_set` for the open work around that node, attach a PDF blob on a `note` (`payload.storage = "blob"`), `manage_type` a custom type (including retire of an unused authored type), `list_activity` for receipts, and `undo` a reversible mutation. Destructive tools (`delete`, `unlink`, `undo`, `manage_type` retire) need a key with destructive scope. If you already have a UUID, call `get` for the node or `working_set` for the agenda. An empty lexical `search` is not a reason to upsert a duplicate.
 
    With Node 22 + pnpm (and the vault already up):
 
@@ -142,12 +143,12 @@ Mac and Linux. Clone this repo. Node 22 + pnpm. Postgres 16. PATH must include `
      -H "Accept: application/json, text/event-stream" \
      -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"list_activity","arguments":{"action":"create","target":"<NODE_UUID>"}}}'
 
-   # undo that create (soft-deletes; requires confirm)
+   # undo that create (soft-deletes; needs destructive scope)
    curl -sS http://127.0.0.1:8787/mcp \
      -H "Authorization: ApiKey ${FOUNDATION_API_KEY}" \
      -H "Content-Type: application/json" \
      -H "Accept: application/json, text/event-stream" \
-     -d '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"undo","arguments":{"id":"<ACTIVITY_UUID>","confirm":true}}}'
+     -d '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"undo","arguments":{"id":"<ACTIVITY_UUID>"}}}'
    ```
 
    **Store a small PDF as a blob** (synthetic example; `get` returns `blob_id` + sha256, not the bytes). Fetch bytes with `GET /blobs/<BLOB_ID>`:

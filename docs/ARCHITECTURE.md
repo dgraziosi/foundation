@@ -156,7 +156,7 @@ Writes go through the graph and leave **activity**. `undo` reverses a reversible
 - **payload replace:** update replaces `payload` when that field is passed. Omit it and the body stays.
 - **data merge:** update patches `data` (`JSONB ||`). A partial patch does not wipe other keys.
 - **Create idempotency:** `idempotency_key` on create. A retry returns the same node; it does not twin.
-- Optional `actor` / `actor_label` are stored on the activity row (who wrote), not a permission gate.
+- The server stamps `actor` / `actor_label` on the activity row from the authenticated key. Viewer journal writes stamp the user. Clients cannot impersonate another bot.
 - **Suggested links:** `upsert` (and `get` when the node still has no edges) may return `suggested_links` from title FTS. These are proposals (`child_of` / `about` / `relates_to` to a live target). A node that already has a live `child_of` is not offered a second parent. The vault does not invent types or write an edge; `link` is the write.
 
 ```mermaid
@@ -251,11 +251,11 @@ flowchart LR
 
 Agents talk to the vault over MCP. That path is not the architecture — it is the door.
 
-`/mcp` with `Authorization: ApiKey <FOUNDATION_API_KEY>`. Streamable HTTP on this process. Named harnesses attach with that URL and key: [`HARNESS.md`](./HARNESS.md).
+`/mcp` with `Authorization: ApiKey <key>`. Streamable HTTP on this process. `FOUNDATION_API_KEY` is the bootstrap root key (destructive scope). Named keys live as hashes in `$FOUNDATION_DATA/api-keys.json`. Mint with `scripts/mint-api-key.sh`. Named harnesses attach with that URL and one key: [`HARNESS.md`](./HARNESS.md).
 
 The current tools: `bootstrap`, `search`, `lookup`, `get`, `working_set`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`. `get` is the record. `list_activity` `{ target }` is the diary. `upsert` replaces `payload` when passed.
 
-An agent that can reach the vault MCP may read/write; one that cannot does not.
+An agent that can reach the vault MCP may read and write ordinary tools. Delete, unlink, undo, and type-retire need destructive scope on that key.
 
 ## How the user looks at the vault
 

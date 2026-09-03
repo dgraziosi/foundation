@@ -8,6 +8,7 @@ import { createPool, getNodeById, migrate, seedSystemOntology, type Pool } from 
 import { isToolError, todayInNewYork } from "@foundation/schema";
 import { createApp } from "./app.js";
 import { deleteGraphNode, getGraphNode, listGraphActivity, upsertGraphNode } from "./graph.js";
+import { DESTRUCTIVE } from "./write-context.js";
 import { journalDayTitle, journalMarkdownPayload } from "./view-journal.js";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -240,7 +241,7 @@ test("Today after a deleted same-day journal makes a new entry", { skip: !databa
     });
     assert.equal(written.status, 200);
 
-    const removed = await deleteGraphNode(pool, { id: created.node.id, confirm: true });
+    const removed = await deleteGraphNode(pool, { id: created.node.id }, DESTRUCTIVE);
     assert.equal(isToolError(removed), false);
     const gone = await getGraphNode(pool, created.node.id);
     assert.equal(isToolError(gone), true);

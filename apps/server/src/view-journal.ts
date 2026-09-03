@@ -46,14 +46,18 @@ export async function viewJournalToday(pool: Pool, dataDir: string) {
   const stable = todayJournalKey(day);
   const prior = await getNodeByIdempotencyKey(pool, stable, { includeDeleted: true });
   const key = prior?.deleted_at ? `${stable}-${randomUUID()}` : stable;
-  const created = await upsertGraphNode(pool, {
-    type: "journal",
-    title: journalDayTitle(day),
-    payload: journalMarkdownPayload(""),
-    idempotency_key: key,
-    allow_duplicate: true,
-    ...VIEWER_WRITER,
-  });
+  const created = await upsertGraphNode(
+    pool,
+    {
+      type: "journal",
+      title: journalDayTitle(day),
+      payload: journalMarkdownPayload(""),
+      idempotency_key: key,
+      allow_duplicate: true,
+    },
+    { dataDir },
+    { writer: VIEWER_WRITER },
+  );
   if (isToolError(created)) {
     return created;
   }
@@ -76,14 +80,18 @@ export async function viewJournalWrite(
   if (!title) {
     return { error: "Title is required.", suggestion: "Keep a title on the first line." };
   }
-  const written = await upsertGraphNode(pool, {
-    id: input.id,
-    type: "journal",
-    title,
-    payload: journalMarkdownPayload(input.body),
-    base_updated_at: input.base_updated_at,
-    ...VIEWER_WRITER,
-  });
+  const written = await upsertGraphNode(
+    pool,
+    {
+      id: input.id,
+      type: "journal",
+      title,
+      payload: journalMarkdownPayload(input.body),
+      base_updated_at: input.base_updated_at,
+    },
+    { dataDir },
+    { writer: VIEWER_WRITER },
+  );
   if (isToolError(written)) {
     return written;
   }

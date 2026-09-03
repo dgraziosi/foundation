@@ -33,7 +33,7 @@ import {
   SEED_NODE_TYPES,
   SEED_TYPE_VIEWS,
   RelationTypeSchema,
-  missingConfirm,
+  missingDestructive,
   toolError,
   type Activity,
   type Edge,
@@ -45,6 +45,7 @@ import {
   type UndoInput,
 } from "@foundation/schema";
 import { removeAuthoredType } from "./retire-type.js";
+import { writerFrom, type WriteContext } from "./write-context.js";
 
 function snapshotNode(value: unknown): Node | null {
   const parsed = NodeSchema.safeParse(value);
@@ -457,11 +458,13 @@ async function invertRelationChange(
 export async function undoGraphActivity(
   pool: Pool,
   input: UndoInput,
+  ctx?: WriteContext,
 ): Promise<{ ok: true; activity_id: string } | ToolError> {
-  const confirmErr = missingConfirm("undo", input.confirm);
-  if (confirmErr) {
-    return confirmErr;
+  const scopeErr = missingDestructive("undo", ctx?.destructive);
+  if (scopeErr) {
+    return scopeErr;
   }
+  const writer = writerFrom(ctx);
 
   return withTransaction(pool, async (client) => {
     const row = await getActivityById(client, input.id, { forUpdate: true });
@@ -534,8 +537,8 @@ export async function undoGraphActivity(
     }
 
     const compensating = await insertActivity(client, {
-      actor: input.actor ?? row.actor,
-      actor_label: input.actor_label ?? row.actor_label,
+      actor: writer.actor,
+      actor_label: writer.actor_label,
       action: inverted.action,
       target_kind: row.target_kind,
       target_id: row.target_id,

@@ -57,7 +57,12 @@ async function connectedSearchClient(): Promise<{
   client: Client;
   close: () => Promise<void>;
 }> {
-  const server = createMcpServer(unusedPool(), "/tmp/foundation-search-url-string");
+  const server = createMcpServer(unusedPool(), "/tmp/foundation-search-url-string", {
+    name: "root",
+    actor: "agent",
+    actor_label: "root",
+    destructive: true,
+  });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "search-url-string-test", version: "0.1.0" });
   await server.connect(serverTransport);

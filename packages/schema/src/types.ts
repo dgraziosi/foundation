@@ -237,7 +237,8 @@ export const BootstrapOutputSchema = z.object({
   rules: z.object({
     identity: z.literal("uuid"),
     payloads: z.string(),
-    destructive_confirm: z.literal(true),
+    destructive_scope: z.boolean(),
+    actor_label: z.string(),
     ontology_writable: z.literal(true),
     no_proposal_inbox: z.literal(true),
     edges_are_source_of_truth: z.literal(true),

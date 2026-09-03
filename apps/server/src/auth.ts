@@ -1,8 +1,10 @@
 import type { NextFunction, Request, Response } from "express";
+import type { AgentPrincipal, Keyring } from "./keyring.js";
+import type { WriteContext } from "./write-context.js";
 
 /**
- * Authorization: ApiKey <FOUNDATION_API_KEY>
- * Bearer <FOUNDATION_API_KEY> is accepted as a documented equivalent.
+ * Authorization: ApiKey <key>
+ * Bearer <key> is accepted as a documented equivalent.
  * Cookie `foundation_key` unlocks the `/view` window only (`Path=/view`).
  * `/mcp` and `/blobs` require the Authorization header — the cookie is not an MCP credential.
  */
@@ -46,10 +48,20 @@ export function apiKeyCookieHeader(key: string): string {
   return `${API_KEY_COOKIE}=${encodeURIComponent(key)}; Path=/view; HttpOnly; SameSite=Strict; Max-Age=2592000`;
 }
 
-export function requireApiKey(expected: string) {
+export function writeContextOf(principal: AgentPrincipal): WriteContext {
+  return {
+    writer: {
+      actor: principal.actor,
+      actor_label: principal.actor_label,
+    },
+    destructive: principal.destructive,
+  };
+}
+
+export function requireApiKey(keyring: Keyring) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const provided = headerApiKey(req);
-    if (!provided || provided !== expected) {
+    const principal = keyring.resolve(headerApiKey(req));
+    if (!principal) {
       res.setHeader("WWW-Authenticate", 'ApiKey realm="foundation"');
       const mcp = req.baseUrl === "/mcp" || req.originalUrl.startsWith("/mcp");
       if (mcp) {
@@ -63,6 +75,15 @@ export function requireApiKey(expected: string) {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
+    req.agent = principal;
     next();
   };
+}
+
+declare global {
+  namespace Express {
+    interface Request {
+      agent?: AgentPrincipal;
+    }
+  }
 }

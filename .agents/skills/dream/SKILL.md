@@ -31,7 +31,7 @@ This pass rewrites records that moved. Vault health, nightly backup, the weekly 
 - Not Mem0 chat extract. Do not ingest mail or chat.
 - Do not invent insight records.
 - Do not write dues into standing harness memory. Dues stay on the record.
-- Not a new vault call. Use `get`, `list_activity`, `upsert`, and `search`. Destructive calls (`delete`, `unlink`, `undo`, `manage_type` retire) need `confirm: true`.
+- Not a new vault call. Use `get`, `list_activity`, `upsert`, and `search`. Destructive calls (`delete`, `unlink`, `undo`, `manage_type` retire) need a key with destructive scope.
 - Not a Viewer pass.
 
 ## Pass

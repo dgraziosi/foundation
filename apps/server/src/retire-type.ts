@@ -20,12 +20,12 @@ function typeRemovalErrors(slug: string, purpose: TypeRemovalPurpose) {
       live: (n: number) =>
         toolError(
           `Cannot retire type "${slug}": ${n} node(s) still use it`,
-          "Delete or retype those nodes first, then retry manage_type action retire with confirm: true.",
+          "Delete or retype those nodes first, then retry manage_type action retire.",
         ),
       tombstones: (n: number) =>
         toolError(
           `Cannot retire type "${slug}": ${n} deleted node(s) of that type are still restorable`,
-          "Undo those deletes to restore the nodes, or retry manage_type action retire with confirm: true and purge_deleted: true to permanently drop the deleted nodes and their edges.",
+          "Undo those deletes to restore the nodes, or retry manage_type action retire with purge_deleted: true to permanently drop the deleted nodes and their edges.",
         ),
       parents: (n: number) =>
         toolError(
@@ -42,7 +42,7 @@ function typeRemovalErrors(slug: string, purpose: TypeRemovalPurpose) {
       ),
       leftover: toolError(
         `Cannot retire type "${slug}": deleted nodes still reference it`,
-        "Undo those deletes to restore the nodes, or retry manage_type action retire with confirm: true and purge_deleted: true to permanently drop the deleted nodes and their edges.",
+        "Undo those deletes to restore the nodes, or retry manage_type action retire with purge_deleted: true to permanently drop the deleted nodes and their edges.",
       ),
       rationale: `Purge deleted nodes while retiring type ${slug}`,
     };
@@ -56,7 +56,7 @@ function typeRemovalErrors(slug: string, purpose: TypeRemovalPurpose) {
     tombstones: (n: number) =>
       toolError(
         `Cannot undo type create "${slug}": ${n} deleted node(s) of that type are still restorable`,
-        "Undo those deletes to restore the nodes, or retry undo with confirm: true and purge_deleted: true to permanently drop the deleted nodes and their edges.",
+        "Undo those deletes to restore the nodes, or retry undo with purge_deleted: true to permanently drop the deleted nodes and their edges.",
       ),
     parents: (n: number) =>
       toolError(
@@ -67,7 +67,7 @@ function typeRemovalErrors(slug: string, purpose: TypeRemovalPurpose) {
     system: toolError(`Cannot delete system type "${slug}"`),
     leftover: toolError(
       `Cannot undo type create "${slug}": deleted nodes still reference it`,
-      "Undo those deletes to restore the nodes, or retry undo with confirm: true and purge_deleted: true to permanently drop the deleted nodes and their edges.",
+      "Undo those deletes to restore the nodes, or retry undo with purge_deleted: true to permanently drop the deleted nodes and their edges.",
     ),
     rationale: `Purge deleted nodes while undoing type create ${slug}`,
   };
