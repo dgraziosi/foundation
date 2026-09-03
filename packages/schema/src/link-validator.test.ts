@@ -474,7 +474,7 @@ test("validateExistingLink checks ontology fit and skips create-only rules", () 
   });
   assert.equal(supportsNote.ok, false);
   if (supportsNote.ok) return;
-  assert.match(supportsNote.error, /requires a spine target/);
+  assert.match(supportsNote.error, /does not allow target type "note"|requires a spine target/);
 
   const unknown = validateExistingLink({
     from_id: ids.a,

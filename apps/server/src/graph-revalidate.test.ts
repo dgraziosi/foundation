@@ -223,14 +223,14 @@ test(
           DESTRUCTIVE,
         );
         assert.equal(isToolError(created), false);
-        const person = await upsertGraphNode(pool, { type: "person", title: "Ada" });
+        const person = await upsertGraphNode(pool, { type: "person", title: "Ref Ada" });
         if (isToolError(person)) {
-          assert.fail("upsert failed");
+          assert.fail(person.error);
           return;
         }
         const mention = await upsertGraphNode(pool, {
           type: "mention",
-          title: "Named Ada",
+          title: "Named Ref Ada",
           data: { who: person.node.id },
         });
         assert.equal(isToolError(mention), false);
@@ -245,7 +245,7 @@ test(
         if (!isToolError(blocked)) return;
         assert.match(blocked.error, /still point at this id via ref fields/);
         assert.match(blocked.suggestion ?? "", /data\.<field>: null/);
-        assert.match(blocked.suggestion ?? "", mention.node.id);
+        assert.ok((blocked.suggestion ?? "").includes(mention.node.id));
 
         const stillLive = await getGraphNode(pool, person.node.id);
         assert.equal(isToolError(stillLive), false);
@@ -259,7 +259,7 @@ test(
         const cleared = await upsertGraphNode(pool, {
           id: mention.node.id,
           type: "mention",
-          title: "Named Ada",
+          title: "Named Ref Ada",
           data: { who: null },
           base_updated_at: mention.node.updated_at,
         });
