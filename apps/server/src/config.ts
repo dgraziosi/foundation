@@ -1,5 +1,10 @@
 import { config as loadDotenv } from "dotenv";
 import { resolve } from "node:path";
+import {
+  DEFAULT_LEASE_TTL_SECONDS,
+  MAX_LEASE_TTL_SECONDS,
+  MIN_LEASE_TTL_SECONDS,
+} from "@foundation/schema";
 import { z } from "zod";
 
 loadDotenv({ path: resolve(process.cwd(), ".env") });
@@ -20,6 +25,12 @@ const EnvSchema = z.object({
   HOST: z.string().default("127.0.0.1"),
   VIEW_PORT: z.coerce.number().int().positive().default(8788),
   VIEW_HOST: z.string().default("127.0.0.1"),
+  FOUNDATION_LEASE_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(MIN_LEASE_TTL_SECONDS)
+    .max(MAX_LEASE_TTL_SECONDS)
+    .default(DEFAULT_LEASE_TTL_SECONDS),
 });
 
 export type AppConfig = z.infer<typeof EnvSchema>;
@@ -33,6 +44,7 @@ export type AppBindings = Pick<AppConfig, "FOUNDATION_API_KEY" | "FOUNDATION_DAT
       | "VIEW_PORT"
       | "FOUNDATION_API_KEY_LABEL"
       | "FOUNDATION_VIEW_KEY"
+      | "FOUNDATION_LEASE_TTL_SECONDS"
     >
   >;
 

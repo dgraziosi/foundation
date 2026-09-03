@@ -79,7 +79,16 @@ function registerMcpAndBlobs(app: Express, pool: Pool, config: AppBindings, keyr
         });
         return;
       }
-      await handleMcpRequest(pool, req, res, config.FOUNDATION_DATA, agent);
+      await handleMcpRequest(
+        pool,
+        req,
+        res,
+        config.FOUNDATION_DATA,
+        agent,
+        config.FOUNDATION_LEASE_TTL_SECONDS === undefined
+          ? undefined
+          : { ttlSeconds: config.FOUNDATION_LEASE_TTL_SECONDS },
+      );
     } catch (error) {
       console.error("MCP request failed", error);
       if (!res.headersSent) {

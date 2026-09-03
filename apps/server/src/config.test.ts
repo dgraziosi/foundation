@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { DEFAULT_LEASE_TTL_SECONDS } from "@foundation/schema";
 import { loadConfig } from "./config.js";
 
 const required = {
@@ -33,4 +34,14 @@ test("FOUNDATION_VIEW_KEY is optional; blank is unset", () => {
 
   const set = loadConfig({ ...required, FOUNDATION_VIEW_KEY: "  vault-secret  " });
   assert.equal(set.FOUNDATION_VIEW_KEY, "vault-secret");
+});
+
+test("FOUNDATION_LEASE_TTL_SECONDS defaults and refuses out of range", () => {
+  const config = loadConfig(required);
+  assert.equal(config.FOUNDATION_LEASE_TTL_SECONDS, DEFAULT_LEASE_TTL_SECONDS);
+
+  const set = loadConfig({ ...required, FOUNDATION_LEASE_TTL_SECONDS: "120" });
+  assert.equal(set.FOUNDATION_LEASE_TTL_SECONDS, 120);
+
+  assert.throws(() => loadConfig({ ...required, FOUNDATION_LEASE_TTL_SECONDS: "10" }));
 });
