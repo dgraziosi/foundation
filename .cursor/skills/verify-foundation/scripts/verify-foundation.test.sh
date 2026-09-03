@@ -104,6 +104,8 @@ out="$(
 [[ "${out}" != *"verify-scaffold-test-key"* ]] || fail "doctor printed the key"
 key_path="$(env -u VERIFY_RUN_ID VERIFY_LAST_RUN_FILE="${last_file}" "${helper}" key-file)"
 [[ "${key_path}" == "${key_dir}/api_key" ]] || fail "key-file path, got '${key_path}'"
+view_key_path="$(env -u VERIFY_RUN_ID VERIFY_LAST_RUN_FILE="${last_file}" "${helper}" view-key-file)"
+[[ "${view_key_path}" == "${key_dir}/view_key" ]] || fail "view-key-file path, got '${view_key_path}'"
 loaded="$(
   env -u FOUNDATION_API_KEY -u VERIFY_RUN_ID VERIFY_LAST_RUN_FILE="${last_file}" bash -c '
     source "$1"
@@ -113,6 +115,13 @@ loaded="$(
   ' bash "${helper}"
 )"
 [[ "${loaded}" == "verify-scaffold-test-key" ]] || fail "load_api_key should export the run key"
+printf '%s\n' "verify-scaffold-view-key" >"${key_dir}/view_key"
+view_doc="$(
+  env -u FOUNDATION_API_KEY -u FOUNDATION_VIEW_KEY -u VERIFY_RUN_ID VERIFY_LAST_RUN_FILE="${last_file}" \
+    "${helper}" doctor 2>&1 || true
+)"
+[[ "${view_doc}" == *"view key is set"* ]] || fail "doctor should say the view key is set, got: ${view_doc}"
+[[ "${view_doc}" != *"verify-scaffold-view-key"* ]] || fail "doctor printed the view key"
 rm -rf -- "${key_dir}"
 rm -f -- "${last_file}"
 
@@ -270,6 +279,14 @@ ready_out="$(
     "${helper}" launch 2>&1
 )" || fail "stub launch should succeed, got: ${ready_out}"
 [[ "${ready_out}" == *"already up from this run"* ]] && fail "first stub launch should start, got: ${ready_out}"
+[[ -f "${run_root}/view_key" ]] || fail "launch should write the view key file"
+view_got="$(tr -d '\r\n' <"${run_root}/view_key")"
+[[ -n "${view_got}" ]] || fail "view key file is empty"
+[[ "${view_got}" != "verify-scaffold-launch-key" ]] || fail "view key must not be the API key"
+[[ "${ready_out}" != *"${view_got}"* ]] || fail "launch printed the view key"
+[[ "${ready_out}" == *"view key file"* ]] || fail "launch should name the view key file, got: ${ready_out}"
+view_mode="$(stat -c '%a' "${run_root}/view_key")"
+[[ "${view_mode}" == "600" ]] || fail "view key file mode should be 600, got ${view_mode}"
 [[ -f "${state_file}" ]] || fail "successful launch must write state"
 started="$(grep -E '^STARTED=' "${state_file}" | tail -n 1)"
 [[ "${started}" == "STARTED=1" ]] || fail "STARTED should be 1 after keep, got ${started}"
@@ -567,6 +584,7 @@ do
 done
 [[ "${map_blob}" == *"Write today"* ]] || fail "verify-foundation map must show Today on Home"
 [[ "${map_blob}" == *"That key did not unlock"* ]] || fail "verify-foundation map must use person unlock error"
+[[ "${map_blob}" == *"view-key-file"* ]] || fail "verify-foundation map must name view-key-file"
 [[ "${map_blob}" == *"Keep a title"* ]] || fail "verify-foundation map must show Keep a title"
 unlock_map="${map_root}/features/unlock.md"
 unlock_blob="$(cat "${unlock_map}")"
@@ -577,6 +595,7 @@ if grep -Fq 'curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:8787/mcp' 
 fi
 skill_blob="$(cat "${map_root}/SKILL.md")"
 [[ "${skill_blob}" == *"curl -sS http://127.0.0.1:8788/view/api/journals/today"* ]] || fail "SKILL Drive must show Today peek GET"
+[[ "${skill_blob}" == *"view-key-file"* ]] || fail "SKILL Drive must use view-key-file when present"
 grep -Fq -- 'curl -sS -L --max-redirs 3' "${helper}" || fail "doctor must follow the /view redirect a browser follows"
 [[ "${skill_blob}" == *"Does not create"* ]] || fail "SKILL Drive must say the Today peek GET does not create"
 [[ "${skill_blob}" == *"fail when it is unset"* ]] || fail "SKILL must fail server tests when DATABASE_URL is unset"
@@ -624,6 +643,10 @@ workflow_blob="$(cat "${workflow}")"
 [[ "${workflow_blob}" == *"postgresql-16"* ]] || fail "verify.yml must install host Postgres 16"
 [[ "${workflow_blob}" == *"/usr/lib/postgresql/16/bin"* ]] || fail "verify.yml must put initdb/pg_ctl/psql on PATH"
 [[ "${workflow_blob}" == *"docker stop"* ]] || fail "verify.yml must free 5432 before host initdb"
+
+grep -Fq 'view-key-file' "${drive}" || fail "HTTP drive must unlock with the view key file"
+grep -Fq 'Retry-After' "${drive}" || fail "HTTP drive must prove 429 Retry-After"
+grep -Fq -- '-X POST http://127.0.0.1:8787/mcp' "${drive}" || fail "HTTP drive must POST /mcp for cookie-scope"
 
 redacted="$(printf '%s\n' "Set-Cookie: foundation_key=super-secret; Path=/view; HttpOnly" | verify_http_redact_set_cookie)"
 [[ "${redacted}" == *"foundation_key=<redacted>"* ]] || fail "HTTP drive must redact Set-Cookie values"

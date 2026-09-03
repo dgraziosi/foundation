@@ -8,7 +8,7 @@ Foundation is a life graph. Viewer is the human window on one vault. It writes j
 
 - Official start: clone root, `FOUNDATION_API_KEY` set, empty first-day `FOUNDATION_DATA` (or the user's existing vault on that machine), then `./scripts/keep-vault-up.sh`. Ready: `GET http://127.0.0.1:8787/health` returns `{ "ok": true, "service": "foundation", "db": "up" }`.
 - Viewer: `http://127.0.0.1:8788/view`. MCP / health / agent blobs: `http://127.0.0.1:8787`.
-- Verification runs use `.cursor/skills/verify-foundation/scripts/verify-foundation.sh launch` so the data dir and `BACKUP_ROOT` are disposable. Do not invent a live personal vault. Do not seed a fake life. Later `doctor` / `cleanup` / Unlock use `run-id` and `key-file` from that launch.
+- Verification runs use `.cursor/skills/verify-foundation/scripts/verify-foundation.sh launch` so the data dir and `BACKUP_ROOT` are disposable. Do not invent a live personal vault. Do not seed a fake life. Later `doctor` / `cleanup` / Unlock use `run-id`, `view-key-file`, and `key-file` from that launch.
 - Run `verify-foundation.sh doctor` and require health green, Viewer GET 200, and (for a full window drive) `apps/viewer/dist/index.html`.
 - Never drive an instance this run did not start, unless the user already has a vault up and asked you to use it. One instance on `8787` / `8788` / `5432`.
 - Host programs: Postgres 16 on PATH (`initdb`, `pg_ctl`, `psql`) plus `pnpm start`. The package name is unknown in this repo. If launch cannot start, report the missing program and prove Viewer tests / Viewer build instead.
