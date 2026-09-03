@@ -7,8 +7,8 @@ import {
   validateLink,
   validateLinkSequence,
 } from "./link-validator.js";
-import { SEED_NODE_TYPES } from "./seeds.js";
-import type { NodeType } from "./types.js";
+import { SEED_NODE_TYPES, SEED_RELATION_TYPES } from "./seeds.js";
+import type { NodeType, RelationType } from "./types.js";
 
 const ids = {
   a: "11111111-1111-4111-8111-111111111111",
@@ -310,6 +310,41 @@ test("relates_to does not silently rewrite; it suggests child_of", () => {
   assert.match(result.suggestion ?? "", /child_of/);
 });
 
+test("unconstrained upgrade still fires when relates_to is not first in the list", () => {
+  const relations: RelationType[] = [
+    ...SEED_RELATION_TYPES.filter((relation) => relation.slug === "inspired_by"),
+    ...SEED_RELATION_TYPES.filter((relation) => relation.slug !== "inspired_by"),
+  ];
+  const result = validateLink(
+    {
+      from_id: ids.a,
+      to_id: ids.b,
+      relation_type: "relates_to",
+      from_type: "project",
+      to_type: "area",
+    },
+    { relationTypes: relations },
+  );
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.relation_type, "relates_to");
+  assert.match(result.suggestion ?? "", /child_of/);
+});
+
+test("other unconstrained associatives that fit the spine also suggest hierarchy", () => {
+  const result = validateLink({
+    from_id: ids.a,
+    to_id: ids.b,
+    relation_type: "inspired_by",
+    from_type: "project",
+    to_type: "area",
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.relation_type, "inspired_by");
+  assert.match(result.suggestion ?? "", /child_of/);
+});
+
 test("listValidRelationSlugs includes child_of for project → area", () => {
   const slugs = listValidRelationSlugs("project", "area");
   assert.ok(slugs.includes("child_of"));
@@ -486,6 +521,69 @@ test("validateExistingLink checks ontology fit and skips create-only rules", () 
   assert.equal(unknown.ok, false);
   if (unknown.ok) return;
   assert.match(unknown.error, /Unknown relation_type/);
+});
+
+test("renamed hierarchy slug still enforces parent_types and one-parent", () => {
+  const relations: RelationType[] = SEED_RELATION_TYPES.map((relation) =>
+    relation.slug === "child_of" ? { ...relation, slug: "under" } : relation,
+  );
+  const ok = validateLink(
+    {
+      from_id: ids.a,
+      to_id: ids.b,
+      relation_type: "under",
+      from_type: "project",
+      to_type: "area",
+    },
+    { relationTypes: relations },
+  );
+  assert.equal(ok.ok, true);
+  const refuse = validateLink(
+    {
+      from_id: ids.a,
+      to_id: ids.b,
+      relation_type: "under",
+      from_type: "task",
+      to_type: "area",
+    },
+    { relationTypes: relations },
+  );
+  assert.equal(refuse.ok, false);
+  if (refuse.ok) return;
+  assert.match(refuse.error, /cannot be under/);
+  const second = validateLink(
+    {
+      from_id: ids.a,
+      to_id: ids.c,
+      relation_type: "under",
+      from_type: "project",
+      to_type: "area",
+    },
+    {
+      relationTypes: relations,
+      existingEdges: [{ from_id: ids.a, to_id: ids.b, relation_type: "under" }],
+    },
+  );
+  assert.equal(second.ok, false);
+  if (second.ok) return;
+  assert.match(second.error, /already has a under parent|already has a hierarchy parent/);
+});
+
+test("widening about target_types allows that target", () => {
+  const relations = SEED_RELATION_TYPES.map((relation) =>
+    relation.slug === "about" ? { ...relation, target_types: ["person", "company"] } : relation,
+  );
+  const result = validateLink(
+    {
+      from_id: ids.a,
+      to_id: ids.b,
+      relation_type: "about",
+      from_type: "note",
+      to_type: "company",
+    },
+    { relationTypes: relations },
+  );
+  assert.equal(result.ok, true);
 });
 
 test("types without parent_types still cannot use child_of", () => {

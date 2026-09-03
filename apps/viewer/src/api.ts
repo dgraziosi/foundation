@@ -58,11 +58,21 @@ export type TypeField = {
 export type OntologyType = {
   slug: string;
   label: string;
+  kind?: string;
+  parent_types?: string[];
   views: ViewEngineId[];
   default_view?: ViewEngineId;
   count: number;
   hue?: string;
   glyph?: string;
+};
+
+export type OntologyRelation = {
+  slug: string;
+  label: string;
+  kind: "hierarchy" | "associative";
+  source_types: string[];
+  target_types: string[];
 };
 
 export type TypeViewChip = { name: string; display: string; value: string };
@@ -91,6 +101,7 @@ export type TypeView = {
     hue?: string;
     glyph?: string;
     parent_types?: string[];
+    kind?: string;
   };
   nodes: TypeViewNode[];
   children: TypeViewNode[];
@@ -160,6 +171,7 @@ export type NodeDetail = {
     hue?: string;
     glyph?: string;
     parent_types?: string[];
+    kind?: string;
   } | null;
   edges: IncidentEdge[];
   related?: Array<{ relation_type: string; direction: "in" | "out"; neighbor: Neighbor }>;
@@ -190,7 +202,7 @@ export function unlock(apiKey: string) {
 }
 
 export function fetchOntology() {
-  return viewFetch<{ types: OntologyType[] }>("/view/api/ontology");
+  return viewFetch<{ types: OntologyType[]; relations: OntologyRelation[] }>("/view/api/ontology");
 }
 
 export function fetchSearch(input: { q: string; type: string; status: string }) {

@@ -593,6 +593,58 @@ test(
 );
 
 test(
+  "system relations may edit source and target sets; seed apply keeps them",
+  { skip: !databaseUrl },
+  async () => {
+    if (!databaseUrl) {
+      return;
+    }
+    const pool = await poolForSchema("graph_system_relation_targets");
+    try {
+      const patched = await manageRelation(pool, {
+        action: "update",
+        slug: "about",
+        target_types: ["person", "company"],
+      });
+      assert.equal(isToolError(patched), false);
+      if (isToolError(patched)) {
+        return;
+      }
+      assert.deepEqual(patched.relation.target_types, ["person", "company"]);
+
+      const kindBlocked = await manageRelation(pool, {
+        action: "update",
+        slug: "about",
+        kind: "hierarchy",
+      });
+      assert.equal(isToolError(kindBlocked), true);
+
+      const note = await upsertGraphNode(pool, { type: "note", title: "Fixture Co" });
+      const company = await upsertGraphNode(pool, { type: "company", title: "Fixture Co" });
+      if (isToolError(note) || isToolError(company)) {
+        assert.fail("upsert failed");
+        return;
+      }
+      const linked = await linkGraphNodes(pool, {
+        from_id: note.node.id,
+        to_id: company.node.id,
+        relation_type: "about",
+        from_base_updated_at: note.node.updated_at,
+        to_base_updated_at: company.node.updated_at,
+      });
+      assert.equal(isToolError(linked), false);
+
+      await seedSystemOntology(pool);
+      const again = await inspectOntology(pool, "relations");
+      const about = again.relations.find((relation) => relation.slug === "about");
+      assert.deepEqual(about?.target_types, ["person", "company"]);
+    } finally {
+      await pool.end();
+    }
+  },
+);
+
+test(
   "system task may edit fields and view queries; view ids and slug stay locked",
   { skip: !databaseUrl },
   async () => {

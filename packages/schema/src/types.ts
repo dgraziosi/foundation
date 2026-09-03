@@ -242,7 +242,7 @@ export const BootstrapOutputSchema = z.object({
     ontology_writable: z.literal(true),
     no_proposal_inbox: z.literal(true),
     edges_are_source_of_truth: z.literal(true),
-    hierarchy_relation: z.literal("child_of"),
+    hierarchy_relation: z.string().min(1),
   }),
   how_to_extend: z.object({
     summary: z.string(),

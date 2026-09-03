@@ -173,6 +173,16 @@ export function DetailPage() {
                 <Icon size={16} strokeWidth={2} />
                 <span className="font-medium text-foreground">{identity?.label ?? detail.node.type}</span>
               </div>
+              {(detail.type?.parent_types?.length ?? 0) > 0 ? (
+                <p className="m-0 text-meta text-muted-foreground" data-constraint="parent_types">
+                  May hang under{" "}
+                  {(detail.type?.parent_types ?? [])
+                    .map(
+                      (slug) => ontology.data?.types.find((type) => type.slug === slug)?.label ?? slug,
+                    )
+                    .join(", ")}
+                </p>
+              ) : null}
               <StatusTag status={detail.node.status} />
               {fields.map((field) => {
                 const ref = detail.resolved_refs?.[field.name];
@@ -209,6 +219,23 @@ export function DetailPage() {
               {[...byRelation.entries()].map(([relation, rows]) => (
                 <div key={relation}>
                   <div className="text-label text-muted-foreground">{relation}</div>
+                  {(() => {
+                    const listed = ontology.data?.relations.find((item) => item.slug === relation);
+                    if (!listed?.target_types.length) {
+                      return null;
+                    }
+                    return (
+                      <div className="text-meta text-muted-foreground" data-constraint="target_types">
+                        Targets{" "}
+                        {listed.target_types
+                          .map(
+                            (slug) =>
+                              ontology.data?.types.find((type) => type.slug === slug)?.label ?? slug,
+                          )
+                          .join(", ")}
+                      </div>
+                    );
+                  })()}
                   {rows.map((row) => (
                     <Button
                       key={`${row.direction}-${row.neighbor.id}`}

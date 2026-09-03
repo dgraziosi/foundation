@@ -464,6 +464,61 @@ test("activity undo inverses, filters, and destructive-scope gates", { skip: !da
       );
     });
 
+    await t.test("undo of a relation widen refuses leftover edges", async () => {
+      const widened = await manageRelation(pool, {
+        action: "update",
+        slug: "about",
+        target_types: ["person", "company"],
+      });
+      assert.equal(isToolError(widened), false);
+      if (isToolError(widened)) return;
+
+      const note = await upsertGraphNode(pool, { type: "note", title: "Fixture Co undo" });
+      const company = await upsertGraphNode(pool, { type: "company", title: "Fixture Co undo" });
+      if (isToolError(note) || isToolError(company)) {
+        assert.fail("upsert failed");
+        return;
+      }
+      const linked = await linkGraphNodes(pool, {
+        from_id: note.node.id,
+        to_id: company.node.id,
+        relation_type: "about",
+        from_base_updated_at: note.node.updated_at,
+        to_base_updated_at: company.node.updated_at,
+      });
+      assert.equal(isToolError(linked), false);
+      if (isToolError(linked)) return;
+
+      const refused = await undoGraphActivity(pool, {
+        id: widened.activity_id,
+      }, DESTRUCTIVE);
+      assert.equal(isToolError(refused), true);
+      if (!isToolError(refused)) return;
+      assert.match(refused.error, /Cannot undo relation update "about"/);
+      assert.match(refused.suggestion ?? "", /Unlink that about first/);
+
+      const stillWide = await inspectOntology(pool, "relations");
+      const about = stillWide.relations.find((relation) => relation.slug === "about");
+      assert.deepEqual(about?.target_types, ["person", "company"]);
+
+      const unlinked = await unlinkGraphNodes(pool, {
+        from_id: note.node.id,
+        to_id: company.node.id,
+        relation_type: "about",
+        from_base_updated_at: note.node.updated_at,
+        to_base_updated_at: company.node.updated_at,
+      }, DESTRUCTIVE);
+      assert.equal(isToolError(unlinked), false);
+
+      const undone = await undoGraphActivity(pool, {
+        id: widened.activity_id,
+      }, DESTRUCTIVE);
+      assert.equal(isToolError(undone), false);
+      const restored = await inspectOntology(pool, "relations");
+      const after = restored.relations.find((relation) => relation.slug === "about");
+      assert.deepEqual(after?.target_types, ["person"]);
+    });
+
     await t.test("undo of unlink maps a missing relation FK to a tool error", async () => {
       const relation = await manageRelation(pool, {
         action: "create",

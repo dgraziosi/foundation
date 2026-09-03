@@ -1,4 +1,10 @@
-import { canChildOf, getParentTypes, isSpineType } from "./hierarchy.js";
+import { canChildOf, getParentTypes } from "./hierarchy.js";
+import {
+  hasHierarchyParent,
+  hierarchySlug,
+  isHierarchySlug,
+  isUnconstrainedAssociativeSlug,
+} from "./ontology-roles.js";
 import { SEED_NODE_TYPES, SEED_RELATION_TYPES } from "./seeds.js";
 import type { NodeType, RelationType } from "./types.js";
 
@@ -14,7 +20,7 @@ export type LinkProposal = {
   relation_type: string;
   from_type: string;
   to_type: string;
-  /** When true, rewrite a spine-fitting relates_to into child_of. Default off. */
+  /** When true, rewrite a spine-fitting unconstrained associative into the hierarchy verb. Default off. */
   upgrade?: boolean;
 };
 
@@ -55,13 +61,7 @@ function relationAllowsPair(
     relation.source_types.length === 0 || relation.source_types.includes(fromType);
   const targetOk =
     relation.target_types.length === 0 || relation.target_types.includes(toType);
-  if (!sourceOk || !targetOk) {
-    return false;
-  }
-  if (relation.slug === "child_of") {
-    return true;
-  }
-  return true;
+  return sourceOk && targetOk;
 }
 
 export function listValidRelationSlugs(
@@ -76,7 +76,7 @@ export function listValidRelationSlugs(
       if (!relationAllowsPair(relation, fromType, toType)) {
         return false;
       }
-      if (relation.slug === "child_of") {
+      if (relation.kind === "hierarchy") {
         return canChildOf(fromType, toType, nodeTypes);
       }
       return true;
@@ -87,9 +87,8 @@ export function listValidRelationSlugs(
 /**
  * Pure link rules. No I/O.
  * Pipeline: unknown relation → self-link → duplicate on proposed type →
- * symmetric duplicate on proposed type → optional relates_to→child_of upgrade →
- * re-resolve + registry constraints → child_of parent_types + uniqueness →
- * supports spine-target check.
+ * symmetric duplicate on proposed type → optional unconstrained→hierarchy upgrade →
+ * re-resolve + registry constraints → hierarchy parent_types + uniqueness.
  */
 export function validateLink(
   proposal: LinkProposal,
@@ -142,12 +141,17 @@ export function validateLink(
     }
   }
 
+  const hierarchy = hierarchySlug(relationTypes);
   let upgradeSuggestion: string | undefined;
-  if (relationType === "relates_to" && canChildOf(proposal.from_type, proposal.to_type, nodeTypes)) {
+  if (
+    hierarchy &&
+    isUnconstrainedAssociativeSlug(relationType, relationTypes) &&
+    canChildOf(proposal.from_type, proposal.to_type, nodeTypes)
+  ) {
     if (proposal.upgrade) {
-      relationType = "child_of";
+      relationType = hierarchy;
     } else {
-      upgradeSuggestion = `These types fit the spine as child_of (${proposal.from_type} → ${proposal.to_type}). Retry with relation_type "child_of", or pass upgrade: true.`;
+      upgradeSuggestion = `These types fit the spine as ${hierarchy} (${proposal.from_type} → ${proposal.to_type}). Retry with relation_type "${hierarchy}", or pass upgrade: true.`;
     }
   }
 
@@ -165,14 +169,11 @@ export function validateLink(
     return typesOk;
   }
 
-  if (typesOk.relation_type === "child_of") {
-    const existingParent = existingEdges.find(
-      (edge) => edge.from_id === proposal.from_id && edge.relation_type === "child_of",
-    );
-    if (existingParent) {
+  if (isHierarchySlug(typesOk.relation_type, relationTypes)) {
+    if (hasHierarchyParent(proposal.from_id, existingEdges, relationTypes)) {
       return {
         ok: false,
-        error: "Node already has a child_of parent (at most one hierarchy parent)",
+        error: `Node already has a ${hierarchy ?? typesOk.relation_type} parent (at most one hierarchy parent)`,
       };
     }
   }
@@ -231,7 +232,7 @@ export function validateExistingLink(
     };
   }
 
-  if (pair.relation_type === "child_of" && !canChildOf(pair.from_type, pair.to_type, nodeTypes)) {
+  if (relation.kind === "hierarchy" && !canChildOf(pair.from_type, pair.to_type, nodeTypes)) {
     const allowed = getParentTypes(pair.from_type, nodeTypes);
     const valid = listValidRelationSlugs(pair.from_type, pair.to_type, {
       nodeTypes,
@@ -239,18 +240,10 @@ export function validateExistingLink(
     });
     return {
       ok: false,
-      error: `"${pair.from_type}" cannot be child_of "${pair.to_type}"`,
+      error: `"${pair.from_type}" cannot be ${pair.relation_type} "${pair.to_type}"`,
       suggestion: allowed.length
         ? `Allowed parent types for ${pair.from_type}: ${allowed.join(", ")}. Other valid verbs: ${valid.join(", ") || "none"}`
         : `${pair.from_type} does not take a hierarchy parent. Valid verbs: ${valid.join(", ") || "none"}`,
-    };
-  }
-
-  if (pair.relation_type === "supports" && !isSpineType(pair.to_type, nodeTypes)) {
-    return {
-      ok: false,
-      error: `Relation "supports" requires a spine target, not "${pair.to_type}"`,
-      suggestion: `Allowed target types: ${relation.target_types.join(", ")}`,
     };
   }
 
@@ -328,7 +321,7 @@ export type LinkSequenceErr = {
 
 /**
  * Validate edges in order. Each accepted edge (resolved relation) is visible
- * to later edges, including a second child_of from the same source.
+ * to later edges, including a second hierarchy parent from the same source.
  */
 export function validateLinkSequence(
   proposals: readonly LinkProposal[],

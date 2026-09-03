@@ -117,6 +117,33 @@ test("spine-root window keeps overdue, in-window, and undated depth-1", () => {
   assert.equal(addIsoDays("2026-08-19", 14), "2026-09-02");
 });
 
+test("renamed slugs still plan about and event walks from properties", () => {
+  const relations = SEED_RELATION_TYPES.map((relation) => {
+    if (relation.slug === "about") {
+      return { ...relation, slug: "concerning" };
+    }
+    if (relation.slug === "relates_to") {
+      return { ...relation, slug: "linked_to" };
+    }
+    if (relation.slug === "supports") {
+      return { ...relation, slug: "backs" };
+    }
+    if (relation.semantic_parent_slug === "relates_to") {
+      return { ...relation, semantic_parent_slug: "linked_to" };
+    }
+    return relation;
+  });
+  const person = planWorkingSetWalk(seedType("person"), SEED_NODE_TYPES, relations);
+  assert.equal(person.work, "about");
+  assert.ok(person.workRelations.includes("concerning"));
+  assert.ok(person.workRelations.includes("linked_to"));
+  assert.equal(person.workRelations.includes("about"), false);
+  const trip = planWorkingSetWalk(seedType("trip"), SEED_NODE_TYPES, relations);
+  assert.equal(trip.work, "event");
+  assert.ok(trip.workRelations.includes("linked_to"));
+  assert.ok(trip.workRelations.includes("backs"));
+});
+
 test("preferWorkRelation: about and supports beat relates_to", () => {
   const person = planWorkingSetWalk(seedType("person"), SEED_NODE_TYPES, SEED_RELATION_TYPES);
   assert.equal(preferWorkRelation("about", "relates_to", person), "about");

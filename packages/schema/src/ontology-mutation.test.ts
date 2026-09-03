@@ -75,10 +75,17 @@ test("non-system types are not locked", () => {
   );
 });
 
-test("system relations refuse constraint edits", () => {
-  const err = assertSystemRelationPatch(childOf, { source_types: ["note"] });
+test("system relations may edit source_types and target_types", () => {
+  assert.equal(assertSystemRelationPatch(childOf, { source_types: ["note"] }), null);
+  assert.equal(assertSystemRelationPatch(childOf, { target_types: ["area"] }), null);
+});
+
+test("system relations refuse kind, label, and symmetry edits", () => {
+  const err = assertSystemRelationPatch(childOf, { kind: "associative", label: "Under" });
   assert.ok(err);
   assert.match(err.error, /Cannot change system relation "child_of"/);
+  assert.match(err.error, /kind/);
+  assert.match(err.error, /label/);
 });
 
 test("missingDestructive requires destructive scope", () => {

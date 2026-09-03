@@ -22,6 +22,7 @@ export type WorkingSetWalkPlan = {
   hierarchyRelations: string[];
   workRelations: string[];
   incomingOnlyRelations: string[];
+  unconstrainedRelations: string[];
 };
 
 export type WorkingSetDateFields = {
@@ -105,6 +106,17 @@ function hierarchySlugs(relations: readonly RelationType[]): Set<string> {
   return slugs;
 }
 
+function unconstrainedAssociativeSlugsOf(relations: readonly RelationType[]): string[] {
+  return relations
+    .filter(
+      (relation) =>
+        relation.kind === "associative" &&
+        relation.source_types.length === 0 &&
+        relation.target_types.length === 0,
+    )
+    .map((relation) => relation.slug);
+}
+
 function slugsWithSemanticParent(
   relations: readonly RelationType[],
   parents: ReadonlySet<string>,
@@ -142,6 +154,7 @@ export function planWorkingSetWalk(
   relations: readonly RelationType[],
 ): WorkingSetWalkPlan {
   const hierarchyRelations = [...hierarchySlugs(relations)];
+  const unconstrained = unconstrainedAssociativeSlugsOf(relations);
   const hierarchyParent = isHierarchyParentType(rootType.slug, types);
   const aboutTarget = isAboutTargetType(rootType.slug, relations);
   const eventLike = hasStartAndEndRoles(rootType) && !hierarchyParent;
@@ -156,6 +169,7 @@ export function planWorkingSetWalk(
       hierarchyRelations,
       workRelations: hierarchyRelations,
       incomingOnlyRelations: hierarchyRelations,
+      unconstrainedRelations: unconstrained,
     };
   }
 
@@ -168,7 +182,7 @@ export function planWorkingSetWalk(
           relation.target_types.includes(rootType.slug),
       )
       .map((relation) => relation.slug);
-    const family = slugsWithSemanticParent(relations, new Set(["relates_to", "about", ...targeted]));
+    const family = slugsWithSemanticParent(relations, new Set([...unconstrained, ...targeted]));
     return {
       work: "about",
       ancestors,
@@ -176,11 +190,15 @@ export function planWorkingSetWalk(
       hierarchyRelations,
       workRelations: family,
       incomingOnlyRelations: targeted,
+      unconstrainedRelations: unconstrained,
     };
   }
 
   if (eventLike) {
-    const family = slugsWithSemanticParent(relations, new Set(["relates_to", "supports"]));
+    const associative = relations
+      .filter((relation) => relation.kind === "associative")
+      .map((relation) => relation.slug);
+    const family = slugsWithSemanticParent(relations, new Set(associative));
     const workRelations = [...new Set([...hierarchyRelations, ...family])];
     return {
       work: "event",
@@ -189,6 +207,7 @@ export function planWorkingSetWalk(
       hierarchyRelations,
       workRelations,
       incomingOnlyRelations: hierarchyRelations,
+      unconstrainedRelations: unconstrained,
     };
   }
 
@@ -199,6 +218,7 @@ export function planWorkingSetWalk(
     hierarchyRelations,
     workRelations: [],
     incomingOnlyRelations: [],
+    unconstrainedRelations: unconstrained,
   };
 }
 
@@ -213,7 +233,7 @@ export function workRelationSpecificity(slug: string, plan: WorkingSetWalkPlan):
   if (plan.incomingOnlyRelations.includes(slug)) {
     return 1;
   }
-  if (slug === "relates_to") {
+  if (plan.unconstrainedRelations.includes(slug)) {
     return 3;
   }
   return 2;

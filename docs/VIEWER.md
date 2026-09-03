@@ -81,7 +81,7 @@ Node fill is the type's color. Node glyph is the type's icon. Hover shows the ti
 
 ## Collection
 
-Opened from a type folder, as a view in the content host. Page chrome: type glyph, type color, type name, count of objects in the active view after that view's filter. Layout is the type's `default_view`, chosen from that type's `views`. Filter, sort, and group are that view's declarations. If the type names more than one view, the switcher lists only those names.
+Opened from a type folder, as a view in the content host. Page chrome: type glyph, type color, type name, count of objects in the active view after that view's filter. When the type has `parent_types`, a quiet line lists those allowed parents. Layout is the type's `default_view`, chosen from that type's `views`. Filter, sort, and group are that view's declarations. If the type names more than one view, the switcher lists only those names.
 
 Layouts the type may name: list, card, table, board, calendar, timeline, outline, graph.
 
@@ -117,7 +117,7 @@ A page in the content host. Not a docked inspector. Two columns fill the pane un
 
 **Document column.** Title. Body, rendered: headings, lists, quotes, code, callouts, dividers. Callout kinds: note, info, tip, warning, danger. Then Structure, when the object has children (or an ancestor chain, when the type asks for that): an embedded collection, height at most half the viewport, only when there is something to show. Opening a child or ancestor opens that object's detail page.
 
-**Properties column.** Belongs to this page. Floor **240px**. Collapsible. Type glyph, type hue, type name. Status. The type's fields, displayed. When `data.url` is a well-formed https URL, Open leaves the window for that file. Related objects, grouped by relation; each row is a title; click opens that object's detail page. Location: the ancestor chain. Timestamps. Incoming and outgoing both show. Values display; they do not edit. Open stays `data.url`. Url and repo: [`SPEC.md`](./SPEC.md#url-repo-and-link). Link is the edge tool.
+**Properties column.** Belongs to this page. Floor **240px**. Collapsible. Type glyph, type hue, type name. When the type has `parent_types`, a quiet line reads those allowed parents from the same property the validator uses. Status. The type's fields, displayed. When `data.url` is a well-formed https URL, Open leaves the window for that file. Related objects, grouped by relation; each row is a title; click opens that object's detail page. When that relation has `target_types`, the group shows those allowed targets. Location: the ancestor chain (live hierarchy-kind edges, not a frozen slug). Timestamps. Incoming and outgoing both show. Values display; they do not edit. Open stays `data.url`. Url and repo: [`SPEC.md`](./SPEC.md#url-repo-and-link). Link is the edge tool.
 
 Closing the detail view activates the view to its left in the strip. Closing the last one returns to Home.
 

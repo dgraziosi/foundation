@@ -15,6 +15,21 @@ export {
   requiresHierarchyParent,
 } from "./hierarchy.js";
 export {
+  genericAssociativeSlug,
+  hasHierarchyParent,
+  hierarchyRelations,
+  hierarchySlug,
+  hierarchySlugs,
+  isHierarchySlug,
+  isUnconstrainedAssociativeSlug,
+  suggestionTargetRelations,
+  targetedAssociativeRelations,
+  targetedRelationsForType,
+  unconstrainedAssociativeRelations,
+  unconstrainedAssociativeSlugs,
+  type HierarchyEdge,
+} from "./ontology-roles.js";
+export {
   findInBatchLinkDuplicate,
   listValidRelationSlugs,
   validateExistingLink,

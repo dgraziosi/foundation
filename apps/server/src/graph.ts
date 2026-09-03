@@ -34,7 +34,6 @@ import {
   updateNode,
   updateNodeType,
   updateRelationType,
-  updateRelationTypeDescription,
   withTransaction,
   isUniqueViolation,
   type BlobRuntime,
@@ -136,6 +135,7 @@ import {
   type UpsertPayload,
 } from "@foundation/schema";
 import { randomUUID } from "node:crypto";
+import { refuseInvalidRelationEdges } from "./relation-revalidate.js";
 import { removeAuthoredType } from "./retire-type.js";
 import { suggestLinksForNode } from "./suggested-links.js";
 import { undoGraphActivity } from "./undo.js";
@@ -1439,28 +1439,6 @@ export async function manageRelation(
     return locked;
   }
 
-  if (existing.is_system) {
-    return withTransaction(pool, async (client) => {
-      const relation = await updateRelationTypeDescription(
-        client,
-        input.slug,
-        input.description ?? existing.description,
-      );
-      if (!relation) {
-        return toolError(`Relation "${input.slug}" not found`);
-      }
-      const activity = await insertActivity(client, {
-        ...writer,
-        action: "relation_change",
-        target_kind: "relation",
-        target_id: relation.slug,
-        before: existing,
-        after: relation,
-      });
-      return { relation, activity_id: activity.id };
-    });
-  }
-
   const sourceTypes = input.source_types ?? existing.source_types;
   const targetTypes = input.target_types ?? existing.target_types;
   const sourceErr = await assertTypeSlugsExist(pool, sourceTypes, "source_types");
@@ -1485,16 +1463,26 @@ export async function manageRelation(
     }
   }
 
+  const patch = {
+    label: existing.is_system ? existing.label : (input.label ?? existing.label),
+    description: input.description ?? existing.description,
+    kind: existing.is_system ? existing.kind : (input.kind ?? existing.kind),
+    source_types: sourceTypes,
+    target_types: targetTypes,
+    is_symmetric: existing.is_system ? existing.is_symmetric : (input.is_symmetric ?? existing.is_symmetric),
+    semantic_parent_slug: existing.is_system ? existing.semantic_parent_slug : semanticParent,
+  };
+
   return withTransaction(pool, async (client) => {
-    const relation = await updateRelationType(client, input.slug, {
-      label: input.label ?? existing.label,
-      description: input.description ?? existing.description,
-      kind: input.kind ?? existing.kind,
-      source_types: sourceTypes,
-      target_types: targetTypes,
-      is_symmetric: input.is_symmetric ?? existing.is_symmetric,
-      semantic_parent_slug: semanticParent,
-    });
+    const edgeErr = await refuseInvalidRelationEdges(
+      client,
+      { ...existing, ...patch },
+      "manage_relation",
+    );
+    if (edgeErr) {
+      return edgeErr;
+    }
+    const relation = await updateRelationType(client, input.slug, patch);
     if (!relation) {
       return toolError(`Relation "${input.slug}" not found`);
     }

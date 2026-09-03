@@ -1,6 +1,8 @@
 import {
   getNodeType,
   hasLiveChildOf,
+  listNodeTypes,
+  listRelationTypes,
   searchTitleLinkCandidates,
   type Queryable,
 } from "@foundation/db";
@@ -15,12 +17,18 @@ export async function suggestLinksForNode(
   if (!type) {
     return [];
   }
-  const [candidates, hasChildOf] = await Promise.all([
+  const [candidates, hasHierarchyParent, nodeTypes, relationTypes] = await Promise.all([
     searchTitleLinkCandidates(db, {
       title: node.title,
       excludeId: node.id,
     }),
     hasLiveChildOf(db, node.id),
+    listNodeTypes(db),
+    listRelationTypes(db),
   ]);
-  return classifySuggestedLinks(node.id, type, candidates, { hasChildOf });
+  return classifySuggestedLinks(node.id, type, candidates, {
+    hasHierarchyParent,
+    nodeTypes,
+    relationTypes,
+  });
 }
