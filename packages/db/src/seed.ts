@@ -65,8 +65,6 @@ export async function seedSystemOntology(pool: pg.Pool): Promise<void> {
       ON CONFLICT (slug) DO UPDATE SET
         label = EXCLUDED.label,
         kind = EXCLUDED.kind,
-        source_types = EXCLUDED.source_types,
-        target_types = EXCLUDED.target_types,
         is_symmetric = EXCLUDED.is_symmetric,
         updated_at = now()
       WHERE relation_types.is_system = true

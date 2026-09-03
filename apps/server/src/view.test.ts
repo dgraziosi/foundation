@@ -171,7 +171,17 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       const ontology = await fetch(`${origin}/view/api/ontology`, { headers: authHeader() });
       assert.equal(ontology.status, 200);
       const ontologyBody = (await ontology.json()) as {
-        types: Array<{ slug: string; views: string[]; default_view?: string; count: number; hue?: string; glyph?: string }>;
+        types: Array<{
+          slug: string;
+          views: string[];
+          default_view?: string;
+          count: number;
+          hue?: string;
+          glyph?: string;
+          kind?: string;
+          parent_types?: string[];
+        }>;
+        relations: Array<{ slug: string; kind: string; target_types: string[] }>;
       };
       const taskType = ontologyBody.types.find((type) => type.slug === "task");
       assert.deepEqual(taskType?.views, ["board", "list", "calendar", "timeline", "outline"]);
@@ -179,6 +189,11 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       assert.equal(taskType?.count, 0);
       assert.equal(taskType?.hue, "green");
       assert.equal(taskType?.glyph, "CircleCheck");
+      assert.equal(taskType?.kind, "spine");
+      assert.deepEqual(taskType?.parent_types, ["goal", "project"]);
+      const about = ontologyBody.relations.find((relation) => relation.slug === "about");
+      assert.equal(about?.kind, "associative");
+      assert.deepEqual(about?.target_types, ["person"]);
       const noteType = ontologyBody.types.find((type) => type.slug === "note");
       assert.deepEqual(noteType?.views, ["list"]);
       assert.equal(noteType?.default_view, "list");

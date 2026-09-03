@@ -20,6 +20,7 @@ import {
   dateValueFromData,
   fieldByRole,
   findViewDeclaration,
+  hierarchySlugs,
   isToolError,
   isUuid,
   resolveTypeViews,
@@ -33,7 +34,6 @@ import { getGraphNode, inspectOntology, searchGraphNodes } from "./graph.js";
 
 const RECENTS_PAGE_LIMIT = 500;
 const TASKS_PAGE_LIMIT = 200;
-const HIERARCHY_RELATION = "child_of";
 
 export type ViewGraphNode = {
   id: string;
@@ -156,6 +156,8 @@ export function dueTone(due: string, today = todayInNewYork()): DueTone {
 export type ViewOntologyType = {
   slug: string;
   label: string;
+  kind: string;
+  parent_types: string[];
   views: ViewEngineId[];
   default_view?: ViewEngineId;
   count: number;
@@ -163,8 +165,18 @@ export type ViewOntologyType = {
   glyph?: string;
 };
 
-export async function viewOntology(pool: Pool): Promise<{ types: ViewOntologyType[] }> {
-  const ontology = await inspectOntology(pool, "types");
+export type ViewOntologyRelation = {
+  slug: string;
+  label: string;
+  kind: "hierarchy" | "associative";
+  source_types: string[];
+  target_types: string[];
+};
+
+export async function viewOntology(
+  pool: Pool,
+): Promise<{ types: ViewOntologyType[]; relations: ViewOntologyRelation[] }> {
+  const ontology = await inspectOntology(pool, "all");
   const counts = await countLiveNodesGroupedByType(pool);
   return {
     types: ontology.types.map((type) => {
@@ -172,6 +184,8 @@ export async function viewOntology(pool: Pool): Promise<{ types: ViewOntologyTyp
       return {
         slug: type.slug,
         label: type.label,
+        kind: type.kind,
+        parent_types: type.parent_types,
         views: resolved.views,
         ...(resolved.defaultView ? { default_view: resolved.defaultView } : {}),
         count: counts.get(type.slug) ?? 0,
@@ -179,6 +193,13 @@ export async function viewOntology(pool: Pool): Promise<{ types: ViewOntologyTyp
         ...(type.glyph ? { glyph: type.glyph } : {}),
       };
     }),
+    relations: ontology.relations.map((relation) => ({
+      slug: relation.slug,
+      label: relation.label,
+      kind: relation.kind,
+      source_types: relation.source_types,
+      target_types: relation.target_types,
+    })),
   };
 }
 
@@ -260,6 +281,7 @@ export async function viewType(
         hue?: string;
         glyph?: string;
         parent_types: string[];
+        kind?: string;
       };
       nodes: ViewTypeNode[];
       children: ViewTypeNode[];
@@ -289,6 +311,7 @@ export async function viewType(
       views: declarations,
       fields,
       parent_types: type.parent_types,
+      kind: type.kind,
       ...(type.default_view ? { default_view: type.default_view } : {}),
       ...(type.hue ? { hue: type.hue } : {}),
       ...(type.glyph ? { glyph: type.glyph } : {}),
@@ -368,6 +391,8 @@ export async function viewGraph(
     pool,
     nodes.map((node) => node.id),
   );
+  const ontology = await inspectOntology(pool, "relations");
+  const hierarchy = new Set(hierarchySlugs(ontology.relations));
   return {
     nodes: nodes.map((node) => ({
       id: node.id,
@@ -380,7 +405,7 @@ export async function viewGraph(
       from: edge.from_id,
       to: edge.to_id,
       relation_type: edge.relation_type,
-      kind: edge.relation_type === HIERARCHY_RELATION ? "hierarchy" : "associative",
+      kind: hierarchy.has(edge.relation_type) ? "hierarchy" : "associative",
     })),
   };
 }
@@ -408,9 +433,11 @@ export async function viewNode(pool: Pool, id: string, dataDir: string) {
       resolved_refs[field.name] = { id: target.id, title: target.title, type: target.type };
     }
   }
+  const ontology = await inspectOntology(pool, "relations");
+  const hierarchy = new Set(hierarchySlugs(ontology.relations));
   const ancestors: Array<{ id: string; title: string; type: string }> = [];
   let walk: string | undefined = got.edges.find(
-    (edge) => edge.relation_type === HIERARCHY_RELATION && edge.direction === "out",
+    (edge) => hierarchy.has(edge.relation_type) && edge.direction === "out",
   )?.neighbor.id;
   const seen = new Set<string>([got.node.id]);
   while (walk && !seen.has(walk)) {
@@ -421,7 +448,7 @@ export async function viewNode(pool: Pool, id: string, dataDir: string) {
     }
     ancestors.push({ id: parent.node.id, title: parent.node.title, type: parent.node.type });
     walk = parent.edges.find(
-      (edge) => edge.relation_type === HIERARCHY_RELATION && edge.direction === "out",
+      (edge) => hierarchy.has(edge.relation_type) && edge.direction === "out",
     )?.neighbor.id;
   }
   const orderedAncestors = rootToParent(ancestors);
@@ -452,6 +479,7 @@ export async function viewNode(pool: Pool, id: string, dataDir: string) {
           label: type.label,
           fields,
           parent_types: type.parent_types,
+          kind: type.kind,
           ...(type.hue ? { hue: type.hue } : {}),
           ...(type.glyph ? { glyph: type.glyph } : {}),
         }
