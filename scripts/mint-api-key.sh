@@ -111,30 +111,43 @@ if ((destructive == 1)); then
 fi
 
 python3 - "${keys_file}" "${name}" "${digest}" "${actor_label}" "${scopes}" <<'PY'
-import json, sys
+import fcntl, json, os, sys
 path, name, digest, label, scopes_raw = sys.argv[1:]
 scopes = json.loads(scopes_raw)
+lock_fd = os.open(path + ".lock", os.O_RDWR | os.O_CREAT, 0o600)
 try:
-    with open(path, encoding="utf-8") as fh:
-        data = json.load(fh)
-except FileNotFoundError:
-    data = {"keys": []}
-if not isinstance(data, dict) or not isinstance(data.get("keys"), list):
-    print("mint-api-key: api-keys.json must be { keys: [...] }", file=sys.stderr)
-    sys.exit(1)
-for row in data["keys"]:
-    if isinstance(row, dict) and row.get("name") == name:
-        print(f"mint-api-key: a key named {name} already exists", file=sys.stderr)
+    fcntl.flock(lock_fd, fcntl.LOCK_EX)
+    try:
+        with open(path, encoding="utf-8") as fh:
+            raw = fh.read()
+        data = json.loads(raw) if raw.strip() else {"keys": []}
+    except FileNotFoundError:
+        data = {"keys": []}
+    except json.JSONDecodeError:
+        print("mint-api-key: api-keys.json is not JSON", file=sys.stderr)
         sys.exit(1)
-data["keys"].append({
-    "name": name,
-    "secret_sha256": digest,
-    "actor_label": label,
-    "scopes": scopes,
-})
-with open(path, "w", encoding="utf-8") as fh:
-    json.dump(data, fh, indent=2)
-    fh.write("\n")
+    if not isinstance(data, dict) or not isinstance(data.get("keys"), list):
+        print("mint-api-key: api-keys.json must be { keys: [...] }", file=sys.stderr)
+        sys.exit(1)
+    for row in data["keys"]:
+        if isinstance(row, dict) and row.get("name") == name:
+            print(f"mint-api-key: a key named {name} already exists", file=sys.stderr)
+            sys.exit(1)
+    data["keys"].append({
+        "name": name,
+        "secret_sha256": digest,
+        "actor_label": label,
+        "scopes": scopes,
+    })
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(data, fh, indent=2)
+        fh.write("\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, path)
+finally:
+    os.close(lock_fd)
 PY
 
 chmod 600 -- "${keys_file}"

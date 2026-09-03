@@ -47,4 +47,29 @@ if ! grep -Fq -- '"destructive"' "${keys}"; then
   fail "destructive scope was not stored"
 fi
 
+empty_dir="${scratch}/empty"
+mkdir -p -- "${empty_dir}"
+: > "${empty_dir}/api-keys.json"
+if ! "${mint}" --name chief --data-dir "${empty_dir}" >/dev/null; then
+  fail "empty api-keys.json should mint again"
+fi
+if ! grep -Fq -- '"name": "chief"' "${empty_dir}/api-keys.json"; then
+  fail "empty api-keys.json was not repaired"
+fi
+
+race_dir="${scratch}/race"
+mkdir -p -- "${race_dir}"
+"${mint}" --name alpha --data-dir "${race_dir}" >/dev/null &
+pid1=$!
+"${mint}" --name beta --data-dir "${race_dir}" >/dev/null &
+pid2=$!
+wait "$pid1" || fail "concurrent mint alpha failed"
+wait "$pid2" || fail "concurrent mint beta failed"
+if ! grep -Fq -- '"name": "alpha"' "${race_dir}/api-keys.json"; then
+  fail "concurrent mint lost alpha"
+fi
+if ! grep -Fq -- '"name": "beta"' "${race_dir}/api-keys.json"; then
+  fail "concurrent mint lost beta"
+fi
+
 echo "mint-api-key.test: ok"
