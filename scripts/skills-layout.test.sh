@@ -229,6 +229,7 @@ fi
 pr_copy_files=(
   "${dream_skill}"
   "${skills_root}/graph-hygiene/SKILL.md"
+  "${skills_root}/drift-read/SKILL.md"
   "${skills_root}/vault-health/SKILL.md"
   "${skills_root}/backup-vault/SKILL.md"
   "${skills_root}/update-foundation/SKILL.md"
@@ -239,6 +240,7 @@ pr_copy_files=(
   "${skills_root}/create-bot/bot-template.md"
   "${repo_root}/docs/AGENTS.md"
   "${repo_root}/docs/GRAPH_HYGIENE.md"
+  "${repo_root}/docs/GRAPH_DRIFT.md"
   "${repo_root}/docs/HARNESS.md"
   "${repo_root}/docs/ARCHITECTURE.md"
   "${repo_root}/docs/SPEC.md"
@@ -303,6 +305,12 @@ if [[ ! -f "${agents_doc}" ]]; then
 fi
 if ! grep -Fq -- '.agents/skills/dream/' "${agents_doc}"; then
   fail "docs/AGENTS.md does not list .agents/skills/dream/"
+fi
+if ! grep -Fq -- '.agents/skills/drift-read/' "${agents_doc}"; then
+  fail "docs/AGENTS.md does not list .agents/skills/drift-read/"
+fi
+if ! grep -Fq -- 'scripts/drift-read.sh' "${agents_doc}"; then
+  fail "docs/AGENTS.md does not name scripts/drift-read.sh"
 fi
 if ! grep -Fq -- '02:00' "${agents_doc}"; then
   fail "docs/AGENTS.md does not recommend Dream at 02:00"
