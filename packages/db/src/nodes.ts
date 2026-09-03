@@ -161,12 +161,21 @@ export async function updateNode(
   return rows[0] ? mapNode(rows[0]) : undefined;
 }
 
-export async function softDeleteNode(db: Queryable, id: string): Promise<Node | undefined> {
+export async function softDeleteNode(
+  db: Queryable,
+  id: string,
+  options: { base_updated_at?: string } = {},
+): Promise<Node | undefined> {
   const { rows } = await db.query<NodeRow>(
     `UPDATE nodes SET deleted_at = now(), updated_at = date_trunc('milliseconds', now())
      WHERE id = $1 AND deleted_at IS NULL
+       AND (
+         $2::timestamptz IS NULL
+         OR date_trunc('milliseconds', updated_at AT TIME ZONE 'UTC')
+           = date_trunc('milliseconds', $2::timestamptz AT TIME ZONE 'UTC')
+       )
      RETURNING id, type, title, status, payload, data, metadata, created_at, updated_at, deleted_at`,
-    [id],
+    [id, options.base_updated_at ?? null],
   );
   return rows[0] ? mapNode(rows[0]) : undefined;
 }

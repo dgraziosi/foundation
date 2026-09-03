@@ -244,9 +244,12 @@ export type UpsertInput = z.infer<typeof UpsertInputSchema>;
 export const DeleteInputSchema = z.object({
   id: z.string().uuid(),
   confirm: z.boolean().optional(),
+  /** Required: node's current `updated_at` from get. */
+  base_updated_at: z.string().min(1).optional(),
   actor: ActivityActorSchema.optional(),
   actor_label: z.string().trim().min(1).max(200).optional(),
 });
+export type DeleteInput = z.infer<typeof DeleteInputSchema>;
 
 export const MutationOkSchema = z.object({
   ok: z.literal(true),
@@ -384,9 +387,14 @@ export const UnlinkInputSchema = z.object({
   to_id: z.string().uuid(),
   relation_type: z.string().min(1),
   confirm: z.boolean().optional(),
+  /** Required: `from` node's `updated_at` from get. */
+  from_base_updated_at: z.string().min(1).optional(),
+  /** Required: `to` node's `updated_at` from get. */
+  to_base_updated_at: z.string().min(1).optional(),
   actor: ActivityActorSchema.optional(),
   actor_label: z.string().trim().min(1).max(200).optional(),
 });
+export type UnlinkInput = z.infer<typeof UnlinkInputSchema>;
 
 export const InspectOntologyInputSchema = z.object({
   kind: z.enum(["types", "relations", "all"]).optional(),
@@ -726,6 +734,12 @@ export const UndoInputSchema = z.object({
   confirm: z.boolean().optional(),
   /** Permanently drop leftover soft-deleted nodes when undoing a type create. */
   purge_deleted: z.boolean().optional(),
+  /** Required when the invert touches a node: that node's `updated_at` from get. */
+  base_updated_at: z.string().min(1).optional(),
+  /** Required when the invert touches an edge: `from` node's `updated_at` from get. */
+  from_base_updated_at: z.string().min(1).optional(),
+  /** Required when the invert touches an edge: `to` node's `updated_at` from get. */
+  to_base_updated_at: z.string().min(1).optional(),
   actor: ActivityActorSchema.optional(),
   actor_label: z.string().trim().min(1).max(200).optional(),
 });
