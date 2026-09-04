@@ -209,10 +209,12 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 
 ### `list_activity`
 
-- **In:** `{ action?, target?, since?, limit?, cursor? }`
+- **In:** `{ action?, target?, since?, limit?, cursor?, fields?, diff_only? }`
 - **Out:** `{ activities, count, next? }`
 - `target` is `target_id` (node UUID, edge UUID, or type/relation slug). `{ target: <node id> }` is the diary for that node. Newest first. Default limit 50, max 200. `since` is a time window (`created_at >=`), not a page. After a full page, send `next` as `cursor`. `count` matches the same filters. `get` does not include these rows.
-- `since` is an ISO-8601 timestamp. Rows include `actor`, `actor_label`, `before` / `after`, `reversible`, `undo_token`, `token_expires_at`, and `undone_at`. `actor` / `actor_label` are stamped by the server from the key (or Viewer). Node write rows store snapshots of `payload`, `data`, title, type, and status. A bad body is rebuilt from those snapshots, then written with `upsert`.
+- `since` is an ISO-8601 timestamp. Rows include `actor`, `actor_label`, `before` / `after`, `reversible`, `undo_token`, `token_expires_at`, `undone_at`, and `schema_version`. `actor` / `actor_label` are stamped by the server from the key (or Viewer). Node write rows store snapshots of `payload`, `data`, title, type, and status. A bad body is rebuilt from those snapshots, then written with `upsert`.
+- Omit `fields` and `diff_only` for today's full snapshot. `fields` is a non-empty list of activity keys (`id`, `actor`, `actor_label`, `action`, `target_kind`, `target_id`, `before`, `after`, `reversible`, `undo_token`, `token_expires_at`, `undone_at`, `rationale`, `created_at`, `schema_version`). The row then contains only those keys. `diff_only: true` replaces `before` / `after` with the changed top-level keys (JSON equality). A null side stays null and the other side stays the full snapshot. Undo reads the stored row, not this lean view.
+- New writes stamp `schema_version` `1`. Existing rows read as `1`. `undo` refuses an unknown version.
 - Blob node snapshots store `payload.blob_id` plus `blob: { blob_id, sha256, byte_size, media_type }` — not PDF/file bytes.
 
 ### `undo`
@@ -246,7 +248,7 @@ Instance coordination. Not a graph write and not `get_vault_health`.
 
 - **In:** `{ action: "claim"|"finish"|"release"|"read", name, token?, ttl_seconds? }`
 - **Out:** `{ action, job: { name, held, holder, until, last_run }, token? }` or `{ error, suggestion? }`
-- `name` is a slug (`dream`, `vault-health`, `backup-vault`, `graph-hygiene`, `update-foundation`, or another `^[a-z][a-z0-9_-]{0,62}$` name). First successful `claim` inserts the row.
+- `name` is a slug (`dream`, `vault-health`, `backup-vault`, `graph-hygiene`, `update-foundation`, `activity-prune`, or another `^[a-z][a-z0-9_-]{0,62}$` name). First successful `claim` inserts the row. Activity prune is the host script [`scripts/activity-prune.sh`](../scripts/activity-prune.sh). It reads `vault_settings.activity_retention_days`. The script does not claim. A bot may `claim` `activity-prune` before that pass.
 - `claim` without `token` takes the name if it is open or expired. Success returns `token`. A live name returns `{ error: "Held", suggestion }` (who and until). Same API key without the token is still Held. That is two processes sharing one key.
 - `claim` with the live `token` for that name extends the deadline (heartbeat) and returns the same token.
 - `finish` needs `name` and `token`. It stamps `last_run` from the live holder and opens the name.

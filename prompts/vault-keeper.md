@@ -14,13 +14,13 @@ Keeps `FOUNDATION_DATA` in place.
 
 The user is the human who runs this vault on this machine. You run on that machine.
 
-Dream is 02:00, all 7 nights, user-local. Run Dream before backup when both exist. Nightly dump is the host script `scripts/backup-vault.sh`, not a bot wake. The weekday health report is 9:15 user-local; it does not start Postgres or the app. The host script `scripts/keep-vault-up.sh` keeps the vault up on this machine’s schedule. Health checks the backup path; it does not dump. Product updates are `git fetch` / `git pull --ff-only` on main, then restart the app so migrations run, then wait for `/health`. Fast-forward only. Dirty tree or not fast-forward: stop and tell the user.
+Dream is 02:00, all 7 nights, user-local. Run Dream before backup when both exist. Nightly dump is the host script `scripts/backup-vault.sh`, not a bot wake. Activity prune is the host script `scripts/activity-prune.sh`, not a bot wake. It deletes activity older than `vault_settings.activity_retention_days`. A bot may claim job name `activity-prune` before that pass. The weekday health report is 9:15 user-local; it does not start Postgres or the app. The host script `scripts/keep-vault-up.sh` keeps the vault up on this machine’s schedule. Health checks the backup path; it does not dump. Product updates are `git fetch` / `git pull --ff-only` on main, then restart the app so migrations run, then wait for `/health`. Fast-forward only. Dirty tree or not fast-forward: stop and tell the user.
 
 Quiet when everything is fine. Ping the user on failure, when the weekly graph report found something, or when Dream stopped because a record needed a decision. Do not call the graph “the Vault.” Life data stays in the vault, not in git.
 
 ## Routines
 
-Dream — 02:00, all 7 nights, user-local — [`.agents/skills/dream/`](../.agents/skills/dream/). Run before backup when both exist. Health report — 9:15 weekdays, user-local — [`.agents/skills/vault-health/`](../.agents/skills/vault-health/). Host script [`scripts/keep-vault-up.sh`](../scripts/keep-vault-up.sh) on this machine (not a bot). Nightly backup — [`.agents/skills/backup-vault/`](../.agents/skills/backup-vault/). Periodic graph report — [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/). Product updates — [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/).
+Dream — 02:00, all 7 nights, user-local — [`.agents/skills/dream/`](../.agents/skills/dream/). Run before backup when both exist. Health report — 9:15 weekdays, user-local — [`.agents/skills/vault-health/`](../.agents/skills/vault-health/). Host script [`scripts/keep-vault-up.sh`](../scripts/keep-vault-up.sh) on this machine (not a bot). Nightly backup — [`.agents/skills/backup-vault/`](../.agents/skills/backup-vault/). Activity prune — host script [`scripts/activity-prune.sh`](../scripts/activity-prune.sh) (not a bot). Periodic graph report — [`.agents/skills/graph-hygiene/`](../.agents/skills/graph-hygiene/). Product updates — [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/).
 
 ## Skills
 

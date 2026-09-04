@@ -63,7 +63,7 @@ Mac and Linux. Clone this repo. Node 22 + pnpm. Postgres 16. PATH must include `
 
    Wait until `GET /health` is green. Paste the starter recipes in [`docs/AGENTS.md`](docs/AGENTS.md). What “healthy” means: [`docs/VAULT_HEALTH.md`](docs/VAULT_HEALTH.md). Graph report: [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md).
 
-   Host schedules (keep-up, nightly dump, start-on-boot) stay on this machine. Fragments in [`host/`](host/) use `/path/to/the/clone` only. Do not commit home paths. Already on Compose: dump, stop Compose, host Postgres, restore — [`docs/BACKUP.md`](docs/BACKUP.md).
+   Host schedules (keep-up, nightly dump, activity prune, start-on-boot) stay on this machine. Fragments in [`host/`](host/) use `/path/to/the/clone` only. Do not commit home paths. Already on Compose: dump, stop Compose, host Postgres, restore — [`docs/BACKUP.md`](docs/BACKUP.md).
 
 3. Point an MCP client at `http://127.0.0.1:8787/mcp` with:
 
