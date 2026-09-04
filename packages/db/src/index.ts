@@ -32,6 +32,11 @@ export {
   UNDO_TTL_MS,
 } from "./activity.js";
 export {
+  activityRetentionCutoff,
+  pruneActivity,
+  type PruneActivityResult,
+} from "./prune.js";
+export {
   deleteEdge,
   deleteEdgeById,
   findEdge,

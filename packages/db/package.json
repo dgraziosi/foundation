@@ -13,7 +13,8 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "bash ../../scripts/require-database-url.sh && tsx --test --test-force-exit src/**/*.test.ts",
-    "migrate": "tsx src/cli.ts"
+    "migrate": "tsx src/cli.ts",
+    "prune-activity": "tsx src/prune-cli.ts"
   },
   "dependencies": {
     "@foundation/schema": "workspace:*",
