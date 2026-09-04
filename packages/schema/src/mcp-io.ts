@@ -69,9 +69,11 @@ export const SlugSchema = z
   );
 
 export const GetInputSchema = z.object({
-  id: z.string().uuid(),
-  /** When true, blob payloads may include a base64 `body` if under the inline cap. Default false. */
-  include_body: z.boolean().optional(),
+  id: z.string().uuid().describe("Live node UUID"),
+  include_body: z
+    .boolean()
+    .optional()
+    .describe("When true, small blob payloads may include a base64 body. Default false"),
 });
 
 export const NeighborRefSchema = z.object({
@@ -107,11 +109,32 @@ export const GetSuccessSchema = z.object({
 });
 
 export const WorkingSetInputSchema = z.object({
-  id: z.string().uuid(),
-  include_completed: z.boolean().optional(),
-  depth: z.number().int().min(1).max(WORKING_SET_DEPTH_MAX).optional(),
-  limit: z.number().int().min(1).max(WORKING_SET_LIMIT_MAX).optional(),
-  due_within_days: z.number().int().min(1).max(WORKING_SET_DUE_WITHIN_DAYS_MAX).optional(),
+  id: z.string().uuid().describe("Live node UUID to walk from"),
+  include_completed: z
+    .boolean()
+    .optional()
+    .describe("Include completed and archived work. Default false"),
+  depth: z
+    .number()
+    .int()
+    .min(1)
+    .max(WORKING_SET_DEPTH_MAX)
+    .optional()
+    .describe("Work-walk hops. Default and max come from vault settings"),
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(WORKING_SET_LIMIT_MAX)
+    .optional()
+    .describe("Max items. Default and max come from vault settings"),
+  due_within_days: z
+    .number()
+    .int()
+    .min(1)
+    .max(WORKING_SET_DUE_WITHIN_DAYS_MAX)
+    .optional()
+    .describe("Spine-root due window in days. Default comes from vault settings"),
 });
 export type WorkingSetInput = z.infer<typeof WorkingSetInputSchema>;
 
@@ -170,12 +193,20 @@ export type WorkingSetSuccess = z.infer<typeof WorkingSetSuccessSchema>;
 /** Upsert ingest: inline body, existing blob_id, bytes_base64, or uploads source_path. */
 export const UpsertPayloadSchema = z
   .object({
-    media_type: z.string().min(1),
-    storage: PayloadStorageSchema,
-    body: z.string().optional(),
-    blob_id: z.string().uuid().optional(),
-    bytes_base64: z.string().max(BLOB_BASE64_MAX_CHARS).optional(),
-    source_path: z.string().min(1).optional(),
+    media_type: z.string().min(1).describe("MIME type, such as text/markdown or application/json"),
+    storage: PayloadStorageSchema.describe("inline or blob"),
+    body: z.string().optional().describe("Inline text. Required when storage is inline"),
+    blob_id: z.string().uuid().optional().describe("Existing blob UUID"),
+    bytes_base64: z
+      .string()
+      .max(BLOB_BASE64_MAX_CHARS)
+      .optional()
+      .describe("New blob bytes as base64. Pass only one of blob_id, bytes_base64, or source_path"),
+    source_path: z
+      .string()
+      .min(1)
+      .optional()
+      .describe("Path under uploads. The server moves the file into blobs"),
   })
   .superRefine((value, ctx) => {
     if (value.storage === "inline") {
@@ -216,34 +247,38 @@ export const WriterIdentitySchema = z.object({
 export type WriterIdentity = z.infer<typeof WriterIdentitySchema>;
 
 export const UpsertInputSchema = z.object({
-  id: z.string().uuid().optional(),
-  type: z.string().min(1),
-  title: z.string().min(1),
-  payload: UpsertPayloadSchema.optional(),
-  data: JsonObjectSchema.optional(),
-  status: NodeStatusSchema.optional(),
-  metadata: JsonObjectSchema.optional(),
-  /** Required on update: node's current `updated_at` from get. */
-  base_updated_at: z.string().min(1).optional(),
-  /** Create only: same key returns the existing node instead of a twin. */
-  idempotency_key: z.string().trim().min(1).max(200).optional(),
-  /**
-   * Create only: write even when lookup finds an exact title or unique exact alias.
-   * Same-name entities stay allowed with this flag. Ignored on update.
-   */
-  allow_duplicate: z.boolean().optional(),
-  /**
-   * Unique Drive / Gmail / Calendar identity `{ system, id }`. Not data.url
-   * (that key is the https address). `url: null` clears uniqueness.
-   */
-  url: UrlIdentitySchema.nullable().optional(),
+  id: z.string().uuid().optional().describe("Existing node UUID. Omit to create"),
+  type: z.string().min(1).describe("Type slug"),
+  title: z.string().min(1).describe("Record title"),
+  payload: UpsertPayloadSchema.optional().describe("Replacement body. Omit to leave the body unchanged"),
+  data: JsonObjectSchema.optional().describe("Top-level data keys to merge on update"),
+  status: NodeStatusSchema.optional().describe("active, completed, or archived"),
+  metadata: JsonObjectSchema.optional().describe("Extra metadata bag"),
+  base_updated_at: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Required on update. Node updated_at from get"),
+  idempotency_key: z
+    .string()
+    .trim()
+    .min(1)
+    .max(200)
+    .optional()
+    .describe("Create only. Same key returns the existing node instead of a twin"),
+  allow_duplicate: z
+    .boolean()
+    .optional()
+    .describe("Create only. Write even when lookup finds an exact title or unique alias"),
+  url: UrlIdentitySchema.nullable()
+    .optional()
+    .describe("Unique Drive, Gmail, or Calendar identity. Null clears it. Not data.url"),
 });
 export type UpsertInput = z.infer<typeof UpsertInputSchema>;
 
 export const DeleteInputSchema = z.object({
-  id: z.string().uuid(),
-  /** Required: node's current `updated_at` from get. */
-  base_updated_at: z.string().min(1).optional(),
+  id: z.string().uuid().describe("Live node UUID"),
+  base_updated_at: z.string().min(1).optional().describe("Required. Node updated_at from get"),
 });
 export type DeleteInput = z.infer<typeof DeleteInputSchema>;
 
@@ -267,30 +302,52 @@ export const LINK_CAS_AGREE_SUGGESTION =
   "Use one updated_at from get for that node on every edge that touches it.";
 
 export const LinkEdgeItemSchema = z.object({
-  from_id: z.string().uuid(),
-  to_id: z.string().uuid(),
-  relation_type: z.string().min(1),
-  upgrade: z.boolean().optional(),
-  metadata: JsonObjectSchema.optional(),
-  /** Required: `from` node's `updated_at` from get. */
-  from_base_updated_at: z.string().min(1).optional(),
-  /** Required: `to` node's `updated_at` from get. */
-  to_base_updated_at: z.string().min(1).optional(),
+  from_id: z.string().uuid().describe("Source node UUID"),
+  to_id: z.string().uuid().describe("Target node UUID"),
+  relation_type: z.string().min(1).describe("Live relation slug"),
+  upgrade: z
+    .boolean()
+    .optional()
+    .describe("When true, rewrite an unconstrained associative to the hierarchy verb if it fits"),
+  metadata: JsonObjectSchema.optional().describe("Optional edge metadata"),
+  from_base_updated_at: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Required. from node's updated_at from get"),
+  to_base_updated_at: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Required. to node's updated_at from get"),
 });
 export type LinkEdgeItem = z.infer<typeof LinkEdgeItemSchema>;
 
 export const LinkInputSchema = z.object({
-  from_id: z.string().uuid().optional(),
-  to_id: z.string().uuid().optional(),
-  relation_type: z.string().min(1).optional(),
-  upgrade: z.boolean().optional(),
-  metadata: JsonObjectSchema.optional(),
-  /** Required: `from` node's `updated_at` from get. */
-  from_base_updated_at: z.string().min(1).optional(),
-  /** Required: `to` node's `updated_at` from get. */
-  to_base_updated_at: z.string().min(1).optional(),
-  /** 1–20 edges. Pass this or the one-edge fields, not both. */
-  edges: z.array(LinkEdgeItemSchema).min(1).max(LINK_BATCH_MAX).optional(),
+  from_id: z.string().uuid().optional().describe("Source node UUID for one edge"),
+  to_id: z.string().uuid().optional().describe("Target node UUID for one edge"),
+  relation_type: z.string().min(1).optional().describe("Live relation slug for one edge"),
+  upgrade: z
+    .boolean()
+    .optional()
+    .describe("When true, rewrite an unconstrained associative to the hierarchy verb if it fits"),
+  metadata: JsonObjectSchema.optional().describe("Optional edge metadata for one edge"),
+  from_base_updated_at: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Required for one edge. from node's updated_at from get"),
+  to_base_updated_at: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Required for one edge. to node's updated_at from get"),
+  edges: z
+    .array(LinkEdgeItemSchema)
+    .min(1)
+    .max(LINK_BATCH_MAX)
+    .optional()
+    .describe("1–20 edges. Pass this or the one-edge fields, not both"),
 });
 export type LinkInput = z.infer<typeof LinkInputSchema>;
 
@@ -377,18 +434,27 @@ export function normalizeLinkEdges(input: LinkInput): NormalizedLinkEdges | Tool
 }
 
 export const UnlinkInputSchema = z.object({
-  from_id: z.string().uuid(),
-  to_id: z.string().uuid(),
-  relation_type: z.string().min(1),
-  /** Required: `from` node's `updated_at` from get. */
-  from_base_updated_at: z.string().min(1).optional(),
-  /** Required: `to` node's `updated_at` from get. */
-  to_base_updated_at: z.string().min(1).optional(),
+  from_id: z.string().uuid().describe("Source node UUID"),
+  to_id: z.string().uuid().describe("Target node UUID"),
+  relation_type: z.string().min(1).describe("Live relation slug"),
+  from_base_updated_at: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Required. from node's updated_at from get"),
+  to_base_updated_at: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Required. to node's updated_at from get"),
 });
 export type UnlinkInput = z.infer<typeof UnlinkInputSchema>;
 
 export const InspectOntologyInputSchema = z.object({
-  kind: z.enum(["types", "relations", "all"]).optional(),
+  kind: z
+    .enum(["types", "relations", "all"])
+    .optional()
+    .describe("Which registry rows to return. Default all"),
 });
 
 export const InspectOntologySuccessSchema = z.object({
@@ -397,20 +463,32 @@ export const InspectOntologySuccessSchema = z.object({
 });
 
 export const ManageTypeInputSchema = z.object({
-  action: z.enum(["create", "update", "retire"]),
-  slug: SlugSchema,
-  label: z.string().min(1).optional(),
-  description: z.string().optional(),
-  kind: TypeKindSchema.optional(),
-  parent_types: z.array(z.string()).optional(),
-  json_schema: z.unknown().nullable().optional(),
-  views: z.array(z.union([ViewEngineIdSchema, ViewDeclarationSchema])).optional(),
-  default_view: ViewEngineIdSchema.optional(),
-  fields: z.array(z.unknown()).optional(),
-  hue: TypeHueSchema.nullable().optional(),
-  glyph: TypeGlyphSchema.nullable().optional(),
-  /** Permanently drop leftover soft-deleted nodes when retiring a type. */
-  purge_deleted: z.boolean().optional(),
+  action: z.enum(["create", "update", "retire"]).describe("create, update, or retire"),
+  slug: SlugSchema.describe("Type slug"),
+  label: z.string().min(1).optional().describe("Human label"),
+  description: z.string().optional().describe("What this type is for"),
+  kind: TypeKindSchema.optional().describe("spine or artifact"),
+  parent_types: z
+    .array(z.string())
+    .optional()
+    .describe("Type slugs that may be hierarchy parents"),
+  json_schema: z
+    .unknown()
+    .nullable()
+    .optional()
+    .describe("Compiled from fields. Pass null to clear. Prefer fields"),
+  views: z
+    .array(z.union([ViewEngineIdSchema, ViewDeclarationSchema]))
+    .optional()
+    .describe("Ordered view declarations, or bare engine ids"),
+  default_view: ViewEngineIdSchema.optional().describe("Must be one of the view ids"),
+  fields: z.array(z.unknown()).optional().describe("Ordered field template"),
+  hue: TypeHueSchema.nullable().optional().describe("Named type hue. Null clears it"),
+  glyph: TypeGlyphSchema.nullable().optional().describe("Lucide icon name. Null clears it"),
+  purge_deleted: z
+    .boolean()
+    .optional()
+    .describe("When retiring, permanently drop leftover soft-deleted nodes of this type"),
 });
 export type ManageTypeInput = z.infer<typeof ManageTypeInputSchema>;
 
@@ -420,15 +498,25 @@ export const ManageTypeSuccessSchema = z.object({
 });
 
 export const ManageRelationInputSchema = z.object({
-  action: z.enum(["create", "update"]),
-  slug: SlugSchema,
-  label: z.string().min(1).optional(),
-  description: z.string().optional(),
-  kind: RelationKindSchema.optional(),
-  source_types: z.array(z.string()).optional(),
-  target_types: z.array(z.string()).optional(),
-  is_symmetric: z.boolean().optional(),
-  semantic_parent_slug: z.string().nullable().optional(),
+  action: z.enum(["create", "update"]).describe("create or update"),
+  slug: SlugSchema.describe("Relation slug"),
+  label: z.string().min(1).optional().describe("Human label"),
+  description: z.string().optional().describe("What this relation means"),
+  kind: RelationKindSchema.optional().describe("hierarchy or associative"),
+  source_types: z
+    .array(z.string())
+    .optional()
+    .describe("Allowed source type slugs. Empty means any type"),
+  target_types: z
+    .array(z.string())
+    .optional()
+    .describe("Allowed target type slugs. Empty means any type"),
+  is_symmetric: z.boolean().optional().describe("When true, A→B and B→A are the same edge"),
+  semantic_parent_slug: z
+    .string()
+    .nullable()
+    .optional()
+    .describe("More specific verb under this parent slug. Null clears it"),
 });
 export type ManageRelationInput = z.infer<typeof ManageRelationInputSchema>;
 
@@ -476,33 +564,36 @@ export const SearchUrlFilterSchema = z
  * A `z.string()` union here invites the call search refuses.
  */
 export const SearchInputListedSchema = z.object({
-  /** Lexical query. Optional when a filter is set. */
-  query: z.string().optional(),
-  type: z.string().min(1).optional(),
-  status: NodeStatusSchema.optional(),
-  /** UUID of a live parent; lists nodes with child_of to that parent. */
-  under: z.string().uuid().optional(),
-  /** ISO-8601 timestamp; live nodes with updated_at >= since. */
-  since: z.string().min(1).optional(),
-  /**
-   * Unique Drive / Gmail / Calendar lookup `{ system, id }`.
-   * A string is not this filter. Use data_equals: { url } for the https address.
-   */
-  url: UrlIdentitySchema.optional(),
-  /** Unique GitHub lookup. */
-  repo: RepoRefSchema.optional(),
-  /** Unique receipt lookup (gmail | calendar). Kind lives on the stored node. */
-  receipt: ReceiptLookupSchema.optional(),
-  /** Due before today, or due today, in the vault settings timezone. */
-  due: SearchDueKindSchema.optional(),
-  /** Inclusive ISO date YYYY-MM-DD on data.due. */
-  due_on_or_before: IsoDateSchema.optional(),
-  /** Inclusive ISO date YYYY-MM-DD on data.due. */
-  due_on_or_after: IsoDateSchema.optional(),
-  /** Top-level data key equality (JSONB @>). One or a few keys, e.g. { kind, status }. */
-  data_equals: DataEqualsSchema.optional(),
-  limit: z.number().int().min(1).max(100).optional(),
-  cursor: z.string().min(1).optional(),
+  query: z.string().optional().describe("Lexical query. Optional when a filter is set"),
+  type: z.string().min(1).optional().describe("Type slug filter"),
+  status: NodeStatusSchema.optional().describe("active, completed, or archived"),
+  under: z
+    .string()
+    .uuid()
+    .optional()
+    .describe("Live parent UUID. Lists nodes with child_of to that parent"),
+  since: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("ISO-8601 timestamp. Live nodes with updated_at on or after this instant"),
+  url: UrlIdentitySchema.optional().describe(
+    "Unique Drive, Gmail, or Calendar lookup. A string is not this filter",
+  ),
+  repo: RepoRefSchema.optional().describe("Unique GitHub lookup"),
+  receipt: ReceiptLookupSchema.optional().describe(
+    "Unique receipt lookup (gmail or calendar). Kind lives on the stored node",
+  ),
+  due: SearchDueKindSchema.optional().describe(
+    "Due before today, or due today, in the vault settings timezone",
+  ),
+  due_on_or_before: IsoDateSchema.optional().describe("Inclusive ISO date YYYY-MM-DD on data.due"),
+  due_on_or_after: IsoDateSchema.optional().describe("Inclusive ISO date YYYY-MM-DD on data.due"),
+  data_equals: DataEqualsSchema.optional().describe(
+    "Top-level data key equality. One or a few keys, such as kind or status",
+  ),
+  limit: z.number().int().min(1).max(100).optional().describe("Page size. Default 20, max 100"),
+  cursor: z.string().min(1).optional().describe("Opaque page cursor from a prior next value"),
 });
 
 /**
@@ -614,16 +705,26 @@ export const LookupOutcomeSchema = z.enum([
 export type LookupOutcome = z.infer<typeof LookupOutcomeSchema>;
 
 export const LookupInputItemSchema = z.object({
-  name: z.string().trim().min(1).max(LOOKUP_NAME_MAX),
-  type: z.string().min(1).optional(),
-  id: z.string().trim().min(1).max(80).optional(),
+  name: z.string().trim().min(1).max(LOOKUP_NAME_MAX).describe("Name to resolve"),
+  type: z.string().min(1).optional().describe("Optional type slug to narrow this name"),
+  id: z.string().trim().min(1).max(80).optional().describe("Optional caller correlation id"),
 });
 export type LookupInputItem = z.infer<typeof LookupInputItemSchema>;
 
 export const LookupInputSchema = z.object({
-  inputs: z.array(LookupInputItemSchema).min(1).max(LOOKUP_BATCH_MAX),
-  type: z.string().min(1).optional(),
-  limit: z.number().int().min(1).max(LOOKUP_CANDIDATE_MAX).optional(),
+  inputs: z
+    .array(LookupInputItemSchema)
+    .min(1)
+    .max(LOOKUP_BATCH_MAX)
+    .describe("One or more names to resolve, max 20"),
+  type: z.string().min(1).optional().describe("Type slug applied to every input that omits its own"),
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(LOOKUP_CANDIDATE_MAX)
+    .optional()
+    .describe("Max candidates per input"),
 });
 export type LookupInput = z.infer<typeof LookupInputSchema>;
 
@@ -687,13 +788,24 @@ export const LookupSuccessSchema = z.object({
 export type LookupSuccess = z.infer<typeof LookupSuccessSchema>;
 
 export const ListActivityInputSchema = z.object({
-  action: ActivityActionSchema.optional(),
-  target: z.string().min(1).optional(),
-  since: z.string().min(1).optional(),
-  limit: z.number().int().min(1).max(200).optional(),
-  cursor: z.string().min(1).optional(),
-  fields: z.array(ActivityFieldNameSchema).min(1).optional(),
-  diff_only: z.boolean().optional(),
+  action: ActivityActionSchema.optional().describe("Filter to one activity action"),
+  target: z.string().min(1).optional().describe("Node, edge, type, or relation id to read the diary for"),
+  since: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("ISO-8601 timestamp. Rows with created_at on or after this instant"),
+  limit: z.number().int().min(1).max(200).optional().describe("Page size. Default 50, max 200"),
+  cursor: z.string().min(1).optional().describe("Opaque page cursor from a prior next value"),
+  fields: z
+    .array(ActivityFieldNameSchema)
+    .min(1)
+    .optional()
+    .describe("Subset of activity keys to return. Omit for the full snapshot"),
+  diff_only: z
+    .boolean()
+    .optional()
+    .describe("When true, before and after keep only changed top-level keys"),
 });
 export type ListActivityInput = z.infer<typeof ListActivityInputSchema>;
 
@@ -705,14 +817,25 @@ export const ListActivitySuccessSchema = z.object({
 export type ListActivitySuccess = z.infer<typeof ListActivitySuccessSchema>;
 
 export const UndoInputSchema = z.object({
-  id: z.string().uuid(),
-  /** Permanently drop leftover soft-deleted nodes when undoing a type create. */
-  purge_deleted: z.boolean().optional(),
-  /** Required when the invert touches a node: that node's `updated_at` from get. */
-  base_updated_at: z.string().min(1).optional(),
-  /** Required when the invert touches an edge: `from` node's `updated_at` from get. */
-  from_base_updated_at: z.string().min(1).optional(),
-  /** Required when the invert touches an edge: `to` node's `updated_at` from get. */
-  to_base_updated_at: z.string().min(1).optional(),
+  id: z.string().uuid().describe("Activity row UUID to invert"),
+  purge_deleted: z
+    .boolean()
+    .optional()
+    .describe("When undoing a type create, permanently drop leftover soft-deleted nodes of that type"),
+  base_updated_at: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Required when the invert touches a node. That node's updated_at from get"),
+  from_base_updated_at: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Required when the invert touches an edge. from node's updated_at from get"),
+  to_base_updated_at: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Required when the invert touches an edge. to node's updated_at from get"),
 });
 export type UndoInput = z.infer<typeof UndoInputSchema>;
