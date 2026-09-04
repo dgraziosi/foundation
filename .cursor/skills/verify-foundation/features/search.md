@@ -29,8 +29,8 @@ Preconditions:
 - **Type filter.** Choose a type in the first select (Any / type labels). The overlay searches even without a query. First-day note: `GET /view/api/search?type=note` returns `{ "searched": true, "hits": [] }`.
 - **Open hit.** When a hit exists, choose its title. Overlay closes. Detail page for that id.
 - **Close.** Choose **Close**. Overlay is gone. The surface underneath is unchanged.
-- **HTTP idle.** `GET /view/api/search` with the API key. `{ "searched": false, "hits": [] }`.
-- **HTTP miss.** `GET /view/api/search?q=zzzxnever` with the API key. `{ "searched": true, "hits": [] }`.
+- **HTTP idle.** `GET /view/api/search` with the vault key (view-key-file when present). `{ "searched": false, "hits": [] }`.
+- **HTTP miss.** `GET /view/api/search?q=zzzxnever` with the vault key (view-key-file when present). `{ "searched": true, "hits": [] }`.
 - **Proof.** Screenshot the overlay heading and idle or empty copy, or save the two JSON bodies. Feature id `search-idle` or `search-empty`.
 
 ## Gotchas

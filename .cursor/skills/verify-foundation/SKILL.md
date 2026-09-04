@@ -23,7 +23,7 @@ pstack's generic generator writes `.cursor/skills/verify-*`. This repo's product
 
 Do not write a live personal vault into git. Do not reintroduce Compose as install. Host programs: Postgres 16 on PATH (`initdb`, `pg_ctl`, `psql`) plus the app (`pnpm start`). The package name for Postgres is unknown in this repo — do not guess an installer.
 
-Journal write is on this branch. Home always offers **Today**, even at journal count 0. **Today** (or `/view/journal/today`) creates today's journal if none is live, then the page autosaves title and body. An empty title shows **Keep a title**. Unlock title is **Unlock**. The field is the vault key. The error is **That key did not unlock.** Other types stay display-only. Bots still write everything else through MCP.
+Journal write is on this branch. Home always offers **Today**, even at journal count 0. **Today** (or `/view/journal/today`) creates today's journal if none is live, then the page autosaves title and body. An empty title shows **Keep a title**. Unlock title is **Unlock.** The field is the vault key. The error is **That key did not unlock.** Other types stay display-only. Bots still write everything else through MCP.
 
 ## Launch
 
@@ -54,7 +54,7 @@ Viewer is then `http://127.0.0.1:8788/view`. Off-box is `VIEW_HOST=0.0.0.0` (`ht
 That script:
 
 1. Refuses if `GET /health` is already green and this run did not start it — do not drive a shared instance.
-2. Requires Node 22, `pnpm`, and Postgres 16 on PATH (`initdb`, `pg_ctl`, `psql`). If any are missing, it prints the gap and exits. It does not guess a package installer.
+2. Requires Node 22, `pnpm`, and Postgres 16 on PATH (`initdb`, `pg_ctl`, `psql`). If `initdb` / `pg_ctl` are missing from PATH but `/usr/lib/postgresql/16/bin` already has them (this repo's Docker / CI path), the helper puts that directory on PATH for the process. That is not guessing an installer. If the binaries are still missing, it prints the gap and exits. It does not guess a package installer.
 3. Makes an empty first-day folder under `$VERIFY_DATA_DIR` (default `/tmp/foundation-verify-$RUN_ID/data`).
 4. Starts through `scripts/keep-vault-up.sh` with env overrides only. Always passes a disposable `BACKUP_ROOT` under that run folder (`/tmp/foundation-verify-$RUN_ID/backups`) so an empty first-day vault does not see the clone's dumps. Always passes `DATABASE_URL=postgres://foundation:foundation@127.0.0.1:5432/foundation`. It does not forward an ambient `DATABASE_URL` onto disposable `FOUNDATION_DATA`.
 5. Loads `FOUNDATION_API_KEY` in this process (env, else this run's key file, else the clone `.env`, else mint). Writes that key to `/tmp/foundation-verify-$RUN_ID/api_key` (mode 0600). Not evidence. Not git. Does not print the key. Doctor and Unlock read that file when `FOUNDATION_API_KEY` is unset.

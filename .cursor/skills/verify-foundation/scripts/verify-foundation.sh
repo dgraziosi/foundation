@@ -341,8 +341,28 @@ verify_reclaim_failed_start() {
   return 0
 }
 
+# Docker / CI already install Postgres 16 here. Putting that directory
+# on PATH is not guessing an installer.
+verify_host_postgres16_bin() {
+  printf '%s\n' "${VERIFY_POSTGRES16_BIN:-/usr/lib/postgresql/16/bin}"
+}
+
+verify_use_host_postgres16() {
+  local bin
+  if command -v initdb >/dev/null 2>&1 && command -v pg_ctl >/dev/null 2>&1; then
+    return 0
+  fi
+  bin="$(verify_host_postgres16_bin)"
+  if [[ -x "${bin}/initdb" && -x "${bin}/pg_ctl" ]]; then
+    PATH="${bin}:${PATH}"
+    export PATH
+    echo "verify: put ${bin} on PATH for this process (host Postgres 16 already installed)"
+  fi
+}
+
 verify_toolchain() {
   local missing=0
+  verify_use_host_postgres16
   if ! command -v node >/dev/null 2>&1; then
     echo "doctor: node is not on PATH (need Node 22)" >&2
     missing=1

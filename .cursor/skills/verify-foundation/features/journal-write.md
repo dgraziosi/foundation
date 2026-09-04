@@ -1,6 +1,6 @@
 # Journal write
 
-Journal write is the Viewer's only write. After Unlock, **Today** on Home (or the journal collection, or `/view/journal/today`) creates today's New York calendar journal if none is live, then opens it as a page. The user edits the title and the markdown body. The window autosaves. Other types stay display-only. Bots still write everything else through MCP.
+Journal write is the Viewer's only write. After Unlock, **Today** on Home (or the journal collection, or `/view/journal/today`) creates today's journal for the vault timezone (seed: `America/New_York`) if none is live, then opens it as a page. The user edits the title and the markdown body. The window autosaves. Other types stay display-only. Bots still write everything else through MCP.
 
 ## Sub-features
 
@@ -24,11 +24,11 @@ Preconditions:
 
 - Doctor is green. Session unlocked. Viewer dist is built for a browser drive.
 - A first-day vault is enough: Today creates the day's journal. That is the allowed Viewer write. Do not MCP `upsert` a journal to stand in for it.
-- If launch cannot start (Postgres 16 not on PATH), prove the source contract (`pnpm --filter @foundation/viewer test`, including `journal page is a document` and the mounted leave-flush test) and do not mark a live write verified.
+- If launch cannot start after the helper has tried `/usr/lib/postgresql/16/bin`, prove the source contract (`pnpm --filter @foundation/viewer test`, including `journal page is a document` and the mounted leave-flush test) and do not mark a live write verified.
 
 - **Home door.** Open Home. Today is visible at journal count 0. Choose **Today**.
 - **Collection door.** Open `/view/types/journal`. Heading includes **Journal**. First-day: **Nothing yet.** Link **Today**.
-- **Today.** Choose **Today** (or open `/view/journal/today`). `[data-surface="journal-page"]`. Day label is the created calendar day. Title `aria-label="Title"` (first create: that calendar day, for example `September 1, 2026`). Editor placeholder **Write a first sentence.**
+- **Today.** Choose **Today** (or open `/view/journal/today`). `[data-surface="journal-page"]`. Day label is the created calendar day. Title `aria-label="Title"` (first create: that vault day's title, for example `September 4, 2026` on a seed New York vault). Editor placeholder **Write a first sentence.**
 - **Keep a title.** Clear the title. The page shows **Keep a title**. The write still uses that journal's calendar day, not wall-clock today on a past entry.
 - **Save.** Change the title and a sentence. Wait about a second. Reload the node or POST Today again. Title and body persisted.
 - **Leave flush.** Type, then leave before the debounce lands. Reopen. The flushed body is on the page when the person has not typed again. A clash or failed leave still shows the draft with **Couldn't save**, and a clash offers **Reload**.
@@ -43,3 +43,4 @@ Preconditions:
 - Do not call MCP `upsert` and call that Viewer journal write.
 - The cookie unlocks this write. It still does not unlock `/mcp` or agent `/blobs/:id`.
 - An empty title shows **Keep a title** and writes that journal's calendar day.
+- Server Today create/lookup follows `vault_settings.timezone` (seed `America/New_York`). Viewer chrome — Home's day, the page day label, and the empty-title fallback — still formats `America/New_York`. A first-day vault still matches New York.

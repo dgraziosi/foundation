@@ -35,6 +35,25 @@ got="$(verify_disposable_run_root "../x" "/tmp/foundation-verify-../x" || true)"
 verify_run_id_ok ".." && fail "run id .. must be invalid"
 verify_run_id_ok "20260901Tproof1" || fail "date-stamp run id must be valid"
 
+# Host Postgres 16 bins already installed at the Docker/CI path go on PATH.
+# That is not guessing an installer.
+pg16_bin="/tmp/foundation-verify-pg16-$$"
+mkdir -p -- "${pg16_bin}"
+printf '%s\n' '#!/bin/sh' 'exit 0' >"${pg16_bin}/initdb"
+printf '%s\n' '#!/bin/sh' 'exit 0' >"${pg16_bin}/pg_ctl"
+chmod +x "${pg16_bin}/initdb" "${pg16_bin}/pg_ctl"
+pg16_path="$(
+  PATH="/usr/bin:/bin" VERIFY_POSTGRES16_BIN="${pg16_bin}" bash -c '
+    source "$1"
+    verify_use_host_postgres16 >/dev/null
+    command -v initdb
+    command -v pg_ctl
+  ' bash "${helper}"
+)"
+[[ "${pg16_path}" == *"${pg16_bin}/initdb"* ]] || fail "helper should put host Postgres 16 initdb on PATH, got '${pg16_path}'"
+[[ "${pg16_path}" == *"${pg16_bin}/pg_ctl"* ]] || fail "helper should put host Postgres 16 pg_ctl on PATH, got '${pg16_path}'"
+rm -rf -- "${pg16_bin}"
+
 # Live cleanup of a direct-child VERIFY_DATA_DIR must leave /tmp and a canary.
 canary="/tmp/foundation-verify-canary-$$"
 run_id="wipeprobe$$"
@@ -586,6 +605,12 @@ done
 [[ "${map_blob}" == *"That key did not unlock"* ]] || fail "verify-foundation map must use person unlock error"
 [[ "${map_blob}" == *"view-key-file"* ]] || fail "verify-foundation map must name view-key-file"
 [[ "${map_blob}" == *"Keep a title"* ]] || fail "verify-foundation map must show Keep a title"
+[[ "${map_blob}" == *"vault timezone"* ]] || fail "journal map must say Today follows the vault timezone"
+[[ "${map_blob}" != *"creates today's New York calendar journal"* ]] || fail "journal map must not freeze Today to New York"
+grep -Fq 'Prove `collection-filtered` on **List**, not Board.' "${map_root}/features/collection.md" \
+  || fail "collection map must say prove filtered copy on List, not Board."
+grep -Fq '/usr/lib/postgresql/16/bin' "${helper}" || fail "helper must know the Docker/CI Postgres 16 bin path"
+grep -Fq 'verify_use_host_postgres16' "${helper}" || fail "helper must put host Postgres 16 bins on PATH when present"
 unlock_map="${map_root}/features/unlock.md"
 unlock_blob="$(cat "${unlock_map}")"
 [[ "${unlock_blob}" == *"-X POST http://127.0.0.1:8787/mcp"* ]] || fail "unlock cookie-scope must POST /mcp"

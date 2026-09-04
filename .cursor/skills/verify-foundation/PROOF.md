@@ -119,3 +119,29 @@ What that run drove:
 - Server tests on the throwaway `DATABASE_URL` ran (0 skipped). One host-cluster FTS snippet assertion missed `fiancée` in the headline. GitHub `verify` runs the same suite against the `pgvector/pgvector:pg16` service.
 
 Evidence: `.cursor/skills/verify-foundation/evidence/ci-postgres-50/` (gitignored).
+
+## Maintain run (20260904Tmaintain)
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20260904Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin` but not on the process PATH until the helper (this run) prepended that directory. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20260904Tmaintain`.
+
+Map corrections this run (source + live HTTP on a first-day vault):
+
+- Today create/lookup follows `vault_settings.timezone` (seed `America/New_York`). Viewer chrome still formats the day in New York.
+- Default task board columns hardcode **Nothing yet.** Prove `collection-filtered` on List.
+- Unlock heading is **Unlock.** HTTP Viewer calls use the vault key (view-key-file when present).
+- Helper puts `/usr/lib/postgresql/16/bin` on PATH when those binaries exist and `initdb` / `pg_ctl` are missing from PATH.
+
+What that run drove:
+
+- `verify-foundation.test.sh` (helper contracts, including the PATH prepend).
+- `pnpm --filter @foundation/viewer test` passed 75 tests.
+- Viewer build succeeded. Doctor: health `{ ok: true, service: foundation, db: up }`, Viewer GET 200, toolchain ok.
+- `verify-http-drive.sh` exited 0 (Unlock reject/accept, MCP key does not unlock, cookie does not open MCP, sixth wrong unlock 429, Home empty peek).
+- `verify-mcp-drive.sh` exited 0 (`POST /mcp` `tools/list`).
+- HTTP Collection: `GET /view/api/types/task` `type.label` Task, views board/list/calendar/timeline/outline, `nodes` `[]`.
+- HTTP Detail: `GET /view/api/nodes/00000000-0000-4000-8000-000000000000` 404 `{"error":"Not found"}`.
+- HTTP Search: idle `{ searched: false, hits: [] }`; `q=zzzxnever` and `type=note` `{ searched: true, hits: [] }`.
+- HTTP Journal write: `POST /view/api/journals/today` created type `journal`, `text/markdown`, empty body, title `September 4, 2026`. Second POST same id. `PATCH` title/body 200. Stale `base_updated_at` 409. PATCH non-journal skipped (no non-journal record; do not upsert).
+- Browser chrome was not clicked. Same-path HTTP was the drive.
+
+Evidence: `.cursor/skills/verify-foundation/evidence/20260904Tmaintain/` (gitignored).
