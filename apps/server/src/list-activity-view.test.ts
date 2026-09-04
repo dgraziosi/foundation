@@ -37,6 +37,7 @@ test("list_activity fields, diff_only, and schema_version", { skip: !databaseUrl
     }
     const updated = await upsertGraphNode(pool, {
       id: created.node.id,
+      type: "note",
       title: "diary note two",
       payload: { media_type: "text/plain", storage: "inline", body: "v2" },
       base_updated_at: created.node.updated_at,
