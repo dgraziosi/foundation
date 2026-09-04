@@ -26,6 +26,7 @@ import {
   type PoolClient,
 } from "@foundation/db";
 import {
+  ACTIVITY_SCHEMA_VERSION,
   EdgeSchema,
   NodeSchema,
   NodeTypeSchema,
@@ -588,6 +589,12 @@ export async function undoGraphActivity(
       return toolError(
         `Activity not found: ${input.id}`,
         "Pass an activity id from list_activity or a mutation's activity_id.",
+      );
+    }
+    if (row.schema_version !== ACTIVITY_SCHEMA_VERSION) {
+      return toolError(
+        `Unsupported activity snapshot schema_version ${row.schema_version}`,
+        `This vault understands schema_version ${ACTIVITY_SCHEMA_VERSION}.`,
       );
     }
     if (!row.reversible) {

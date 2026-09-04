@@ -72,6 +72,7 @@ import {
   SEARCH_UUID_SUGGESTION,
   encodeActivityCursor,
   encodeSearchCursor,
+  presentActivity,
   parseActivityCursor,
   parseSearchCursor,
   LOOKUP_NO_SELECTOR_SUGGESTION,
@@ -1529,7 +1530,9 @@ export async function listGraphActivity(
     cursor,
   });
   return {
-    activities: page.activities,
+    activities: page.activities.map((row) =>
+      presentActivity(row, { fields: input.fields, diff_only: input.diff_only }),
+    ),
     count: page.count,
     ...(page.next ? { next: encodeActivityCursor(page.next) } : {}),
   };
