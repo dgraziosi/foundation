@@ -450,6 +450,11 @@ export {
   type TypeIdentity,
 } from "./type-identity.js";
 export {
+  activitySnapshotDiff,
+  presentActivity,
+  projectActivity,
+} from "./activity-view.js";
+export {
   LIST_CURSOR_INVALID_SUGGESTION,
   encodeActivityCursor,
   encodeSearchCursor,
@@ -459,8 +464,11 @@ export {
   type SearchCursorValue,
 } from "./list-page.js";
 export {
+  ACTIVITY_FIELD_NAMES,
+  ACTIVITY_SCHEMA_VERSION,
   ActivityActionSchema,
   ActivityActorSchema,
+  ActivityFieldNameSchema,
   ActivitySchema,
   ActivityTargetKindSchema,
   BlobSchema,
@@ -492,6 +500,7 @@ export {
   RelationTypeSchema,
   TypeKindSchema,
   type Activity,
+  type ActivityFieldName,
   type Blob,
   type BootstrapOutput,
   type Edge,

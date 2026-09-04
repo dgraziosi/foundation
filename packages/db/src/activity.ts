@@ -1,4 +1,5 @@
 import {
+  ACTIVITY_SCHEMA_VERSION,
   ActivityActionSchema,
   ActivityActorSchema,
   ActivityTargetKindSchema,
@@ -25,6 +26,7 @@ type ActivityRow = {
   undone_at: Date | null;
   rationale: string | null;
   created_at: Date;
+  schema_version: number;
 };
 
 type ActivityListRow = ActivityRow & {
@@ -47,13 +49,14 @@ export function mapActivity(row: ActivityRow): Activity {
     undone_at: row.undone_at ? iso(row.undone_at) : null,
     rationale: row.rationale,
     created_at: iso(row.created_at),
+    schema_version: row.schema_version ?? ACTIVITY_SCHEMA_VERSION,
   };
 }
 
 const ACTIVITY_COLUMNS = `
   id, actor, actor_label, action, target_kind, target_id,
   before, after, reversible, undo_token, token_expires_at, undone_at,
-  rationale, created_at
+  rationale, created_at, schema_version
 `;
 
 export async function insertActivity(
@@ -76,10 +79,12 @@ export async function insertActivity(
   const { rows } = await db.query<{ id: string }>(
     `INSERT INTO activity (
        actor, actor_label, action, target_kind, target_id,
-       before, after, reversible, undo_token, token_expires_at, rationale
+       before, after, reversible, undo_token, token_expires_at, rationale,
+       schema_version
      ) VALUES (
        $1, $2, $3, $4, $5,
-       $6::jsonb, $7::jsonb, $8, $9, $10, $11
+       $6::jsonb, $7::jsonb, $8, $9, $10, $11,
+       $12
      )
      RETURNING id`,
     [
@@ -94,6 +99,7 @@ export async function insertActivity(
       undoToken,
       expires,
       row.rationale ?? null,
+      ACTIVITY_SCHEMA_VERSION,
     ],
   );
   return { id: rows[0]!.id };
