@@ -43,8 +43,8 @@ export type UrlIdentitySystem = (typeof URL_IDENTITY_SYSTEMS)[number];
 
 export const UrlIdentitySystemSchema = z.enum(URL_IDENTITY_SYSTEMS);
 export const UrlIdentitySchema = z.object({
-  system: UrlIdentitySystemSchema,
-  id: z.string().trim().min(1),
+  system: UrlIdentitySystemSchema.describe("gmail, calendar, or drive"),
+  id: z.string().trim().min(1).describe("Object id in that system"),
 });
 export type UrlIdentity = z.infer<typeof UrlIdentitySchema>;
 
@@ -54,8 +54,8 @@ export type RepoSystem = (typeof REPO_SYSTEMS)[number];
 
 export const RepoSystemSchema = z.enum(REPO_SYSTEMS);
 export const RepoRefSchema = z.object({
-  system: RepoSystemSchema,
-  id: z.string().trim().min(1),
+  system: RepoSystemSchema.describe("github"),
+  id: z.string().trim().min(1).describe("Object id in that system"),
 });
 export type RepoRef = z.infer<typeof RepoRefSchema>;
 
@@ -77,8 +77,8 @@ export type ReceiptRef = z.infer<typeof ReceiptRefSchema>;
 
 /** Unique live receipt lookup — system and id only. Kind lives on the stored node. */
 export const ReceiptLookupSchema = z.object({
-  system: ReceiptSystemSchema,
-  id: z.string().trim().min(1),
+  system: ReceiptSystemSchema.describe("gmail or calendar"),
+  id: z.string().trim().min(1).describe("Object id in that system"),
 });
 export type ReceiptLookup = z.infer<typeof ReceiptLookupSchema>;
 
@@ -113,27 +113,36 @@ export const ViewEngineIdSchema = z.enum(VIEW_ENGINE_IDS);
 export const ViewBindSchema = z.enum(VIEW_BINDS);
 
 export const ViewDeclarationSchema = z.object({
-  id: ViewEngineIdSchema,
+  id: ViewEngineIdSchema.describe("View engine: list, card, table, board, calendar, timeline, outline, or graph"),
   filter: z
     .object({
-      clauses: z.array(
-        z.object({
-          bind: ViewBindSchema,
-          op: z.enum(["eq", "in"]),
-          value: z.union([z.string(), z.array(z.string())]),
-        }),
-      ),
+      clauses: z
+        .array(
+          z.object({
+            bind: ViewBindSchema.describe("Which bound field to filter"),
+            op: z.enum(["eq", "in"]).describe("eq matches one value; in matches any of a list"),
+            value: z
+              .union([z.string(), z.array(z.string())])
+              .describe("Filter value, or a list when op is in"),
+          }),
+        )
+        .describe("Filter clauses applied together"),
     })
-    .optional(),
+    .optional()
+    .describe("Optional filter on bound fields"),
   sort: z
     .array(
       z.object({
-        bind: ViewBindSchema,
-        dir: z.enum(["asc", "desc"]),
+        bind: ViewBindSchema.describe("Which bound field to sort"),
+        dir: z.enum(["asc", "desc"]).describe("Sort direction"),
       }),
     )
-    .optional(),
-  group: z.object({ bind: ViewBindSchema }).optional(),
+    .optional()
+    .describe("Optional sort keys in order"),
+  group: z
+    .object({ bind: ViewBindSchema.describe("Which bound field to group by") })
+    .optional()
+    .describe("Optional group-by on one bound field"),
 });
 
 export const TypeFieldSchema = z.object({
