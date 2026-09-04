@@ -4,7 +4,7 @@ Unlock is the door to the Viewer. The person types the vault key. When `FOUNDATI
 
 ## Sub-features
 
-- `unlock-door` shows **Unlock** when the session is missing or 401. The field is **Vault key**.
+- `unlock-door` shows **Unlock.** when the session is missing or 401. The field is **Vault key**.
 - `unlock-reject` keeps the door and shows **That key did not unlock.** for a wrong key. JSON `POST /view/unlock` uses the same error.
 - `unlock-accept` accepts the key, sets `foundation_key` (`Path=/view`; HttpOnly; SameSite=Strict), and proceeds to Home.
 - `unlock-cookie-scope` proves the cookie does not unlock `/mcp` or `/blobs/:id`.

@@ -23,11 +23,11 @@ Preconditions:
 - A first-day vault has no user records. Use `detail-missing` with a made-up UUID, or skip `detail-open` and say there was no live record. Do not upsert a fake life to force a title.
 
 - **Missing.** Open `/view/nodes/00000000-0000-4000-8000-000000000000`. Copy **Not found.**
-- **HTTP missing.** `GET /view/api/nodes/00000000-0000-4000-8000-000000000000` with the API key. Status `404`. Body `{"error":"Not found"}`.
+- **HTTP missing.** `GET /view/api/nodes/00000000-0000-4000-8000-000000000000` with the vault key (view-key-file when present). Status `404`. Body `{"error":"Not found"}`.
 - **Open from Home or collection.** When a real record exists on this vault, choose its title. Path `/view/nodes/<uuid>`. Heading is that title. `[data-surface="detail-page"]` is present. Properties column heading **Properties**.
 - **Open from search.** From the search overlay, choose a hit. Same detail page. Overlay closes.
-- **Close.** Choose the strip button `aria-label="Close <title>"`. The tab to the left activates, or Home.
-- **HTTP get.** `GET /view/api/nodes/<uuid>` with the API key. Body includes `node.title`, `node.type`, `node.status`, `node.data`. Display only.
+- **Close.** Choose the strip button `aria-label="Close <title>"` after a click-open (the tab label is that title). A deep-link to `/view/nodes/:id` keeps the tab label `Detail`, so the control is `Close Detail`.
+- **HTTP get.** `GET /view/api/nodes/<uuid>` with the vault key (view-key-file when present). Body includes `node.title`, `node.type`, `node.status`, `node.data`. Display only.
 - **Proof.** Screenshot the detail heading and Properties, or save the 404 body for `detail-missing`. Feature id `detail-missing` is enough on a first-day vault.
 
 ## Gotchas

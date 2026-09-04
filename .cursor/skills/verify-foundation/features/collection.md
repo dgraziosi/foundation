@@ -31,7 +31,7 @@ Preconditions:
 - **View switcher.** `aria-label="View"` lists only declared ids (task seed: Board, List, Calendar, Timeline, Outline). Choosing **List** keeps the same type and changes the layout, not the route.
 - **Show completed.** `aria-label="Show completed"` is a toggle. It widens an active status filter for this window. Home Open tasks must not change.
 - **Graph.** If the type names `graph`, that layout uses `[data-surface="graph"]` (floor 460px). Click a node: detail page. Right-click a node: local graph, depth 1–4, default 2.
-- **HTTP.** `GET /view/api/types/task` with the API key. Body has `type.label`, `type.views`, `nodes`. First-day: `nodes` is `[]`.
+- **HTTP.** `GET /view/api/types/task` with the vault key (view-key-file when present). Body has `type.label`, `type.views`, `nodes`. First-day: `nodes` is `[]`.
 - **Proof.** Screenshot the collection heading and empty copy, or save the type JSON. Feature id `collection-empty` or `collection-open`.
 
 ## Gotchas
@@ -40,3 +40,4 @@ Preconditions:
 - Count in the heading is after the active view's filter, not always the live type count on Home folders.
 - `journal` as a collection is a list of journal records. **Today** on that heading leaves the list for [Journal write](./journal-write.md). Do not treat the list as the write page.
 - Do not treat MCP `search { type }` as a collection proof. Drive `/view/types/<slug>` or `GET /view/api/types/<slug>`.
+- Default task **board** columns hardcode **Nothing yet.** even when the page-level empty string is **Nothing matches your filters.** Prove `collection-filtered` on **List**, not Board.

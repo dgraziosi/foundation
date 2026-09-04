@@ -34,7 +34,7 @@ Preconditions:
 - **Tasks View all.** Choose Open tasks **View all**. Path `/view/types/task`. The collection heading includes **Task**.
 - **Type folder.** When a folder is shown (count > 0), choose it. Path `/view/types/<slug>`. Types with count 0 do not appear.
 - **Open a row.** Choose a Recents or open-task title. Path `/view/nodes/<uuid>`. `[data-surface="detail-page"]` and that title as the page heading. A journal with inline markdown opens the write page instead.
-- **HTTP Home widgets.** `GET /view/api/recents?limit=5` and `GET /view/api/tasks?limit=5` and `GET /view/api/ontology` and `GET /view/api/journals/today` with the API key. The window caps Recents and Open tasks at 5. Empty first-day: `rows` and `tasks` are `[]`. Today peek may be `{ "node": null }`. Ontology lists types; folders in the window are those with `count > 0`.
+- **HTTP Home widgets.** `GET /view/api/recents?limit=5` and `GET /view/api/tasks?limit=5` and `GET /view/api/ontology` and `GET /view/api/journals/today` with the vault key (view-key-file when present). The window caps Recents and Open tasks at 5. Empty first-day: `rows` and `tasks` are `[]`. Today peek may be `{ "node": null }`. Ontology lists types; folders in the window are those with `count > 0`.
 - **Proof.** Screenshot Home with Today, Recents, and Open tasks visible, or save the JSON bodies (no personal titles if you drove a user's vault). Feature id `home-today` or `home-empty`.
 
 ## Gotchas
