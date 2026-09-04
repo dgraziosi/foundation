@@ -6,6 +6,18 @@ Historical proof runs below may mention older door copy. The current window is t
 
 Live journal HTTP was not driven on the VMs that ran these proofs. Host Postgres 16 was not on PATH (`initdb`, `pg_ctl`, `psql`). That is a run limitation. The feature is on the branch.
 
+## Named proof `activity-prune-12`
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=activity-prune-12`). Doctor green. `tools/list` returned 15 tools. No prune tool. No `get_vault_health`.
+
+MCP on `http://127.0.0.1:8787/mcp`:
+
+1. Two `upsert` writes on one note left create + update activity. Both rows carried `schema_version` `1`. Default `list_activity` `{ target }` returned full snapshots (count 2).
+2. SQL aged the create row past one day. `UPDATE vault_settings.activity_retention_days` to `1`. `scripts/activity-prune.sh` / `pnpm --filter @foundation/db prune-activity` deleted 1. The recent update stayed. Its undo token stayed.
+3. `list_activity` `{ fields: ["id", "action", "schema_version"] }` returned only those keys. `{ diff_only: true }` returned changed `title` / `payload` / `updated_at` and omitted unchanged `id`. Default `list_activity` still returned a full snapshot with `schema_version`.
+4. `job` `{ action: "claim", name: "activity-prune" }` held the name. `finish` opened it and stamped last run.
+5. Cleanup removed the disposable run root. Evidence stayed under `.cursor/skills/verify-foundation/evidence/activity-prune-12/`. Keys and bodies were redacted.
+
 ## Named proof `vault-settings-11`
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=vault-settings-11`). Doctor green. Fresh `vault_settings` row was timezone `America/New_York`, working-set cap 40, due window 14.

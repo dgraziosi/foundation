@@ -198,6 +198,29 @@ export const ActivityActionSchema = z.enum([
 ]);
 export const ActivityTargetKindSchema = z.enum(["node", "edge", "type", "relation"]);
 
+export const ACTIVITY_SCHEMA_VERSION = 1;
+
+export const ACTIVITY_FIELD_NAMES = [
+  "id",
+  "actor",
+  "actor_label",
+  "action",
+  "target_kind",
+  "target_id",
+  "before",
+  "after",
+  "reversible",
+  "undo_token",
+  "token_expires_at",
+  "undone_at",
+  "rationale",
+  "created_at",
+  "schema_version",
+] as const;
+
+export const ActivityFieldNameSchema = z.enum(ACTIVITY_FIELD_NAMES);
+export type ActivityFieldName = z.infer<typeof ActivityFieldNameSchema>;
+
 export const ActivitySchema = z.object({
   id: z.string().uuid(),
   actor: ActivityActorSchema,
@@ -213,6 +236,7 @@ export const ActivitySchema = z.object({
   undone_at: z.string().nullable(),
   rationale: z.string().nullable(),
   created_at: z.string(),
+  schema_version: z.number().int().min(1),
 });
 export type Activity = z.infer<typeof ActivitySchema>;
 

@@ -174,7 +174,9 @@ flowchart LR
   batch_link --> activity
 ```
 
-`list_activity` `{ target: <node id> }` is the diary for that node. Newest first. Default limit 50, max 200. `since` is a time window (`created_at >=`), not a page. After a full page, send `next` as `cursor`. `count` matches the same filters. `get` does not include these rows.
+`list_activity` `{ target: <node id> }` is the diary for that node. Newest first. Default limit 50, max 200. `since` is a time window (`created_at >=`), not a page. After a full page, send `next` as `cursor`. `count` matches the same filters. Omit `fields` and `diff_only` for the full snapshot. `fields` projects keys. `diff_only` returns changed top-level `before` / `after` keys. New rows stamp `schema_version` (today `1`). `get` does not include these rows.
+
+Host script [`scripts/activity-prune.sh`](../scripts/activity-prune.sh) deletes activity older than `vault_settings.activity_retention_days` (seed 365). Changing that row changes the cutoff. Rows inside the window stay. Undo tokens on retained rows still work. Bots may claim job name `activity-prune` before the pass. No prune MCP tool.
 
 ## Job leases
 
@@ -213,7 +215,7 @@ Empty `{}` is an error (no `list_nodes` tool). `{ cursor }` with no filter is th
 
 `lookup` is a separate read-only tool: batch name resolution with a result per input. Unique folded title, unique user alias, or UUID may bind. Token and fuzzy matches are candidates that need user confirmation before a write. Each useful candidate includes `id`, `type`, canonical `title`, `updated_at`, `match`, and `confidence` plus the surrounding `candidates` list. `confidence` ranks; it is not a probability and does not authorize a write. Title folding uses generated `title_norm` / `title_compact` and trigram indexes. Aliases stay on `data.aliases` (JSONB unnest). Create-time `upsert` (no `id`) uses the same matcher: exact/alias hits refuse unless `allow_duplicate` is set; fuzzy hits warn. Not embeddings.
 
-`working_set` is a separate read-only tool over the same nodes and edges. Given one live id, it returns the actionable set around that root: open work, dues, and the parent chain when the type has `parent_types`. Walks use the live ontology (hierarchy kind and `parent_types`, associative about-targets, `start`/`end` date roles). The graph shape is unchanged. Caps and a due window keep a spine-root (`area`) from dumping a life. Those defaults and the “today” clock come from the one-row `vault_settings` table (seed timezone `America/New_York`). Retention and spine-root columns sit on that row for later prune and backup; this pass does not prune activity. After `lookup` binds a name, this is the one agenda call. It is not the rewrite loop — `get` is the record, `list_activity` `{ target }` is the diary. Age-decay on this agenda is out of this amendment. Parameters: [`MCP_TOOLS.md`](./MCP_TOOLS.md).
+`working_set` is a separate read-only tool over the same nodes and edges. Given one live id, it returns the actionable set around that root: open work, dues, and the parent chain when the type has `parent_types`. Walks use the live ontology (hierarchy kind and `parent_types`, associative about-targets, `start`/`end` date roles). The graph shape is unchanged. Caps and a due window keep a spine-root (`area`) from dumping a life. Those defaults and the “today” clock come from the one-row `vault_settings` table (seed timezone `America/New_York`). Activity prune reads `activity_retention_days` from that row. After `lookup` binds a name, this is the one agenda call. It is not the rewrite loop — `get` is the record, `list_activity` `{ target }` is the diary. Age-decay on this agenda is out of this amendment. Parameters: [`MCP_TOOLS.md`](./MCP_TOOLS.md).
 
 ```mermaid
 flowchart TB

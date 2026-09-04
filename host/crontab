@@ -2,4 +2,5 @@
 # Do not commit a home path.
 */15 * * * * /path/to/the/clone/scripts/keep-vault-up.sh
 @reboot /path/to/the/clone/scripts/keep-vault-up.sh
+30 2 * * * /path/to/the/clone/scripts/activity-prune.sh
 0 3 * * * /path/to/the/clone/scripts/backup-vault.sh

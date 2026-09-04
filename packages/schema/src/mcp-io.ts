@@ -10,6 +10,7 @@ import {
 import {
   ActivityActionSchema,
   ActivityActorSchema,
+  ActivityFieldNameSchema,
   ActivitySchema,
   BlobSchema,
   EdgeSchema,
@@ -691,11 +692,13 @@ export const ListActivityInputSchema = z.object({
   since: z.string().min(1).optional(),
   limit: z.number().int().min(1).max(200).optional(),
   cursor: z.string().min(1).optional(),
+  fields: z.array(ActivityFieldNameSchema).min(1).optional(),
+  diff_only: z.boolean().optional(),
 });
 export type ListActivityInput = z.infer<typeof ListActivityInputSchema>;
 
 export const ListActivitySuccessSchema = z.object({
-  activities: z.array(ActivitySchema),
+  activities: z.array(ActivitySchema.partial()),
   count: z.number().int().min(0),
   next: z.string().min(1).optional(),
 });
