@@ -18,11 +18,6 @@ import {
   WorkingSetInputSchema,
 } from "./mcp-io.js";
 
-/**
- * Shapes `defineTool` advertises on `tools/list`.
- * Search lists `SearchInputListedSchema`, not the wire/parse schema.
- * Bootstrap has no parameters.
- */
 const ADVERTISED_MCP_INPUT_SCHEMAS: Record<string, ZodTypeAny> = {
   bootstrap: z.object({}),
   search: SearchInputListedSchema,
