@@ -1,1 +1,1 @@
-| `upsert` | Create or update a node (title, type, payload, data, status). Always pass `type` on create and update. Passing `payload` replaces that body; omit it and the body stays. Updates require `base_updated_at`. Create accepts `idempotency_key`. Create (no id) preflights duplicates via `lookup`. Blob ingest via `bytes_base64` or `source_path`. Returns `suggested_links` (proposals only). |
+FILE_CONTENT_PLACEHOLDER_USE_SHELL_INSTEAD
