@@ -6,6 +6,17 @@ Historical proof runs below may mention older door copy. The current window is t
 
 Live journal HTTP was not driven on the VMs that ran these proofs. Host Postgres 16 was not on PATH (`initdb`, `pg_ctl`, `psql`). That is a run limitation. The feature is on the branch.
 
+## Named proof `zod-describe-13`
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=zod-describe-13`). Doctor green after Viewer build. `tools/list` returned 15 tools. No new tool.
+
+MCP on `http://127.0.0.1:8787/mcp`:
+
+1. `tools/list` advertised non-empty Zod parameter descriptions on `search`, `upsert`, `list_activity`, and `job`, including nested `search.url.system` / `search.url.id`.
+2. `pnpm --filter @foundation/schema test` passed, including `mcp-input-describe.test.ts`. A probe object with JSDoc and no `.describe()` failed the walker, then the real listed shapes passed.
+3. GitHub `verify` gates on this machine: schema 216 pass; viewer 75 pass; viewer build; `skills-layout`, `drift-read`, `foundation-init`, `mint-api-key`, `require-database-url` ok; `verify-http-drive` and `verify-mcp-drive` ok. Server tests on the throwaway `DATABASE_URL` passed except the known host-cluster FTS headline miss (`fiancée` not in the payload snippet). That miss is not this slice.
+4. Cleanup removed the disposable run root. Evidence stayed under `.cursor/skills/verify-foundation/evidence/zod-describe-13/`. Keys were redacted.
+
 ## Named proof `activity-prune-12`
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=activity-prune-12`). Doctor green. `tools/list` returned 15 tools. No prune tool. No `get_vault_health`.
