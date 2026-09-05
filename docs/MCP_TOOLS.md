@@ -1,1 +1,1 @@
-FILE_CONTENT_PLACEHOLDER_USE_SHELL_INSTEAD
+$include:/workspace/mcp-tools-patched.md
