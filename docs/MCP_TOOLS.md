@@ -1,1 +1,1 @@
-$include:/workspace/mcp-tools-patched.md
+file:///workspace/mcp-tools-patched.md
