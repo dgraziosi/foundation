@@ -45,7 +45,7 @@ Keep implementation details out of the map. Name only user paths, stable handles
 
 - [Unlock](./unlock.md) covers the door: wrong key, right key, session, cookie scope.
 - [Home](./home.md) covers Today (always, including journal count 0), Recents, open tasks, type folders, and empty copy.
-- [Collection](./collection.md) covers a type's declared layouts, empty/filtered copy, and Show completed.
+- [Collection](./collection.md) covers a type's declared layouts, empty/filtered copy, Show completed, and the parent-types line when the type names allowed parents.
 - [Detail](./detail.md) covers opening one record as a page from Home, collection, Recents, search, or graph.
 - [Search](./search.md) covers the rail overlay, query, type/status filters, and opening a hit.
 - [Journal write](./journal-write.md) covers Today, the journal page, and autosave. Other types stay display-only.
