@@ -11,7 +11,7 @@ Destructive tools need a key with destructive scope or they return `{ error, sug
 | `lookup` | Resolve one or more names to live nodes. One result per input (`exact` / `alias` / `candidate` / `ambiguous` / `no_match`). Read-only. |
 | `get` | Return the record: payload, data, incident edges with neighbor titles, and `suggested_links` from title FTS. Does not return activity. Blob payloads return metadata, not bytes. |
 | `working_set` | Return the actionable working set around one live node: open work, dues, and the parent chain when the root hangs under something. |
-| `upsert` | Create or update a node (title, type, payload, data, status). Passing `payload` replaces that body; omit it and the body stays. Updates require `base_updated_at`. Create accepts `idempotency_key`. Create (no id) preflights duplicates via `lookup`. Blob ingest via `bytes_base64` or `source_path`. Returns `suggested_links` (proposals only). |
+| `upsert` | Create or update a node (title, type, payload, data, status). Always pass `type` on create and update. Passing `payload` replaces that body; omit it and the body stays. Updates require `base_updated_at`. Create accepts `idempotency_key`. Create (no id) preflights duplicates via `lookup`. Blob ingest via `bytes_base64` or `source_path`. Returns `suggested_links` (proposals only). |
 | `delete` | Soft-delete a node. Needs a key with destructive scope and `base_updated_at` from `get`. |
 | `link` | Create typed edges after validation. One edge or `edges[]` (1–20). Whole batch validates; one transaction writes all or none. Requires endpoint if-match. |
 | `unlink` | Remove a typed edge. Needs a key with destructive scope and endpoint if-match. |
@@ -104,7 +104,7 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 
 ### `upsert`
 
-- **In:** `{ id?, type, title, payload?, data?, url?, status?, metadata?, base_updated_at?, idempotency_key?, allow_duplicate? }`
+- **In:** `{ id?, type, title, payload?, data?, url?, status?, metadata?, base_updated_at?, idempotency_key?, allow_duplicate? }` — `type` is required on create and update.
 - **Out:** `{ node, activity_id, suggested_links, duplicate_warnings? }` or `{ error, suggestion?, outcome?, candidates? }`
 - **`suggested_links`:** Postgres FTS on the new title (create, and update when the title changes) — not embeddings. Each item is `{ kind, target: { id, type, title }, reason }`. `kind` is a live relation slug. `target` is a **live** node that already exists. How they are chosen: spine types with `parent_types` → the live hierarchy relation (`kind: hierarchy`) to a live allowed parent whose title matches; if the title matches a node whose type sits in an associative relation’s `target_types` (seed `about` → `person`) → that relation; otherwise the unconstrained associative (empty source and target, seed `relates_to`). Skip self. Skip nodes already linked to this one. A node with a live hierarchy parent is not offered a second parent (targeted / unconstrained suggestions may still appear). Cap 5. Empty graph or no match → `[]`. **Never creates an edge.** Never adds a type or relation. `link` is how an accepted suggestion becomes an edge. Show non-empty suggestions and ask before calling `link`.
 - `payload`: `{ media_type, storage: "inline"|"blob", body?, blob_id?, bytes_base64?, source_path? }`. On update, passing `payload` **replaces** that body. Omit `payload` and the body stays. A named bot that rewrites a record passes the new short `payload` and `base_updated_at` from `get`.
