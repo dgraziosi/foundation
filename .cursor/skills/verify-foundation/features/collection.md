@@ -4,7 +4,7 @@ Collection is one type's records in the layouts that type declared. The user ope
 
 ## Sub-features
 
-- `collection-open` opens `/view/types/<slug>` with the type label and the count after the active view's filter.
+- `collection-open` opens `/view/types/<slug>` with the type label and the count after the active view's filter. When the type has `parent_types`, a quiet line `data-constraint="parent_types"` reads **May hang under** plus those type labels.
 - `collection-empty` shows **Nothing yet.** when the type has no live records.
 - `collection-filtered` shows **Nothing matches your filters.** when records exist but the active view filter hides them.
 - `collection-views` lists only the view names that type declared (`aria-label="View"`).
@@ -26,12 +26,12 @@ Preconditions:
 - Doctor is green. Session unlocked.
 - Seed types already declare views. `task` default is **board**. `journal` default is **list**. A first-day vault can still open `/view/types/task` and show **Nothing yet.**
 
-- **Open tasks.** From Home, choose Open tasks **View all**, or go to `/view/types/task`. Heading includes **Task**. `[data-surface="view-strip"]` has a Task tab.
+- **Open tasks.** From Home, choose Open tasks **View all**, or go to `/view/types/task`. Heading includes **Task**. `[data-surface="view-strip"]` has a Task tab. First-day `task` also shows **May hang under** Goal, Project (`data-constraint="parent_types"`). Types with empty `parent_types` (seed `journal`) omit that line.
 - **Empty.** On a type with no live records, copy is **Nothing yet.**
 - **View switcher.** `aria-label="View"` lists only declared ids (task seed: Board, List, Calendar, Timeline, Outline). Choosing **List** keeps the same type and changes the layout, not the route.
 - **Show completed.** `aria-label="Show completed"` is a toggle. It widens an active status filter for this window. Home Open tasks must not change.
 - **Graph.** If the type names `graph`, that layout uses `[data-surface="graph"]` (floor 460px). Click a node: detail page. Right-click a node: local graph, depth 1–4, default 2.
-- **HTTP.** `GET /view/api/types/task` with the vault key (view-key-file when present). Body has `type.label`, `type.views`, `nodes`. First-day: `nodes` is `[]`.
+- **HTTP.** `GET /view/api/types/task` with the vault key (view-key-file when present). Body has `type.label`, `type.views`, `type.parent_types`, `nodes`. First-day: `nodes` is `[]`. Seed `task` `parent_types` is `["goal","project"]` (labels Goal, Project). Seed `journal` `parent_types` is `[]`.
 - **Proof.** Screenshot the collection heading and empty copy, or save the type JSON. Feature id `collection-empty` or `collection-open`.
 
 ## Gotchas
@@ -41,3 +41,4 @@ Preconditions:
 - `journal` as a collection is a list of journal records. **Today** on that heading leaves the list for [Journal write](./journal-write.md). Do not treat the list as the write page.
 - Do not treat MCP `search { type }` as a collection proof. Drive `/view/types/<slug>` or `GET /view/api/types/<slug>`.
 - Default task **board** columns hardcode **Nothing yet.** even when the page-level empty string is **Nothing matches your filters.** Prove `collection-filtered` on **List**, not Board.
+- **May hang under** is ontology chrome from `parent_types`. First-day `task` shows it with an empty list. It is not a load error and not a live record.

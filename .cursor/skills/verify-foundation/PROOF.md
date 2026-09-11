@@ -4,7 +4,30 @@ Journal write is on this branch. Home always offers **Today**, even at journal c
 
 Historical proof runs below may mention older door copy. The current window is the paragraph above.
 
-Live journal HTTP was not driven on the VMs that ran these proofs. Host Postgres 16 was not on PATH (`initdb`, `pg_ctl`, `psql`). That is a run limitation. The feature is on the branch.
+Early generate/maintain VMs lacked host Postgres 16 on PATH and did not drive live `/view` HTTP. Later maintain runs that could start a throwaway vault did.
+
+## Maintain run (20260911Tmaintain)
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20260911Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20260911Tmaintain`.
+
+Map corrections this run (source + live HTTP on a first-day vault):
+
+- Collection and detail Properties show **May hang under** plus allowed parent labels when the type has `parent_types` (`data-constraint="parent_types"`). First-day `task` is `["goal","project"]` (Goal, Project). Seed `journal` omits the line.
+
+What that run drove:
+
+- `verify-foundation.test.sh` exited 0.
+- `pnpm --filter @foundation/viewer test` passed 75 tests.
+- Viewer build succeeded. Doctor: health `{ ok: true, service: foundation, db: up }`, Viewer GET 200, toolchain ok.
+- `verify-http-drive.sh` exited 0 (Unlock reject/accept, MCP key does not unlock, cookie does not open MCP, sixth wrong unlock 429, Home empty peek).
+- `verify-mcp-drive.sh` exited 0 (`POST /mcp` `tools/list`).
+- HTTP Collection: `GET /view/api/types/task` `type.label` Task, views board/list/calendar/timeline/outline, `parent_types` `["goal","project"]`, `nodes` `[]`. `GET /view/api/types/journal` `parent_types` `[]`, `nodes` `[]`.
+- HTTP Detail: `GET /view/api/nodes/00000000-0000-4000-8000-000000000000` 404 `{"error":"Not found"}`.
+- HTTP Search: idle `{ searched: false, hits: [] }`; `q=zzzxnever` and `type=note` `{ searched: true, hits: [] }`.
+- HTTP Journal write: `POST /view/api/journals/today` created type `journal`, `text/markdown`, empty body, title `September 11, 2026`. Second POST same id. `PATCH` title/body 200. Stale `base_updated_at` 409. PATCH non-journal skipped (no non-journal record; do not upsert).
+- Browser chrome was not clicked. Same-path HTTP was the drive.
+
+Evidence: `.cursor/skills/verify-foundation/evidence/20260911Tmaintain/` (gitignored).
 
 ## Named proof `activity-prune-12`
 

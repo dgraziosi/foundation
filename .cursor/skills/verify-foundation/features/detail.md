@@ -6,7 +6,7 @@ Detail is one non-journal record as a page in the content host. It is not a dock
 
 - `detail-open` fills the main pane at `/view/nodes/<uuid>` with `[data-surface="detail-page"]` and the record title as the heading (non-journal, or a journal that is not inline markdown).
 - `detail-missing` shows **Not found.** for a bad or unknown id.
-- `detail-properties` shows type, status, fields, related records, location, and timestamps. **Open** appears only when `data.url` is a well-formed https address.
+- `detail-properties` shows type, status, fields, related records, location, and timestamps. When the type has `parent_types`, the same **May hang under** line as collection appears (`data-constraint="parent_types"`). **Open** appears only when `data.url` is a well-formed https address.
 - `detail-structure` shows Structure when there are children, or an ancestor chain the type asks for.
 - `detail-close` closes the detail tab and activates the tab to its left, or Home when that was the last one.
 
@@ -37,3 +37,4 @@ Preconditions:
 - Blob body in the window is `GET /view/blobs/:id` (cookie or Authorization). Agents still use `GET /blobs/:id` with the header.
 - Do not prove detail by calling MCP `get` only. The user path is the page or `/view/api/nodes/:id`.
 - A journal with inline `text/markdown` does not get this chrome. The same `/view/nodes/:id` route renders [Journal write](./journal-write.md) (`[data-surface="journal-page"]`, no Properties). Do not score that as a failed `detail-open`.
+- First-day skip `detail-open`. The Properties **May hang under** line is the same chrome as collection. Prove `type.parent_types` on `GET /view/api/types/task` (`["goal","project"]`) instead of upserting a task.

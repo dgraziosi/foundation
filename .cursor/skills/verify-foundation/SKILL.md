@@ -112,6 +112,7 @@ Stable handles (prefer these over coordinates):
 | `[data-surface="view-strip"]` | Content-host strip. Pinned `Home` plus open collection/detail tabs |
 | `[data-surface="detail-page"]` | Detail page |
 | `[data-surface="graph"]` | Collection graph layout |
+| `data-constraint="parent_types"` | Quiet **May hang under** plus allowed parent labels. Collection heading and detail Properties when the type has `parent_types` |
 | `[data-surface="journal-page"]` | Journal write page (not Properties) |
 | `aria-label="Title"` | Journal title. Empty title shows **Keep a title** |
 | `[data-editor="live-markdown"]` | Journal body. Placeholder `Write a first sentence.` |
