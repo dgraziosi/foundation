@@ -48,6 +48,7 @@ jobs:
       - run: pnpm --filter @foundation/viewer test
       - run: bash scripts/skills-layout.test.sh
       - run: bash scripts/drift-read.test.sh
+      - run: bash scripts/foundation-portability.test.sh
       - run: bash scripts/foundation-init.test.sh
       - run: bash scripts/mint-api-key.test.sh
       - run: pnpm --filter @foundation/viewer build
@@ -86,6 +87,8 @@ jobs:
         run: bash .cursor/skills/verify-foundation/scripts/verify-http-drive.sh
       - name: Prove MCP client round-trip
         run: bash .cursor/skills/verify-foundation/scripts/verify-mcp-drive.sh
+      - name: Prove export and import
+        run: bash .cursor/skills/verify-foundation/scripts/verify-export-import-45.sh
       - name: Cleanup throwaway vault
         if: always()
         run: .cursor/skills/verify-foundation/scripts/verify-foundation.sh cleanup

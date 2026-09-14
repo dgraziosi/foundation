@@ -287,6 +287,7 @@ One type, one line, one envelope on the project. Agents record validated fields 
 - Localhost MCP at `http://127.0.0.1:8787/mcp` with `Authorization: ApiKey <key>`. `FOUNDATION_API_KEY` is the bootstrap root key. Named keys live in `$FOUNDATION_DATA/api-keys.json` (hashes only). Mint with `scripts/mint-api-key.sh`.
 - Window at `/view` (not a second store). The person types the vault key. When `FOUNDATION_VIEW_KEY` is set, that is the vault key; MCP keys do not open the window. When unset, the house key (`FOUNDATION_API_KEY` / named keys) still opens it. MCP / health / agent blobs on `127.0.0.1:8787` and `/view` on `8788` (`http://127.0.0.1:8788/view`). Off-box is `VIEW_HOST=0.0.0.0` (`http://<this-host>:8788/view`). Unlock with the vault key, HttpOnly cookie `Path=/view`. After unlock: Home is Today (always, even at journal count 0), Since you last looked (bot activity since the last Home look, or last 24 hours on a first visit, cap 5), Recents (5, newest first), open tasks (5, due-urgency), and type folders for types that have live objects. Collection and Detail are pages in the content host. A journal opens a writing page (title + markdown body, autosave, if-match). Other live records edit title, status, and declared scalar fields on detail (same if-match). Activity and Trash are window pages. Search is a rail overlay. The rail is Home, Trash, and Search. A click on a record or graph node opens that object's detail page — not a docked inspector. Types carry hue and glyph; Viewer reads them. Dark is first paint; Light and System are real choices. A stored `paper` choice reads as Light. The cookie does not unlock `/mcp` or `/blobs/:id`. Contract: [`VIEWER.md`](./VIEWER.md).
 - Blobs: `$FOUNDATION_DATA/blobs/<uuid>`; ingest on `upsert`; bytes via `GET /blobs/:id`
+- One-shot portability is a host script on the same machine ([`PORTABILITY.md`](./PORTABILITY.md)). `scripts/foundation-export.sh` writes JSON, Markdown-per-type, and CSV-per-type from live records. `scripts/foundation-import.sh --from` reads Obsidian, Notion, Apple Notes, or Google Tasks and `upsert`s live records. Re-runs use `idempotency_key`. This is not a standing sync and not an MCP tool.
 
 ## Locked (do not reopen)
 
@@ -296,7 +297,7 @@ One type, one line, one envelope on the project. Agents record validated fields 
 
 - Mobile app, Watch, Apple auth, billing, iCloud vault sync
 - Multi-tenant SaaS, complex OAuth for third parties
-- Dual write to a markdown vault + database (one store)
+- Dual write to a markdown vault + database (one store). One-shot export and import are host scripts. See [`PORTABILITY.md`](./PORTABILITY.md).
 - Proposal/approve inbox for ontology changes
 - Write-ACL / default-deny beyond the API key and its scopes
 - Bank / card import, a second ledger, double-entry accounting, a rollup tool, or stored remaining on `project`
