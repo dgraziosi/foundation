@@ -6,6 +6,23 @@ Historical proof runs below may mention older door copy. The current window is t
 
 Early generate/maintain VMs lacked host Postgres 16 on PATH and did not drive live `/view` HTTP. Later maintain runs that could start a throwaway vault did.
 
+## Named proof `merge-keep-drop-25`
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=merge-keep-drop-25`). Doctor green after Viewer build. MCP at `http://127.0.0.1:8787/mcp`. Search (`q`) is skipped on this host — FTS config `foundation_english` is missing; use `get` / `list_activity`. `tools/list` returned 16 tools including `merge`.
+
+MCP on `http://127.0.0.1:8787/mcp`:
+
+1. Two live `note` nodes (keep titled "Proof merge keep", drop titled "Proof merge drop") plus a third related note. Drop had alias `Merge drop alias` and repo `https://github.com/example/merge-drop-proof`. A `related_to` edge from drop to the third note.
+2. `merge` with keep, drop, fresh `keep_base_updated_at` / `drop_base_updated_at`, and confirm set to true returned one `activity_id` and `ok: true`.
+3. `get(keep)` showed unioned aliases (`Merge drop alias` present), repo moved onto keep, and the retargeted `related_to` edge. `get(drop)` returned not found as live.
+4. Missing confirm refused with `error` + `suggestion`. Stale keep if-match refused with get-and-retry copy (not "node not found"). Different-type pair (`note` + `person`) refused.
+5. `undo` of that activity with keep's current `updated_at` restored drop live, prior alias/identity on drop, and the original edge endpoints.
+6. Inventory names: `bootstrap`, `search`, `lookup`, `get`, `working_set`, `upsert`, `delete`, `merge`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`, `job`.
+
+GitHub `verify` gates on this machine: schema tests pass including `generate-mcp-docs --check`; viewer tests + build pass; `skills-layout`, `drift-read`, `foundation-init`, `mint-api-key`, `require-database-url` ok; `verify-mcp-drive` ok. `verify-http-drive` Home empty-copy check needs a first-day vault (this proof writes notes). Server tests on the throwaway `DATABASE_URL` passed `merge`, `cas-safety`, `link`, `delete-restore`, and `undo`. Full `@foundation/server` suite had the known host-cluster FTS headline miss (`fiancée` not in the payload snippet). That miss is not this slice.
+
+Evidence stayed under `.cursor/skills/verify-foundation/evidence/merge-keep-drop-25/`. Keys were redacted. The throwaway vault was cleaned up after the proof.
+
 ## Named proof `batch-upsert-23`
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=batch-upsert-23`). Doctor green after Viewer build. MCP at `http://127.0.0.1:8787/mcp`. Search (`q`) is skipped on this host — FTS config `foundation_english` is missing; use `get` / `list_activity`. `tools/list` returned 15 tools. No new tool.
