@@ -15,7 +15,7 @@ import {
   schemaPackageRepoRoot,
 } from "./mcp-inventory.js";
 
-test("advertised MCP inventory is the 15 registered tools in register order", () => {
+test("advertised MCP inventory is the 16 registered tools in register order", () => {
   assert.deepEqual(
     ADVERTISED_MCP_TOOLS.map((tool) => tool.name),
     [
@@ -26,6 +26,7 @@ test("advertised MCP inventory is the 15 registered tools in register order", ()
       "working_set",
       "upsert",
       "delete",
+      "merge",
       "link",
       "unlink",
       "inspect_ontology",

@@ -64,6 +64,7 @@ export {
   findLiveJournalOnDay,
   purgeDeletedNodesByType,
   restoreEdge,
+  retargetEdge,
   restoreNode,
   restoreNodeSnapshot,
   explainLookupNodeCandidates,

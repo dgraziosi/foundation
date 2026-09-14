@@ -430,6 +430,26 @@ export const DeleteInputSchema = z.object({
 });
 export type DeleteInput = z.infer<typeof DeleteInputSchema>;
 
+export const MergeInputSchema = z.object({
+  keep: z.string().uuid().describe("Live node UUID to keep"),
+  drop: z.string().uuid().describe("Live same-type node UUID to merge into keep, then soft-delete"),
+  keep_base_updated_at: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Required. keep node's updated_at from get"),
+  drop_base_updated_at: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Required. drop node's updated_at from get"),
+  confirm: z
+    .boolean()
+    .optional()
+    .describe("Required. Set this true. Merge rewrites edges and refs onto keep and soft-deletes drop"),
+});
+export type MergeInput = z.infer<typeof MergeInputSchema>;
+
 export const MutationOkSchema = z.object({
   ok: z.literal(true),
   activity_id: z.string().uuid(),
@@ -1000,7 +1020,7 @@ export const UndoInputSchema = z.object({
     .string()
     .min(1)
     .optional()
-    .describe("Required when the invert touches a node. That node's updated_at from get"),
+    .describe("Required when the invert touches a node. That node's updated_at from get. Undo of merge uses keep"),
   from_base_updated_at: z
     .string()
     .min(1)

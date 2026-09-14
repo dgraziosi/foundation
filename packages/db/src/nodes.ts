@@ -1192,6 +1192,20 @@ export async function deleteEdge(
   return rows[0] ? mapEdge(rows[0]) : undefined;
 }
 
+export async function retargetEdge(
+  db: Queryable,
+  id: string,
+  endpoints: { from_id: string; to_id: string },
+) {
+  const { rows } = await db.query<EdgeRow>(
+    `UPDATE edges SET from_id = $2, to_id = $3
+     WHERE id = $1
+     RETURNING id, from_id, to_id, relation_type, metadata, created_at`,
+    [id, endpoints.from_id, endpoints.to_id],
+  );
+  return rows[0] ? mapEdge(rows[0]) : undefined;
+}
+
 export async function deleteEdgeById(db: Queryable, id: string) {
   const { rows } = await db.query<EdgeRow>(
     `DELETE FROM edges

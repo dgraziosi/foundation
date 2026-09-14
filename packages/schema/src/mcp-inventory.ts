@@ -12,6 +12,7 @@ import {
   LookupInputSchema,
   ManageRelationInputSchema,
   ManageTypeInputSchema,
+  MergeInputSchema,
   SearchInputListedSchema,
   UndoInputSchema,
   UnlinkInputSchema,
@@ -27,6 +28,7 @@ export const ADVERTISED_MCP_TOOL_NAMES = [
   "working_set",
   "upsert",
   "delete",
+  "merge",
   "link",
   "unlink",
   "inspect_ontology",
@@ -104,6 +106,14 @@ export const ADVERTISED_MCP_TOOLS: readonly AdvertisedMcpTool[] = [
     purpose:
       "Soft-delete a node. Needs a key with destructive scope and `base_updated_at` from `get`.",
     input: DeleteInputSchema,
+  },
+  {
+    name: "merge",
+    description:
+      "Merge two live same-type nodes. Needs a key with destructive scope, confirm set to true, and keep_base_updated_at / drop_base_updated_at from get (if-match). Rewrites drop's live edges and declared ref pointers onto keep, unions aliases, moves unique identity when only drop holds it, then soft-deletes drop. One reversible activity row. Undo restores the prior graph while the row is reversible.",
+    purpose:
+      "Merge two live same-type nodes onto keep. Needs destructive scope, confirm set to true, and if-match on both. Soft-deletes drop.",
+    input: MergeInputSchema,
   },
   {
     name: "link",

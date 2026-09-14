@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   DeleteInputSchema,
+  MergeInputSchema,
   GetSuccessSchema,
   LINK_BATCH_MAX,
   LinkInputSchema,
@@ -454,6 +455,16 @@ test("delete unlink and undo accept if-match timestamps", () => {
     base_updated_at: stamp,
   });
   assert.equal(deleted.base_updated_at, stamp);
+  const merged = MergeInputSchema.parse({
+    keep: id,
+    drop: other,
+    keep_base_updated_at: stamp,
+    drop_base_updated_at: stamp,
+    confirm: true,
+  });
+  assert.equal(merged.keep, id);
+  assert.equal(merged.drop, other);
+  assert.equal(merged.confirm, true);
   const unlinked = UnlinkInputSchema.parse({
     from_id: id,
     to_id: other,
