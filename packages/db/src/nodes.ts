@@ -979,6 +979,22 @@ export async function listRecentLiveNodes(
   return rows.map(mapNode);
 }
 
+export async function listDeletedNodes(
+  db: Queryable,
+  options: { limit?: number } = {},
+): Promise<Node[]> {
+  const limit = options.limit ?? 200;
+  const { rows } = await db.query<NodeRow>(
+    `SELECT ${NODE_COLUMNS}
+     FROM nodes
+     WHERE deleted_at IS NOT NULL
+     ORDER BY deleted_at DESC, title ASC
+     LIMIT $1`,
+    [limit],
+  );
+  return rows.map(mapNode);
+}
+
 export async function listLiveNodesByIds(db: Queryable, ids: string[]): Promise<Node[]> {
   if (ids.length === 0) {
     return [];

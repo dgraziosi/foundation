@@ -57,6 +57,7 @@ export {
   listIncidentEdges,
   listIncidentEdgesForNodes,
   listLiveNodesByIds,
+  listDeletedNodes,
   listRecentLiveNodes,
   listOutlineChildren,
   listTaskCards,
