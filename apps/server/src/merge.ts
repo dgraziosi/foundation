@@ -80,7 +80,9 @@ function planDropEdges(
   relationTypes: RelationType[],
   nodeTypes: Awaited<ReturnType<typeof listNodeTypes>>,
 ): MergeEdgeChange[] | ToolError {
-  const existing = existingTriples(keepEdges);
+  const existing = existingTriples(
+    keepEdges.filter((edge) => edge.from_id !== drop.id && edge.to_id !== drop.id),
+  );
   const plans: MergeEdgeChange[] = [];
   for (const edge of uniqueEdges(dropEdges)) {
     const nextFrom = retargetId(edge.from_id, drop.id, keep.id);
@@ -314,18 +316,23 @@ export async function mergeGraphNodes(
 
     for (const plan of edgePlans) {
       if (plan.disposition === "retarget") {
-        const rewritten = await retargetEdge(client, plan.edge.id, {
-          from_id: plan.next_from_id!,
-          to_id: plan.next_to_id!,
-        });
-        if (!rewritten) {
-          return toolError(`Cannot merge: edge ${plan.edge.id} could not be retargeted`);
-        }
         continue;
       }
       const removed = await deleteEdgeById(client, plan.edge.id);
       if (!removed) {
         return toolError(`Cannot merge: edge ${plan.edge.id} could not be dropped`);
+      }
+    }
+    for (const plan of edgePlans) {
+      if (plan.disposition !== "retarget") {
+        continue;
+      }
+      const rewritten = await retargetEdge(client, plan.edge.id, {
+        from_id: plan.next_from_id!,
+        to_id: plan.next_to_id!,
+      });
+      if (!rewritten) {
+        return toolError(`Cannot merge: edge ${plan.edge.id} could not be retargeted`);
       }
     }
 
@@ -502,17 +509,22 @@ export async function invertMergeActivity(
   }
 
   for (const plan of before.edges) {
+    if (plan.disposition !== "retarget") {
+      continue;
+    }
+    const rewritten = await retargetEdge(client, plan.edge.id, {
+      from_id: plan.edge.from_id,
+      to_id: plan.edge.to_id,
+    });
+    if (!rewritten) {
+      return toolError(
+        `Cannot undo merge: edge ${plan.edge.id} could not be restored`,
+        "The edge may have been unlinked after merge.",
+      );
+    }
+  }
+  for (const plan of before.edges) {
     if (plan.disposition === "retarget") {
-      const rewritten = await retargetEdge(client, plan.edge.id, {
-        from_id: plan.edge.from_id,
-        to_id: plan.edge.to_id,
-      });
-      if (!rewritten) {
-        return toolError(
-          `Cannot undo merge: edge ${plan.edge.id} could not be restored`,
-          "The edge may have been unlinked after merge.",
-        );
-      }
       continue;
     }
     try {

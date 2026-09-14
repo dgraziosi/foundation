@@ -377,4 +377,92 @@ test("merge keep drop happy path, refusals, and undo", { skip: !databaseUrl }, a
     if (isToolError(after)) return;
     assert.equal(after.edges.length, 0);
   });
+
+  await t.test("merging a node with its same-type parent hangs keep under drop's parent", async () => {
+    const typed = await manageType(pool, {
+      action: "create",
+      slug: "nest",
+      kind: "artifact",
+      label: "Nest",
+    });
+    assert.equal(isToolError(typed), false);
+    if (isToolError(typed)) return;
+    const nested = await manageType(pool, { action: "update", slug: "nest", parent_types: ["nest"] });
+    assert.equal(isToolError(nested), false);
+    if (isToolError(nested)) return;
+
+    const grand = await upsertGraphNode(pool, { type: "nest", title: "Grand nest" });
+    const parent = await upsertGraphNode(pool, { type: "nest", title: "Parent nest" });
+    const child = await upsertGraphNode(pool, { type: "nest", title: "Child nest" });
+    assert.equal(isToolError(grand), false);
+    assert.equal(isToolError(parent), false);
+    assert.equal(isToolError(child), false);
+    if (isToolError(grand) || isToolError(parent) || isToolError(child)) return;
+
+    const hangParent = await linkGraphNodes(pool, {
+      from_id: parent.node.id,
+      to_id: grand.node.id,
+      relation_type: "child_of",
+      from_base_updated_at: parent.node.updated_at,
+      to_base_updated_at: grand.node.updated_at,
+    });
+    const hangChild = await linkGraphNodes(pool, {
+      from_id: child.node.id,
+      to_id: parent.node.id,
+      relation_type: "child_of",
+      from_base_updated_at: child.node.updated_at,
+      to_base_updated_at: parent.node.updated_at,
+    });
+    assert.equal(isToolError(hangParent), false);
+    assert.equal(isToolError(hangChild), false);
+    if (isToolError(hangParent) || isToolError(hangChild)) return;
+
+    const freshKeep = await getGraphNode(pool, child.node.id);
+    const freshDrop = await getGraphNode(pool, parent.node.id);
+    assert.equal(isToolError(freshKeep), false);
+    assert.equal(isToolError(freshDrop), false);
+    if (isToolError(freshKeep) || isToolError(freshDrop)) return;
+
+    const merged = await mergeGraphNodes(
+      pool,
+      {
+        keep: child.node.id,
+        drop: parent.node.id,
+        keep_base_updated_at: freshKeep.node.updated_at,
+        drop_base_updated_at: freshDrop.node.updated_at,
+        confirm: true,
+      },
+      DESTRUCTIVE,
+    );
+    assert.equal(isToolError(merged), false);
+    if (isToolError(merged)) return;
+
+    const after = await getGraphNode(pool, child.node.id);
+    assert.equal(isToolError(after), false);
+    if (isToolError(after)) return;
+    assert.equal(after.edges.length, 1);
+    assert.equal(after.edges[0]?.relation_type, "child_of");
+    assert.equal(after.edges[0]?.neighbor.id, grand.node.id);
+
+    const undone = await undoGraphActivity(
+      pool,
+      { id: merged.activity_id, base_updated_at: after.node.updated_at },
+      DESTRUCTIVE,
+    );
+    assert.equal(isToolError(undone), false);
+    if (isToolError(undone)) return;
+    const restoredKeep = await getGraphNode(pool, child.node.id);
+    const restoredDrop = await getGraphNode(pool, parent.node.id);
+    assert.equal(isToolError(restoredKeep), false);
+    assert.equal(isToolError(restoredDrop), false);
+    if (isToolError(restoredKeep) || isToolError(restoredDrop)) return;
+    const keepParent = restoredKeep.edges.find(
+      (edge) => edge.relation_type === "child_of" && edge.direction === "out",
+    );
+    const dropParent = restoredDrop.edges.find(
+      (edge) => edge.relation_type === "child_of" && edge.direction === "out",
+    );
+    assert.equal(keepParent?.neighbor.id, parent.node.id);
+    assert.equal(dropParent?.neighbor.id, grand.node.id);
+  });
 });
