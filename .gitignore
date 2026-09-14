@@ -11,3 +11,5 @@ foundation-backups
 coverage
 .pnpm-store
 *.tsbuildinfo
+__pycache__/
+*.pyc

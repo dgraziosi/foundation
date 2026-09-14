@@ -292,3 +292,5 @@ Env the helper reads (all optional except as noted):
 Index: [`features/README.md`](features/README.md).
 
 Mapped now: Unlock, Home (Today, Since you last looked, Recents, Open tasks, type folders), Collection, Detail, Edit any node, Activity, Trash, Search, Journal write.
+
+Named host proof `export-import-45` is `.cursor/skills/verify-foundation/scripts/verify-export-import-45.sh`. It drives `scripts/foundation-export.sh` and `scripts/foundation-import.sh` on the throwaway vault. How-to: [`docs/PORTABILITY.md`](../../../docs/PORTABILITY.md).

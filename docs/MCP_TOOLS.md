@@ -455,6 +455,10 @@ Instance coordination. Not a graph write and not `get_vault_health`.
 - `ttl_seconds` is optional on `claim` (default `FOUNDATION_LEASE_TTL_SECONDS`, 900). Allowed range 30–14400. Out of range refuses.
 - Not destructive. Not if-match. Not activity. Not `undo`.
 
+## Host scripts (not MCP tools)
+
+One-shot snapshot and foreign-note import live on the host: [`scripts/foundation-export.sh`](../scripts/foundation-export.sh) and [`scripts/foundation-import.sh`](../scripts/foundation-import.sh). They call the tools above over localhost MCP. `tools/list` stays 16. How-to: [`PORTABILITY.md`](./PORTABILITY.md).
+
 ## HTTP (not an MCP tool)
 
 - `GET /blobs/:id` — raw bytes. Requires `Authorization: ApiKey <FOUNDATION_API_KEY>` (Bearer accepted). The unlock cookie is not a credential here. `Content-Type` is the blob `media_type`, except HTML/SVG and other scriptable types which are `application/octet-stream`. Always `Content-Disposition: attachment` so a browser does not run the file as a page on this host. This is how agents fetch large files without inlining them in MCP JSON.

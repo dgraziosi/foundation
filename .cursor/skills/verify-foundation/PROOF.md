@@ -1,5 +1,20 @@
 # Proofs
 
+## Named proof `export-import-45`
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=export-import-45`). Doctor green. MCP at `http://127.0.0.1:8787/mcp`. Host scripts only. `tools/list` returned 16 tools including `merge`. No export or import tool.
+
+1. MCP `upsert` seeded live fixtures titled "Export proof note" and "Export proof task".
+2. `scripts/foundation-export.sh --out` wrote `foundation.json`, at least one `markdown/<type>/*.md`, and at least one `csv/<type>.csv`.
+3. Fixture trees: Obsidian (2 markdown files), Notion (1 page), Apple Notes (1 note), Google Tasks (1 task with a due).
+4. `import --from obsidian --dry-run` wrote no new nodes. Real import created the two titles. A second import did not twin.
+5. Notion, Apple Notes, and Google Tasks adapters each created the expected type. Google Tasks kept `due` `2026-09-20`.
+6. Home session, digest, and Today peek still loaded on the view door.
+
+Evidence stays under `.cursor/skills/verify-foundation/evidence/export-import-45/`. Keys were redacted. The named-proof throwaway vault was cleaned up after the proof.
+
+GitHub `verify` gates on this machine: schema tests pass including `generate-mcp-docs --check`; viewer tests + build pass; `skills-layout`, `drift-read`, `foundation-portability`, `foundation-init`, `mint-api-key`, `require-database-url` ok; `verify-http-drive`, `verify-mcp-drive`, and `verify-export-import-45.sh` ok on throwaway `VERIFY_RUN_ID=export-import-45`. `tools/list` count 16 including `merge`. Full `@foundation/server` suite had the known host-cluster FTS headline miss (`fiancée` not in the payload snippet). That miss is not this slice.
+
 ## Named proof `home-digest-33`
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=home-digest-33`). Doctor green after Viewer build. Viewer at `http://127.0.0.1:8788/view`. MCP at `http://127.0.0.1:8787/mcp`. `tools/list` returned 16 tools including `merge`. No new tool.

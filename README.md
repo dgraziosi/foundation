@@ -40,6 +40,7 @@ Do not commit personal life data, documents, or secrets to this repository. Thos
 - [`docs/BACKUP.md`](docs/BACKUP.md) — encrypted nightly dump, off-site folder, throwaway restore, and in-place restore on this vault
 - [`docs/GRAPH_HYGIENE.md`](docs/GRAPH_HYGIENE.md) — weekly graph report
 - [`docs/VIEWER.md`](docs/VIEWER.md) — user window contract: surfaces, shell, tokens, states
+- [`docs/PORTABILITY.md`](docs/PORTABILITY.md) — one-shot export (JSON, Markdown, CSV) and import (Obsidian, Notion, Apple Notes, Google Tasks)
 
 ## Install
 

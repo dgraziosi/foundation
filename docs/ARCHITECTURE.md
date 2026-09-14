@@ -276,7 +276,7 @@ Agents talk to the vault over MCP. That path is not the architecture — it is t
 
 `/mcp` with `Authorization: ApiKey <key>`. Streamable HTTP on this process. `FOUNDATION_API_KEY` is the bootstrap root key (destructive scope). Named keys live as hashes in `$FOUNDATION_DATA/api-keys.json`. Mint with `scripts/mint-api-key.sh`. Named harnesses attach with that URL and one key: [`HARNESS.md`](./HARNESS.md).
 
-The current tools: `bootstrap`, `search`, `lookup`, `get`, `working_set`, `upsert`, `delete`, `merge`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`, `job`. `get` is the record. `list_activity` `{ target }` is the diary. `upsert` replaces `payload` when passed. `merge` folds two same-type live nodes onto keep. `job` claims a named instance routine.
+The current tools: `bootstrap`, `search`, `lookup`, `get`, `working_set`, `upsert`, `delete`, `merge`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`, `job`. `get` is the record. `list_activity` `{ target }` is the diary. `upsert` replaces `payload` when passed. `merge` folds two same-type live nodes onto keep. `job` claims a named instance routine. One-shot export and import are host scripts on that same door (`scripts/foundation-export.sh`, `scripts/foundation-import.sh`). They call `inspect_ontology` / `search` / `get` / `upsert`. They do not add a tool. How-to: [`PORTABILITY.md`](./PORTABILITY.md).
 
 An agent that can reach the vault MCP may read and write ordinary tools. Delete, merge, unlink, undo, and type-retire need destructive scope on that key. Merge also needs confirm set to true.
 
