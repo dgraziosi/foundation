@@ -1,5 +1,5 @@
-import { getVaultSettings, type Pool } from "@foundation/db";
-import { ActivityActionSchema, ActivityActorSchema, resolveVaultTimeZone } from "@foundation/schema";
+import { type Pool } from "@foundation/db";
+import { ActivityActionSchema, ActivityActorSchema } from "@foundation/schema";
 import { activityChangeSummary } from "./view-write.js";
 
 export const HOME_DIGEST_LIMIT = 5;
@@ -83,8 +83,6 @@ export async function viewHomeDigestWindow(
   lookedAt: Date | undefined,
   now = new Date(),
 ): Promise<{ rows: ViewDigestRow[]; looked_at: string }> {
-  const settings = await getVaultSettings(pool);
-  resolveVaultTimeZone(settings.timezone);
   const window = digestWindow({ lookedAt, now });
   const digest = await viewHomeDigest(pool, { ...window, limit: HOME_DIGEST_LIMIT });
   return { rows: digest.rows, looked_at: now.toISOString() };
