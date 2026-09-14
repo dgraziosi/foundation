@@ -4,7 +4,7 @@ From a detail page, Activity lists that record's writes. A reversible row the pe
 
 ## Sub-features
 
-- `activity-list` GET `/view/api/nodes/<id>/activity` returns action, actor, actor_label, time, and a short what-changed line.
+- `activity-list` GET `/view/api/nodes/<id>/activity` returns action, actor, actor_label, `created_at`, and `summary`.
 - `activity-undo` POST `/view/api/activity/<id>/undo` with `base_updated_at` inverts a reversible user write.
 - `activity-undo-clash` a stale or missing if-match refuses and does not invert.
 
@@ -20,7 +20,7 @@ Preconditions:
 - Doctor is green. Session unlocked.
 - The record has at least one Viewer write (see [Edit any node](./edit-any-node.md)).
 
-- **HTTP list.** `GET /view/api/nodes/<id>/activity` with the vault key. A Viewer save row has `actor` `user` and `actor_label` `Viewer`.
+- **HTTP list.** `GET /view/api/nodes/<id>/activity` with the vault key. A Viewer save row has `actor` `user`, `actor_label` `Viewer`, `created_at`, and `summary`.
 - **HTTP undo.** `POST /view/api/activity/<id>/undo` with the row's `base_updated_at`. Status `200`. Title/status/data return to the prior values.
 - **Window.** `[data-surface="activity-page"]`. **Undo** on a reversible row.
 

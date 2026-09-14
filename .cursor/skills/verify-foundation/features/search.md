@@ -1,6 +1,6 @@
 # Search
 
-Search is chrome, not a fourth surface. The user opens it from the rail. It queries the graph, optionally by type or status, and a hit opens the detail page. There is no default filter.
+Search is chrome, not a fourth surface. The user opens it from the rail. It queries the graph, optionally by type or status, and a hit opens `/view/nodes/:id`. There is no default filter.
 
 ## Sub-features
 
@@ -8,13 +8,13 @@ Search is chrome, not a fourth surface. The user opens it from the rail. It quer
 - `search-idle` shows **Search the graph, or filter by type.** before a query or filter is submitted.
 - `search-match` lists hits with title, snippet, type, and due when present.
 - `search-empty` shows **No matching nodes.** when a search completed with zero hits.
-- `search-open-result` opens a hit as a detail page and closes the overlay.
+- `search-open-result` opens a hit at `/view/nodes/:id` and closes the overlay. A journal with inline markdown is the write page, not Properties.
 - `search-close` chooses **Close** and returns to the surface underneath.
 
 ## How to get to it (user POV)
 
 - Choose **Search** in the left rail (collapsed rail: `aria-label="Search"`).
-- There is no Search route. The overlay sits on the current Home / collection / detail.
+- There is no Search route. The overlay sits on the current surface (Home, Recents, collection, detail, journal, activity, or Trash).
 
 ## Driving it with verify-foundation
 
@@ -27,7 +27,7 @@ Preconditions:
 - **Idle.** With an empty query and Any / Any status, copy is **Search the graph, or filter by type.**
 - **Empty query.** Type a token that cannot match (`zzzxnever`) and submit the form (Enter). Copy **No matching nodes.**
 - **Type filter.** Choose a type in the first select (Any / type labels). The overlay searches even without a query. First-day note: `GET /view/api/search?type=note` returns `{ "searched": true, "hits": [] }`.
-- **Open hit.** When a hit exists, choose its title. Overlay closes. Detail page for that id.
+- **Open hit.** When a hit exists, choose its title. Overlay closes. Path `/view/nodes/<uuid>`. A non-journal is `[data-surface="detail-page"]`. A journal with inline markdown is `[data-surface="journal-page"]`.
 - **Close.** Choose **Close**. Overlay is gone. The surface underneath is unchanged.
 - **HTTP idle.** `GET /view/api/search` with the vault key (view-key-file when present). `{ "searched": false, "hits": [] }`.
 - **HTTP miss.** `GET /view/api/search?q=zzzxnever` with the vault key (view-key-file when present). `{ "searched": true, "hits": [] }`.
