@@ -120,7 +120,7 @@ Agents can add types and relations over time. No approval inbox.
 
 ## Agent API
 
-These names are the current surface. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md). Rewrite one record with `get`, `upsert`, and `list_activity`.
+These names are the current surface. Full parameters: [`docs/MCP_TOOLS.md`](./MCP_TOOLS.md). Advertised `tools/list` parameter docs come from Zod `.describe()` on each input field. Rewrite one record with `get`, `upsert`, and `list_activity`.
 
 `bootstrap`, `search`, `lookup`, `get`, `working_set`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`, `job`.
 

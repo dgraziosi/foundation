@@ -22,7 +22,7 @@ Destructive tools need a key with destructive scope or they return `{ error, sug
 | `undo` | Reverse a reversible activity row by id. Needs a key with destructive scope. Node and edge inversions require if-match timestamps from `get`. Type-create undo with leftover deleted nodes needs `purge_deleted: true`. |
 | `job` | Claim a named instance routine, keep the claim alive, finish or release it, or read who holds it and last run. Not a graph write. |
 
-Handler contract: each tool has one zod input schema and one output schema; JSON Schema on the wire is derived; invalid input never reaches the domain; domain errors are `{ error, suggestion? }`.
+Handler contract: each tool has one zod input schema and one output schema; JSON Schema on the wire is derived; every advertised input field uses Zod `.describe()` so `tools/list` parameter docs are non-empty; invalid input never reaches the domain; domain errors are `{ error, suggestion? }`.
 
 ## Parameters
 

@@ -50,10 +50,16 @@ export const JobLeaseStateSchema = z.object({
 export type JobLeaseState = z.infer<typeof JobLeaseStateSchema>;
 
 export const JobInputSchema = z.object({
-  action: JobActionSchema,
-  name: JobNameSchema,
-  token: JobTokenSchema.optional(),
-  ttl_seconds: z.number().int().min(MIN_LEASE_TTL_SECONDS).max(MAX_LEASE_TTL_SECONDS).optional(),
+  action: JobActionSchema.describe("claim, finish, release, or read"),
+  name: JobNameSchema.describe("Named instance routine, such as dream or activity-prune"),
+  token: JobTokenSchema.optional().describe("Hold token from claim. Required for finish and release"),
+  ttl_seconds: z
+    .number()
+    .int()
+    .min(MIN_LEASE_TTL_SECONDS)
+    .max(MAX_LEASE_TTL_SECONDS)
+    .optional()
+    .describe("Claim hold length in seconds. Omit to use the vault default"),
 });
 export type JobInput = z.infer<typeof JobInputSchema>;
 
