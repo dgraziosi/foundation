@@ -9,7 +9,24 @@ export const FIELD_ROLES = ["title", "status", "date", "start", "end", "subtitle
 export type FieldRole = (typeof FIELD_ROLES)[number];
 
 export const FIELD_SUGGESTION =
-  "fields is an ordered array of { name, kind, display?, needed?, role?, enum_values?, ref_type? }. kind is string, date, number, enum, or ref. needed does not block capture. role is title, status, date, start, end, or subtitle.";
+  "fields is an ordered array of { name, kind, display?, needed?, role?, enum_values?, ref_type? }. kind is string, date, number, enum, or ref. needed warns on upsert; strict: true refuses. role is title, status, date, start, end, or subtitle.";
+
+export const MISSING_NEEDED_SUGGESTION =
+  "Pass the missing fields on data, or omit strict to write with a warning.";
+
+export function isNeededValueMissing(value: unknown): boolean {
+  return value === undefined || value === null || value === "";
+}
+
+export function missingNeededFields(
+  fields: readonly TypeField[],
+  data: Record<string, unknown>,
+): string[] {
+  return fields
+    .filter((field) => field.needed)
+    .filter((field) => isNeededValueMissing(data[field.name]))
+    .map((field) => field.name);
+}
 
 export type TypeField = {
   name: string;
@@ -187,7 +204,7 @@ function schemaForKind(field: TypeField): Record<string, unknown> {
   return { type: ["string", "null"] };
 }
 
-/** Compiled validation document. additionalProperties stays true. needed is not required. */
+/** Compiled validation document. additionalProperties stays true. needed is not JSON Schema required. */
 export function compileJsonSchemaFromFields(fields: readonly TypeField[]): Record<string, unknown> | null {
   if (fields.length === 0) {
     return null;

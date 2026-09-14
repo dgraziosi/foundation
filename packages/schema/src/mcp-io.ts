@@ -246,7 +246,18 @@ export const WriterIdentitySchema = z.object({
 });
 export type WriterIdentity = z.infer<typeof WriterIdentitySchema>;
 
-export const UpsertInputSchema = z.object({
+export const UPSERT_BATCH_MAX = 20;
+
+export const UPSERT_FORM_SUGGESTION =
+  "Use type and title for one node, or nodes (max 20) for several.";
+
+export const UPSERT_INCOMPLETE_SUGGESTION =
+  "Each node needs type and title. Updates also need id and base_updated_at from get.";
+
+export const UPSERT_BATCH_MAX_SUGGESTION =
+  "Pass nodes with 1 to 20 items, or use type and title for one node.";
+
+export const UpsertNodeItemSchema = z.object({
   id: z.string().uuid().optional().describe("Existing node UUID. Omit to create"),
   type: z.string().min(1).describe("Type slug"),
   title: z.string().min(1).describe("Record title"),
@@ -274,7 +285,144 @@ export const UpsertInputSchema = z.object({
     .optional()
     .describe("Unique Drive, Gmail, or Calendar identity. Null clears it. Not data.url"),
 });
+export type UpsertNodeItem = z.infer<typeof UpsertNodeItemSchema>;
+
+export const UpsertInputSchema = z.object({
+  id: z.string().uuid().optional().describe("Existing node UUID. Omit to create"),
+  type: z.string().min(1).optional().describe("Type slug for one node"),
+  title: z.string().min(1).optional().describe("Record title for one node"),
+  payload: UpsertPayloadSchema.optional().describe("Replacement body. Omit to leave the body unchanged"),
+  data: JsonObjectSchema.optional().describe("Top-level data keys to merge on update"),
+  status: NodeStatusSchema.optional().describe("active, completed, or archived"),
+  metadata: JsonObjectSchema.optional().describe("Extra metadata bag"),
+  base_updated_at: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Required on update. Node updated_at from get"),
+  idempotency_key: z
+    .string()
+    .trim()
+    .min(1)
+    .max(200)
+    .optional()
+    .describe("Create only. Same key returns the existing node instead of a twin"),
+  allow_duplicate: z
+    .boolean()
+    .optional()
+    .describe("Create only. Write even when lookup finds an exact title or unique alias"),
+  url: UrlIdentitySchema.nullable()
+    .optional()
+    .describe("Unique Drive, Gmail, or Calendar identity. Null clears it. Not data.url"),
+  nodes: z
+    .array(UpsertNodeItemSchema)
+    .min(1)
+    .max(UPSERT_BATCH_MAX)
+    .optional()
+    .describe("1–20 nodes. Pass this or the one-node fields, not both"),
+  dry_run: z
+    .boolean()
+    .optional()
+    .describe("When true, return would-be snapshots and write nothing"),
+  strict: z
+    .boolean()
+    .optional()
+    .describe("When true, missing needed fields refuse the write"),
+});
 export type UpsertInput = z.infer<typeof UpsertInputSchema>;
+
+const UPSERT_FLAT_KEYS = [
+  "id",
+  "type",
+  "title",
+  "payload",
+  "data",
+  "status",
+  "metadata",
+  "base_updated_at",
+  "idempotency_key",
+  "allow_duplicate",
+  "url",
+] as const;
+
+export function upsertInputHasFlatFields(input: UpsertInput): boolean {
+  return UPSERT_FLAT_KEYS.some((key) => input[key] !== undefined);
+}
+
+export type NormalizedUpsertNodes = {
+  form: "flat" | "batch";
+  nodes: UpsertNodeItem[];
+};
+
+/** Two forms, not both. Cap and empty `nodes` are also enforced in Zod. */
+export function normalizeUpsertNodes(input: UpsertInput): NormalizedUpsertNodes | ToolError {
+  const hasFlat = upsertInputHasFlatFields(input);
+  const hasNodes = input.nodes !== undefined;
+  if (hasFlat && hasNodes) {
+    return toolError("Pass either a single node or nodes[], not both", UPSERT_FORM_SUGGESTION);
+  }
+  if (hasNodes) {
+    const nodes = input.nodes ?? [];
+    if (nodes.length === 0) {
+      return toolError("nodes must contain at least one item", UPSERT_BATCH_MAX_SUGGESTION);
+    }
+    if (nodes.length > UPSERT_BATCH_MAX) {
+      return toolError(
+        `nodes accepts at most ${UPSERT_BATCH_MAX} items`,
+        UPSERT_BATCH_MAX_SUGGESTION,
+      );
+    }
+    const seenIds = new Map<string, number>();
+    const seenKeys = new Map<string, number>();
+    for (const [index, node] of nodes.entries()) {
+      if (node.id) {
+        const prior = seenIds.get(node.id);
+        if (prior !== undefined) {
+          return toolError(
+            `nodes[${index}]: id repeats nodes[${prior}]`,
+            "Each id in a batch must be unique.",
+          );
+        }
+        seenIds.set(node.id, index);
+      }
+      if (node.idempotency_key) {
+        const prior = seenKeys.get(node.idempotency_key);
+        if (prior !== undefined) {
+          return toolError(
+            `nodes[${index}]: idempotency_key repeats nodes[${prior}]`,
+            "Each idempotency_key in a batch must be unique.",
+          );
+        }
+        seenKeys.set(node.idempotency_key, index);
+      }
+    }
+    return { form: "batch", nodes };
+  }
+  if (input.type === undefined || input.title === undefined) {
+    return toolError(
+      "Pass type and title for one node, or nodes (1 to 20) for several",
+      UPSERT_INCOMPLETE_SUGGESTION,
+    );
+  }
+  return {
+    form: "flat",
+    nodes: [
+      {
+        id: input.id,
+        type: input.type,
+        title: input.title,
+        payload: input.payload,
+        data: input.data,
+        status: input.status,
+        metadata: input.metadata,
+        base_updated_at: input.base_updated_at,
+        idempotency_key: input.idempotency_key,
+        allow_duplicate: input.allow_duplicate,
+        url: input.url,
+      },
+    ],
+  };
+}
 
 export const DeleteInputSchema = z.object({
   id: z.string().uuid().describe("Live node UUID"),
@@ -348,12 +496,16 @@ export const LinkInputSchema = z.object({
     .max(LINK_BATCH_MAX)
     .optional()
     .describe("1–20 edges. Pass this or the one-edge fields, not both"),
+  dry_run: z
+    .boolean()
+    .optional()
+    .describe("When true, return would-be receipts and write nothing"),
 });
 export type LinkInput = z.infer<typeof LinkInputSchema>;
 
 export const LinkItemSuccessSchema = z.object({
   edge: EdgeSchema,
-  activity_id: z.string().uuid(),
+  activity_id: z.string().uuid().optional(),
   suggestion: z.string().optional(),
 });
 export type LinkItemSuccess = z.infer<typeof LinkItemSuccessSchema>;
@@ -365,6 +517,7 @@ export const LinkSuccessSchema = z.object({
   edge: EdgeSchema.optional(),
   activity_id: z.string().uuid().optional(),
   suggestion: z.string().optional(),
+  dry_run: z.literal(true).optional(),
 });
 export type LinkSuccess = z.infer<typeof LinkSuccessSchema>;
 
@@ -764,13 +917,34 @@ export const DuplicateWarningSchema = z.object({
 });
 export type DuplicateWarning = z.infer<typeof DuplicateWarningSchema>;
 
-export const UpsertSuccessSchema = z.object({
+export const NeededWarningSchema = z.object({
+  code: z.literal("missing_needed"),
+  fields: z.array(z.string().min(1)).min(1),
+  suggestion: z.string().min(1),
+});
+export type NeededWarning = z.infer<typeof NeededWarningSchema>;
+
+export const UpsertItemSuccessSchema = z.object({
   node: NodeSchema,
-  activity_id: z.string().uuid(),
-  /** Title-FTS proposals. Empty when none, including an empty graph. Never creates an edge. */
+  activity_id: z.string().uuid().optional(),
   suggested_links: z.array(SuggestedLinkSchema),
-  /** Token/fuzzy/compact hits on create. The write still happened. */
   duplicate_warnings: DuplicateWarningSchema.optional(),
+  warnings: z.array(NeededWarningSchema).optional(),
+});
+export type UpsertItemSuccess = z.infer<typeof UpsertItemSuccessSchema>;
+
+export const UpsertSuccessSchema = z.object({
+  /** Always present. Input order. */
+  nodes: z.array(UpsertItemSuccessSchema).min(1).max(UPSERT_BATCH_MAX).optional(),
+  /** One-node form — the same item as `nodes[0]`. */
+  node: NodeSchema.optional(),
+  activity_id: z.string().uuid().optional(),
+  /** Title-FTS proposals. Empty when none, including an empty graph. Never creates an edge. */
+  suggested_links: z.array(SuggestedLinkSchema).optional(),
+  /** Token/fuzzy/compact hits on create. The write still happened unless dry_run. */
+  duplicate_warnings: DuplicateWarningSchema.optional(),
+  warnings: z.array(NeededWarningSchema).optional(),
+  dry_run: z.literal(true).optional(),
 });
 export type UpsertSuccess = z.infer<typeof UpsertSuccessSchema>;
 
