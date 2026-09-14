@@ -46,7 +46,7 @@ Named skill folders under [`.agents/skills/`](../.agents/skills/). Do not paste 
 | --- | --- |
 | [`.agents/skills/create-bot/`](../.agents/skills/create-bot/) | Another bot from the blank template |
 | [`.agents/skills/handoff/`](../.agents/skills/handoff/) | Name who has the work now, or say done |
-| [`.agents/skills/foundation-mcp/`](../.agents/skills/foundation-mcp/) | Vault MCP — which call to use |
+| [`.agents/skills/foundation-mcp/`](../.agents/skills/foundation-mcp/) | Vault MCP — which call to use. Inventoriable tool table is generated from the advertised inventory in `packages/schema`. |
 | [`.agents/skills/vault-health/`](../.agents/skills/vault-health/) | Weekday 9:15 written report; host script keeps the vault up (`scripts/keep-vault-up.sh`) |
 | [`.agents/skills/dream/`](../.agents/skills/dream/) | Nightly Dream pass (02:00 user-local) |
 | [`.agents/skills/backup-vault/`](../.agents/skills/backup-vault/) | Nightly dump is a host script; bot nags if missing or old |

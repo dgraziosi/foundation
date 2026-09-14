@@ -29,6 +29,17 @@ What that run drove:
 
 Evidence: `.cursor/skills/verify-foundation/evidence/20260911Tmaintain/` (gitignored).
 
+## Named proof `generated-mcp-docs-15`
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=generated-mcp-docs-15`). Doctor green. `tools/list` returned 15 tools. No new tool.
+
+MCP on `http://127.0.0.1:8787/mcp`:
+
+1. `pnpm --filter @foundation/schema generate-mcp-docs --check` exited 0. Generated regions in `docs/MCP_TOOLS.md` and `.agents/skills/foundation-mcp/SKILL.md` matched the advertised inventory in `packages/schema`.
+2. `tools/list` advertised the same 15 names. Parameter descriptions were non-empty on `search`, `upsert`, `list_activity`, and `job`, including nested `search.url.system`.
+3. GitHub `verify` gates on this machine: schema 223 pass; viewer tests pass; viewer build; `skills-layout`, `drift-read`, `foundation-init`, `mint-api-key`, `require-database-url` ok; `verify-http-drive` and `verify-mcp-drive` ok. Server tests on the throwaway `DATABASE_URL` passed except the known host-cluster FTS headline miss (`fiancée` not in the payload snippet). That miss is not this slice.
+4. Evidence stayed under `.cursor/skills/verify-foundation/evidence/generated-mcp-docs-15/`. Keys were redacted. The throwaway vault was left running.
+
 ## Named proof `zod-describe-13`
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=zod-describe-13`). Doctor green after Viewer build. `tools/list` returned 15 tools. No new tool.

@@ -4,6 +4,7 @@ Product contract: [`docs/SPEC.md`](./SPEC.md). Url, repo, and link: [`SPEC.md`](
 
 Destructive tools need a key with destructive scope or they return `{ error, suggestion }`. Identity is UUID. A record is what is true now, short. History stays in activity. If you already have a UUID and need the record (payload, data, edges, if-match), call `get`. `get` does not return activity. If you already have a UUID and need the diary for that record, call `list_activity` `{ target }`. If you already have a UUID and need the open work around it, call `working_set`. To resolve one or more entity names, call `lookup`, then `working_set` with that id. Ontology mutations apply immediately (activity log + `undo`; no proposal inbox). A named bot rewrites one record on purpose: `get` → `list_activity` `{ target }` → keep what still matters, invent nothing → `upsert` the same id with a short `payload` and `base_updated_at`. Not a background job. The server does not invent the body. No rewrite tool. Contract: [`SPEC.md`](./SPEC.md#rewrite-one-record).
 
+<!-- generated:mcp-tool-table -->
 | Tool | Purpose |
 | --- | --- |
 | `bootstrap` | Return starter ontology, how to extend it, and current type/relation inventory. Call first. |
@@ -21,14 +22,17 @@ Destructive tools need a key with destructive scope or they return `{ error, sug
 | `list_activity` | Read the diary (filter by action, target, since). `{ target: <node id> }` is the write history for that node (`before` / `after`). |
 | `undo` | Reverse a reversible activity row by id. Needs a key with destructive scope. Node and edge inversions require if-match timestamps from `get`. Type-create undo with leftover deleted nodes needs `purge_deleted: true`. |
 | `job` | Claim a named instance routine, keep the claim alive, finish or release it, or read who holds it and last run. Not a graph write. |
+<!-- /generated:mcp-tool-table -->
 
-Handler contract: each tool has one zod input schema and one output schema; JSON Schema on the wire is derived; every advertised input field uses Zod `.describe()` so `tools/list` parameter docs are non-empty; invalid input never reaches the domain; domain errors are `{ error, suggestion? }`.
+Handler contract: each tool has one zod input schema and one output schema; JSON Schema on the wire is derived; every advertised input field uses Zod `.describe()` so `tools/list` parameter docs are non-empty; invalid input never reaches the domain; domain errors are `{ error, suggestion? }`. The tool table and each **In:** / parameter list below are generated from that advertised inventory in `packages/schema`. Hand-maintained prose after those blocks stays the write rules and gotchas. Regenerate with `pnpm --filter @foundation/schema generate-mcp-docs`.
 
 ## Parameters
 
 ### `bootstrap`
 
-- **In:** none
+<!-- generated:mcp-params:bootstrap -->
+- **In:** `none`
+<!-- /generated:mcp-params:bootstrap -->
 - **Out:** `{ spine, types, relations, rules, how_to_extend }`
 - `how_to_extend` includes `manage_type`, `manage_relation`, `nodes`, `links`, `activity`, `search`, `lookup`, and `working_set`. After `lookup` binds a UUID, `working_set` is the one call for open work around that node. Summary notes that vault health, graph hygiene, and applying git updates are instance routines, not tools ([`docs/VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`docs/GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md), [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/)). No `get_vault_health` tool.
 
@@ -36,7 +40,11 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 
 The record. History stays in activity.
 
+<!-- generated:mcp-params:get -->
 - **In:** `{ id, include_body? }`
+- `id` — Live node UUID
+- `include_body` — When true, small blob payloads may include a base64 body. Default false
+<!-- /generated:mcp-params:get -->
 - **Out:** `{ node, edges: [{ id, from_id, to_id, relation_type, direction, metadata, created_at, neighbor: { id, title, type } }], blob?, suggested_links }` or `{ error, suggestion? }`
 - `node` is what is true now: type, title, status, `payload`, `data`, metadata, `created_at`, `updated_at`. It does not include activity rows. `list_activity` `{ target }` is the diary.
 - Each incident edge includes **neighbor title and type**, not UUID-only hops. Use those titles to `search` or `get` the other node. For the open work around this id (children, dues, parent chain), call `working_set` — `get` stays one node plus flags (`include_body`).
@@ -52,7 +60,14 @@ Read-only agenda around one live node. New tool — not a `get` flag.
 
 **Why `working_set`.** The return is the set of nodes an agent needs to act on around that root. `context` already means prompt stuffing and MCP session state; an agent would expect bodies and history. `agenda` reads as calendar-only and misses the parent chain on a task root.
 
+<!-- generated:mcp-params:working_set -->
 - **In:** `{ id, include_completed?, depth?, limit?, due_within_days? }`
+- `id` — Live node UUID to walk from
+- `include_completed` — Include completed and archived work. Default false
+- `depth` — Work-walk hops. Default and max come from vault settings
+- `limit` — Max items. Default and max come from vault settings
+- `due_within_days` — Spine-root due window in days. Default comes from vault settings
+<!-- /generated:mcp-params:working_set -->
 - **Out:** `{ root: { id, type, title, status, due? }, items: [{ id, type, title, status, due?, start?, end?, role, via, parent? }], walk, truncated }` or `{ error, suggestion? }`
 - `id` is a live node UUID. Unknown or deleted id → `{ error, suggestion }` in the same family as `get` (`Node not found: <id>`; deleted nodes stay hidden until undo).
 - `include_completed` default `false`. Open work is `status: "active"`. Completed and archived work rows stay out unless this is `true`. Ancestor rows (`role: "parent"`) always include the live chain so a completed goal still explains a task.
@@ -104,7 +119,29 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 
 ### `upsert`
 
-- **In:** `{ id?, type, title, payload?, data?, url?, status?, metadata?, base_updated_at?, idempotency_key?, allow_duplicate? }` — `type` is required on create and update.
+<!-- generated:mcp-params:upsert -->
+- **In:** `{ id?, type, title, payload?: { media_type, storage: "inline"|"blob", body?, blob_id?, bytes_base64?, source_path? }, data?, status?: "active"|"completed"|"archived", metadata?, base_updated_at?, idempotency_key?, allow_duplicate?, url?: { system: "gmail"|"calendar"|"drive", id } }`
+- `id` — Existing node UUID. Omit to create
+- `type` — Type slug
+- `title` — Record title
+- `payload` — Replacement body. Omit to leave the body unchanged
+- `payload.media_type` — MIME type, such as text/markdown or application/json
+- `payload.storage` — inline or blob
+- `payload.body` — Inline text. Required when storage is inline
+- `payload.blob_id` — Existing blob UUID
+- `payload.bytes_base64` — New blob bytes as base64. Pass only one of blob_id, bytes_base64, or source_path
+- `payload.source_path` — Path under uploads. The server moves the file into blobs
+- `data` — Top-level data keys to merge on update
+- `status` — active, completed, or archived
+- `metadata` — Extra metadata bag
+- `base_updated_at` — Required on update. Node updated_at from get
+- `idempotency_key` — Create only. Same key returns the existing node instead of a twin
+- `allow_duplicate` — Create only. Write even when lookup finds an exact title or unique alias
+- `url` — Unique Drive, Gmail, or Calendar identity. Null clears it. Not data.url
+- `url.system` — gmail, calendar, or drive
+- `url.id` — Object id in that system
+<!-- /generated:mcp-params:upsert -->
+`type` is required on create and update.
 - **Out:** `{ node, activity_id, suggested_links, duplicate_warnings? }` or `{ error, suggestion?, outcome?, candidates? }`
 - **`suggested_links`:** Postgres FTS on the new title (create, and update when the title changes) — not embeddings. Each item is `{ kind, target: { id, type, title }, reason }`. `kind` is a live relation slug. `target` is a **live** node that already exists. How they are chosen: spine types with `parent_types` → the live hierarchy relation (`kind: hierarchy`) to a live allowed parent whose title matches; if the title matches a node whose type sits in an associative relation’s `target_types` (seed `about` → `person`) → that relation; otherwise the unconstrained associative (empty source and target, seed `relates_to`). Skip self. Skip nodes already linked to this one. A node with a live hierarchy parent is not offered a second parent (targeted / unconstrained suggestions may still appear). Cap 5. Empty graph or no match → `[]`. **Never creates an edge.** Never adds a type or relation. `link` is how an accepted suggestion becomes an edge. Show non-empty suggestions and ask before calling `link`.
 - `payload`: `{ media_type, storage: "inline"|"blob", body?, blob_id?, bytes_base64?, source_path? }`. On update, passing `payload` **replaces** that body. Omit `payload` and the body stays. A named bot that rewrites a record passes the new short `payload` and `base_updated_at` from `get`.
@@ -131,14 +168,34 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 
 ### `delete`
 
-- **In:** `{ id, base_updated_at }`
+<!-- generated:mcp-params:delete -->
+- **In:** `{ id, base_updated_at? }`
+- `id` — Live node UUID
+- `base_updated_at` — Required. Node updated_at from get
+<!-- /generated:mcp-params:delete -->
 - **Out:** `{ ok, activity_id }` or `{ error, suggestion? }`
 - Soft-delete (`deleted_at`). Needs a key with destructive scope. Requires `base_updated_at` from `get` (if-match, millisecond precision). Mismatch or omit → `{ error, suggestion }` (get and retry). A CAS miss is stale, never “node not found,” and the node stays live. After if-match, delete refuses when a live record still holds a declared `ref` field (`kind: "ref"` on that type’s fields) whose `data` value is this id → `{ error, suggestion }` (clear `data.<field>` with upsert and if-match, then retry). Those fields stay pointers, not edges. `url` / `data.repo` / `data.receipt` / leftover extra keys are not this check. `get` hides deleted nodes. Incident edges stay in place for undo; `get` and `link` validation ignore edges to deleted endpoints. Reparenting drops a stale `child_of` to a deleted parent so uniqueness matches the live graph, and records an `unlink` activity row with a `before` snapshot of the dropped edge. Restore via `undo` of the delete row. Soft-delete does **not** delete blob bytes (so undo can restore a blob node).
 
 ### `link`
 
-- **In (one edge):** `{ from_id, to_id, relation_type, upgrade?, metadata?, from_base_updated_at?, to_base_updated_at? }`
-- **In (batch):** `{ edges: [{ from_id, to_id, relation_type, upgrade?, metadata?, from_base_updated_at?, to_base_updated_at? }] }`
+<!-- generated:mcp-params:link -->
+- **In:** `{ from_id?, to_id?, relation_type?, upgrade?, metadata?, from_base_updated_at?, to_base_updated_at?, edges? }`
+- `from_id` — Source node UUID for one edge
+- `to_id` — Target node UUID for one edge
+- `relation_type` — Live relation slug for one edge
+- `upgrade` — When true, rewrite an unconstrained associative to the hierarchy verb if it fits
+- `metadata` — Optional edge metadata for one edge
+- `from_base_updated_at` — Required for one edge. from node's updated_at from get
+- `to_base_updated_at` — Required for one edge. to node's updated_at from get
+- `edges` — 1–20 edges. Pass this or the one-edge fields, not both
+- `edges[].from_id` — Source node UUID
+- `edges[].to_id` — Target node UUID
+- `edges[].relation_type` — Live relation slug
+- `edges[].upgrade` — When true, rewrite an unconstrained associative to the hierarchy verb if it fits
+- `edges[].metadata` — Optional edge metadata
+- `edges[].from_base_updated_at` — Required. from node's updated_at from get
+- `edges[].to_base_updated_at` — Required. to node's updated_at from get
+<!-- /generated:mcp-params:link -->
 - `edges` is 1–20. Pass either the one-edge fields or `edges[]`, not both.
 - **Out (one-edge form):** `{ edge, activity_id, suggestion?, links: [{ edge, activity_id, suggestion? }] }` or `{ error, suggestion? }`
 - **Out (`edges[]` form):** `{ links: [{ edge, activity_id, suggestion? }] }` or `{ error, suggestion? }`
@@ -150,19 +207,44 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 
 ### `unlink`
 
-- **In:** `{ from_id, to_id, relation_type, from_base_updated_at, to_base_updated_at }`
+<!-- generated:mcp-params:unlink -->
+- **In:** `{ from_id, to_id, relation_type, from_base_updated_at?, to_base_updated_at? }`
+- `from_id` — Source node UUID
+- `to_id` — Target node UUID
+- `relation_type` — Live relation slug
+- `from_base_updated_at` — Required. from node's updated_at from get
+- `to_base_updated_at` — Required. to node's updated_at from get
+<!-- /generated:mcp-params:unlink -->
 - **Out:** `{ ok, activity_id }` or `{ error, suggestion? }`
 - Needs a key with destructive scope.
 - **If-match:** `from_base_updated_at` and `to_base_updated_at` are required and must match each endpoint's current `updated_at` from `get`. Stale or missing → `{ error, suggestion }` (get the nodes and retry). Unlinking does not change `node.updated_at`. Not a write-ACL.
 
 ### `inspect_ontology`
 
+<!-- generated:mcp-params:inspect_ontology -->
 - **In:** `{ kind?: "types"|"relations"|"all" }`
+- `kind` — Which registry rows to return. Default all
+<!-- /generated:mcp-params:inspect_ontology -->
 - **Out:** `{ types, relations }`. Each type includes `fields`, view declarations, optional `default_view`, optional `hue`, and optional `glyph`, with `slug`, `label`, `kind`, `parent_types`, and compiled `json_schema`.
 
 ### `manage_type`
 
-- **In:** `{ action: "create"|"update"|"retire", slug, label?, description?, kind?, parent_types?, json_schema?, views?, default_view?, fields?, hue?, glyph?, purge_deleted? }`
+<!-- generated:mcp-params:manage_type -->
+- **In:** `{ action: "create"|"update"|"retire", slug, label?, description?, kind?: "spine"|"artifact", parent_types?, json_schema?, views?, default_view?, fields?, hue?, glyph?, purge_deleted? }`
+- `action` — create, update, or retire
+- `slug` — Type slug
+- `label` — Human label
+- `description` — What this type is for
+- `kind` — spine or artifact
+- `parent_types` — Type slugs that may be hierarchy parents
+- `json_schema` — Compiled from fields. Pass null to clear. Prefer fields
+- `views` — Ordered view declarations, or bare engine ids
+- `default_view` — Must be one of the view ids
+- `fields` — Ordered field template
+- `hue` — Named type hue. Null clears it
+- `glyph` — Lucide icon name. Null clears it
+- `purge_deleted` — When retiring, permanently drop leftover soft-deleted nodes of this type
+<!-- /generated:mcp-params:manage_type -->
 - **Out:** `{ type, activity_id }` or `{ error, suggestion? }`
 - Applies immediately. System seed types may edit description, `fields`, `hue`, `glyph`, and `filter` / `sort` / `group` on views they already declare. They cannot change slug, kind, parent_types, label, retire, or the ordered view **ids** (no add, drop, or reorder of engines). `default_view` stays a member of those locked ids. Authored types keep the wider patch, including the view id list. Custom types may set `parent_types` so `child_of` placement works. Seed apply fills missing seed hue/glyph and missing seed fields only; it does not overwrite a user edit. Seed `spend` (artifact, `parent_types: ["project"]`) is the type for one money line. `project` has optional `budget_amount` / `budget_currency`. Contract: [`SPEC.md`](./SPEC.md#project-spend).
 - **`fields`:** ordered template `{ name, kind, display?, needed?, role?, enum_values?, ref_type? }`. Kinds: `string`, `date`, `number`, `enum`, `ref`. Roles: `title`, `status`, `date`, `start`, `end`, `subtitle`. At most one of title/status/date/start/end. `end` requires `start`. `status` requires enum. Date roles require kind date. `json_schema` is compiled from fields — pass `fields`, not a hand-written schema, once a template exists. `needed` does not block capture.
@@ -171,13 +253,46 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 
 ### `manage_relation`
 
-- **In:** `{ action: "create"|"update", slug, label?, description?, kind?, source_types?, target_types?, is_symmetric?, semantic_parent_slug? }`
+<!-- generated:mcp-params:manage_relation -->
+- **In:** `{ action: "create"|"update", slug, label?, description?, kind?: "hierarchy"|"associative", source_types?, target_types?, is_symmetric?, semantic_parent_slug? }`
+- `action` — create or update
+- `slug` — Relation slug
+- `label` — Human label
+- `description` — What this relation means
+- `kind` — hierarchy or associative
+- `source_types` — Allowed source type slugs. Empty means any type
+- `target_types` — Allowed target type slugs. Empty means any type
+- `is_symmetric` — When true, A→B and B→A are the same edge
+- `semantic_parent_slug` — More specific verb under this parent slug. Null clears it
+<!-- /generated:mcp-params:manage_relation -->
 - **Out:** `{ relation, activity_id }` or `{ error, suggestion? }`
 - Applies immediately. System relations may edit description, `source_types`, and `target_types`. Slug, kind, label, symmetry, and `semantic_parent_slug` stay locked. Empty source/target lists mean any type. Seed apply does not overwrite a user-edited source or target set.
 
 ### `search`
 
-- **In:** `{ query?, type?, status?, under?, since?, url?, repo?, receipt?, due?, due_on_or_before?, due_on_or_after?, data_equals?, limit?, cursor? }`
+<!-- generated:mcp-params:search -->
+- **In:** `{ query?, type?, status?: "active"|"completed"|"archived", under?, since?, url?: { system: "gmail"|"calendar"|"drive", id }, repo?: { system: "github", id }, receipt?: { system: "gmail"|"calendar", id }, due?: "overdue"|"today", due_on_or_before?, due_on_or_after?, data_equals?, limit?, cursor? }`
+- `query` — Lexical query. Optional when a filter is set
+- `type` — Type slug filter
+- `status` — active, completed, or archived
+- `under` — Live parent UUID. Lists nodes with child_of to that parent
+- `since` — ISO-8601 timestamp. Live nodes with updated_at on or after this instant
+- `url` — Unique Drive, Gmail, or Calendar lookup. A string is not this filter
+- `url.system` — gmail, calendar, or drive
+- `url.id` — Object id in that system
+- `repo` — Unique GitHub lookup
+- `repo.system` — github
+- `repo.id` — Object id in that system
+- `receipt` — Unique receipt lookup (gmail or calendar). Kind lives on the stored node
+- `receipt.system` — gmail or calendar
+- `receipt.id` — Object id in that system
+- `due` — Due before today, or due today, in the vault settings timezone
+- `due_on_or_before` — Inclusive ISO date YYYY-MM-DD on data.due
+- `due_on_or_after` — Inclusive ISO date YYYY-MM-DD on data.due
+- `data_equals` — Top-level data key equality. One or a few keys, such as kind or status
+- `limit` — Page size. Default 20, max 100
+- `cursor` — Opaque page cursor from a prior next value
+<!-- /generated:mcp-params:search -->
 - **Out:** `{ nodes: [{ id, type, title, status, snippet, due? }], count, next?, suggestion? }` or `{ error, suggestion? }`
 - Postgres FTS on `title` (weighted highest) + string values from `data` + extracted inline payload text. HTML: tag text plus `alt` / `title` / `aria-label` / `placeholder`. JSON: string values from the parsed body — **not** `JSON.stringify` of the payload wrapper (`media_type`, `storage`, …). Latin diacritics are folded (`fiancee` matches `fiancée` and vice versa). Soft-deleted nodes are excluded. Lexical recall only (no embeddings).
 - **`query` is optional** when `type`, `status`, `under`, `since`, `url`, `repo`, `receipt`, `due`, `due_on_or_before`, `due_on_or_after`, or `data_equals` is set. That is how agents list without a word: all people (`type: "person"`), all open tasks (`type: "task", status: "active"`), overdue or due-today (`due: "overdue"` | `"today"`), due on or before a date (`due_on_or_before: "2026-08-27"`), children of a parent (`under: <parent uuid>` = live `child_of`), spend bids (`type: "spend", data_equals: { stage: "quoted" }`), spend under a project (`type: "spend", under: <project uuid>`), nodes updated `since` an ISO-8601 timestamp, a Gmail/Calendar/Drive object (`url: { system, id }`), a GitHub object (`repo: { system, id }`), a sent-mail or cleared-event receipt (`receipt: { system, id }`), or nodes whose top-level `data` keys equal a value (`data_equals: { kind: "…", status: "…" }`). Empty `{}` → `{ error, suggestion }` (do not add `list_nodes`). `{ cursor }` with no filter is the same error. Default `limit` 20, max 100. `count` matches the same filters. After a full page, send `next` as `cursor`. `since` is a time window (`updated_at >=`), not a page. Do not page by raising `limit` or with `offset`.
@@ -192,7 +307,15 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 
 ### `lookup`
 
+<!-- generated:mcp-params:lookup -->
 - **In:** `{ inputs: [{ name, type?, id? }], type?, limit? }`
+- `inputs` — One or more names to resolve, max 20
+- `inputs[].name` — Name to resolve
+- `inputs[].type` — Optional type slug to narrow this name
+- `inputs[].id` — Optional caller correlation id
+- `type` — Type slug applied to every input that omits its own
+- `limit` — Max candidates per input
+<!-- /generated:mcp-params:lookup -->
 - **Out:** `{ results: [{ input, outcome, candidates, suggestion? }] }` or `{ error, suggestion? }`
 - `inputs` is required (1–20). Each `name` is 1–200 characters. Optional `id` is echoed for correlation. Top-level `type` applies when an input omits `type`. `limit` is candidates per input (default 5, max 10).
 - One result per input, same order, even when some names miss.
@@ -209,7 +332,16 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 
 ### `list_activity`
 
+<!-- generated:mcp-params:list_activity -->
 - **In:** `{ action?, target?, since?, limit?, cursor?, fields?, diff_only? }`
+- `action` — Filter to one activity action
+- `target` — Node, edge, type, or relation id to read the diary for
+- `since` — ISO-8601 timestamp. Rows with created_at on or after this instant
+- `limit` — Page size. Default 50, max 200
+- `cursor` — Opaque page cursor from a prior next value
+- `fields` — Subset of activity keys to return. Omit for the full snapshot
+- `diff_only` — When true, before and after keep only changed top-level keys
+<!-- /generated:mcp-params:list_activity -->
 - **Out:** `{ activities, count, next? }`
 - `target` is `target_id` (node UUID, edge UUID, or type/relation slug). `{ target: <node id> }` is the diary for that node. Newest first. Default limit 50, max 200. `since` is a time window (`created_at >=`), not a page. After a full page, send `next` as `cursor`. `count` matches the same filters. `get` does not include these rows.
 - `since` is an ISO-8601 timestamp. Rows include `actor`, `actor_label`, `before` / `after`, `reversible`, `undo_token`, `token_expires_at`, `undone_at`, and `schema_version`. `actor` / `actor_label` are stamped by the server from the key (or Viewer). Node write rows store snapshots of `payload`, `data`, title, type, and status. A bad body is rebuilt from those snapshots, then written with `upsert`.
@@ -219,7 +351,15 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 
 ### `undo`
 
-- **In:** `{ id, base_updated_at?, from_base_updated_at?, to_base_updated_at?, purge_deleted? }` (`id` is an activity row id)
+<!-- generated:mcp-params:undo -->
+- **In:** `{ id, purge_deleted?, base_updated_at?, from_base_updated_at?, to_base_updated_at? }`
+- `id` — Activity row UUID to invert
+- `purge_deleted` — When undoing a type create, permanently drop leftover soft-deleted nodes of that type
+- `base_updated_at` — Required when the invert touches a node. That node's updated_at from get
+- `from_base_updated_at` — Required when the invert touches an edge. from node's updated_at from get
+- `to_base_updated_at` — Required when the invert touches an edge. to node's updated_at from get
+<!-- /generated:mcp-params:undo -->
+`id` is an activity row id.
 - **Out:** `{ ok, activity_id }` or `{ error, suggestion? }`
 - Needs a key with destructive scope.
 - **If-match:** node inversions (`create`, `update`, `delete`) require `base_updated_at` matching that node's current `updated_at` from `get`. Undo of `delete` uses the last live stamp from `get` (the same value `delete` required) because `get` hides tombstones and delete itself bumps `updated_at`. Edge inversions (`link`, `unlink`) require `from_base_updated_at` and `to_base_updated_at` from `get` on both endpoints. Type and relation inversions have no node timestamp. Stale or missing → `{ error, suggestion }` (get and retry). A matching undo still writes a compensating row. Invert stays refused when it is not safe.
@@ -246,7 +386,13 @@ Instance coordination. Not a graph write and not `get_vault_health`.
 
 **Why a new tool.** `upsert` / `get` / `search` are the graph. A named routine (Dream, weekday health) is not a record. Putting the lock on a node would drag if-match, activity, and the Viewer into a mutex. Vault health stays a host routine. `job` only decides who may run that pass.
 
+<!-- generated:mcp-params:job -->
 - **In:** `{ action: "claim"|"finish"|"release"|"read", name, token?, ttl_seconds? }`
+- `action` — claim, finish, release, or read
+- `name` — Named instance routine, such as dream or activity-prune
+- `token` — Hold token from claim. Required for finish and release
+- `ttl_seconds` — Claim hold length in seconds. Omit to use the vault default
+<!-- /generated:mcp-params:job -->
 - **Out:** `{ action, job: { name, held, holder, until, last_run }, token? }` or `{ error, suggestion? }`
 - `name` is a slug (`dream`, `vault-health`, `backup-vault`, `graph-hygiene`, `update-foundation`, `activity-prune`, or another `^[a-z][a-z0-9_-]{0,62}$` name). First successful `claim` inserts the row. Activity prune is the host script [`scripts/activity-prune.sh`](../scripts/activity-prune.sh). It reads `vault_settings.activity_retention_days`. The script does not claim. A bot may `claim` `activity-prune` before that pass.
 - `claim` without `token` takes the name if it is open or expired. Success returns `token`. A live name returns `{ error: "Held", suggestion }` (who and until). Same API key without the token is still Held. That is two processes sharing one key.

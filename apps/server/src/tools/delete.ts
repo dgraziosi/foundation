@@ -1,4 +1,4 @@
-import { DeleteInputSchema, MutationOkSchema } from "@foundation/schema";
+import { advertisedMcpTool, DeleteInputSchema, MutationOkSchema } from "@foundation/schema";
 import type { Pool } from "@foundation/db";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { writeContextOf } from "../auth.js";
@@ -9,8 +9,7 @@ import { defineTool } from "./define-tool.js";
 export function registerDeleteTool(server: McpServer, pool: Pool, agent: AgentPrincipal): void {
   defineTool(server, {
     name: "delete",
-    description:
-      "Soft-delete a node. Needs a key with destructive scope and base_updated_at from get (if-match). Refuses when a live record still points at this id via a declared ref field; clear data.<field> with upsert, then retry.",
+    description: advertisedMcpTool("delete").description,
     input: DeleteInputSchema.shape,
     output: MutationOkSchema,
     handler: async (input) => deleteGraphNode(pool, input, writeContextOf(agent)),
