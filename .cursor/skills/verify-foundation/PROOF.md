@@ -19,9 +19,9 @@ MCP on `http://127.0.0.1:8787/mcp`:
 5. `undo` of that activity with keep's current `updated_at` restored drop live, prior alias/identity on drop, and the original edge endpoints.
 6. Inventory names: `bootstrap`, `search`, `lookup`, `get`, `working_set`, `upsert`, `delete`, `merge`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`, `job`.
 
-GitHub `verify` gates on this machine: schema tests pass including `generate-mcp-docs --check`; viewer tests + build pass; `skills-layout`, `drift-read`, `foundation-init`, `mint-api-key`, `require-database-url` ok; `verify-mcp-drive` ok. `verify-http-drive` Home empty-copy check needs a first-day vault (this proof writes notes). Server tests on the throwaway `DATABASE_URL` passed `merge`, `cas-safety`, `link`, `delete-restore`, and `undo`. Full `@foundation/server` suite had the known host-cluster FTS headline miss (`fiancée` not in the payload snippet). That miss is not this slice.
+GitHub `verify` gates on this machine: schema tests pass including `generate-mcp-docs --check`; viewer tests + build pass; `skills-layout`, `drift-read`, `foundation-init`, `mint-api-key`, `require-database-url` ok; `verify-http-drive` and `verify-mcp-drive` ok on a clean first-day throwaway (`VERIFY_RUN_ID=verify-gates-25`; `tools/list` count 16 including `merge`). Server tests on the named-proof `DATABASE_URL` passed `merge`, `cas-safety`, `link`, `delete-restore`, and `undo`. Full `@foundation/server` suite had the known host-cluster FTS headline miss (`fiancée` not in the payload snippet). That miss is not this slice.
 
-Evidence stayed under `.cursor/skills/verify-foundation/evidence/merge-keep-drop-25/`. Keys were redacted. The throwaway vault was cleaned up after the proof.
+Evidence stayed under `.cursor/skills/verify-foundation/evidence/merge-keep-drop-25/`. Keys were redacted. The named-proof throwaway vault was cleaned up after the proof.
 
 ## Named proof `batch-upsert-23`
 
