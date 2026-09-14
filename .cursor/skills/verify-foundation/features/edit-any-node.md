@@ -7,7 +7,7 @@ An unlocked person can change title, status, and declared scalar fields on a liv
 - `edit-title-status` PATCHes title and status on a live non-journal node with `base_updated_at`.
 - `edit-declared-field` PATCHes one ontology-declared scalar field (for example person `org`) with the same CAS.
 - `edit-clash` a stale `base_updated_at` returns `409` and does not clobber.
-- `edit-empty-title` an empty title returns `400` **Title is required.**
+- `edit-empty-title` an empty title does not save. The window shows **Keep a title** and does not PATCH. HTTP PATCH with `title` empty is `400` and GET still shows the prior title.
 - `edit-journal-body-only` a PATCH that includes `body` on a non-journal record still returns `403` **Journal writes only.**
 
 ## How to get to it (user POV)
@@ -24,7 +24,7 @@ Preconditions:
 
 - **HTTP edit.** `PATCH /view/api/nodes/<id>` `{ title, status, data, base_updated_at }`. Status `200`. Reload GET shows the new values.
 - **HTTP clash.** Repeat the same stale `base_updated_at`. Status `409`. GET still shows the saved values.
-- **Window.** Title field `aria-label="Title"`. Status `aria-label="Status"`. Save copy **Saving** / **Saved** / **Couldn't save**. Clash offers **Reload**.
+- **Window.** Title field `aria-label="Title"`. Status `aria-label="Status"`. Empty title shows **Keep a title** and does not PATCH. Save copy **Saving** / **Saved** / **Couldn't save**. Clash offers **Reload**.
 
 ## Gotchas
 
