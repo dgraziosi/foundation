@@ -41,13 +41,13 @@ async function connectedClient(): Promise<{
   };
 }
 
-test("tools/list still advertises the 15 inventory tools", async () => {
+test("tools/list still advertises the 16 inventory tools", async () => {
   const { client, close } = await connectedClient();
   try {
     const listed = await client.listTools();
     const names = listed.tools.map((tool) => tool.name);
     assert.deepEqual(names, [...ADVERTISED_MCP_TOOL_NAMES]);
-    assert.equal(names.length, 15);
+    assert.equal(names.length, 16);
   } finally {
     await close();
   }

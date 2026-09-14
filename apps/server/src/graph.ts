@@ -145,10 +145,11 @@ import { randomUUID } from "node:crypto";
 import { refuseInvalidRelationEdges } from "./relation-revalidate.js";
 import { removeAuthoredType } from "./retire-type.js";
 import { suggestLinksForNode } from "./suggested-links.js";
+import { mergeGraphNodes } from "./merge.js";
 import { undoGraphActivity } from "./undo.js";
 import { writerFrom, type WriteContext } from "./write-context.js";
 
-export { undoGraphActivity };
+export { mergeGraphNodes, undoGraphActivity };
 export type { WriteContext };
 
 function mergedNodeData(
