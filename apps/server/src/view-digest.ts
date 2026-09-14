@@ -55,7 +55,7 @@ export async function viewHomeDigest(
   const { rows } = await pool.query<DigestSqlRow>(
     `SELECT a.id, a.actor, a.actor_label, a.action, a.target_id, a.before, a.after, a.created_at, n.title
      FROM activity a
-     INNER JOIN nodes n ON n.id = a.target_id AND n.deleted_at IS NULL
+     INNER JOIN nodes n ON n.id::text = a.target_id AND n.deleted_at IS NULL
      WHERE a.actor <> 'user'
        AND a.target_kind = 'node'
        AND a.target_id IS NOT NULL
