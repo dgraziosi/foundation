@@ -16,7 +16,7 @@ Starter recipes still paste from [`AGENTS.md`](./AGENTS.md). Named skill folders
 
 ## Cursor
 
-Cursor loads [`.agents/skills/`](../.agents/skills/) from the clone. Put this JSON in the MCP config (`mcpServers` with `url` + `headers`). Same URL and key as the shared pattern. Then confirm with lean `bootstrap` and/or read a guidance resource / bot prompt.
+Cursor loads [`.agents/skills/`](../.agents/skills/) from the clone. Put this JSON in the MCP config (`mcpServers` with `url` + `headers`). Same URL and key as the shared pattern. Then confirm with lean `bootstrap`, a guidance resource / bot prompt, or a simple `search`.
 
 ```json
 {
@@ -40,7 +40,7 @@ Grok Bot’s skill library is not this git tree. Import [`.agents/skills/`](../.
 paths = ["/absolute/path/to/the/clone/.agents/skills"]
 ```
 
-Add a remote HTTP MCP connector named `foundation` on the machine that runs this vault. Put this in the connector config. Then confirm with lean `bootstrap` and/or read a guidance resource / bot prompt.
+Add a remote HTTP MCP connector named `foundation` on the machine that runs this vault. Put this in the connector config. Then confirm with lean `bootstrap`, a guidance resource / bot prompt, or a simple `search`.
 
 ```json
 {
@@ -54,7 +54,7 @@ Add a remote HTTP MCP connector named `foundation` on the machine that runs this
 
 ## Hermes
 
-Import or point Hermes at [`.agents/skills/`](../.agents/skills/) from the clone. Open `~/.hermes/config.yaml` and add a `foundation` server. Set `url` and `headers.Authorization` from the shared pattern. Then confirm with lean `bootstrap` and/or read a guidance resource / bot prompt.
+Import or point Hermes at [`.agents/skills/`](../.agents/skills/) from the clone. Open `~/.hermes/config.yaml` and add a `foundation` server. Set `url` and `headers.Authorization` from the shared pattern. Then confirm with lean `bootstrap`, a guidance resource / bot prompt, or a simple `search`.
 
 ```yaml
 mcp_servers:
@@ -66,7 +66,7 @@ mcp_servers:
 
 ## OpenClaw
 
-Import or point OpenClaw at [`.agents/skills/`](../.agents/skills/) from the clone. Add an `mcp.servers` entry named `foundation` with `url`, `transport: "streamable-http"`, and `headers.Authorization`. Same URL and key as the shared pattern. Then confirm with lean `bootstrap` and/or read a guidance resource / bot prompt.
+Import or point OpenClaw at [`.agents/skills/`](../.agents/skills/) from the clone. Add an `mcp.servers` entry named `foundation` with `url`, `transport: "streamable-http"`, and `headers.Authorization`. Same URL and key as the shared pattern. Then confirm with lean `bootstrap`, a guidance resource / bot prompt, or a simple `search`.
 
 ```json
 {
@@ -88,7 +88,7 @@ Control UI: Settings → MCP → Add server (Streamable HTTP).
 
 ## Claude Code
 
-Import or point Claude Code at [`.agents/skills/`](../.agents/skills/) from the clone. Do not copy the folders into `.claude/skills/`. Run the command, or write `.mcp.json` (`type: "http"`, `url`, `headers`). Same URL and key as the shared pattern. Then confirm with lean `bootstrap` and/or read a guidance resource / bot prompt.
+Import or point Claude Code at [`.agents/skills/`](../.agents/skills/) from the clone. Do not copy the folders into `.claude/skills/`. Run the command, or write `.mcp.json` (`type: "http"`, `url`, `headers`). Same URL and key as the shared pattern. Then confirm with lean `bootstrap`, a guidance resource / bot prompt, or a simple `search`.
 
 ```bash
 claude mcp add --transport http foundation http://127.0.0.1:8787/mcp --header "Authorization: ApiKey YOUR_KEY"
@@ -112,7 +112,7 @@ claude mcp add --transport http foundation http://127.0.0.1:8787/mcp --header "A
 
 ## Codex
 
-Codex loads [`.agents/skills/`](../.agents/skills/) from the clone. Open `~/.codex/config.toml` (or project `.codex/config.toml`) and add `mcp_servers.foundation`. Set `url` and `http_headers.Authorization` from the shared pattern. Then confirm with lean `bootstrap` and/or read a guidance resource / bot prompt.
+Codex loads [`.agents/skills/`](../.agents/skills/) from the clone. Open `~/.codex/config.toml` (or project `.codex/config.toml`) and add `mcp_servers.foundation`. Set `url` and `http_headers.Authorization` from the shared pattern. Then confirm with lean `bootstrap`, a guidance resource / bot prompt, or a simple `search`.
 
 ```toml
 [mcp_servers.foundation]
