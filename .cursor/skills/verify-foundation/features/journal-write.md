@@ -1,6 +1,6 @@
 # Journal write
 
-Journal write is the Viewer's only write. After Unlock, **Today** on Home (or the journal collection, or `/view/journal/today`) creates today's journal for the vault timezone (seed: `America/New_York`) if none is live, then opens it as a page. The user edits the title and the markdown body. The window autosaves. Other types stay display-only. Bots still write everything else through MCP.
+Journal write stays the dedicated writing page. After Unlock, **Today** on Home (or the journal collection, or `/view/journal/today`) creates today's journal for the vault timezone (seed: `America/New_York`) if none is live, then opens it as a page. The user edits the title and the markdown body. The window autosaves. Other live records use [Edit any node](./edit-any-node.md).
 
 ## Sub-features
 
@@ -8,7 +8,7 @@ Journal write is the Viewer's only write. After Unlock, **Today** on Home (or th
 - `journal-write-page` shows the day label, title field `aria-label="Title"`, and the editor (`data-editor="live-markdown"`, placeholder **Write a first sentence.**). An empty title keeps that journal's calendar day and shows **Keep a title**.
 - `journal-write-save` persists title and body (debounce) via `PATCH /view/api/nodes/:id`. A second Today returns the same live id. Copy is **Saving**, **Saved**, or **Couldn't save**. A clash offers **Reload** and keeps the draft.
 - `journal-write-leave` flushes a dirty draft when the person leaves. A clash or failed write on leave still keeps the draft and offers Reload / Couldn't save when they come back. A cached sibling journal that keeps the writing page mounted still flushes the journal they left. Coming back after a landed leave shows the flushed body.
-- `journal-write-only` refuses a PATCH on a non-journal record (`403` **Journal writes only.**).
+- `journal-write-only` refuses a PATCH that includes `body` on a non-journal record (`403` **Journal writes only.**). Title, status, and declared fields on that record use [Edit any node](./edit-any-node.md).
 - `journal-collection` is still the read-only list at `/view/types/journal`. See [Collection](./collection.md). **Today** leaves that list for this page.
 
 ## How to get to it (user POV)
@@ -33,7 +33,7 @@ Preconditions:
 - **Save.** Change the title and a sentence. Wait about a second. Reload the node or POST Today again. Title and body persisted.
 - **Leave flush.** Type, then leave before the debounce lands. Reopen. The flushed body is on the page when the person has not typed again. A clash or failed leave still shows the draft with **Couldn't save**, and a clash offers **Reload**.
 - **HTTP today.** `curl -sS -X POST http://127.0.0.1:8788/view/api/journals/today -H "Authorization: ApiKey $(cat "${KEY_FILE}")"`. Status `200`. `node.type` is `journal`. `node.payload.media_type` is `text/markdown`. First create: `node.payload.body` is `""`. A second POST returns the same `node.id`.
-- **HTTP save.** `curl -sS -X PATCH http://127.0.0.1:8788/view/api/nodes/<id> -H "Authorization: ApiKey $(cat "${KEY_FILE}")" -H "content-type: application/json" -d "{\"title\":\"Morning\",\"body\":\"# Morning\\n\\nWrote in the window.\\n\",\"base_updated_at\":\"<updated_at>\"}"`. Status `200`. Stale `base_updated_at` → `409`. PATCH a note → `403` `{"error":"Journal writes only."}`.
+- **HTTP save.** `curl -sS -X PATCH http://127.0.0.1:8788/view/api/nodes/<id> -H "Authorization: ApiKey $(cat "${KEY_FILE}")" -H "content-type: application/json" -d "{\"title\":\"Morning\",\"body\":\"# Morning\\n\\nWrote in the window.\\n\",\"base_updated_at\":\"<updated_at>\"}"`. Status `200`. Stale `base_updated_at` → `409`. PATCH a note **with `body`** → `403` `{"error":"Journal writes only."}`.
 - **Proof.** Screenshot the journal page (day label + Title), or save the today POST and the PATCH (no personal body if you drove a user's vault). Feature id `journal-write-today` or `journal-write-page`.
 
 ## Gotchas
