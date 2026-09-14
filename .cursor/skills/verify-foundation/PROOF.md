@@ -1,10 +1,27 @@
 # Proofs
 
-Journal write is on this branch. Home always offers **Today**, even at journal count 0. **Today** (`/view/journal/today`, `POST /view/api/journals/today`) creates today's journal if none is live. The page autosaves title and one markdown body on that record (`PATCH /view/api/nodes/:id`). An empty title shows **Keep a title**. Unlock title is **Unlock.** The field is the vault key. The error is **That key did not unlock.** Other types stay display-only. The Viewer cookie does not unlock MCP.
+Journal write is on this branch. Home always offers **Today**, even at journal count 0. **Today** (`/view/journal/today`, `POST /view/api/journals/today`) creates today's journal if none is live. The page autosaves title and one markdown body on that record (`PATCH /view/api/nodes/:id`). An empty title shows **Keep a title**. Unlock title is **Unlock.** The field is the vault key. The error is **That key did not unlock.** Other live records edit title, status, and declared fields on detail. Activity and Trash use the same if-match and restore family. The Viewer cookie does not unlock MCP.
 
 Historical proof runs below may mention older door copy. The current window is the paragraph above.
 
 Early generate/maintain VMs lacked host Postgres 16 on PATH and did not drive live `/view` HTTP. Later maintain runs that could start a throwaway vault did.
+
+## Named proof `edit-any-node-31`
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=edit-any-node-31`). Doctor green after Viewer build. Viewer at `http://127.0.0.1:8788/view`. MCP at `http://127.0.0.1:8787/mcp`. `tools/list` returned 16 tools including `merge`. No new tool.
+
+HTTP on the view door with the throwaway view key (person created via MCP `upsert` so the window had a live non-journal record):
+
+1. `PATCH /view/api/nodes/:id` changed title to "Ada Lovelace", status to `completed`, and declared field `data.org` to "College". Reload GET showed those values.
+2. The same stale `base_updated_at` returned `409` (`base_updated_at does not match current updated_at`). GET still showed "Ada Lovelace".
+3. `GET /view/api/nodes/:id/activity` listed the Viewer update (`actor=user`, `actor_label=Viewer`, summary `title, status, data.org`) with Undo offered.
+4. `POST /view/api/activity/:id/undo` restored title "Proof Ada", status `active`, and `data.org` "Labs".
+5. `DELETE /view/api/nodes/:id` moved the record out of Recents. `GET /view/api/trash` listed it. `POST /view/api/nodes/:id/restore` returned it live with title "Proof Ada".
+6. `POST /view/api/journals/today` opened today's journal. `PATCH` saved title "Proof morning" and body `Wrote today.\n`.
+
+GitHub `verify` gates on this machine: schema tests pass including `generate-mcp-docs --check`; viewer tests + build pass; `skills-layout`, `drift-read`, `foundation-init`, `mint-api-key`, `require-database-url` ok; `verify-http-drive` and `verify-mcp-drive` ok on this throwaway. Named proof script `verify-edit-any-node.sh` exited 0. Server tests on the throwaway `DATABASE_URL` passed the view write suite (`view window writes journal, any-node, activity, and trash`). Full `@foundation/server` suite had the known host-cluster FTS headline miss (`fiancée` not in the payload snippet). That miss is not this slice.
+
+Evidence stayed under `.cursor/skills/verify-foundation/evidence/edit-any-node-31/`. Keys were redacted. The named-proof throwaway vault was cleaned up after the proof.
 
 ## Named proof `merge-keep-drop-25`
 
