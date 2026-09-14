@@ -277,16 +277,5 @@ export const BootstrapOutputSchema = z.object({
     edges_are_source_of_truth: z.literal(true),
     hierarchy_relation: z.string().min(1),
   }),
-  how_to_extend: z.object({
-    summary: z.string(),
-    manage_type: z.string(),
-    manage_relation: z.string(),
-    nodes: z.string(),
-    links: z.string(),
-    activity: z.string(),
-    search: z.string(),
-    lookup: z.string(),
-    working_set: z.string(),
-  }),
 });
 export type BootstrapOutput = z.infer<typeof BootstrapOutputSchema>;

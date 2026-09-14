@@ -52,9 +52,9 @@ export const ADVERTISED_MCP_TOOLS: readonly AdvertisedMcpTool[] = [
   {
     name: "bootstrap",
     description:
-      "Return starter ontology, how to extend it, and current type/relation inventory. Call first.",
+      "Return starter spine, compact rules, and current type/relation inventory. Call first. How-to-extend lives on foundation://guidance resources.",
     purpose:
-      "Return starter ontology, how to extend it, and current type/relation inventory. Call first.",
+      "Return starter spine, compact rules, and current type/relation inventory. Call first. How-to-extend lives on foundation://guidance resources.",
     input: z.object({}),
   },
   {
