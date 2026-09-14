@@ -261,6 +261,52 @@ export function journalDraftQuiet(
   return draft.title === saved.title && journalPayloadBody(draft.body) === journalPayloadBody(saved.body);
 }
 
+export type NodeSaveDraft = {
+  title: string;
+  status: string;
+  data: Record<string, unknown>;
+};
+
+export function nodeDraftQuiet(draft: NodeSaveDraft, saved: NodeSaveDraft): boolean {
+  return (
+    draft.title === saved.title &&
+    draft.status === saved.status &&
+    JSON.stringify(draft.data) === JSON.stringify(saved.data)
+  );
+}
+
+export function nodeSaveCopy(
+  status: JournalSaveStatus,
+  keepTitle: boolean,
+): { status: string | null; reload: boolean; keepTitle: boolean } {
+  return journalSaveCopy(status, keepTitle);
+}
+
+export function isEditableTypeField(field: { kind: string }): boolean {
+  return field.kind === "string" || field.kind === "date" || field.kind === "number" || field.kind === "enum";
+}
+
+export function fieldInputValue(value: unknown): string {
+  if (value === undefined || value === null) {
+    return "";
+  }
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value);
+  }
+  return JSON.stringify(value);
+}
+
+export function fieldSaveValue(kind: string, raw: string): unknown {
+  if (raw === "") {
+    return null;
+  }
+  if (kind === "number") {
+    const next = Number(raw);
+    return Number.isFinite(next) ? next : raw;
+  }
+  return raw;
+}
+
 export function relativeTime(iso: string, now = new Date()): string {
   const then = Date.parse(iso);
   if (Number.isNaN(then)) {

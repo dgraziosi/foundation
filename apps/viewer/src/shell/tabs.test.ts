@@ -9,6 +9,15 @@ import {
 
 const noteId = "11111111-1111-4111-8111-111111111111";
 
+test("trash is a content tab, not Home", () => {
+  const trash = pathTab("/trash", {});
+  assert.equal(trash.kind, "trash");
+  const added = syncHostTabs([], trash);
+  assert.equal(added.length, 1);
+  const again = syncHostTabs(added, trash);
+  assert.equal(again, added);
+});
+
 test("today is a content tab, not Home", () => {
   const today = pathTab("/journal/today", {});
   assert.equal(today.kind, "today");

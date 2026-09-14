@@ -23,6 +23,10 @@ import {
   journalSaveResultApplies,
   journalSaveWhenQuiet,
   journalWriteTitle,
+  fieldInputValue,
+  fieldSaveValue,
+  isEditableTypeField,
+  nodeDraftQuiet,
   todayInNewYork,
   parseSearchSnippet,
   relativeTime,
@@ -334,6 +338,22 @@ test("Home widget sort is due-urgency then recency, capped at 5", () => {
   assert.deepEqual(
     [...recents].sort(compareRecentRows).map((row) => row.title),
     ["A same time", "B same time", "Older"],
+  );
+});
+
+test("declared scalar fields are editable; refs are not", () => {
+  assert.equal(isEditableTypeField({ kind: "string" }), true);
+  assert.equal(isEditableTypeField({ kind: "enum" }), true);
+  assert.equal(isEditableTypeField({ kind: "ref" }), false);
+  assert.equal(fieldInputValue(null), "");
+  assert.equal(fieldSaveValue("number", "12"), 12);
+  assert.equal(fieldSaveValue("string", ""), null);
+  assert.equal(
+    nodeDraftQuiet(
+      { title: "Ada", status: "active", data: { org: "Labs" } },
+      { title: "Ada", status: "active", data: { org: "Labs" } },
+    ),
+    true,
   );
 });
 

@@ -274,3 +274,77 @@ export function saveJournal(input: { id: string; title: string; body: string; ba
     }),
   });
 }
+
+export type ViewActivityRow = {
+  id: string;
+  action: string;
+  actor: string;
+  actor_label: string | null;
+  created_at: string;
+  summary: string;
+  reversible: boolean;
+  can_undo: boolean;
+  base_updated_at?: string;
+};
+
+export type TrashRow = {
+  id: string;
+  type: string;
+  title: string;
+  deleted_at: string;
+  updated_at: string;
+};
+
+export function saveNode(input: {
+  id: string;
+  title: string;
+  status: string;
+  data: Record<string, unknown>;
+  base_updated_at: string;
+}) {
+  return viewFetch<NodeDetail>(`/view/api/nodes/${encodeURIComponent(input.id)}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      title: input.title,
+      status: input.status,
+      data: input.data,
+      base_updated_at: input.base_updated_at,
+    }),
+  });
+}
+
+export function fetchNodeActivity(id: string) {
+  return viewFetch<{ rows: ViewActivityRow[] }>(`/view/api/nodes/${encodeURIComponent(id)}/activity`);
+}
+
+export function undoActivity(input: { id: string; base_updated_at: string }) {
+  return viewFetch<{ ok: true; activity_id: string } & Partial<NodeDetail>>(
+    `/view/api/activity/${encodeURIComponent(input.id)}/undo`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ base_updated_at: input.base_updated_at }),
+    },
+  );
+}
+
+export function moveNodeToTrash(input: { id: string; base_updated_at: string }) {
+  return viewFetch<{ ok: true; activity_id: string }>(`/view/api/nodes/${encodeURIComponent(input.id)}`, {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ base_updated_at: input.base_updated_at }),
+  });
+}
+
+export function fetchTrash() {
+  return viewFetch<{ rows: TrashRow[] }>("/view/api/trash");
+}
+
+export function restoreNode(input: { id: string; base_updated_at: string }) {
+  return viewFetch<NodeDetail>(`/view/api/nodes/${encodeURIComponent(input.id)}/restore`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ base_updated_at: input.base_updated_at }),
+  });
+}

@@ -3,6 +3,7 @@ import { createContext, useContext } from "react";
 export type HostTab =
   | { kind: "today"; label: string }
   | { kind: "recents"; label: string }
+  | { kind: "trash"; label: string }
   | { kind: "collection"; slug: string; label: string }
   | { kind: "detail"; id: string; label: string };
 
@@ -11,6 +12,7 @@ export type ShellOutlet = {
   openCollection: (slug: string, label?: string) => void;
   syncCollectionLabel: (slug: string, label: string) => void;
   openRecents: () => void;
+  openTrash: () => void;
   openSearch: () => void;
   railOpen: boolean;
   setRailOpen: (open: boolean) => void;
