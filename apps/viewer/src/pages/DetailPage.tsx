@@ -14,9 +14,11 @@ import {
   isUuid,
   journalSaveResultApplies,
   nodeDraftQuiet,
+  nodeLeaveWrite,
   nodeSaveCopy,
   relativeTime,
   type JournalSaveStatus,
+  type NodeLeaveWrite,
   type NodeSaveDraft,
 } from "../format";
 import { openableUrl } from "../url";
@@ -234,6 +236,16 @@ function LiveDetail({
   baseRef.current = base;
   const saveStatusRef = useRef(saveStatus);
   saveStatusRef.current = saveStatus;
+  const saveTimer = useRef<number | null>(null);
+  const inflightWrite = useRef<Promise<void> | null>(null);
+  const flushAfterWrite = useRef(false);
+  const leavePending = useRef<{
+    id: string;
+    draft: NodeSaveDraft;
+    skip: NodeSaveDraft;
+    base: string;
+    keepTitle: boolean;
+  } | null>(null);
 
   useEffect(() => {
     const incoming = draftFromDetail(detail, detail.type?.fields ?? []);
@@ -275,6 +287,117 @@ function LiveDetail({
   draftRef.current = draft;
   const saveCopy = nodeSaveCopy(saveStatus, keepTitle);
   const dataKey = JSON.stringify(draft.data);
+  const leaveSnap = useRef<{
+    id: string;
+    draft: NodeSaveDraft;
+    skip: NodeSaveDraft;
+    base: string;
+    keepTitle: boolean;
+  } | null>(null);
+  if (seededId.current === detail.node.id) {
+    leaveSnap.current = {
+      id: detail.node.id,
+      draft,
+      skip: { ...skip.current },
+      base: baseRef.current,
+      keepTitle,
+    };
+  }
+
+  function applySaved(saved: NodeDetail, mine: number) {
+    const landed = draftFromDetail(saved, saved.type?.fields ?? []);
+    if (leavePending.current?.id === saved.node.id) {
+      leavePending.current = {
+        ...leavePending.current,
+        skip: landed,
+        base: saved.node.updated_at ?? "",
+      };
+    }
+    queryClient.setQueryData(["node", saved.node.id], saved);
+    void queryClient.invalidateQueries({ queryKey: ["recents"] });
+    void queryClient.invalidateQueries({ queryKey: ["ontology"] });
+    if (seededId.current !== saved.node.id) {
+      return;
+    }
+    if (!journalSaveResultApplies(mine, saveGen.current)) {
+      return;
+    }
+    skip.current = landed;
+    setBase(saved.node.updated_at ?? "");
+    baseRef.current = saved.node.updated_at ?? "";
+    openDetail(saved.node.id, saved.node.title);
+    if (nodeDraftQuiet(draftRef.current, landed)) {
+      setSaveStatus("saved");
+    }
+  }
+
+  function finishWrite() {
+    writesInFlight.current -= 1;
+    if (!flushAfterWrite.current) {
+      return;
+    }
+    flushAfterWrite.current = false;
+    const pending = leavePending.current;
+    leavePending.current = null;
+    if (pending) {
+      flushLeave(pending);
+    }
+  }
+
+  function writeNow(pending: NodeLeaveWrite, mine = ++saveGen.current) {
+    setSaveStatus("saving");
+    writesInFlight.current += 1;
+    const done = (async () => {
+      try {
+        const saved = await saveNode({
+          id: pending.id,
+          title: pending.title,
+          status: pending.status,
+          data: pending.data,
+          base_updated_at: pending.base,
+        });
+        applySaved(saved, mine);
+        return saved;
+      } catch (error) {
+        if (!journalSaveResultApplies(mine, saveGen.current)) {
+          return;
+        }
+        if (seededId.current !== pending.id) {
+          return;
+        }
+        if (error instanceof ApiError && error.status === 409) {
+          setSaveStatus("clash");
+          return;
+        }
+        setSaveStatus("failed");
+      } finally {
+        finishWrite();
+      }
+    })();
+    inflightWrite.current = done.then(() => undefined);
+    return done;
+  }
+
+  function flushLeave(snap: {
+    id: string;
+    draft: NodeSaveDraft;
+    skip: NodeSaveDraft;
+    base: string;
+    keepTitle: boolean;
+  }) {
+    const pending = nodeLeaveWrite(snap);
+    if (!pending) {
+      return;
+    }
+    void writeNow(pending);
+  }
+
+  function cancelDebounce() {
+    if (saveTimer.current != null) {
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+  }
 
   useEffect(() => {
     if (!base || keepTitle || saveStatus === "clash") {
@@ -293,46 +416,42 @@ function LiveDetail({
     const mine = ++saveGen.current;
     setSaveStatus("saving");
     const handle = window.setTimeout(() => {
-      void (async () => {
-        writesInFlight.current += 1;
-        try {
-          const saved = await saveNode({
-            id: detail.node.id,
-            title: draftRef.current.title,
-            status: draftRef.current.status,
-            data: draftRef.current.data,
-            base_updated_at: baseRef.current,
-          });
-          if (!journalSaveResultApplies(mine, saveGen.current)) {
-            return;
-          }
-          const landed = draftFromDetail(saved, saved.type?.fields ?? []);
-          skip.current = landed;
-          setBase(saved.node.updated_at ?? "");
-          baseRef.current = saved.node.updated_at ?? "";
-          queryClient.setQueryData(["node", detail.node.id], saved);
-          openDetail(detail.node.id, saved.node.title);
-          void queryClient.invalidateQueries({ queryKey: ["recents"] });
-          void queryClient.invalidateQueries({ queryKey: ["ontology"] });
-          if (nodeDraftQuiet(draftRef.current, landed)) {
-            setSaveStatus("saved");
-          }
-        } catch (error) {
-          if (!journalSaveResultApplies(mine, saveGen.current)) {
-            return;
-          }
-          if (error instanceof ApiError && error.status === 409) {
-            setSaveStatus("clash");
-            return;
-          }
-          setSaveStatus("failed");
-        } finally {
-          writesInFlight.current -= 1;
-        }
-      })();
+      saveTimer.current = null;
+      void writeNow(
+        {
+          id: detail.node.id,
+          title: draftRef.current.title,
+          status: draftRef.current.status,
+          data: draftRef.current.data,
+          base: baseRef.current,
+        },
+        mine,
+      );
     }, 700);
-    return () => window.clearTimeout(handle);
+    saveTimer.current = handle;
+    return () => {
+      window.clearTimeout(handle);
+      if (saveTimer.current === handle) {
+        saveTimer.current = null;
+      }
+    };
   }, [base, title, status, dataKey, keepTitle, saveStatus, detail.node.id, openDetail, queryClient]);
+
+  useEffect(() => {
+    const nodeId = detail.node.id;
+    return () => {
+      const snap = leaveSnap.current?.id === nodeId ? leaveSnap.current : null;
+      if (!snap) {
+        return;
+      }
+      if (writesInFlight.current > 0) {
+        leavePending.current = snap;
+        flushAfterWrite.current = true;
+        return;
+      }
+      flushLeave(snap);
+    };
+  }, [detail.node.id]);
 
   async function reloadKeepDraft() {
     const mine = ++saveGen.current;
@@ -368,7 +487,25 @@ function LiveDetail({
 
   async function trash() {
     setTrashError(null);
+    cancelDebounce();
     try {
+      if (inflightWrite.current) {
+        await inflightWrite.current;
+      }
+      const pending = nodeLeaveWrite({
+        id: detail.node.id,
+        draft: draftRef.current,
+        skip: skip.current,
+        base: baseRef.current,
+        keepTitle,
+      });
+      if (pending) {
+        const saved = await writeNow(pending);
+        if (!saved) {
+          setTrashError("Couldn't move to trash.");
+          return;
+        }
+      }
       await moveNodeToTrash({ id: detail.node.id, base_updated_at: baseRef.current });
       await queryClient.invalidateQueries({ queryKey: ["recents"] });
       await queryClient.invalidateQueries({ queryKey: ["trash"] });

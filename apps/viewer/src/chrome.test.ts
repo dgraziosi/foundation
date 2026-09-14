@@ -154,6 +154,10 @@ test("journal page is a document; today is the start path", async () => {
   assert.match(typeView, /\/journal\/today/);
   const detail = await src("pages/DetailPage.tsx");
   assert.match(detail, /JournalPage/);
+  assert.match(detail, /nodeLeaveWrite/);
+  assert.match(detail, /flushLeave/);
+  assert.match(detail, /leaveSnap/);
+  assert.match(detail, /writesInFlight/);
   const app = await src("App.tsx");
   assert.match(app, /path="\/journal\/today"/);
 });
@@ -355,6 +359,9 @@ test("window writes journal, any-node, activity undo, and trash", async () => {
   assert.match(api, /undoActivity/);
   assert.match(api, /fetchTrash/);
   assert.doesNotMatch(api, /manage_type/);
+  const trash = await src("pages/TrashPage.tsx");
+  assert.match(trash, /restore\.error/);
+  assert.match(trash, /Couldn't restore/);
 });
 
 test("no-views copy is honest and Home is the landing surface", async () => {

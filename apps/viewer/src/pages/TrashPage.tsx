@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { fetchOntology, fetchTrash, restoreNode } from "../api";
+import { ApiError, fetchOntology, fetchTrash, restoreNode } from "../api";
 import { relativeTime } from "../format";
 import { useShell } from "../shell/context";
 import { useThemeLane } from "../theme";
@@ -24,11 +24,18 @@ export function TrashPage() {
     },
   });
   const rows = trash.data?.rows ?? [];
+  const restoreError =
+    restore.error instanceof ApiError
+      ? restore.error.message
+      : restore.error
+        ? "Couldn't restore."
+        : null;
 
   return (
     <ScrollArea className="flex min-h-0 flex-1 flex-col">
       <div className="flex flex-col gap-md p-lg" data-surface="trash-page">
         <h1 className="text-display-m">Trash</h1>
+        {restoreError ? <Quiet>{restoreError}</Quiet> : null}
         {trash.isLoading ? <Placeholders /> : null}
         {trash.isError ? <LoadError onRetry={() => void trash.refetch()} /> : null}
         {trash.data && rows.length === 0 ? <Quiet>Nothing in trash.</Quiet> : null}

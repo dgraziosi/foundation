@@ -275,6 +275,37 @@ export function nodeDraftQuiet(draft: NodeSaveDraft, saved: NodeSaveDraft): bool
   );
 }
 
+export type NodeLeaveWrite = {
+  id: string;
+  title: string;
+  status: string;
+  data: Record<string, unknown>;
+  base: string;
+};
+
+/** Leave flush writes the record we left, not the one now on screen. */
+export function nodeLeaveWrite(input: {
+  id: string;
+  draft: NodeSaveDraft;
+  skip: NodeSaveDraft;
+  base: string;
+  keepTitle: boolean;
+}): NodeLeaveWrite | null {
+  if (!input.id || !input.base || input.keepTitle) {
+    return null;
+  }
+  if (nodeDraftQuiet(input.draft, input.skip)) {
+    return null;
+  }
+  return {
+    id: input.id,
+    title: input.draft.title,
+    status: input.draft.status,
+    data: input.draft.data,
+    base: input.base,
+  };
+}
+
 export function nodeSaveCopy(
   status: JournalSaveStatus,
   keepTitle: boolean,

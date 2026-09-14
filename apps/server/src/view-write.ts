@@ -28,7 +28,7 @@ import { DESTRUCTIVE, type WriteContext } from "./write-context.js";
 
 const VIEWER_WRITE: WriteContext = { ...DESTRUCTIVE, writer: VIEWER_WRITER };
 
-const NODE_UNDO_ACTIONS = new Set(["create", "update", "delete", "restore"]);
+const NODE_UNDO_ACTIONS = new Set(["create", "update", "delete"]);
 
 export type ViewNodePatch = {
   id: string;
@@ -313,6 +313,7 @@ async function restoreWithoutToken(pool: Pool, node: Node) {
       target_id: restored.id,
       before: current,
       after: restored,
+      reversible: false,
     });
     return { ok: true as const, activity_id: activity.id, node: restored };
   });

@@ -8,7 +8,7 @@ import { createPool, getNodeById, migrate, seedSystemOntology, type Pool } from 
 import { isToolError } from "@foundation/schema";
 import { createApp } from "./app.js";
 import { getGraphNode, upsertGraphNode } from "./graph.js";
-import { activityChangeSummary, pickEditableData } from "./view-write.js";
+import { activityChangeSummary, pickEditableData, presentViewActivity } from "./view-write.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 const apiKey = "test-foundation-key";
@@ -37,6 +37,44 @@ test("activityChangeSummary names title, status, and data keys", () => {
     }),
     "title, status, data.org",
   );
+});
+
+test("presentViewActivity never offers undo on a restore row", () => {
+  const stamp = "2026-09-01T12:00:00.000Z";
+  const live = {
+    id: "11111111-1111-4111-8111-111111111111",
+    type: "person",
+    title: "Ada",
+    status: "active" as const,
+    payload: { media_type: "text/plain", storage: "inline" as const, body: "" },
+    data: {},
+    metadata: {},
+    created_at: stamp,
+    updated_at: stamp,
+    deleted_at: null,
+  };
+  const presented = presentViewActivity(
+    {
+      id: "22222222-2222-4222-8222-222222222222",
+      actor: "user",
+      actor_label: "Viewer",
+      action: "restore",
+      target_kind: "node",
+      target_id: live.id,
+      before: { ...live, deleted_at: stamp },
+      after: live,
+      reversible: true,
+      undo_token: "33333333-3333-4333-8333-333333333333",
+      token_expires_at: "2099-01-01T00:00:00.000Z",
+      undone_at: null,
+      rationale: null,
+      created_at: stamp,
+      schema_version: 1,
+    },
+    live,
+  );
+  assert.equal(presented.can_undo, false);
+  assert.equal(presented.summary, "Restored");
 });
 
 async function poolForSchema(schema: string): Promise<Pool> {
@@ -251,13 +289,43 @@ test("viewer any-node write, activity undo, and trash restore", { skip: !databas
     const liveRecentRows = (await liveRecents.json()) as { rows: Array<{ id: string }> };
     assert.ok(liveRecentRows.rows.some((row) => row.id === created.node.id));
 
+    const removedAgain = await fetch(`${viewOrigin}/view/api/nodes/${created.node.id}`, {
+      method: "DELETE",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ base_updated_at: liveAgain.node.updated_at }),
+    });
+    assert.equal(removedAgain.status, 200);
+    const expiredTomb = await getNodeById(pool, created.node.id, { includeDeleted: true });
+    assert.ok(expiredTomb?.deleted_at);
+    await pool.query(
+      `UPDATE activity SET token_expires_at = now() - interval '1 hour' WHERE target_id = $1 AND action = 'delete'`,
+      [created.node.id],
+    );
+    const fallbackRestore = await fetch(`${viewOrigin}/view/api/nodes/${created.node.id}/restore`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ base_updated_at: expiredTomb.updated_at }),
+    });
+    assert.equal(fallbackRestore.status, 200);
+    const afterFallback = await fetch(`${viewOrigin}/view/api/nodes/${created.node.id}/activity`, {
+      headers: { cookie },
+    });
+    assert.equal(afterFallback.status, 200);
+    const fallbackListed = (await afterFallback.json()) as {
+      rows: Array<{ action: string; can_undo: boolean }>;
+    };
+    const restoreRows = fallbackListed.rows.filter((row) => row.action === "restore");
+    assert.ok(restoreRows.length > 0);
+    assert.ok(restoreRows.every((row) => row.can_undo === false));
+    const liveFallback = (await fallbackRestore.json()) as { node: { updated_at: string } };
+
     const journalBodyOnPerson = await fetch(`${viewOrigin}/view/api/nodes/${created.node.id}`, {
       method: "PATCH",
       headers: { cookie, "content-type": "application/json" },
       body: JSON.stringify({
         title: "Hijack",
         body: "no",
-        base_updated_at: liveAgain.node.updated_at,
+        base_updated_at: liveFallback.node.updated_at,
       }),
     });
     assert.equal(journalBodyOnPerson.status, 403);

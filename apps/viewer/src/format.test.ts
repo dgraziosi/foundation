@@ -27,6 +27,7 @@ import {
   fieldSaveValue,
   isEditableTypeField,
   nodeDraftQuiet,
+  nodeLeaveWrite,
   todayInNewYork,
   parseSearchSnippet,
   relativeTime,
@@ -354,6 +355,29 @@ test("declared scalar fields are editable; refs are not", () => {
       { title: "Ada", status: "active", data: { org: "Labs" } },
     ),
     true,
+  );
+});
+
+test("leave flush writes the record we left when the draft is still dirty", () => {
+  const draft = { title: "Ada Lovelace", status: "completed", data: { org: "College" } };
+  const skip = { title: "Ada", status: "active", data: { org: "Labs" } };
+  assert.deepEqual(
+    nodeLeaveWrite({ id: "a", draft, skip, base: "2026-09-01T12:00:00.000Z", keepTitle: false }),
+    {
+      id: "a",
+      title: "Ada Lovelace",
+      status: "completed",
+      data: { org: "College" },
+      base: "2026-09-01T12:00:00.000Z",
+    },
+  );
+  assert.equal(
+    nodeLeaveWrite({ id: "a", draft: skip, skip, base: "2026-09-01T12:00:00.000Z", keepTitle: false }),
+    null,
+  );
+  assert.equal(
+    nodeLeaveWrite({ id: "a", draft, skip, base: "2026-09-01T12:00:00.000Z", keepTitle: true }),
+    null,
   );
 });
 
