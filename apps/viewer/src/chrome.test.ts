@@ -43,6 +43,8 @@ test("Home is Recents, open tasks, and type folders — not the graph", async ()
   assert.match(home, /View all/);
   assert.match(home, /HOME_WIDGET_LIMIT/);
   assert.match(home, /fetchHomeDigest/);
+  assert.match(home, /refetchOnWindowFocus: false/);
+  assert.match(home, /refetchOnReconnect: false/);
   assert.match(home, /Since you last looked/);
   assert.match(home, /data-surface="home-digest"/);
   assert.match(home, /Nothing new\./);

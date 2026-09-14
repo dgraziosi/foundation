@@ -32,6 +32,7 @@ export function HomePage() {
     queryKey: ["home-digest"],
     queryFn: fetchHomeDigest,
     refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
   const recents = useQuery({
     queryKey: ["recents", HOME_WIDGET_LIMIT],
