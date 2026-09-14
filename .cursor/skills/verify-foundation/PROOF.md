@@ -1,5 +1,22 @@
 # Proofs
 
+## Named proof `home-digest-33`
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=home-digest-33`). Doctor green after Viewer build. Viewer at `http://127.0.0.1:8788/view`. MCP at `http://127.0.0.1:8787/mcp`. `tools/list` returned 16 tools including `merge`. No new tool.
+
+HTTP on the view door with the throwaway view key (cookie jar keeps the last-looked watermark):
+
+1. First `GET /view/api/digest` after Unlock returned `rows` `[]` and set `foundation_home_looked`.
+2. MCP `upsert` of a live note titled "Digest proof note" (`actor` `agent`, label `root`). Reload digest listed that title.
+3. A second digest fetch with no further bot writes returned `rows` `[]` (**Nothing new.**).
+4. Viewer `PATCH` retitled the record "Digest user edit" (`actor=user`). Reload digest stayed empty.
+5. A second MCP title write "Digest bot again" appeared in the digest. `GET /view/api/nodes/:id` opened that live id.
+6. Recents, Open tasks, and Today peek still loaded. Inventory names stayed 16 including `merge`.
+
+GitHub `verify` gates on this machine: schema tests pass including `generate-mcp-docs --check`; viewer tests + build pass; `skills-layout`, `drift-read`, `foundation-init`, `mint-api-key`, `require-database-url` ok; `verify-http-drive` and `verify-mcp-drive` ok on a clean first-day throwaway (`VERIFY_RUN_ID=verify-gates-33`; first-day digest `rows` `[]`). Named proof script `verify-home-digest.sh` exited 0. Server `view-digest` tests passed. Full `@foundation/server` suite had the known host-cluster FTS headline miss (`fiancée` not in the payload snippet). That miss is not this slice.
+
+Evidence stayed under `.cursor/skills/verify-foundation/evidence/home-digest-33/`. Keys were redacted. The named-proof throwaway vault was cleaned up after the proof.
+
 Journal write is on this branch. Home always offers **Today**, even at journal count 0. **Today** (`/view/journal/today`, `POST /view/api/journals/today`) creates today's journal if none is live. The page autosaves title and one markdown body on that record (`PATCH /view/api/nodes/:id`). An empty title shows **Keep a title**. Unlock title is **Unlock.** The field is the vault key. The error is **That key did not unlock.** Other live records edit title, status, and declared fields on detail. Activity and Trash use the same if-match and restore family. The Viewer cookie does not unlock MCP.
 
 Historical proof runs below may mention older door copy. The current window is the paragraph above.
