@@ -374,7 +374,7 @@ function LiveDetail({
       };
     }
     rememberLanded(saved);
-    if (leavePending.current) {
+    if (leavePending.current?.id === saved.node.id) {
       return;
     }
     if (seededId.current !== saved.node.id) {
@@ -423,7 +423,7 @@ function LiveDetail({
         if (!journalSaveResultApplies(mine, saveGen.current)) {
           return;
         }
-        if (leavePending.current || seededId.current !== pending.id) {
+        if (leavePending.current?.id === pending.id || seededId.current !== pending.id) {
           return;
         }
         if (error instanceof ApiError && error.status === 409) {
@@ -562,9 +562,8 @@ function LiveDetail({
       skip.current = landed;
       setBase(saved.node.updated_at ?? "");
       baseRef.current = saved.node.updated_at ?? "";
-      queryClient.setQueryData(["node", detail.node.id], saved);
+      rememberLanded(saved);
       openDetail(detail.node.id, saved.node.title);
-      void queryClient.invalidateQueries({ queryKey: ["recents"] });
       setSaveStatus("saved");
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
