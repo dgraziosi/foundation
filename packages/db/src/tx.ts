@@ -7,6 +7,16 @@ export function iso(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : String(value);
 }
 
+function isDryRunResult(value: unknown): boolean {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    "dry_run" in value &&
+    (value as { dry_run?: unknown }).dry_run === true
+  );
+}
+
 export async function withTransaction<T>(
   pool: pg.Pool,
   fn: (client: pg.PoolClient) => Promise<T>,
@@ -16,8 +26,9 @@ export async function withTransaction<T>(
     await client.query("BEGIN");
     const result = await fn(client);
     // Tool errors are returned as values; COMMIT would persist side effects
-    // (e.g. a blobs INSERT) from a failed upsert.
-    if (isToolError(result)) {
+    // (e.g. a blobs INSERT) from a failed upsert. dry_run uses the same write
+    // path, then rolls back so the caller sees would-be snapshots only.
+    if (isToolError(result) || isDryRunResult(result)) {
       await client.query("ROLLBACK");
       return result;
     }

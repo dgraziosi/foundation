@@ -39,8 +39,8 @@ async function poolForSchema(schema: string): Promise<Pool> {
 async function created(pool: Pool, input: Parameters<typeof upsertGraphNode>[1]): Promise<Node> {
   const result = await upsertGraphNode(pool, input);
   assert.equal(isToolError(result), false);
-  if (isToolError(result)) {
-    throw new Error(result.error);
+  if (isToolError(result) || !("node" in result) || !result.node) {
+    throw new Error(isToolError(result) ? result.error : "upsert did not return a node");
   }
   return result.node;
 }

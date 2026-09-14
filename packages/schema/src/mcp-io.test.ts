@@ -24,6 +24,7 @@ import {
   UpsertSuccessSchema,
   isToolError,
   normalizeLinkEdges,
+  normalizeUpsertNodes,
   searchHasSelector,
 } from "./mcp-io.js";
 
@@ -369,6 +370,67 @@ test("upsert create accepts allow_duplicate", () => {
     allow_duplicate: true,
   });
   assert.equal(parsed.allow_duplicate, true);
+});
+
+test("upsert accepts nodes[], dry_run, and strict", () => {
+  const parsed = UpsertInputSchema.parse({
+    nodes: [
+      { type: "note", title: "One" },
+      { type: "note", title: "Two" },
+    ],
+    dry_run: true,
+    strict: true,
+  });
+  assert.equal(parsed.nodes?.length, 2);
+  assert.equal(parsed.dry_run, true);
+  assert.equal(parsed.strict, true);
+  const normalized = normalizeUpsertNodes(parsed);
+  assert.equal(isToolError(normalized), false);
+  if (isToolError(normalized)) return;
+  assert.equal(normalized.form, "batch");
+  assert.equal(normalized.nodes.length, 2);
+  assert.equal(isToolError(normalizeUpsertNodes({ type: "note", title: "One", nodes: parsed.nodes })), true);
+  assert.equal(isToolError(normalizeUpsertNodes({})), true);
+});
+
+test("upsert success keeps one-node shape and allows dry_run batch", () => {
+  const node = {
+    id: "11111111-1111-4111-8111-111111111111",
+    type: "note",
+    title: "scratch",
+    status: "active" as const,
+    payload: { media_type: "text/plain", storage: "inline" as const, body: "" },
+    data: {},
+    metadata: {},
+    created_at: "2026-08-16T00:00:00.000Z",
+    updated_at: "2026-08-16T00:00:00.000Z",
+    deleted_at: null,
+  };
+  const one = UpsertSuccessSchema.parse({
+    node,
+    activity_id: "22222222-2222-4222-8222-222222222222",
+    suggested_links: [],
+    nodes: [{ node, activity_id: "22222222-2222-4222-8222-222222222222", suggested_links: [] }],
+  });
+  assert.equal(one.node?.id, node.id);
+  const preview = UpsertSuccessSchema.parse({
+    nodes: [{ node, suggested_links: [], warnings: [{ code: "missing_needed", fields: ["amount"], suggestion: "pass amount" }] }],
+    dry_run: true,
+  });
+  assert.equal(preview.dry_run, true);
+  assert.equal(preview.nodes?.[0]?.activity_id, undefined);
+});
+
+test("link accepts dry_run", () => {
+  const parsed = LinkInputSchema.parse({
+    from_id: "11111111-1111-4111-8111-111111111111",
+    to_id: "22222222-2222-4222-8222-222222222222",
+    relation_type: "relates_to",
+    from_base_updated_at: "2026-08-19T00:00:00.000Z",
+    to_base_updated_at: "2026-08-19T00:00:00.000Z",
+    dry_run: true,
+  });
+  assert.equal(parsed.dry_run, true);
 });
 
 test("manage_type accepts hue and glyph", () => {

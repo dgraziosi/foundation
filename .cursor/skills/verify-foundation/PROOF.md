@@ -6,6 +6,25 @@ Historical proof runs below may mention older door copy. The current window is t
 
 Early generate/maintain VMs lacked host Postgres 16 on PATH and did not drive live `/view` HTTP. Later maintain runs that could start a throwaway vault did.
 
+## Named proof `batch-upsert-23`
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=batch-upsert-23`). Doctor green after Viewer build. MCP at `http://127.0.0.1:8787/mcp`. Search (`q`) is skipped on this host — FTS config `foundation_english` is missing; use `get` / `list_activity`. `tools/list` returned 15 tools. No new tool.
+
+MCP on `http://127.0.0.1:8787/mcp`:
+
+1. Single `upsert` `{ type: note, title: "Proof single upsert" }` returned a node and `activity_id`. `get` by that id returned the note.
+2. Multi-row `upsert` with one invalid type (`not_a_type`) returned `nodes[1]: Unknown type "not_a_type"`. `list_activity` had no row titled "Proof would persist".
+3. Multi-row `upsert` of two notes (`Proof batch A`, `Proof batch B`) returned `nodes.length === 2` with both `activity_id`s. `get` each id succeeded.
+4. `upsert` `{ dry_run: true, nodes: [ { type: note, title: "Proof dry run node" } ] }` returned a would-be snapshot and `dry_run: true` with no `activity_id`. `get` of the would-be id returned `Node not found`.
+5. `link` `{ dry_run: true, from, to, kind: related_to }` returned a receipt and `dry_run: true`. `get` of the from-node had `edges` `[]`.
+6. `upsert` `{ type: spend, title: "Proof spend warn" }` (no amount/currency/stage) succeeded with `warnings[0].code === "missing_needed"` and fields `amount`, `currency`, `stage`.
+7. Same call with `strict: true` and title `Proof spend strict refuse` returned `Missing needed fields: amount, currency, stage`. `list_activity` had no row with that title.
+8. `tools/list` names matched the inventory order: `bootstrap`, `search`, `lookup`, `get`, `working_set`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`, `job`.
+
+GitHub `verify` gates on this machine: schema tests pass including `generate-mcp-docs --check`; viewer tests + build pass; `skills-layout`, `drift-read`, `foundation-init`, `mint-api-key`, `require-database-url` ok; `verify-http-drive` and `verify-mcp-drive` ok on a clean throwaway launch. Server tests on the throwaway `DATABASE_URL` passed `upsert-batch`, `cas-safety`, `link-batch`, and `view`. Full `@foundation/server` suite had the known host-cluster FTS headline miss (`fiancée` not in the payload snippet). That miss is not this slice.
+
+Evidence stayed under `.cursor/skills/verify-foundation/evidence/batch-upsert-23/`. Keys were redacted. The throwaway vault was left running.
+
 ## Maintain run (20260911Tmaintain)
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20260911Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20260911Tmaintain`.

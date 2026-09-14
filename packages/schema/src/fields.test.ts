@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   compileJsonSchemaFromFields,
   mergeMissingFields,
+  missingNeededFields,
   parseTypeFieldsInput,
   validateDataAgainstJsonSchema,
 } from "./index.js";
@@ -36,6 +37,19 @@ test("field parse: unique names, role uniqueness, enum and ref rules", () => {
   assert.equal(ref.ok, true);
   const missing = parseTypeFieldsInput([{ name: "owner", kind: "ref", ref_type: "ghost" }], ["person"]);
   assert.equal(missing.ok, false);
+});
+
+test("missing needed treats absent, null, and empty string as missing", () => {
+  const parsed = parseTypeFieldsInput([
+    { name: "amount", kind: "number", needed: true },
+    { name: "vendor", kind: "string", needed: false },
+  ]);
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) return;
+  assert.deepEqual(missingNeededFields(parsed.fields, {}), ["amount"]);
+  assert.deepEqual(missingNeededFields(parsed.fields, { amount: null }), ["amount"]);
+  assert.deepEqual(missingNeededFields(parsed.fields, { amount: "" }), ["amount"]);
+  assert.deepEqual(missingNeededFields(parsed.fields, { amount: 12.5 }), []);
 });
 
 test("compile: needed is not required; extra keys pass; wrong kind misses", () => {

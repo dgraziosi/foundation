@@ -62,6 +62,9 @@ import {
   validateLinkSequence,
   findInBatchLinkDuplicate,
   normalizeLinkEdges,
+  normalizeUpsertNodes,
+  missingNeededFields,
+  MISSING_NEEDED_SUGGESTION,
   LINK_CAS_AGREE_SUGGESTION,
   MISSING_BASE_SUGGESTION,
   parseTimestampMs,
@@ -132,8 +135,10 @@ import {
   type ToolError,
   type DeleteInput,
   type DuplicateWarning,
+  type NeededWarning,
   type UnlinkInput,
   type UpsertInput,
+  type UpsertNodeItem,
   type UpsertPayload,
 } from "@foundation/schema";
 import { randomUUID } from "node:crypto";
@@ -320,8 +325,8 @@ async function replayIdempotentCreate(
   return { node, activity_id: created.id };
 }
 
-async function knownTypeSlugs(pool: Pool): Promise<string> {
-  const types = await listNodeTypes(pool);
+async function knownTypeSlugs(db: Queryable): Promise<string> {
+  const types = await listNodeTypes(db);
   return types.map((type) => type.slug).join(", ");
 }
 
@@ -539,254 +544,429 @@ export async function getGraphNode(
   };
 }
 
+function prefixNodeError(form: "flat" | "batch", index: number, error: ToolError): ToolError {
+  if (form === "flat") {
+    return error;
+  }
+  return { ...error, error: `nodes[${index}]: ${error.error}` };
+}
+
+function neededWarningsFor(type: NodeType, data: Record<string, unknown>): NeededWarning[] | undefined {
+  const missing = missingNeededFields(type.fields ?? [], data);
+  if (missing.length === 0) {
+    return undefined;
+  }
+  return [
+    {
+      code: "missing_needed",
+      fields: missing,
+      suggestion: MISSING_NEEDED_SUGGESTION,
+    },
+  ];
+}
+
+type UpsertOneOk = {
+  node: Node;
+  activity_id?: string;
+  duplicate_warnings?: DuplicateWarning;
+  warnings?: NeededWarning[];
+};
+
+async function upsertOneInTx(
+  client: Queryable,
+  input: UpsertNodeItem,
+  ctx: {
+    form: "flat" | "batch";
+    index: number;
+    blobs?: BlobRuntime;
+    writer: ReturnType<typeof writerFrom>;
+    strict: boolean;
+    dryRun: boolean;
+    applyResolvedPayload: (resolved: ResolvedStoredPayload) => Promise<void>;
+    markDiscardCreatedBlob: () => void;
+    clearPendingUpload: () => void;
+  },
+): Promise<UpsertOneOk | ToolError> {
+  const fail = (error: ToolError) => prefixNodeError(ctx.form, ctx.index, error);
+  const type = await getNodeType(client, input.type);
+  if (!type) {
+    return fail(
+      toolError(
+        `Unknown type "${input.type}"`,
+        `Call inspect_ontology or bootstrap, or manage_type to add it. Known types: ${await knownTypeSlugs(client)}`,
+      ),
+    );
+  }
+
+  let existing: Node | undefined;
+  if (input.id) {
+    existing = await getNodeById(client, input.id, { includeDeleted: true, forUpdate: true });
+    if (existing?.deleted_at) {
+      return fail(
+        toolError(
+          `Node ${input.id} is deleted`,
+          "Restore via undo. Use a new id to create another node.",
+        ),
+      );
+    }
+  }
+
+  if (!existing && input.idempotency_key) {
+    const replay = await getNodeByIdempotencyKey(client, input.idempotency_key, {
+      includeDeleted: true,
+    });
+    if (replay) {
+      const replayed = await replayIdempotentCreate(client, replay);
+      return isToolError(replayed) ? fail(replayed) : replayed;
+    }
+  }
+
+  const merged = mergedNodeData(existing, input.data);
+  const leftoverPresent = hasLeftoverIdentityKeys(merged);
+  const migrated = migrateLeftoverIdentity(merged, existing?.metadata ?? {});
+  const canonical = canonicalizeDueInData(
+    canonicalizeReceiptInData(canonicalizeRepoInData(migrated.data)),
+  );
+  const aliased = applyAliasesFromPatch(canonical, input.data);
+  if (isToolError(aliased)) {
+    return fail(aliased);
+  }
+  const nextData = applyUrlFromPatch(aliased, input.data);
+  if (isToolError(nextData)) {
+    return fail(nextData);
+  }
+  const nextMeta = applyUrlIdentityFromUpsert(migrated.metadata, input.metadata, input.url);
+  if (isToolError(nextMeta)) {
+    return fail(nextMeta);
+  }
+  const dataErr = validateUpsertData(type, nextData);
+  if (dataErr) {
+    return fail(dataErr);
+  }
+  const refErr = await validateRefFields(client, type, nextData);
+  if (refErr) {
+    return fail(refErr);
+  }
+  const warnings = neededWarningsFor(type, nextData);
+  if (warnings && ctx.strict) {
+    return fail(
+      toolError(`Missing needed fields: ${warnings[0]!.fields.join(", ")}`, MISSING_NEEDED_SUGGESTION),
+    );
+  }
+
+  if (existing) {
+    const resolved = await resolveStoredPayload(client, input.payload, ctx.blobs);
+    if ("error" in resolved) {
+      return fail(resolved);
+    }
+    await ctx.applyResolvedPayload(resolved);
+    const stale = assertIfMatch("base_updated_at", input.base_updated_at, existing.updated_at);
+    if (stale) {
+      return fail(stale);
+    }
+    if (existing.type !== input.type) {
+      const edgeErr = await refuseInvalidIncidentEdges(client, existing, input.type);
+      if (edgeErr) {
+        return fail(edgeErr);
+      }
+    }
+    await client.query("SAVEPOINT upsert_update");
+    try {
+      const node = await updateNode(client, input.id!, {
+        type: input.type,
+        title: input.title,
+        status: input.status,
+        payload: resolved.payload,
+        data: input.data === undefined && !leftoverPresent ? undefined : nextData,
+        metadata:
+          input.metadata === undefined && input.url === undefined && !leftoverPresent
+            ? undefined
+            : nextMeta,
+        base_updated_at: input.base_updated_at,
+      });
+      await client.query("RELEASE SAVEPOINT upsert_update");
+      if (!node) {
+        const current = await getNodeById(client, input.id!, { includeDeleted: true });
+        if (!current) {
+          return fail(
+            toolError(
+              `Node not found: ${input.id}`,
+              "If you already have a UUID, call get. Search is for lexical recall, not a substitute for get. Deleted nodes are hidden until restored via undo.",
+            ),
+          );
+        }
+        if (current.deleted_at) {
+          return fail(
+            toolError(
+              `Node ${input.id} is deleted`,
+              "Restore via undo. Use a new id to create another node.",
+            ),
+          );
+        }
+        return fail(
+          toolError("base_updated_at does not match current updated_at", LOST_UPDATE_SUGGESTION),
+        );
+      }
+      if (ctx.dryRun) {
+        return { node, ...(warnings ? { warnings } : {}) };
+      }
+      const activity = await insertActivity(client, {
+        ...ctx.writer,
+        action: "update",
+        target_kind: "node",
+        target_id: node.id,
+        before: await snapshotNodeForActivity(client, existing),
+        after: await snapshotNodeForActivity(client, node, resolved.blob),
+      });
+      return { node, activity_id: activity.id, ...(warnings ? { warnings } : {}) };
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        await client.query("ROLLBACK TO SAVEPOINT upsert_update");
+        const pointerErr = await uniqueDataError(client, nextData, nextMeta, existing.id);
+        if (pointerErr) {
+          return fail(pointerErr);
+        }
+      }
+      throw error;
+    }
+  }
+
+  let duplicate_warnings: DuplicateWarning | undefined;
+  if (!input.id) {
+    const preflight = await createDuplicatePreflight(client, {
+      title: input.title,
+      type: input.type,
+      allow_duplicate: input.allow_duplicate,
+    });
+    if (preflight.block) {
+      return fail(preflight.block);
+    }
+    duplicate_warnings = preflight.warning;
+  }
+
+  await client.query("SAVEPOINT upsert_insert");
+  try {
+    const resolved = await resolveStoredPayload(client, input.payload, ctx.blobs);
+    if ("error" in resolved) {
+      return fail(resolved);
+    }
+    await ctx.applyResolvedPayload(resolved);
+    const node = await insertNode(client, {
+      id: input.id ?? randomUUID(),
+      type: input.type,
+      title: input.title,
+      status: input.status ?? "active",
+      payload: resolved.payload ?? DEFAULT_PAYLOAD,
+      data: nextData,
+      metadata: nextMeta,
+      idempotency_key: input.idempotency_key ?? null,
+    });
+    await client.query("RELEASE SAVEPOINT upsert_insert");
+    if (ctx.dryRun) {
+      return {
+        node,
+        ...(duplicate_warnings ? { duplicate_warnings } : {}),
+        ...(warnings ? { warnings } : {}),
+      };
+    }
+    const activity = await insertActivity(client, {
+      ...ctx.writer,
+      action: "create",
+      target_kind: "node",
+      target_id: node.id,
+      before: null,
+      after: await snapshotNodeForActivity(client, node, resolved.blob),
+    });
+    return {
+      node,
+      activity_id: activity.id,
+      ...(duplicate_warnings ? { duplicate_warnings } : {}),
+      ...(warnings ? { warnings } : {}),
+    };
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      await client.query("ROLLBACK TO SAVEPOINT upsert_insert");
+      ctx.markDiscardCreatedBlob();
+      ctx.clearPendingUpload();
+      if (input.idempotency_key) {
+        const replay = await getNodeByIdempotencyKey(client, input.idempotency_key, {
+          includeDeleted: true,
+        });
+        if (replay) {
+          const replayed = await replayIdempotentCreate(client, replay);
+          return isToolError(replayed) ? fail(replayed) : replayed;
+        }
+      }
+      const pointerErr = await uniqueDataError(client, nextData, nextMeta);
+      if (pointerErr) {
+        return fail(pointerErr);
+      }
+    }
+    throw error;
+  }
+}
+
+export type UpsertItemOut = {
+  node: Node;
+  activity_id?: string;
+  suggested_links: SuggestedLink[];
+  duplicate_warnings?: DuplicateWarning;
+  warnings?: NeededWarning[];
+};
+
+export type UpsertFlatSuccess = {
+  node: Node;
+  activity_id: string;
+  suggested_links: SuggestedLink[];
+  duplicate_warnings?: DuplicateWarning;
+  warnings?: NeededWarning[];
+  nodes: UpsertItemOut[];
+};
+
+export type UpsertFlatDryRunSuccess = {
+  node: Node;
+  suggested_links: SuggestedLink[];
+  duplicate_warnings?: DuplicateWarning;
+  warnings?: NeededWarning[];
+  nodes: UpsertItemOut[];
+  dry_run: true;
+};
+
+export type UpsertBatchSuccess = {
+  nodes: UpsertItemOut[];
+  dry_run?: true;
+};
+
+export async function upsertGraphNode(
+  pool: Pool,
+  input: UpsertInput & { nodes?: undefined; dry_run?: false },
+  blobs?: BlobRuntime,
+  ctx?: WriteContext,
+): Promise<UpsertFlatSuccess | ToolError>;
 export async function upsertGraphNode(
   pool: Pool,
   input: UpsertInput,
   blobs?: BlobRuntime,
   ctx?: WriteContext,
-): Promise<
-  | {
-      node: Node;
-      activity_id: string;
-      suggested_links: SuggestedLink[];
-      duplicate_warnings?: DuplicateWarning;
-    }
-  | ToolError
-> {
-  const type = await getNodeType(pool, input.type);
-  if (!type) {
-    return toolError(
-      `Unknown type "${input.type}"`,
-      `Call inspect_ontology or bootstrap, or manage_type to add it. Known types: ${await knownTypeSlugs(pool)}`,
-    );
+): Promise<UpsertFlatSuccess | UpsertFlatDryRunSuccess | UpsertBatchSuccess | ToolError>;
+export async function upsertGraphNode(
+  pool: Pool,
+  input: UpsertInput,
+  blobs?: BlobRuntime,
+  ctx?: WriteContext,
+): Promise<UpsertFlatSuccess | UpsertFlatDryRunSuccess | UpsertBatchSuccess | ToolError> {
+  const normalized = normalizeUpsertNodes(input);
+  if (isToolError(normalized)) {
+    return normalized;
   }
-
-  let createdBlobAbs: string | undefined;
-  let pendingUploadUnlink: string | undefined;
-  let discardCreatedBlob = false;
+  const { form, nodes } = normalized;
+  const dryRun = input.dry_run === true;
+  const strict = input.strict === true;
+  const createdBlobAbs: string[] = [];
+  const pendingUploadUnlinks: string[] = [];
+  const discardCreatedBlobAbs: string[] = [];
   const writer = writerFrom(ctx);
 
   async function applyResolvedPayload(resolved: ResolvedStoredPayload): Promise<void> {
-    pendingUploadUnlink = resolved.pendingUploadUnlink;
+    if (resolved.pendingUploadUnlink) {
+      pendingUploadUnlinks.push(resolved.pendingUploadUnlink);
+    }
     if (resolved.created && resolved.blob && blobs) {
       const abs = resolveBlobFilePath(blobs.dataDir, resolved.blob.path);
       if (typeof abs === "string") {
-        createdBlobAbs = abs;
+        createdBlobAbs.push(abs);
       }
     }
   }
 
   try {
     const result = await withTransaction(pool, async (client) => {
-      let existing: Node | undefined;
-      if (input.id) {
-        existing = await getNodeById(client, input.id, { includeDeleted: true, forUpdate: true });
-        if (existing?.deleted_at) {
-          return toolError(
-            `Node ${input.id} is deleted`,
-            "Restore via undo. Use a new id to create another node.",
-          );
-        }
-      }
-
-      if (!existing && input.idempotency_key) {
-        const replay = await getNodeByIdempotencyKey(client, input.idempotency_key, {
-          includeDeleted: true,
+      const items: UpsertOneOk[] = [];
+      for (const [index, item] of nodes.entries()) {
+        const createdBefore = createdBlobAbs.length;
+        const pendingBefore = pendingUploadUnlinks.length;
+        const one = await upsertOneInTx(client, item, {
+          form,
+          index,
+          blobs,
+          writer,
+          strict,
+          dryRun,
+          applyResolvedPayload,
+          markDiscardCreatedBlob: () => {
+            discardCreatedBlobAbs.push(...createdBlobAbs.slice(createdBefore));
+          },
+          clearPendingUpload: () => {
+            pendingUploadUnlinks.length = pendingBefore;
+          },
         });
-        if (replay) {
-          return replayIdempotentCreate(client, replay);
+        if (isToolError(one)) {
+          return one;
         }
+        items.push(one);
       }
-
-      const merged = mergedNodeData(existing, input.data);
-      const leftoverPresent = hasLeftoverIdentityKeys(merged);
-      const migrated = migrateLeftoverIdentity(merged, existing?.metadata ?? {});
-      const canonical = canonicalizeDueInData(
-        canonicalizeReceiptInData(canonicalizeRepoInData(migrated.data)),
-      );
-      const aliased = applyAliasesFromPatch(canonical, input.data);
-      if (isToolError(aliased)) {
-        return aliased;
-      }
-      const nextData = applyUrlFromPatch(aliased, input.data);
-      if (isToolError(nextData)) {
-        return nextData;
-      }
-      const nextMeta = applyUrlIdentityFromUpsert(
-        migrated.metadata,
-        input.metadata,
-        input.url,
-      );
-      if (isToolError(nextMeta)) {
-        return nextMeta;
-      }
-      const dataErr = validateUpsertData(type, nextData);
-      if (dataErr) {
-        return dataErr;
-      }
-      const refErr = await validateRefFields(client, type, nextData);
-      if (refErr) {
-        return refErr;
-      }
-
-      if (existing) {
-        const resolved = await resolveStoredPayload(client, input.payload, blobs);
-        if ("error" in resolved) {
-          return resolved;
-        }
-        await applyResolvedPayload(resolved);
-        const stale = assertIfMatch("base_updated_at", input.base_updated_at, existing.updated_at);
-        if (stale) {
-          return stale;
-        }
-        if (existing.type !== input.type) {
-          const edgeErr = await refuseInvalidIncidentEdges(client, existing, input.type);
-          if (edgeErr) {
-            return edgeErr;
-          }
-        }
-        await client.query("SAVEPOINT upsert_update");
-        try {
-          const node = await updateNode(client, input.id!, {
-            type: input.type,
-            title: input.title,
-            status: input.status,
-            payload: resolved.payload,
-            data: input.data === undefined && !leftoverPresent ? undefined : nextData,
-            metadata:
-              input.metadata === undefined && input.url === undefined && !leftoverPresent
-                ? undefined
-                : nextMeta,
-            base_updated_at: input.base_updated_at,
-          });
-          await client.query("RELEASE SAVEPOINT upsert_update");
-          if (!node) {
-            const current = await getNodeById(client, input.id!, { includeDeleted: true });
-            if (!current) {
-              return toolError(
-                `Node not found: ${input.id}`,
-                "If you already have a UUID, call get. Search is for lexical recall, not a substitute for get. Deleted nodes are hidden until restored via undo.",
-              );
-            }
-            if (current.deleted_at) {
-              return toolError(
-                `Node ${input.id} is deleted`,
-                "Restore via undo. Use a new id to create another node.",
-              );
-            }
-            return toolError(
-              "base_updated_at does not match current updated_at",
-              LOST_UPDATE_SUGGESTION,
-            );
-          }
-          const activity = await insertActivity(client, {
-            ...writer,
-            action: "update",
-            target_kind: "node",
-            target_id: node.id,
-            before: await snapshotNodeForActivity(client, existing),
-            after: await snapshotNodeForActivity(client, node, resolved.blob),
-          });
-          return { node, activity_id: activity.id };
-        } catch (error) {
-          if (isUniqueViolation(error)) {
-            await client.query("ROLLBACK TO SAVEPOINT upsert_update");
-            const pointerErr = await uniqueDataError(client, nextData, nextMeta, existing.id);
-            if (pointerErr) {
-              return pointerErr;
-            }
-          }
-          throw error;
-        }
-      }
-
-      let duplicate_warnings: DuplicateWarning | undefined;
-      if (!input.id) {
-        const preflight = await createDuplicatePreflight(client, {
-          title: input.title,
-          type: input.type,
-          allow_duplicate: input.allow_duplicate,
-        });
-        if (preflight.block) {
-          return preflight.block;
-        }
-        duplicate_warnings = preflight.warning;
-      }
-
-      await client.query("SAVEPOINT upsert_insert");
-      try {
-        const resolved = await resolveStoredPayload(client, input.payload, blobs);
-        if ("error" in resolved) {
-          return resolved;
-        }
-        await applyResolvedPayload(resolved);
-        const node = await insertNode(client, {
-          id: input.id ?? randomUUID(),
-          type: input.type,
-          title: input.title,
-          status: input.status ?? "active",
-          payload: resolved.payload ?? DEFAULT_PAYLOAD,
-          data: nextData,
-          metadata: nextMeta,
-          idempotency_key: input.idempotency_key ?? null,
-        });
-        await client.query("RELEASE SAVEPOINT upsert_insert");
-        const activity = await insertActivity(client, {
-          ...writer,
-          action: "create",
-          target_kind: "node",
-          target_id: node.id,
-          before: null,
-          after: await snapshotNodeForActivity(client, node, resolved.blob),
-        });
-        return {
-          node,
-          activity_id: activity.id,
-          ...(duplicate_warnings ? { duplicate_warnings } : {}),
-        };
-      } catch (error) {
-        if (isUniqueViolation(error)) {
-          await client.query("ROLLBACK TO SAVEPOINT upsert_insert");
-          discardCreatedBlob = true;
-          pendingUploadUnlink = undefined;
-          if (input.idempotency_key) {
-            const replay = await getNodeByIdempotencyKey(client, input.idempotency_key, {
-              includeDeleted: true,
-            });
-            if (replay) {
-              return replayIdempotentCreate(client, replay);
-            }
-          }
-          const pointerErr = await uniqueDataError(client, nextData, nextMeta);
-          if (pointerErr) {
-            return pointerErr;
-          }
-        }
-        throw error;
-      }
+      return dryRun ? { items, dry_run: true as const } : { items };
     });
 
-    if (isToolError(result) || discardCreatedBlob) {
-      if (createdBlobAbs) {
-        await unlinkQuiet(createdBlobAbs);
+    if (isToolError(result) || dryRun) {
+      for (const abs of createdBlobAbs) {
+        await unlinkQuiet(abs);
       }
       if (isToolError(result)) {
         return result;
       }
+    } else {
+      for (const abs of discardCreatedBlobAbs) {
+        await unlinkQuiet(abs);
+      }
     }
-    if (pendingUploadUnlink) {
-      await unlinkQuiet(pendingUploadUnlink);
+    if (!dryRun) {
+      for (const pending of pendingUploadUnlinks) {
+        await unlinkQuiet(pending);
+      }
     }
     if (isToolError(result)) {
       return result;
     }
+
+    const withSuggestions = await Promise.all(
+      result.items.map(async (item) => ({
+        node: item.node,
+        ...(item.activity_id ? { activity_id: item.activity_id } : {}),
+        suggested_links: await suggestLinksForNode(pool, item.node),
+        ...(item.duplicate_warnings ? { duplicate_warnings: item.duplicate_warnings } : {}),
+        ...(item.warnings ? { warnings: item.warnings } : {}),
+      })),
+    );
+
+    if (form === "flat") {
+      const only = withSuggestions[0]!;
+      if (dryRun) {
+        return {
+          node: only.node,
+          suggested_links: only.suggested_links,
+          ...(only.duplicate_warnings ? { duplicate_warnings: only.duplicate_warnings } : {}),
+          ...(only.warnings ? { warnings: only.warnings } : {}),
+          nodes: withSuggestions,
+          dry_run: true as const,
+        };
+      }
+      return {
+        node: only.node,
+        activity_id: only.activity_id!,
+        suggested_links: only.suggested_links,
+        ...(only.duplicate_warnings ? { duplicate_warnings: only.duplicate_warnings } : {}),
+        ...(only.warnings ? { warnings: only.warnings } : {}),
+        nodes: withSuggestions,
+      };
+    }
     return {
-      ...result,
-      suggested_links: await suggestLinksForNode(pool, result.node),
+      nodes: withSuggestions,
+      ...(dryRun ? { dry_run: true as const } : {}),
     };
   } catch (error) {
-    if (createdBlobAbs) {
-      await unlinkQuiet(createdBlobAbs);
+    for (const abs of createdBlobAbs) {
+      await unlinkQuiet(abs);
     }
     throw error;
   }
@@ -897,8 +1077,15 @@ async function refuseInboundRefPointers(db: Queryable, targetId: string): Promis
   );
 }
 
-export type LinkFlatSuccess = LinkItemSuccess & { links: LinkItemSuccess[] };
-export type LinkBatchSuccess = { links: LinkItemSuccess[] };
+export type LinkCommittedItem = LinkItemSuccess & { activity_id: string };
+export type LinkFlatSuccess = LinkCommittedItem & { links: LinkCommittedItem[] };
+export type LinkBatchSuccess = { links: LinkCommittedItem[] };
+export type LinkDryRunSuccess = {
+  dry_run: true;
+  links: LinkItemSuccess[];
+  edge?: Edge;
+  suggestion?: string;
+};
 
 function prefixEdgeError(
   form: "flat" | "batch",
@@ -988,6 +1175,7 @@ export async function linkGraphNodes(
     metadata?: Record<string, unknown>;
     from_base_updated_at?: string;
     to_base_updated_at?: string;
+    dry_run?: false;
   },
   ctx?: WriteContext,
 ): Promise<LinkFlatSuccess | ToolError>;
@@ -995,6 +1183,7 @@ export async function linkGraphNodes(
   pool: Pool,
   input: {
     edges: LinkEdgeItem[];
+    dry_run?: false;
   },
   ctx?: WriteContext,
 ): Promise<LinkBatchSuccess | ToolError>;
@@ -1002,17 +1191,18 @@ export async function linkGraphNodes(
   pool: Pool,
   input: LinkInput,
   ctx?: WriteContext,
-): Promise<LinkFlatSuccess | LinkBatchSuccess | ToolError>;
+): Promise<LinkFlatSuccess | LinkBatchSuccess | LinkDryRunSuccess | ToolError>;
 export async function linkGraphNodes(
   pool: Pool,
   input: LinkInput,
   ctx?: WriteContext,
-): Promise<LinkFlatSuccess | LinkBatchSuccess | ToolError> {
+): Promise<LinkFlatSuccess | LinkBatchSuccess | LinkDryRunSuccess | ToolError> {
   const normalized = normalizeLinkEdges(input);
   if (isToolError(normalized)) {
     return normalized;
   }
   const { form, edges } = normalized;
+  const dryRun = input.dry_run === true;
   const writer = writerFrom(ctx);
   return withTransaction(pool, async (client) => {
     const lockOrder = [...new Set(edges.flatMap((edge) => [edge.from_id, edge.to_id]))].sort();
@@ -1073,6 +1263,13 @@ export async function linkGraphNodes(
         relation_type: result.relation_type,
         metadata: edgeInput.metadata ?? {},
       });
+      if (dryRun) {
+        links.push({
+          edge,
+          ...(result.suggestion ? { suggestion: result.suggestion } : {}),
+        });
+        continue;
+      }
       for (const dropped of droppedStaleChildOf) {
         await insertActivity(client, {
           ...writer,
@@ -1100,14 +1297,25 @@ export async function linkGraphNodes(
 
     if (form === "flat") {
       const only = links[0]!;
+      if (dryRun) {
+        return {
+          dry_run: true as const,
+          edge: only.edge,
+          ...(only.suggestion ? { suggestion: only.suggestion } : {}),
+          links,
+        };
+      }
       return {
         edge: only.edge,
-        activity_id: only.activity_id,
+        activity_id: only.activity_id!,
         ...(only.suggestion ? { suggestion: only.suggestion } : {}),
-        links,
+        links: links as LinkCommittedItem[],
       };
     }
-    return { links };
+    if (dryRun) {
+      return { dry_run: true as const, links };
+    }
+    return { links: links as LinkCommittedItem[] };
   });
 }
 

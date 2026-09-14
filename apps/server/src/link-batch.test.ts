@@ -145,8 +145,10 @@ test("batch link: two forms, atomic write, shared-node CAS, undo per receipt", {
       const listed = await listGraphActivity(pool, { action: "link" });
       assert.equal(isToolError(listed), false);
       if (isToolError(listed)) return;
-      const ids = new Set(linked.links.map((item) => item.activity_id));
-      const rows = listed.activities.filter((row) => ids.has(row.id));
+      const ids = new Set(
+        linked.links.map((item) => item.activity_id).filter((id): id is string => id !== undefined),
+      );
+      const rows = listed.activities.filter((row) => row.id !== undefined && ids.has(row.id));
       assert.equal(rows.length, 2);
       assert.ok(rows.every((row) => row.actor_label === "batch-agent"));
     });

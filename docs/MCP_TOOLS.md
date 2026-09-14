@@ -12,9 +12,9 @@ Destructive tools need a key with destructive scope or they return `{ error, sug
 | `lookup` | Resolve one or more names to live nodes. One result per input (`exact` / `alias` / `candidate` / `ambiguous` / `no_match`). Read-only. |
 | `get` | Return the record: payload, data, incident edges with neighbor titles, and `suggested_links` from title FTS. Does not return activity. Blob payloads return metadata, not bytes. |
 | `working_set` | Return the actionable working set around one live node: open work, dues, and the parent chain when the root hangs under something. |
-| `upsert` | Create or update a node (title, type, payload, data, status). Always pass `type` on create and update. Passing `payload` replaces that body; omit it and the body stays. Updates require `base_updated_at`. Create accepts `idempotency_key`. Create (no id) preflights duplicates via `lookup`. Blob ingest via `bytes_base64` or `source_path`. Returns `suggested_links` (proposals only). |
+| `upsert` | Create or update one node or `nodes[]` (1–20). Whole batch validates; one transaction writes all or none. `dry_run: true` writes nothing. Missing needed fields warn; `strict: true` refuses. Always pass `type`. Updates require `base_updated_at`. |
 | `delete` | Soft-delete a node. Needs a key with destructive scope and `base_updated_at` from `get`. |
-| `link` | Create typed edges after validation. One edge or `edges[]` (1–20). Whole batch validates; one transaction writes all or none. Requires endpoint if-match. |
+| `link` | Create typed edges after validation. One edge or `edges[]` (1–20). Whole batch validates; one transaction writes all or none. `dry_run: true` writes nothing. Requires endpoint if-match. |
 | `unlink` | Remove a typed edge. Needs a key with destructive scope and endpoint if-match. |
 | `inspect_ontology` | List type and relation registry rows (system + authored), including each type’s `fields`, view declarations, `default_view`, `hue`, and `glyph`. |
 | `manage_type` | Create, update, or retire a node type (including `fields`, view queries, hue, and glyph). Applies immediately. Retire needs a key with destructive scope. |
@@ -120,10 +120,10 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 ### `upsert`
 
 <!-- generated:mcp-params:upsert -->
-- **In:** `{ id?, type, title, payload?: { media_type, storage: "inline"|"blob", body?, blob_id?, bytes_base64?, source_path? }, data?, status?: "active"|"completed"|"archived", metadata?, base_updated_at?, idempotency_key?, allow_duplicate?, url?: { system: "gmail"|"calendar"|"drive", id } }`
+- **In:** `{ id?, type?, title?, payload?: { media_type, storage: "inline"|"blob", body?, blob_id?, bytes_base64?, source_path? }, data?, status?: "active"|"completed"|"archived", metadata?, base_updated_at?, idempotency_key?, allow_duplicate?, url?: { system: "gmail"|"calendar"|"drive", id }, nodes?, dry_run?, strict? }`
 - `id` — Existing node UUID. Omit to create
-- `type` — Type slug
-- `title` — Record title
+- `type` — Type slug for one node
+- `title` — Record title for one node
 - `payload` — Replacement body. Omit to leave the body unchanged
 - `payload.media_type` — MIME type, such as text/markdown or application/json
 - `payload.storage` — inline or blob
@@ -140,9 +140,35 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 - `url` — Unique Drive, Gmail, or Calendar identity. Null clears it. Not data.url
 - `url.system` — gmail, calendar, or drive
 - `url.id` — Object id in that system
+- `nodes` — 1–20 nodes. Pass this or the one-node fields, not both
+- `nodes[].id` — Existing node UUID. Omit to create
+- `nodes[].type` — Type slug
+- `nodes[].title` — Record title
+- `nodes[].payload` — Replacement body. Omit to leave the body unchanged
+- `nodes[].payload.media_type` — MIME type, such as text/markdown or application/json
+- `nodes[].payload.storage` — inline or blob
+- `nodes[].payload.body` — Inline text. Required when storage is inline
+- `nodes[].payload.blob_id` — Existing blob UUID
+- `nodes[].payload.bytes_base64` — New blob bytes as base64. Pass only one of blob_id, bytes_base64, or source_path
+- `nodes[].payload.source_path` — Path under uploads. The server moves the file into blobs
+- `nodes[].data` — Top-level data keys to merge on update
+- `nodes[].status` — active, completed, or archived
+- `nodes[].metadata` — Extra metadata bag
+- `nodes[].base_updated_at` — Required on update. Node updated_at from get
+- `nodes[].idempotency_key` — Create only. Same key returns the existing node instead of a twin
+- `nodes[].allow_duplicate` — Create only. Write even when lookup finds an exact title or unique alias
+- `nodes[].url` — Unique Drive, Gmail, or Calendar identity. Null clears it. Not data.url
+- `nodes[].url.system` — gmail, calendar, or drive
+- `nodes[].url.id` — Object id in that system
+- `dry_run` — When true, return would-be snapshots and write nothing
+- `strict` — When true, missing needed fields refuse the write
 <!-- /generated:mcp-params:upsert -->
-`type` is required on create and update.
-- **Out:** `{ node, activity_id, suggested_links, duplicate_warnings? }` or `{ error, suggestion?, outcome?, candidates? }`
+`type` is required on each node (one-node fields or every `nodes[]` item).
+- Pass either the one-node fields or `nodes[]` (1–20), not both. The whole batch validates; one transaction writes all nodes or none. First error wins.
+- **`dry_run: true`:** return would-be snapshots (`node` / `nodes[]`) and write nothing. No activity rows. `activity_id` is omitted.
+- **`strict: true`:** missing type `needed` fields refuse (`{ error, suggestion }`). Without `strict`, those misses still write and return `warnings: [{ code: "missing_needed", fields, suggestion }]`.
+- **Out (one-node form):** `{ node, activity_id?, suggested_links, duplicate_warnings?, warnings?, nodes, dry_run? }` or `{ error, suggestion?, outcome?, candidates? }`
+- **Out (`nodes[]` form):** `{ nodes: [{ node, activity_id?, suggested_links, duplicate_warnings?, warnings? }], dry_run? }` or `{ error, suggestion?, outcome?, candidates? }`
 - **`suggested_links`:** Postgres FTS on the new title (create, and update when the title changes) — not embeddings. Each item is `{ kind, target: { id, type, title }, reason }`. `kind` is a live relation slug. `target` is a **live** node that already exists. How they are chosen: spine types with `parent_types` → the live hierarchy relation (`kind: hierarchy`) to a live allowed parent whose title matches; if the title matches a node whose type sits in an associative relation’s `target_types` (seed `about` → `person`) → that relation; otherwise the unconstrained associative (empty source and target, seed `relates_to`). Skip self. Skip nodes already linked to this one. A node with a live hierarchy parent is not offered a second parent (targeted / unconstrained suggestions may still appear). Cap 5. Empty graph or no match → `[]`. **Never creates an edge.** Never adds a type or relation. `link` is how an accepted suggestion becomes an edge. Show non-empty suggestions and ask before calling `link`.
 - `payload`: `{ media_type, storage: "inline"|"blob", body?, blob_id?, bytes_base64?, source_path? }`. On update, passing `payload` **replaces** that body. Omit `payload` and the body stays. A named bot that rewrites a record passes the new short `payload` and `base_updated_at` from `get`.
 - Inline media types: `text/markdown`, `text/html`, `application/json`, `text/plain`.
@@ -179,7 +205,7 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 ### `link`
 
 <!-- generated:mcp-params:link -->
-- **In:** `{ from_id?, to_id?, relation_type?, upgrade?, metadata?, from_base_updated_at?, to_base_updated_at?, edges? }`
+- **In:** `{ from_id?, to_id?, relation_type?, upgrade?, metadata?, from_base_updated_at?, to_base_updated_at?, edges?, dry_run? }`
 - `from_id` — Source node UUID for one edge
 - `to_id` — Target node UUID for one edge
 - `relation_type` — Live relation slug for one edge
@@ -195,10 +221,12 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 - `edges[].metadata` — Optional edge metadata
 - `edges[].from_base_updated_at` — Required. from node's updated_at from get
 - `edges[].to_base_updated_at` — Required. to node's updated_at from get
+- `dry_run` — When true, return would-be receipts and write nothing
 <!-- /generated:mcp-params:link -->
 - `edges` is 1–20. Pass either the one-edge fields or `edges[]`, not both.
-- **Out (one-edge form):** `{ edge, activity_id, suggestion?, links: [{ edge, activity_id, suggestion? }] }` or `{ error, suggestion? }`
-- **Out (`edges[]` form):** `{ links: [{ edge, activity_id, suggestion? }] }` or `{ error, suggestion? }`
+- **`dry_run: true`:** return would-be receipts (`edge` / `links[]`) and write nothing. No activity rows. `activity_id` is omitted.
+- **Out (one-edge form):** `{ edge, activity_id?, suggestion?, links: [{ edge, activity_id?, suggestion? }], dry_run? }` or `{ error, suggestion? }`
+- **Out (`edges[]` form):** `{ links: [{ edge, activity_id?, suggestion? }], dry_run? }` or `{ error, suggestion? }`
 - Validation: whole batch before any write. [`packages/schema`](../packages/schema) `validateLink` per edge (unknown relation, self-link, duplicate, symmetric duplicate, constraints, hierarchy uniqueness / `parent_types`). In-batch exact and symmetric duplicates refuse. Later edges see earlier accepted edges in the same call (including a second hierarchy parent from the same source). An unconstrained associative that fits the spine **suggests** the hierarchy verb; it does not rewrite unless that edge passes `upgrade: true`. A suggestion does not fail the batch. Duplicate checks run on the proposed relation **before** the optional upgrade.
 - **Atomic write:** one transaction. First error wins; no partial `links` and no new edges on refuse.
 - **If-match:** `from_base_updated_at` and `to_base_updated_at` are required on **each** edge and must match each endpoint's current `updated_at` from `get`. A missing timestamp on any item refuses that edge and writes nothing. A later edge does not inherit CAS from an earlier edge that named the same node. Several edges that share a node still use one agreed timestamp. Disagreeing timestamps refuse the batch. Stale or missing → `{ error, suggestion }` (get the nodes and retry). Linking does not change `updated_at`. Not a write-ACL.
@@ -247,7 +275,7 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 <!-- /generated:mcp-params:manage_type -->
 - **Out:** `{ type, activity_id }` or `{ error, suggestion? }`
 - Applies immediately. System seed types may edit description, `fields`, `hue`, `glyph`, and `filter` / `sort` / `group` on views they already declare. They cannot change slug, kind, parent_types, label, retire, or the ordered view **ids** (no add, drop, or reorder of engines). `default_view` stays a member of those locked ids. Authored types keep the wider patch, including the view id list. Custom types may set `parent_types` so `child_of` placement works. Seed apply fills missing seed hue/glyph and missing seed fields only; it does not overwrite a user edit. Seed `spend` (artifact, `parent_types: ["project"]`) is the type for one money line. `project` has optional `budget_amount` / `budget_currency`. Contract: [`SPEC.md`](./SPEC.md#project-spend).
-- **`fields`:** ordered template `{ name, kind, display?, needed?, role?, enum_values?, ref_type? }`. Kinds: `string`, `date`, `number`, `enum`, `ref`. Roles: `title`, `status`, `date`, `start`, `end`, `subtitle`. At most one of title/status/date/start/end. `end` requires `start`. `status` requires enum. Date roles require kind date. `json_schema` is compiled from fields — pass `fields`, not a hand-written schema, once a template exists. `needed` does not block capture.
+- **`fields`:** ordered template `{ name, kind, display?, needed?, role?, enum_values?, ref_type? }`. Kinds: `string`, `date`, `number`, `enum`, `ref`. Roles: `title`, `status`, `date`, `start`, `end`, `subtitle`. At most one of title/status/date/start/end. `end` requires `start`. `status` requires enum. Date roles require kind date. `json_schema` is compiled from fields — pass `fields`, not a hand-written schema, once a template exists. `needed` warns on upsert; `strict: true` refuses.
 - **`views` / `default_view`:** defining a type includes this choice. `views` is an ordered array of declarations `{ id, filter?, sort?, group? }` (bare ids still parse). `id` is `list` | `card` | `table` | `board` | `calendar` | `timeline` | `outline` | `graph`. Filter/sort/group bind to field roles or node `title` / `status` / `updated_at`. `default_view` must be a member of those ids, or omitted when `views` is empty. Seed types already declare views (`task` defaults to `board`, filter `status = active`). The Viewer reads the same contract from `inspect_ontology`.
 - **Retire:** `action: "retire"` drops an authored type that has **zero live nodes**. Needs a key with destructive scope. System seed types refuse. Live nodes refuse with `{ error, suggestion }` (delete or retype, then retry). Soft-deleted nodes of that type stay restorable — same family as undo-of-type-create: restore those deletes first, or pass `purge_deleted: true` to hard-delete the tombstones and their incident edges. Never a silent vault wipe. Undo of retire restores the registry row.
 
