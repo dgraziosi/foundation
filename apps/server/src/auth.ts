@@ -9,6 +9,8 @@ import type { WriteContext } from "./write-context.js";
  * `/mcp` and `/blobs` require the Authorization header — the cookie is not an MCP credential.
  */
 export const API_KEY_COOKIE = "foundation_key";
+export const HOME_LOOKED_COOKIE = "foundation_home_looked";
+const VIEW_COOKIE_MAX_AGE = 2592000;
 
 export function cookieValue(cookieHeader: string, name: string): string | undefined {
   for (const part of cookieHeader.split(";")) {
@@ -45,7 +47,23 @@ export function providedApiKey(req: Request): string | undefined {
 }
 
 export function apiKeyCookieHeader(key: string): string {
-  return `${API_KEY_COOKIE}=${encodeURIComponent(key)}; Path=/view; HttpOnly; SameSite=Strict; Max-Age=2592000`;
+  return `${API_KEY_COOKIE}=${encodeURIComponent(key)}; Path=/view; HttpOnly; SameSite=Strict; Max-Age=${VIEW_COOKIE_MAX_AGE}`;
+}
+
+export function homeLookedCookieHeader(lookedAt: string): string {
+  return `${HOME_LOOKED_COOKIE}=${encodeURIComponent(lookedAt)}; Path=/view; HttpOnly; SameSite=Strict; Max-Age=${VIEW_COOKIE_MAX_AGE}`;
+}
+
+export function readHomeLooked(cookieHeader: string): Date | undefined {
+  const raw = cookieValue(cookieHeader, HOME_LOOKED_COOKIE);
+  if (!raw) {
+    return undefined;
+  }
+  const ms = Date.parse(raw);
+  if (!Number.isFinite(ms)) {
+    return undefined;
+  }
+  return new Date(ms);
 }
 
 export function writeContextOf(principal: AgentPrincipal): WriteContext {

@@ -1,12 +1,13 @@
 # Home
 
-Home is the first surface after Unlock. It always offers **Today**, even when no journal exists yet (count 0). It also shows Recents (last 5 live records that are not tasks), Open tasks (5, from the `task` type's default filter, by due urgency), and type folders for types that have live records. Home does not write except by opening Today.
+Home is the first surface after Unlock. It always offers **Today**, even when no journal exists yet (count 0). It also shows **Since you last looked** (bot activity since the last Home look), Recents (last 5 live records that are not tasks), Open tasks (5, from the `task` type's default filter, by due urgency), and type folders for types that have live records. Home does not write except by opening Today. The digest watermark is a view cookie, not a graph write.
 
 ## Sub-features
 
 - `home-today` always shows Today (`[data-surface="home-today"]`). Empty body: **Write today** and the calendar day. After a write: the day and the first sentence. Choose it to open `/view/journal/today`.
 - `home-chrome` shows Recents, Open tasks, and a Types block when any type has a live count.
-- `home-empty` shows **Nothing yet.** for Recents and **No open tasks.** when those lists are empty.
+- `home-digest` shows **Since you last looked**. First visit reads bot activity (`actor` not `user`) from the last 24 hours, cap 5. After Home loads, the next fetch with no new bot writes shows **Nothing new.**
+- `home-empty` shows **Nothing yet.** for Recents, **No open tasks.** for Open tasks, and **Nothing new.** for Since you last looked when those lists are empty.
 - `home-recents-all` opens the Recents page from Recents **View all**.
 - `home-tasks-all` opens the task collection from Open tasks **View all**.
 - `home-folder` opens that type's collection from a type folder.
@@ -26,7 +27,8 @@ Preconditions:
 - Session is unlocked (see [Unlock](./unlock.md)).
 - A first-day empty vault is enough for `home-empty` and `home-today`. Do not seed a fake life.
 
-- **Land.** After Unlock, `[data-surface="home"]` is in the page. **Today** is visible. Headings **Recents** and **Open tasks** are visible. Rail has **Home** and **Search**.
+- **Land.** After Unlock, `[data-surface="home"]` is in the page. **Today** is visible. Headings **Since you last looked**, **Recents**, and **Open tasks** are visible. Rail has **Home** and **Search**.
+- **Digest empty.** First-day: Since you last looked shows **Nothing new.** `GET /view/api/digest` returns `rows` `[]` and sets the last-looked cookie (`Path=/view`). A second GET with that cookie stays empty until a bot writes.
 - **Today at count 0.** First-day: Today shows **Write today** and the calendar day. Choose Today. Path `/view/journal/today`. `[data-surface="journal-page"]`.
 - **Empty Recents.** When there are no non-task live records, Recents shows **Nothing yet.**
 - **Empty tasks.** When the `task` default view filter has no rows, Open tasks shows **No open tasks.**
@@ -34,7 +36,7 @@ Preconditions:
 - **Tasks View all.** Choose Open tasks **View all**. Path `/view/types/task`. The collection heading includes **Task**.
 - **Type folder.** When a folder is shown (count > 0), choose it. Path `/view/types/<slug>`. Types with count 0 do not appear.
 - **Open a row.** Choose a Recents or open-task title. Path `/view/nodes/<uuid>`. `[data-surface="detail-page"]` and that title as the page heading. A journal with inline markdown opens the write page instead.
-- **HTTP Home widgets.** `GET /view/api/recents?limit=5` and `GET /view/api/tasks?limit=5` and `GET /view/api/ontology` and `GET /view/api/journals/today` with the vault key (view-key-file when present). The window caps Recents and Open tasks at 5. Empty first-day: `rows` and `tasks` are `[]`. Today peek may be `{ "node": null }`. Ontology lists types; folders in the window are those with `count > 0`.
+- **HTTP Home widgets.** `GET /view/api/digest` and `GET /view/api/recents?limit=5` and `GET /view/api/tasks?limit=5` and `GET /view/api/ontology` and `GET /view/api/journals/today` with the vault key (view-key-file when present). Send the unlock cookie so the digest watermark persists. The window caps the digest, Recents, and Open tasks at 5. Empty first-day: digest, recents, and tasks are `[]`. Today peek may be `{ "node": null }`. Ontology lists types; folders in the window are those with `count > 0`.
 - **Proof.** Screenshot Home with Today, Recents, and Open tasks visible, or save the JSON bodies (no personal titles if you drove a user's vault). Feature id `home-today` or `home-empty`.
 
 ## Gotchas

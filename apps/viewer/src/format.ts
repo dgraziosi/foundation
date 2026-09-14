@@ -417,7 +417,7 @@ export function taskDueGroup(due: string | undefined, tone?: DueTone): TaskDueGr
 
 export const TASK_DUE_GROUPS: TaskDueGroup[] = ["Overdue", "Today", "Upcoming", "No date"];
 
-/** Home Recents and Open tasks widgets. Recents page and the task collection stay uncapped. */
+/** Home Recents, Open tasks, and Since you last looked. Recents page and the task collection stay uncapped. */
 export const HOME_WIDGET_LIMIT = 5;
 
 const TASK_DUE_GROUP_RANK: Record<TaskDueGroup, number> = {

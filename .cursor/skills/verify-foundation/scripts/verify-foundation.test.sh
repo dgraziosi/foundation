@@ -620,6 +620,7 @@ if grep -Fq 'curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:8787/mcp' 
 fi
 skill_blob="$(cat "${map_root}/SKILL.md")"
 [[ "${skill_blob}" == *"curl -sS http://127.0.0.1:8788/view/api/journals/today"* ]] || fail "SKILL Drive must show Today peek GET"
+[[ "${skill_blob}" == *"/view/api/digest"* ]] || fail "SKILL Drive must show Home digest GET"
 [[ "${skill_blob}" == *"view-key-file"* ]] || fail "SKILL Drive must use view-key-file when present"
 grep -Fq -- 'curl -sS -L --max-redirs 3' "${helper}" || fail "doctor must follow the /view redirect a browser follows"
 [[ "${skill_blob}" == *"Does not create"* ]] || fail "SKILL Drive must say the Today peek GET does not create"

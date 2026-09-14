@@ -42,6 +42,10 @@ test("Home is Recents, open tasks, and type folders — not the graph", async ()
   assert.doesNotMatch(home, /100dvh-3rem/);
   assert.match(home, /View all/);
   assert.match(home, /HOME_WIDGET_LIMIT/);
+  assert.match(home, /fetchHomeDigest/);
+  assert.match(home, /Since you last looked/);
+  assert.match(home, /data-surface="home-digest"/);
+  assert.match(home, /Nothing new\./);
   assert.match(home, /fetchRecents\(HOME_WIDGET_LIMIT\)/);
   assert.match(home, /fetchTasks\(HOME_WIDGET_LIMIT\)/);
   assert.match(home, /compareOpenTasks/);
@@ -170,6 +174,7 @@ test("journal page is a document; today is the start path", async () => {
 test("click from graph / Recents / collection / search opens a detail page", async () => {
   const home = await src("pages/HomePage.tsx");
   assert.match(home, /openDetail/);
+  assert.match(home, /openDetail\(row\.target_id/);
   const recents = await src("pages/RecentsPage.tsx");
   assert.match(recents, /openDetail\(row\.id/);
   assert.doesNotMatch(recents, /limit=\{10\}|fetchRecents\(10\)|fetchRecents\(5\)|HOME_WIDGET_LIMIT/);

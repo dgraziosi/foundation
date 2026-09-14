@@ -152,6 +152,8 @@ curl -sS -D - http://127.0.0.1:8788/view/unlock \
 
 # session / Home widgets / collection / detail / search
 curl -sS http://127.0.0.1:8788/view/api/session -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
+# digest watermark is the Path=/view cookie; keep a jar across loads
+curl -sS "http://127.0.0.1:8788/view/api/digest" -H "Authorization: ApiKey $(cat "${KEY_FILE}")" -b /tmp/foundation-verify-view.cookies -c /tmp/foundation-verify-view.cookies
 curl -sS "http://127.0.0.1:8788/view/api/recents?limit=5" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
 curl -sS "http://127.0.0.1:8788/view/api/tasks?limit=5" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
 curl -sS http://127.0.0.1:8788/view/api/ontology -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
@@ -289,4 +291,4 @@ Env the helper reads (all optional except as noted):
 
 Index: [`features/README.md`](features/README.md).
 
-Mapped now: Unlock, Home, Collection, Detail, Edit any node, Activity, Trash, Search, Journal write.
+Mapped now: Unlock, Home (Today, Since you last looked, Recents, Open tasks, type folders), Collection, Detail, Edit any node, Activity, Trash, Search, Journal write.
