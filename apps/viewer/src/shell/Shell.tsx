@@ -13,6 +13,7 @@ import {
   upsertCollectionTab,
   upsertDetailTab,
   upsertRecentsTab,
+  upsertTrashTab,
 } from "./tabs";
 import { ViewStrip } from "./ViewStrip";
 
@@ -63,6 +64,12 @@ export function Shell() {
     navigate("/recents");
   }, [navigate]);
 
+  const openTrash = useCallback(() => {
+    setSearchOpen(false);
+    setTabs((existing) => upsertTrashTab(existing));
+    navigate("/trash");
+  }, [navigate]);
+
   const openSearch = useCallback(() => setSearchOpen(true), []);
 
   function closeTab(tab: HostTab) {
@@ -83,13 +90,14 @@ export function Shell() {
       openCollection,
       syncCollectionLabel,
       openRecents,
+      openTrash,
       openSearch,
       railOpen,
       setRailOpen,
       railCollapsed,
       setRailCollapsed,
     }),
-    [openDetail, openCollection, syncCollectionLabel, openRecents, openSearch, railOpen, railCollapsed],
+    [openDetail, openCollection, syncCollectionLabel, openRecents, openTrash, openSearch, railOpen, railCollapsed],
   );
 
   return (

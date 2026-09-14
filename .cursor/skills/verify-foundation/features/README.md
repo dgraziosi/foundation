@@ -2,7 +2,7 @@
 
 This directory is the maintained source for verifying the user-facing Viewer. Read the index before driving the window, then use the matching feature file as the recipe.
 
-Foundation is a life graph. Viewer is the human window on one vault. It writes journal only (Today + autosave). Bots write everything else through MCP. Do not treat this map as a personal-knowledge-management checklist or a harness memory test.
+Foundation is a life graph. Viewer is the human window on one vault. Journal keeps a writing page. Other live records edit title, status, and declared fields. Activity and Trash use the same CAS and soft-delete family as MCP. Do not treat this map as a personal-knowledge-management checklist or a harness memory test.
 
 ## Baseline preconditions
 
@@ -18,7 +18,7 @@ Foundation is a life graph. Viewer is the human window on one vault. It writes j
 - Start every recipe from Unlock unless the instance is already unlocked in that browser session.
 - Prefer headings, button names, `aria-label`, and `data-surface` over CSS position.
 - Browser first. Same-path HTTP (`/view/unlock`, `/view/api/*`) when a browser cannot run. Say which you used.
-- Viewer writes journal only. Do not upsert through MCP to simulate a Viewer write. Do not PATCH other types.
+- Viewer writes go through `/view` routes. Do not use MCP `upsert` to stand in for a Viewer save. Creating a throwaway node with MCP so the window has something to edit is fine.
 - Restore nothing after a read drive. Journal Today creates today's journal — that mutation is the proof, not something to undo. Keep proof artifacts.
 
 ## Proof and skip reporting
@@ -47,5 +47,8 @@ Keep implementation details out of the map. Name only user paths, stable handles
 - [Home](./home.md) covers Today (always, including journal count 0), Recents, open tasks, type folders, and empty copy.
 - [Collection](./collection.md) covers a type's declared layouts, empty/filtered copy, Show completed, and the parent-types line when the type names allowed parents.
 - [Detail](./detail.md) covers opening one record as a page from Home, collection, Recents, search, or graph.
+- [Edit any node](./edit-any-node.md) covers title, status, and declared-field saves on a live non-journal record.
+- [Activity](./activity.md) covers that record's activity and Undo.
+- [Trash](./trash.md) covers soft-delete listing and Restore.
 - [Search](./search.md) covers the rail overlay, query, type/status filters, and opening a hit.
-- [Journal write](./journal-write.md) covers Today, the journal page, and autosave. Other types stay display-only.
+- [Journal write](./journal-write.md) covers Today, the journal page, and autosave.

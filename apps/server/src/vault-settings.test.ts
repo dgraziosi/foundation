@@ -76,6 +76,19 @@ test(
         false,
       );
 
+      const nyOverdue = await searchGraphNodes(pool, { type: "task", due: "overdue" });
+      assert.equal(isToolError(nyOverdue), false);
+      if (isToolError(nyOverdue)) {
+        return;
+      }
+      if (otherToday < nyToday) {
+        assert.ok(nyOverdue.nodes.some((node) => node.id === otherTask.id));
+      }
+      assert.equal(
+        nyOverdue.nodes.some((node) => node.id === nyTask.id),
+        false,
+      );
+
       await updateVaultSettings(pool, { timezone: otherZone });
       const moved = await searchGraphNodes(pool, { type: "task", due: "today" });
       assert.equal(isToolError(moved), false);
@@ -96,9 +109,10 @@ test(
       if (nyToday < otherToday) {
         assert.ok(overdue.nodes.some((node) => node.id === nyTask.id));
       }
-      if (otherToday < nyToday) {
-        assert.ok(overdue.nodes.some((node) => node.id === otherTask.id));
-      }
+      assert.equal(
+        overdue.nodes.some((node) => node.id === otherTask.id),
+        false,
+      );
     } finally {
       await pool.end();
     }

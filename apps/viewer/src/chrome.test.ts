@@ -10,10 +10,11 @@ async function src(file: string): Promise<string> {
   return readFile(join(root, file), "utf8");
 }
 
-test("chrome is Home + Search; Search is an overlay; Recents is not a rail item", async () => {
+test("chrome is Home, Search, and Trash; Search is an overlay; Recents is not a rail item", async () => {
   const rail = await src("shell/Rail.tsx");
   assert.match(rail, /Home/);
   assert.match(rail, /Search/);
+  assert.match(rail, /Trash/);
   assert.match(rail, /openSearch/);
   assert.match(rail, /w-14/);
   assert.match(rail, /w-rail/);
@@ -153,6 +154,15 @@ test("journal page is a document; today is the start path", async () => {
   assert.match(typeView, /\/journal\/today/);
   const detail = await src("pages/DetailPage.tsx");
   assert.match(detail, /JournalPage/);
+  assert.match(detail, /nodeLeaveWrite/);
+  assert.match(detail, /flushLeave/);
+  assert.match(detail, /leaveSnap/);
+  assert.match(detail, /writeLeave/);
+  assert.match(detail, /rememberLanded/);
+  assert.match(detail, /node-leave/);
+  assert.match(detail, /holdLeave/);
+  assert.match(detail, /writesInFlight/);
+  assert.doesNotMatch(detail, /void writeNow\(pending\)/);
   const app = await src("App.tsx");
   assert.match(app, /path="\/journal\/today"/);
 });
@@ -339,15 +349,24 @@ test("graph canvas marks use Lucide glyph fill, not a first-letter circle", asyn
   assert.doesNotMatch(`${canvas}\n${marks}`, /slice\(\s*0\s*,\s*1\s*\)/);
 });
 
-test("window writes journal only", async () => {
+test("window writes journal, any-node, activity undo, and trash", async () => {
   const api = await src("api.ts");
   const posts = [...api.matchAll(/method:\s*"POST"/g)];
-  assert.equal(posts.length, 2);
+  assert.equal(posts.length, 4);
   assert.match(api, /\/view\/unlock/);
   assert.match(api, /\/view\/api\/journals\/today/);
+  assert.match(api, /\/view\/api\/activity\//);
+  assert.match(api, /\/restore/);
   assert.match(api, /method:\s*"PATCH"/);
+  assert.match(api, /method:\s*"DELETE"/);
   assert.match(api, /saveJournal/);
+  assert.match(api, /saveNode/);
+  assert.match(api, /undoActivity/);
+  assert.match(api, /fetchTrash/);
   assert.doesNotMatch(api, /manage_type/);
+  const trash = await src("pages/TrashPage.tsx");
+  assert.match(trash, /restore\.error/);
+  assert.match(trash, /Couldn't restore/);
 });
 
 test("no-views copy is honest and Home is the landing surface", async () => {

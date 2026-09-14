@@ -13,6 +13,9 @@ export function tabKey(tab: PathTab): string {
   if (tab.kind === "recents") {
     return "recents";
   }
+  if (tab.kind === "trash") {
+    return "trash";
+  }
   if (tab.kind === "collection") {
     return `type:${tab.slug}`;
   }
@@ -25,6 +28,9 @@ export function pathTab(pathname: string, params: { slug?: string; id?: string }
   }
   if (pathname === "/recents" || pathname.startsWith("/recents/")) {
     return { kind: "recents", label: "Recents" };
+  }
+  if (pathname === "/trash" || pathname.startsWith("/trash/")) {
+    return { kind: "trash", label: "Trash" };
   }
   if (params.slug) {
     return { kind: "collection", slug: params.slug, label: params.slug };
@@ -44,6 +50,9 @@ export function hrefFor(tab: PathTab): string {
   }
   if (tab.kind === "recents") {
     return "/recents";
+  }
+  if (tab.kind === "trash") {
+    return "/trash";
   }
   if (tab.kind === "collection") {
     return `/types/${tab.slug}`;
@@ -111,4 +120,11 @@ export function upsertRecentsTab(existing: HostTab[]): HostTab[] {
     return existing;
   }
   return [...existing, { kind: "recents", label: "Recents" }];
+}
+
+export function upsertTrashTab(existing: HostTab[]): HostTab[] {
+  if (existing.some((tab) => tab.kind === "trash")) {
+    return existing;
+  }
+  return [...existing, { kind: "trash", label: "Trash" }];
 }

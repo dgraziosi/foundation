@@ -986,15 +986,20 @@ test(
   },
 );
 
-test("view window writes journal only", async () => {
+test("view window writes journal, any-node, activity, and trash", async () => {
   const here = dirname(fileURLToPath(import.meta.url));
   const view = await readFile(join(here, "view.ts"), "utf8");
   const posts = [...view.matchAll(/app\.post\(/g)];
-  assert.equal(posts.length, 2);
+  assert.equal(posts.length, 4);
   assert.match(view, /app\.post\(`\$\{VIEW_PATH\}\/unlock`/);
   assert.match(view, /app\.get\(`\$\{VIEW_PATH\}\/api\/journals\/today`/);
   assert.match(view, /app\.post\(`\$\{VIEW_PATH\}\/api\/journals\/today`/);
   assert.match(view, /app\.patch\(`\$\{VIEW_PATH\}\/api\/nodes\/:id`/);
+  assert.match(view, /app\.delete\(`\$\{VIEW_PATH\}\/api\/nodes\/:id`/);
+  assert.match(view, /app\.get\(`\$\{VIEW_PATH\}\/api\/trash`/);
+  assert.match(view, /app\.get\(`\$\{VIEW_PATH\}\/api\/nodes\/:id\/activity`/);
+  assert.match(view, /app\.post\(`\$\{VIEW_PATH\}\/api\/activity\/:id\/undo`/);
+  assert.match(view, /app\.post\(`\$\{VIEW_PATH\}\/api\/nodes\/:id\/restore`/);
   assert.match(view, /app\.get\(`\$\{VIEW_PATH\}\/api\/graph`/);
   assert.match(view, /app\.get\(`\$\{VIEW_PATH\}\/api\/recents`/);
 });

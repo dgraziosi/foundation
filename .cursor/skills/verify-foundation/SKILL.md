@@ -5,7 +5,7 @@ description: Drive Foundation's Viewer (the human window on the life graph) to l
 
 # Verify Foundation (Viewer)
 
-Foundation is a life graph that models the user so bots can help with life goals. Viewer is the human UI — a window on one vault. It writes journal only (Today + autosave). It is not a personal-knowledge-management app and not harness chat-memory.
+Foundation is a life graph that models the user so bots can help with life goals. Viewer is the human UI — a window on one vault. Journal keeps a writing page. Other live records edit title, status, and declared fields. It is not a personal-knowledge-management app and not harness chat-memory.
 
 This skill is for the next agent, read cold. The person using a clone is the user. Stay on product. No live vault contents, no staff names, no personal data.
 
@@ -16,14 +16,14 @@ pstack's generic generator writes `.cursor/skills/verify-*`. This repo's product
 - **graph** — live records (nodes) and edges
 - **ontology** — types and how they connect
 - **MCP** — how a bot talks to the graph (`http://127.0.0.1:8787/mcp`)
-- **Viewer** — the human window (`http://127.0.0.1:8788/view`). Writes journal only.
+- **Viewer** — the human window (`http://127.0.0.1:8788/view`). Same CAS and soft-delete as MCP.
 - **vault** — one instance (`FOUNDATION_DATA` + host Postgres)
 - **record** — the node
 - **user** — the human who runs this vault on this machine
 
 Do not write a live personal vault into git. Do not reintroduce Compose as install. Host programs: Postgres 16 on PATH (`initdb`, `pg_ctl`, `psql`) plus the app (`pnpm start`). The package name for Postgres is unknown in this repo — do not guess an installer.
 
-Journal write is on this branch. Home always offers **Today**, even at journal count 0. **Today** (or `/view/journal/today`) creates today's journal if none is live, then the page autosaves title and body. An empty title shows **Keep a title**. Unlock title is **Unlock.** The field is the vault key. The error is **That key did not unlock.** Other types stay display-only. Bots still write everything else through MCP.
+Journal write is on this branch. Home always offers **Today**, even at journal count 0. **Today** (or `/view/journal/today`) creates today's journal if none is live, then the page autosaves title and body. An empty title shows **Keep a title**. Unlock title is **Unlock.** The field is the vault key. The error is **That key did not unlock.** Other live records edit title, status, and declared fields on detail. Activity and Trash use the same if-match and restore family.
 
 ## Launch
 
@@ -114,6 +114,8 @@ Stable handles (prefer these over coordinates):
 | `[data-surface="graph"]` | Collection graph layout |
 | `data-constraint="parent_types"` | Quiet **May hang under** plus allowed parent labels. Collection heading and detail Properties when the type has `parent_types` |
 | `[data-surface="journal-page"]` | Journal write page (not Properties) |
+| `[data-surface="activity-page"]` | That record's activity |
+| `[data-surface="trash-page"]` | Soft-deleted records |
 | `aria-label="Title"` | Journal title. Empty title shows **Keep a title** |
 | `[data-editor="live-markdown"]` | Journal body. Placeholder `Write a first sentence.` |
 | button `Today` | Home Today and journal collection → `/view/journal/today` |
@@ -128,8 +130,10 @@ Routes (basename `/view`):
 | `/view` | Unlock gate, then Home |
 | `/view/recents` | Recents page (from Home Recents **View all**) |
 | `/view/journal/today` | Create or open today's journal, then the write page |
+| `/view/trash` | Soft-deleted records |
 | `/view/types/:slug` | Collection for that type |
 | `/view/nodes/:id` | Detail for that record. A journal with inline markdown renders the write page |
+| `/view/nodes/:id/activity` | That record's activity |
 
 HTTP the window already uses (cookie `foundation_key` with `Path=/view`, or `Authorization: ApiKey <key>`):
 
@@ -157,15 +161,31 @@ curl -sS "http://127.0.0.1:8788/view/api/types/task" -H "Authorization: ApiKey $
 curl -sS "http://127.0.0.1:8788/view/api/nodes/<UUID>" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
 curl -sS "http://127.0.0.1:8788/view/api/search?q=Fixture" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
 
-# journal write (the only Viewer mutation). POST creates today's journal if none is live.
+# journal write. POST creates today's journal if none is live.
 curl -sS -X POST http://127.0.0.1:8788/view/api/journals/today \
   -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
 curl -sS -X PATCH http://127.0.0.1:8788/view/api/nodes/<UUID> \
   -H "Authorization: ApiKey $(cat "${KEY_FILE}")" -H "content-type: application/json" \
   -d '{"title":"Morning","body":"# Morning\\n\\nWrote in the window.\\n","base_updated_at":"<updated_at>"}'
+
+# any-node write (no body). Activity, trash, restore.
+curl -sS -X PATCH http://127.0.0.1:8788/view/api/nodes/<UUID> \
+  -H "Authorization: ApiKey $(cat "${KEY_FILE}")" -H "content-type: application/json" \
+  -d '{"title":"Ada Lovelace","status":"completed","data":{"org":"College"},"base_updated_at":"<updated_at>"}'
+curl -sS "http://127.0.0.1:8788/view/api/nodes/<UUID>/activity" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
+curl -sS -X POST http://127.0.0.1:8788/view/api/activity/<ACTIVITY>/undo \
+  -H "Authorization: ApiKey $(cat "${KEY_FILE}")" -H "content-type: application/json" \
+  -d '{"base_updated_at":"<updated_at>"}'
+curl -sS -X DELETE http://127.0.0.1:8788/view/api/nodes/<UUID> \
+  -H "Authorization: ApiKey $(cat "${KEY_FILE}")" -H "content-type: application/json" \
+  -d '{"base_updated_at":"<updated_at>"}'
+curl -sS http://127.0.0.1:8788/view/api/trash -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
+curl -sS -X POST http://127.0.0.1:8788/view/api/nodes/<UUID>/restore \
+  -H "Authorization: ApiKey $(cat "${KEY_FILE}")" -H "content-type: application/json" \
+  -d '{"base_updated_at":"<updated_at>"}'
 ```
 
-The cookie does not unlock `/mcp` or agent `/blobs/:id`. Viewer writes journal only (`POST /view/api/journals/today`, `PATCH /view/api/nodes/:id` on a journal). Do not PATCH other types. Do not call MCP `upsert` to fake a Viewer write.
+The cookie does not unlock `/mcp` or agent `/blobs/:id`. Viewer writes go through `/view` (`POST /view/api/journals/today`, `PATCH /view/api/nodes/:id`, activity undo, trash restore). Do not call MCP `upsert` to fake a Viewer save.
 
 Read the feature map under [`features/`](features/README.md) before driving. Drive one mapped feature end to end. A proof that only hits `/health` is not a Viewer proof.
 
@@ -269,4 +289,4 @@ Env the helper reads (all optional except as noted):
 
 Index: [`features/README.md`](features/README.md).
 
-Mapped now: Unlock, Home, Collection, Detail, Search, Journal write.
+Mapped now: Unlock, Home, Collection, Detail, Edit any node, Activity, Trash, Search, Journal write.

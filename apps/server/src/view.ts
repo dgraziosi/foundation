@@ -17,7 +17,15 @@ import {
   viewTasks,
   viewType,
 } from "./view-data.js";
-import { viewJournalToday, viewJournalTodayPeek, viewJournalWrite } from "./view-journal.js";
+import { viewJournalToday, viewJournalTodayPeek } from "./view-journal.js";
+import {
+  viewNodeActivity,
+  viewNodeDelete,
+  viewNodeRestore,
+  viewNodeWrite,
+  viewTrash,
+  viewUndoActivity,
+} from "./view-write.js";
 
 export const VIEW_PATH = "/view";
 const UNLOCK_REJECT = "That key did not unlock.";
@@ -111,8 +119,19 @@ function isBlobPath(path: string): boolean {
   return path.startsWith(`${VIEW_PATH}/blobs/`);
 }
 
-function sendJournalResult(res: Response, got: unknown): void {
-  if (got && typeof got === "object" && "node" in got) {
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function optionalData(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as Record<string, unknown>;
+}
+
+function sendWriteResult(res: Response, got: unknown): void {
+  if (got && typeof got === "object" && !("error" in got)) {
     res.json(got);
     return;
   }
@@ -127,7 +146,10 @@ function sendJournalResult(res: Response, got: unknown): void {
         ? 403
         : message === "Title is required."
           ? 400
-          : /base_updated_at/.test(message)
+          : /base_updated_at/.test(message) ||
+              /not reversible/i.test(message) ||
+              /already undone/i.test(message) ||
+              /expired/i.test(message)
             ? 409
             : 400;
   res.status(status).json({ error: message });
@@ -267,7 +289,7 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings
         res.json({ node: null });
         return;
       }
-      sendJournalResult(res, got);
+      sendWriteResult(res, got);
     } catch (error) {
       console.error("View journal today peek failed", error);
       res.status(500).json({ error: "Could not load." });
@@ -276,29 +298,96 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings
 
   app.post(`${VIEW_PATH}/api/journals/today`, gate, async (_req, res) => {
     try {
-      sendJournalResult(res, await viewJournalToday(pool, config.FOUNDATION_DATA));
+      sendWriteResult(res, await viewJournalToday(pool, config.FOUNDATION_DATA));
     } catch (error) {
       console.error("View journal today failed", error);
       res.status(500).json({ error: "Could not write." });
     }
   });
 
+  app.get(`${VIEW_PATH}/api/nodes/:id/activity`, gate, async (req, res) => {
+    try {
+      const got = await viewNodeActivity(pool, String(req.params.id ?? ""));
+      if ("error" in got) {
+        res.status(404).json({ error: "Not found" });
+        return;
+      }
+      res.json(got);
+    } catch (error) {
+      console.error("View activity failed", error);
+      res.status(500).json({ error: "Could not load." });
+    }
+  });
+
+  app.get(`${VIEW_PATH}/api/trash`, gate, async (_req, res) => {
+    try {
+      res.json(await viewTrash(pool));
+    } catch (error) {
+      console.error("View trash failed", error);
+      res.status(500).json({ error: "Could not load." });
+    }
+  });
+
   app.patch(`${VIEW_PATH}/api/nodes/:id`, gate, async (req, res) => {
     try {
-      const title = typeof req.body?.title === "string" ? req.body.title : "";
-      const body = typeof req.body?.body === "string" ? req.body.body : "";
-      const base = typeof req.body?.base_updated_at === "string" ? req.body.base_updated_at : "";
-      sendJournalResult(
+      sendWriteResult(
         res,
-        await viewJournalWrite(pool, config.FOUNDATION_DATA, {
+        await viewNodeWrite(pool, config.FOUNDATION_DATA, {
           id: String(req.params.id ?? ""),
-          title,
-          body,
-          base_updated_at: base,
+          title: optionalString(req.body?.title),
+          status: optionalString(req.body?.status),
+          data: optionalData(req.body?.data),
+          body: optionalString(req.body?.body),
+          base_updated_at: optionalString(req.body?.base_updated_at) ?? "",
         }),
       );
     } catch (error) {
-      console.error("View journal write failed", error);
+      console.error("View node write failed", error);
+      res.status(500).json({ error: "Could not write." });
+    }
+  });
+
+  app.delete(`${VIEW_PATH}/api/nodes/:id`, gate, async (req, res) => {
+    try {
+      sendWriteResult(
+        res,
+        await viewNodeDelete(pool, {
+          id: String(req.params.id ?? ""),
+          base_updated_at: optionalString(req.body?.base_updated_at) ?? "",
+        }),
+      );
+    } catch (error) {
+      console.error("View node delete failed", error);
+      res.status(500).json({ error: "Could not write." });
+    }
+  });
+
+  app.post(`${VIEW_PATH}/api/nodes/:id/restore`, gate, async (req, res) => {
+    try {
+      sendWriteResult(
+        res,
+        await viewNodeRestore(pool, config.FOUNDATION_DATA, {
+          id: String(req.params.id ?? ""),
+          base_updated_at: optionalString(req.body?.base_updated_at) ?? "",
+        }),
+      );
+    } catch (error) {
+      console.error("View node restore failed", error);
+      res.status(500).json({ error: "Could not write." });
+    }
+  });
+
+  app.post(`${VIEW_PATH}/api/activity/:id/undo`, gate, async (req, res) => {
+    try {
+      sendWriteResult(
+        res,
+        await viewUndoActivity(pool, config.FOUNDATION_DATA, {
+          id: String(req.params.id ?? ""),
+          base_updated_at: optionalString(req.body?.base_updated_at) ?? "",
+        }),
+      );
+    } catch (error) {
+      console.error("View activity undo failed", error);
       res.status(500).json({ error: "Could not write." });
     }
   });

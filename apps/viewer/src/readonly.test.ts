@@ -26,7 +26,7 @@ test("viewer source has no write controls", async () => {
   const files = await collect(root);
   for (const file of files) {
     const text = await readFile(file, "utf8");
-    assert.doesNotMatch(text, />\s*(Upsert|Delete|Link|Unlink|Undo|Confirm)\s*</);
+    assert.doesNotMatch(text, />\s*(Upsert|Link|Unlink|Confirm)\s*</);
     assert.doesNotMatch(text, /manage_type/);
   }
 });
