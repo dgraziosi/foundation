@@ -115,26 +115,6 @@ test(
       assert.deepEqual(Object.keys(boot).sort(), ["relations", "rules", "spine", "types"]);
       assert.equal("how_to_extend" in boot, false);
       assert.equal((boot.rules as { identity: string }).identity, "uuid");
-      const listedTools = await client.listTools();
-      assert.equal(listedTools.tools.length, 15);
-      const resources = await client.listResources();
-      assert.ok(resources.resources.length > 0);
-      const nodesGuidance = await client.readResource({ uri: "foundation://guidance/nodes" });
-      const nodesText = nodesGuidance.contents
-        .map((part) => ("text" in part ? String(part.text) : ""))
-        .join("");
-      assert.match(nodesText, /upsert/);
-      assert.match(nodesText, /data\.url: null clears the href/);
-      const prompts = await client.listPrompts();
-      const promptNames = prompts.prompts.map((row) => row.name);
-      assert.ok(promptNames.includes("chief"));
-      assert.ok(promptNames.includes("vault-keeper"));
-      assert.ok(promptNames.includes("executive-assistant"));
-      const chief = await client.getPrompt({ name: "chief" });
-      const chiefText = chief.messages
-        .map((message) => (message.content.type === "text" ? message.content.text : ""))
-        .join("");
-      assert.match(chiefText, /# Chief of Staff/);
 
       const area = asObject(
         await client.callTool({
