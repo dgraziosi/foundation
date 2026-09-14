@@ -157,7 +157,12 @@ test("journal page is a document; today is the start path", async () => {
   assert.match(detail, /nodeLeaveWrite/);
   assert.match(detail, /flushLeave/);
   assert.match(detail, /leaveSnap/);
+  assert.match(detail, /writeLeave/);
+  assert.match(detail, /rememberLanded/);
+  assert.match(detail, /node-leave/);
+  assert.match(detail, /holdLeave/);
   assert.match(detail, /writesInFlight/);
+  assert.doesNotMatch(detail, /void writeNow\(pending\)/);
   const app = await src("App.tsx");
   assert.match(app, /path="\/journal\/today"/);
 });

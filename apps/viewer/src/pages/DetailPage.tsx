@@ -12,7 +12,10 @@ import {
   fieldSaveValue,
   isEditableTypeField,
   isUuid,
+  journalLeaveHoldWrite,
+  journalLeaveKeepDraft,
   journalSaveResultApplies,
+  journalShouldKeepLeave,
   nodeDraftQuiet,
   nodeLeaveWrite,
   nodeSaveCopy,
@@ -30,6 +33,13 @@ import { LoadError, Placeholders, Quiet } from "../ui/States";
 import { JournalPage } from "./JournalPage";
 
 const STATUSES = ["active", "completed", "archived"] as const;
+
+type NodeLeaveRecord = {
+  draft: NodeSaveDraft;
+  skip: NodeSaveDraft;
+  base: string;
+  status: "clash" | "failed";
+};
 
 function formatValue(value: unknown): string {
   if (typeof value === "string") {
@@ -239,6 +249,7 @@ function LiveDetail({
   const saveTimer = useRef<number | null>(null);
   const inflightWrite = useRef<Promise<void> | null>(null);
   const flushAfterWrite = useRef(false);
+  const holdLeave = useRef(false);
   const leavePending = useRef<{
     id: string;
     draft: NodeSaveDraft;
@@ -249,6 +260,27 @@ function LiveDetail({
 
   useEffect(() => {
     const incoming = draftFromDetail(detail, detail.type?.fields ?? []);
+    const leave = queryClient.getQueryData<NodeLeaveRecord>(["node-leave", detail.node.id]);
+    if (leave) {
+      queryClient.removeQueries({ queryKey: ["node-leave", detail.node.id] });
+      const landedAt = queryClient.getQueryData<string>(["node-landed", detail.node.id]);
+      if (journalShouldKeepLeave({ leaveSkip: { title: "", body: "", base: leave.base }, landedAt })) {
+        seededId.current = detail.node.id;
+        setTitle(leave.draft.title);
+        setStatus(leave.draft.status);
+        const kept: Record<string, string> = {};
+        for (const field of (detail.type?.fields ?? []).filter(isEditableTypeField)) {
+          kept[field.name] = fieldInputValue(leave.draft.data[field.name]);
+        }
+        setValues(kept);
+        setBase(leave.base);
+        baseRef.current = leave.base;
+        skip.current = leave.skip;
+        holdLeave.current = true;
+        setSaveStatus(leave.status);
+        return;
+      }
+    }
     const switched = seededId.current !== detail.node.id;
     if (!switched) {
       if (saveStatusRef.current === "clash" || saveStatusRef.current === "saving") {
@@ -261,6 +293,7 @@ function LiveDetail({
         return;
       }
     }
+    holdLeave.current = false;
     seededId.current = detail.node.id;
     setTitle(incoming.title);
     setStatus(incoming.status);
@@ -273,7 +306,7 @@ function LiveDetail({
     baseRef.current = detail.node.updated_at ?? "";
     skip.current = incoming;
     setSaveStatus("quiet");
-  }, [detail]);
+  }, [detail, queryClient]);
 
   const keepTitle = title.trim() === "";
   const draft: NodeSaveDraft = {
@@ -304,6 +337,33 @@ function LiveDetail({
     };
   }
 
+  function rememberLanded(saved: NodeDetail) {
+    queryClient.removeQueries({ queryKey: ["node-leave", saved.node.id] });
+    queryClient.setQueryData(["node-landed", saved.node.id], saved.node.updated_at ?? "");
+    queryClient.setQueryData(["node", saved.node.id], saved);
+    void queryClient.invalidateQueries({ queryKey: ["recents"] });
+    void queryClient.invalidateQueries({ queryKey: ["ontology"] });
+  }
+
+  function rememberLeaveDraft(
+    nodeId: string,
+    draft: NodeSaveDraft,
+    skipSnap: NodeSaveDraft,
+    base: string,
+    status: "clash" | "failed",
+  ) {
+    const landedAt = queryClient.getQueryData<string>(["node-landed", nodeId]);
+    if (!journalShouldKeepLeave({ leaveSkip: { title: "", body: "", base }, landedAt })) {
+      return;
+    }
+    queryClient.setQueryData<NodeLeaveRecord>(["node-leave", nodeId], {
+      draft,
+      skip: skipSnap,
+      base,
+      status,
+    });
+  }
+
   function applySaved(saved: NodeDetail, mine: number) {
     const landed = draftFromDetail(saved, saved.type?.fields ?? []);
     if (leavePending.current?.id === saved.node.id) {
@@ -313,9 +373,10 @@ function LiveDetail({
         base: saved.node.updated_at ?? "",
       };
     }
-    queryClient.setQueryData(["node", saved.node.id], saved);
-    void queryClient.invalidateQueries({ queryKey: ["recents"] });
-    void queryClient.invalidateQueries({ queryKey: ["ontology"] });
+    rememberLanded(saved);
+    if (leavePending.current) {
+      return;
+    }
     if (seededId.current !== saved.node.id) {
       return;
     }
@@ -362,7 +423,7 @@ function LiveDetail({
         if (!journalSaveResultApplies(mine, saveGen.current)) {
           return;
         }
-        if (seededId.current !== pending.id) {
+        if (leavePending.current || seededId.current !== pending.id) {
           return;
         }
         if (error instanceof ApiError && error.status === 409) {
@@ -378,6 +439,28 @@ function LiveDetail({
     return done;
   }
 
+  function writeLeave(
+    pending: NodeLeaveWrite,
+    draft: NodeSaveDraft,
+    skipSnap: NodeSaveDraft,
+    base: string,
+  ) {
+    void saveNode({
+      id: pending.id,
+      title: pending.title,
+      status: pending.status,
+      data: pending.data,
+      base_updated_at: pending.base,
+    })
+      .then((saved) => {
+        rememberLanded(saved);
+      })
+      .catch((error) => {
+        const clash = error instanceof ApiError && error.status === 409;
+        rememberLeaveDraft(pending.id, draft, skipSnap, base, journalLeaveKeepDraft(clash));
+      });
+  }
+
   function flushLeave(snap: {
     id: string;
     draft: NodeSaveDraft;
@@ -389,7 +472,7 @@ function LiveDetail({
     if (!pending) {
       return;
     }
-    void writeNow(pending);
+    void writeLeave(pending, snap.draft, snap.skip, snap.base);
   }
 
   function cancelDebounce() {
@@ -400,7 +483,14 @@ function LiveDetail({
   }
 
   useEffect(() => {
+    const leaveHold = journalLeaveHoldWrite({ holdLeave: holdLeave.current, saveStatus });
+    if (leaveHold === "consume" || leaveHold === "release") {
+      holdLeave.current = false;
+    }
     if (!base || keepTitle || saveStatus === "clash") {
+      return;
+    }
+    if (leaveHold === "keep" || leaveHold === "consume") {
       return;
     }
     if (nodeDraftQuiet(draftRef.current, skip.current)) {
