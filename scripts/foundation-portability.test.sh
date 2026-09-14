@@ -33,6 +33,9 @@ fi
 if ! grep -Fq -- 'idempotency_key' "${lib_py}"; then
   fail "import must use upsert idempotency_key"
 fi
+if ! grep -Fq -- '"allow_duplicate": True' "${lib_py}"; then
+  fail "import create must pass allow_duplicate so shared titles do not abort"
+fi
 if ! grep -Fq -- 'import_ref' "${lib_py}"; then
   fail "import must store a stable import_ref on data"
 fi
@@ -52,9 +55,28 @@ cat >"${obsidian}/Notes/Export proof note.md" <<'MD'
 ---
 mood: calm
 ---
+
 # Export proof note
 
 Body of the Obsidian fixture note.
+MD
+cat >"${obsidian}/Notes/Aliases fixture.md" <<'MD'
+---
+aliases: Other name
+---
+
+# Aliases fixture
+
+Note with a scalar aliases field.
+MD
+cat >"${obsidian}/Notes/Quoted aliases fixture.md" <<'MD'
+---
+aliases: ["Quoted alias"]
+---
+
+# Quoted aliases fixture
+
+Note with a JSON-array aliases field.
 MD
 cat >"${obsidian}/2026-09-14.md" <<'MD'
 # 2026-09-14
@@ -107,7 +129,7 @@ obsidian_drafts="$(python3 "${lib_py}" import --from obsidian --source "${obsidi
 python3 -c '
 import json, sys
 drafts = json.loads(sys.argv[1])
-if len(drafts) != 2:
+if len(drafts) != 4:
     raise SystemExit(f"obsidian draft count {len(drafts)}")
 by_title = {row["title"]: row for row in drafts}
 note = by_title["Export proof note"]
@@ -121,6 +143,12 @@ if note["data"].get("import_ref") != "obsidian:Notes/Export proof note.md":
     raise SystemExit("obsidian import_ref")
 if not note["idempotency_key"].startswith("imp:obsidian:"):
     raise SystemExit("obsidian idempotency_key")
+aliases_note = by_title["Aliases fixture"]
+if aliases_note["data"].get("aliases") != ["Other name"]:
+    raise SystemExit("obsidian scalar aliases")
+quoted = by_title["Quoted aliases fixture"]
+if quoted["data"].get("aliases") != ["Quoted alias"]:
+    raise SystemExit("obsidian array aliases")
 journal = by_title["2026-09-14"]
 if journal["type"] != "journal":
     raise SystemExit("daily note should be journal")

@@ -497,12 +497,32 @@ def heading_title_and_body(text: str, fallback: str) -> tuple[str, str]:
     lines = text.splitlines()
     title = fallback
     start = 0
-    if lines and lines[0].startswith("# "):
-        title = lines[0][2:].strip() or fallback
-        start = 1
+    while start < len(lines) and lines[start] == "":
+        start += 1
+    if start < len(lines) and lines[start].startswith("# "):
+        title = lines[start][2:].strip() or fallback
+        start += 1
         if start < len(lines) and lines[start] == "":
             start += 1
     return title, "\n".join(lines[start:]).strip()
+
+
+def aliases_from_frontmatter(value: Any) -> list[str] | None:
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        if text.startswith("[") and text.endswith("]"):
+            try:
+                value = json.loads(text)
+            except json.JSONDecodeError:
+                return None
+        else:
+            return [text]
+    if not isinstance(value, list):
+        return None
+    items = [item.strip() for item in value if isinstance(item, str) and item.strip()]
+    return items or None
 
 
 def skip_dir(name: str) -> bool:
@@ -556,6 +576,11 @@ def draft_from_note_text(adapter: str, source_ref: str, text: str, *, prefer_jou
         if key in {"id", "type", "payload", "url", "repo", "receipt"}:
             continue
         if SECRET_KEY_RE.search(key):
+            continue
+        if key == "aliases":
+            aliases = aliases_from_frontmatter(value)
+            if aliases:
+                data["aliases"] = aliases
             continue
         if isinstance(value, (str, int, float, bool)):
             data[key] = value
@@ -694,6 +719,7 @@ def apply_import(
             "type": draft.type,
             "title": draft.title,
             "idempotency_key": draft.idempotency_key,
+            "allow_duplicate": True,
             "data": draft.data,
         }
         if draft.status:
