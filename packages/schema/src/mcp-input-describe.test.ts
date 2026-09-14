@@ -6,7 +6,7 @@ import {
   missingAdvertisedInputDescriptions,
 } from "./mcp-inventory.js";
 
-test("advertised MCP input schemas are the 15 registered tools", () => {
+test("advertised MCP input schemas are the 16 registered tools", () => {
   assert.deepEqual(Object.keys(ADVERTISED_MCP_INPUT_SCHEMAS), [...ADVERTISED_MCP_TOOL_NAMES]);
 });
 

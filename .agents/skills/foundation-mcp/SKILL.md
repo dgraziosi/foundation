@@ -12,7 +12,7 @@ The user is the human who runs this vault on this machine. The vault MCP is on t
 Look up the live schema at call time (`bootstrap`, `inspect_ontology`, or the server tool list). `bootstrap` is lean (spine, types, relations, rules). Read `foundation://guidance` resources for how to extend. Starter bot recipes are MCP prompts. Input parameter docs on that list come from Zod `.describe()`. Do not trust a dump in this file.
 
 <!-- generated:mcp-skill-inventory -->
-Advertised tools (15): `bootstrap`, `search`, `lookup`, `get`, `working_set`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`, `job`.
+Advertised tools (16): `bootstrap`, `search`, `lookup`, `get`, `working_set`, `upsert`, `delete`, `merge`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`, `job`.
 Generated from the advertised inventory in `@foundation/schema`. Look up the live schema at call time. Parameter docs: [`docs/MCP_TOOLS.md`](../../../docs/MCP_TOOLS.md).
 <!-- /generated:mcp-skill-inventory -->
 
@@ -28,6 +28,7 @@ Generated from the advertised inventory in `@foundation/schema`. Look up the liv
 - `link` — accept a suggested edge or hang a child. Pass `from_id`, `to_id`, `relation_type`, plus **`from_base_updated_at` and `to_base_updated_at`** from a fresh `get` on each endpoint (if-match), or `edges[]` (1–20). `dry_run: true` returns would-be receipts and writes nothing. Do not invent `from_updated_at` / `to_updated_at`. Suggestions and `child_of` placement read live `kind`, `parent_types`, and `target_types`, not a frozen slug list.
 - `manage_relation` — create or update a relation. System relations may edit `source_types` and `target_types`. Slug, kind, label, and symmetry stay locked.
 - `delete` — soft-delete a live node. Refuses when a live `ref` field still points at that id (clear the field first).
+- `merge` — two live same-type duplicates. Pass `keep`, `drop`, `keep_base_updated_at`, `drop_base_updated_at`, and confirm set to true. Needs destructive scope. Rewrites edges and declared refs onto keep, unions aliases, moves unique identity when only drop holds it, then soft-deletes drop. Undo that activity row to restore the prior graph.
 - `job` — claim a named instance routine before a pass (`dream`, `vault-health`, `activity-prune`, …). Keep the token. A second live claim fails. `finish` records last run. `release` opens without recording. `read` is who and last run. Not a graph write and not `get_vault_health`. Activity prune itself is the host script `scripts/activity-prune.sh`.
 
 Invalid input on `tools/call` is `{ error, suggestion }`, not a generic SDK validation miss. Read `suggestion` and retry once with the **suggested field names exactly** — do not invent alternate parameter names.
@@ -36,11 +37,11 @@ A record is what is true now, short. History stays in activity. To rewrite one r
 
 ## Destructive scope
 
-Destructive calls (`delete`, `unlink`, `undo`, `manage_type` retire) need a key with destructive scope. Ordinary upsert and link do not. `delete`, `unlink`, and node or edge `undo` also need if-match timestamps from `get`.
+Destructive calls (`delete`, `merge`, `unlink`, `undo`, `manage_type` retire) need a key with destructive scope. Ordinary upsert and link do not. `merge` also needs confirm set to true. `delete`, `merge`, `unlink`, and node or edge `undo` also need if-match timestamps from `get`.
 
 ## Write rules
 
 - Do not send `actor` or `actor_label`. The server stamps them from the API key.
 - Life data stays in the vault. Nothing personal in git.
 - One writer per record: if `updated_at` moved, `get` again. Do not clobber.
-- Checklist before every mutate: (1) `type` on upsert, (2) fresh `get` timestamps for `base_updated_at` / `from_base_updated_at` / `to_base_updated_at`, (3) on `{ error, suggestion }`, use the suggested field names exactly.
+- Checklist before every mutate: (1) `type` on upsert, (2) fresh `get` timestamps for `base_updated_at` / `keep_base_updated_at` / `drop_base_updated_at` / `from_base_updated_at` / `to_base_updated_at`, (3) on `{ error, suggestion }`, use the suggested field names exactly.

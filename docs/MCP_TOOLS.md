@@ -14,6 +14,7 @@ Destructive tools need a key with destructive scope or they return `{ error, sug
 | `working_set` | Return the actionable working set around one live node: open work, dues, and the parent chain when the root hangs under something. |
 | `upsert` | Create or update one node or `nodes[]` (1–20). Whole batch validates; one transaction writes all or none. `dry_run: true` writes nothing. Missing needed fields warn; `strict: true` refuses. Always pass `type`. Updates require `base_updated_at`. |
 | `delete` | Soft-delete a node. Needs a key with destructive scope and `base_updated_at` from `get`. |
+| `merge` | Merge two live same-type nodes onto keep. Needs destructive scope, confirm set to true, and if-match on both. Soft-deletes drop. |
 | `link` | Create typed edges after validation. One edge or `edges[]` (1–20). Whole batch validates; one transaction writes all or none. `dry_run: true` writes nothing. Requires endpoint if-match. |
 | `unlink` | Remove a typed edge. Needs a key with destructive scope and endpoint if-match. |
 | `inspect_ontology` | List type and relation registry rows (system + authored), including each type’s `fields`, view declarations, `default_view`, `hue`, and `glyph`. |
@@ -24,7 +25,7 @@ Destructive tools need a key with destructive scope or they return `{ error, sug
 | `job` | Claim a named instance routine, keep the claim alive, finish or release it, or read who holds it and last run. Not a graph write. |
 <!-- /generated:mcp-tool-table -->
 
-Handler contract: each tool has one zod input schema and one output schema; JSON Schema on the wire is derived; every advertised input field uses Zod `.describe()` so `tools/list` parameter docs are non-empty; invalid input never reaches the domain; domain errors are `{ error, suggestion? }`. The tool table and each **In:** / parameter list below are generated from that advertised inventory in `packages/schema`. Hand-maintained prose after those blocks stays the write rules and gotchas. Regenerate with `pnpm --filter @foundation/schema generate-mcp-docs`. Product guidance is MCP resources (`foundation://guidance/…`). Starter bot recipes are MCP prompts. Those are not a sixteenth tool.
+Handler contract: each tool has one zod input schema and one output schema; JSON Schema on the wire is derived; every advertised input field uses Zod `.describe()` so `tools/list` parameter docs are non-empty; invalid input never reaches the domain; domain errors are `{ error, suggestion? }`. The tool table and each **In:** / parameter list below are generated from that advertised inventory in `packages/schema`. Hand-maintained prose after those blocks stays the write rules and gotchas. Regenerate with `pnpm --filter @foundation/schema generate-mcp-docs`. Product guidance is MCP resources (`foundation://guidance/…`). Starter bot recipes are MCP prompts. Those are not a seventeenth tool.
 
 ## Parameters
 
@@ -201,6 +202,27 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 <!-- /generated:mcp-params:delete -->
 - **Out:** `{ ok, activity_id }` or `{ error, suggestion? }`
 - Soft-delete (`deleted_at`). Needs a key with destructive scope. Requires `base_updated_at` from `get` (if-match, millisecond precision). Mismatch or omit → `{ error, suggestion }` (get and retry). A CAS miss is stale, never “node not found,” and the node stays live. After if-match, delete refuses when a live record still holds a declared `ref` field (`kind: "ref"` on that type’s fields) whose `data` value is this id → `{ error, suggestion }` (clear `data.<field>` with upsert and if-match, then retry). Those fields stay pointers, not edges. `url` / `data.repo` / `data.receipt` / leftover extra keys are not this check. `get` hides deleted nodes. Incident edges stay in place for undo; `get` and `link` validation ignore edges to deleted endpoints. Reparenting drops a stale `child_of` to a deleted parent so uniqueness matches the live graph, and records an `unlink` activity row with a `before` snapshot of the dropped edge. Restore via `undo` of the delete row. Soft-delete does **not** delete blob bytes (so undo can restore a blob node).
+
+### `merge`
+
+<!-- generated:mcp-params:merge -->
+- **In:** `{ keep, drop, keep_base_updated_at?, drop_base_updated_at?, confirm? }`
+- `keep` — Live node UUID to keep
+- `drop` — Live same-type node UUID to merge into keep, then soft-delete
+- `keep_base_updated_at` — Required. keep node's updated_at from get
+- `drop_base_updated_at` — Required. drop node's updated_at from get
+- `confirm` — Required. Set this true. Merge rewrites edges and refs onto keep and soft-deletes drop
+<!-- /generated:mcp-params:merge -->
+- **Out:** `{ ok, activity_id }` or `{ error, suggestion? }`
+- Needs a key with destructive scope and confirm set to true. Missing confirm or missing destructive scope → `{ error, suggestion }`.
+- Both ids must be live and distinct. Same `type` required; different types refuse. Stale or missing `keep_base_updated_at` / `drop_base_updated_at` is if-match (get and retry), never “node not found.”
+- **Edges.** Every live incident edge on drop is rewritten onto keep when that would not create a forbidden duplicate or ontology violation. A rewrite that would become keep→keep is dropped as a no-op (self-loop). A rewrite that would duplicate an edge keep already has is dropped as a no-op. If keep already has a live hierarchy parent and drop’s parent would add a different second parent, merge refuses (`unlink` one `child_of` first).
+- **Declared refs.** Live nodes that store drop’s id in a declared type `ref` field are patched to keep in the same transaction. Merge does not leave dangling refs the way a raw delete would refuse.
+- **Aliases.** `drop.data.aliases` unions onto `keep.data.aliases` with `name_norm` dedupe. Keep’s title and other aliases stay. Malformed legacy aliases are ignored the same way lookup ignores them. Keep wins on title, status, payload, and other `data` keys.
+- **Identity bags.** If keep and drop both hold conflicting unique `url` / `repo` / `receipt` values, refuse. If only drop holds a value, move it onto keep after drop is soft-deleted. If both hold the same value, keep it. Do not invent a second identity.
+- **Drop.** Soft-delete drop in the same transaction (same restore family as `delete`). Blob bytes are not deleted.
+- **Activity.** One reversible `merge` row. `before` / `after` store keep, drop, edge dispositions, ref retargets, and identity moves. `target_id` is keep. Actor comes from the authenticating key.
+- **Undo.** `undo` of that row while it is reversible restores drop, prior edge endpoints, dropped self/duplicate edges, declared ref fields, aliases, and identity moves. Pass `base_updated_at` from `get(keep)` after merge. The compensating row follows existing undo rules (`reversible = false`).
 
 ### `link`
 
@@ -383,14 +405,14 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 - **In:** `{ id, purge_deleted?, base_updated_at?, from_base_updated_at?, to_base_updated_at? }`
 - `id` — Activity row UUID to invert
 - `purge_deleted` — When undoing a type create, permanently drop leftover soft-deleted nodes of that type
-- `base_updated_at` — Required when the invert touches a node. That node's updated_at from get
+- `base_updated_at` — Required when the invert touches a node. That node's updated_at from get. Undo of merge uses keep
 - `from_base_updated_at` — Required when the invert touches an edge. from node's updated_at from get
 - `to_base_updated_at` — Required when the invert touches an edge. to node's updated_at from get
 <!-- /generated:mcp-params:undo -->
 `id` is an activity row id.
 - **Out:** `{ ok, activity_id }` or `{ error, suggestion? }`
 - Needs a key with destructive scope.
-- **If-match:** node inversions (`create`, `update`, `delete`) require `base_updated_at` matching that node's current `updated_at` from `get`. Undo of `delete` uses the last live stamp from `get` (the same value `delete` required) because `get` hides tombstones and delete itself bumps `updated_at`. Edge inversions (`link`, `unlink`) require `from_base_updated_at` and `to_base_updated_at` from `get` on both endpoints. Type and relation inversions have no node timestamp. Stale or missing → `{ error, suggestion }` (get and retry). A matching undo still writes a compensating row. Invert stays refused when it is not safe.
+- **If-match:** node inversions (`create`, `update`, `delete`, `merge`) require `base_updated_at` matching that node's current `updated_at` from `get`. Undo of `merge` uses keep's current `updated_at` from `get(keep)` after merge. Undo of `delete` uses the last live stamp from `get` (the same value `delete` required) because `get` hides tombstones and delete itself bumps `updated_at`. Edge inversions (`link`, `unlink`) require `from_base_updated_at` and `to_base_updated_at` from `get` on both endpoints. Type and relation inversions have no node timestamp. Stale or missing → `{ error, suggestion }` (get and retry). A matching undo still writes a compensating row. Invert stays refused when it is not safe.
 - `activity_id` is the compensating row (`reversible = false`). Invert map:
 
 | action | inverse |
@@ -398,6 +420,7 @@ A type can take more than one of these (a `goal` is children + ancestors). `walk
 | create node | soft-delete |
 | update node | restore `before` payload/data/title/type/status |
 | delete node | clear `deleted_at` (restore) |
+| merge | restore drop, prior edges/refs/aliases/identity from the merge snapshot |
 | link | delete that edge |
 | unlink | re-insert edge from `before` |
 | type/relation create | delete registry row if unused; else refuse |

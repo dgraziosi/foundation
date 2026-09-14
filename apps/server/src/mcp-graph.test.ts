@@ -15,7 +15,7 @@ test("the server registers the current tools", async () => {
     "utf8",
   );
   const names = [...register.matchAll(/register(\w+)Tool\(server/g)].map((match) => match[1]);
-  assert.equal(names.length, 15);
+  assert.equal(names.length, 16);
   assert.deepEqual(names, [
     "Bootstrap",
     "Search",
@@ -24,6 +24,7 @@ test("the server registers the current tools", async () => {
     "WorkingSet",
     "Upsert",
     "Delete",
+    "Merge",
     "Link",
     "Unlink",
     "InspectOntology",

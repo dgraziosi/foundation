@@ -204,6 +204,7 @@ export const ActivityActionSchema = z.enum([
   "unlink",
   "type_change",
   "relation_change",
+  "merge",
 ]);
 export const ActivityTargetKindSchema = z.enum(["node", "edge", "type", "relation"]);
 

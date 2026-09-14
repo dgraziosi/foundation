@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AgentPrincipal } from "../keyring.js";
 import { registerBootstrapTool } from "./bootstrap.js";
 import { registerDeleteTool } from "./delete.js";
+import { registerMergeTool } from "./merge.js";
 import { registerGetTool } from "./get.js";
 import { registerInspectOntologyTool } from "./inspect-ontology.js";
 import { registerLinkTool } from "./link.js";
@@ -33,6 +34,7 @@ export function registerTools(
   registerWorkingSetTool(server, pool);
   registerUpsertTool(server, pool, dataDir, agent);
   registerDeleteTool(server, pool, agent);
+  registerMergeTool(server, pool, agent);
   registerLinkTool(server, pool, agent);
   registerUnlinkTool(server, pool, agent);
   registerInspectOntologyTool(server, pool);

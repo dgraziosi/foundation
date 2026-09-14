@@ -45,6 +45,7 @@ import {
   type TypeField,
   type UndoInput,
 } from "@foundation/schema";
+import { assertMergeUndoIfMatch, invertMergeActivity } from "./merge.js";
 import { refuseInvalidRelationEdges } from "./relation-revalidate.js";
 import { removeAuthoredType } from "./retire-type.js";
 import { writerFrom, type WriteContext } from "./write-context.js";
@@ -231,9 +232,11 @@ async function assertUndoIfMatch(
       }
       return assertUndoEndpointMatch(client, edge.from_id, edge.to_id, input);
     }
+    case "merge":
+      return assertMergeUndoIfMatch(client, row, input.base_updated_at);
     default:
       return null;
-  }
+    }
 }
 
 async function invertCreateNode(
@@ -645,6 +648,9 @@ export async function undoGraphActivity(
         break;
       case "relation_change":
         inverted = await invertRelationChange(client, row);
+        break;
+      case "merge":
+        inverted = await invertMergeActivity(client, row);
         break;
       case "restore":
         inverted = toolError(
