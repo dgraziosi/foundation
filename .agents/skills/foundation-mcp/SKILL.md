@@ -11,6 +11,11 @@ The user is the human who runs this vault on this machine. The vault MCP is on t
 
 Look up the live schema at call time (`bootstrap`, `inspect_ontology`, or the server tool list). Input parameter docs on that list come from Zod `.describe()`. Do not trust a dump in this file.
 
+<!-- generated:mcp-skill-inventory -->
+Advertised tools (15): `bootstrap`, `search`, `lookup`, `get`, `working_set`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`, `job`.
+Generated from the advertised inventory in `@foundation/schema`. Look up the live schema at call time. Parameter docs: [`docs/MCP_TOOLS.md`](../../../docs/MCP_TOOLS.md).
+<!-- /generated:mcp-skill-inventory -->
+
 ## Which call
 
 - `bootstrap` — first attach / what tools and spine exist

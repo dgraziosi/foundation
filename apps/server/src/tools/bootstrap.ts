@@ -1,5 +1,6 @@
 import { listNodeTypes, listRelationTypes, type Pool } from "@foundation/db";
 import {
+  advertisedMcpTool,
   BootstrapOutputSchema,
   hierarchySlug,
   SPINE_DIAGRAM,
@@ -57,8 +58,7 @@ export async function buildBootstrap(pool: Pool, agent: AgentPrincipal): Promise
 export function registerBootstrapTool(server: McpServer, pool: Pool, agent: AgentPrincipal): void {
   defineTool(server, {
     name: "bootstrap",
-    description:
-      "Return starter ontology, how to extend it, and current type/relation inventory. Call first.",
+    description: advertisedMcpTool("bootstrap").description,
     input: {},
     output: BootstrapOutputSchema,
     handler: async () => buildBootstrap(pool, agent),

@@ -442,11 +442,11 @@ done
 if [[ ! -f "${mcp_tools_doc}" ]]; then
   fail "missing ${mcp_tools_doc}"
 fi
-if ! grep -Fq -- 'payload?, data?, url?, status?, metadata?' "${mcp_tools_doc}"; then
-  fail "docs/MCP_TOOLS.md upsert In omits top-level url?"
+if ! grep -Fq -- '<!-- generated:mcp-tool-table -->' "${mcp_tools_doc}"; then
+  fail "docs/MCP_TOOLS.md is missing the generated tool table region"
 fi
-if grep -Fq -- 'payload?, data?, status?, metadata?, base_updated_at?' "${mcp_tools_doc}"; then
-  fail "docs/MCP_TOOLS.md upsert In still omits url?"
+if ! grep -Fq -- '<!-- generated:mcp-params:upsert -->' "${mcp_tools_doc}"; then
+  fail "docs/MCP_TOOLS.md is missing the generated upsert parameter region"
 fi
 if ! grep -Fq -- 'Leftover `data.living`, `data.code`, `data.origin`, and `data.link` writes migrate into `url` or `repo` and the leftover keys are stripped.' "${mcp_tools_doc}"; then
   fail "docs/MCP_TOOLS.md leftover writes omit migrate-into-url/repo or do not match SPEC"
@@ -534,6 +534,9 @@ fi
 foundation_mcp="${skills_root}/foundation-mcp/SKILL.md"
 if [[ ! -f "${foundation_mcp}" ]]; then
   fail "missing ${foundation_mcp}"
+fi
+if ! grep -Fq -- '<!-- generated:mcp-skill-inventory -->' "${foundation_mcp}"; then
+  fail "foundation-mcp is missing the generated inventory region"
 fi
 if ! grep -Fq -- '`search` `{ url }`' "${foundation_mcp}"; then
   fail "foundation-mcp does not search { url } for Gmail, Calendar, Drive"

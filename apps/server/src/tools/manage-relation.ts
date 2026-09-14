@@ -1,4 +1,5 @@
 import {
+  advertisedMcpTool,
   ManageRelationInputSchema,
   ManageRelationSuccessSchema,
 } from "@foundation/schema";
@@ -12,7 +13,7 @@ import { defineTool } from "./define-tool.js";
 export function registerManageRelationTool(server: McpServer, pool: Pool, agent: AgentPrincipal): void {
   defineTool(server, {
     name: "manage_relation",
-    description: "Create or update a relation type. Applies immediately.",
+    description: advertisedMcpTool("manage_relation").description,
     input: ManageRelationInputSchema.shape,
     output: ManageRelationSuccessSchema,
     handler: async (input) => manageRelation(pool, input, writeContextOf(agent)),
