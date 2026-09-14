@@ -12,7 +12,7 @@ One chrome. A content host. Three surfaces. The ontology owns identity and which
 
 | Surface | What it is |
 | --- | --- |
-| Home | Today, Recents, open tasks, and type folders. |
+| Home | Today, Since you last looked, Recents, open tasks, and type folders. |
 | Collection | One type's objects in the layout that type declared. |
 | Detail | One object, as a page in the content host. Title, body, structure, properties. |
 
@@ -34,7 +34,7 @@ The window has no docked inspector. Properties live on the detail page.
 
 A click on a record or a graph node opens that object's **detail page** in the content host. The page fills the main pane. It does not open a pane beside Home or a collection.
 
-That click comes from: a graph node, a Recents row, an open-task row, a collection row or card or cell or board card or calendar item or outline row, a search result, a related object on a detail page.
+That click comes from: a graph node, a Recents row, an open-task row, a Since you last looked row, a collection row or card or cell or board card or calendar item or outline row, a search result, a related object on a detail page.
 
 Right-click a graph node: local graph, depth **1–4**, default **2**.
 
@@ -44,7 +44,7 @@ Right-click a graph node: local graph, depth **1–4**, default **2**.
 
 **Left rail.** Logo, then Home, then Trash, then Search. Collapse to icons. Width **56px** collapsed, **224px** expanded. Theme toggle lives here.
 
-Home opens Today, Recents, open tasks, and type folders. Trash lists soft-deleted records. Search opens the search overlay. Today is not a rail item.
+Home opens Today, Since you last looked, Recents, open tasks, and type folders. Trash lists soft-deleted records. Search opens the search overlay. Today is not a rail item.
 
 **Content host.** View strip across the top of the main pane. Home is pinned. Opening a collection or a detail is a view in this strip. The active view fills the pane under the strip.
 
@@ -55,6 +55,10 @@ Home opens Today, Recents, open tasks, and type folders. Trash lists soft-delete
 ## Home
 
 **Today.** Always on Home, even when the journal type has a zero count. Empty: **Write today** and the calendar day. After a first sentence, the first line of that prose. Open: today's journal page. Peek does not create a record.
+
+**Since you last looked.** Recent bot activity (`actor` is not `user`) since the last successful Home look. Newest first. Cap **5**. Each row: who wrote (actor label, or **Agent**), a short what-changed line, the live record title, and relative time. A click opens that record's detail page. Missing or trashed targets are skipped. Empty: **Nothing new.**
+
+The window keeps the last-looked time in an HttpOnly cookie on `Path=/view`. It does not write a graph node. After Home loads this digest while unlocked, the watermark advances so the next visit only shows newer bot writes. A first visit with no watermark reads the last **24 hours** (vault timezone), still capped at **5**, then sets the watermark even when that window is empty.
 
 **Recents.** Last **5** live objects that are not tasks, newest first. No status filter. Open and completed tasks both stay out — Recents is not an agenda. Grouped **Today / Yesterday / Earlier this week / Earlier**. Each row: type glyph, title, relative time. **View all** opens Recents. Empty: **Nothing yet.**
 
@@ -154,6 +158,7 @@ Completed tasks on Home Open tasks, while seed `task` still declares `status = a
 | Surface | Default filter |
 | --- | --- |
 | Home Today | Live journal for today, if one exists. Peek does not create. Always shown. |
+| Home Since you last looked | Vault activity where `actor` is not `user`, since the last Home look (or last **24 hours** on a first visit). Live targets only. Cap **5**, newest first. |
 | Home Recents | Live objects that are not tasks. No status clause. Cap **5**, newest first. |
 | Home Open tasks | The `task` type's `default_view` filter, then urgency, then cap **5**. Seed: `status = active`. |
 | Home Type folders | Types with live objects. Count is live objects of that type. Open uses that type's `default_view`. |
@@ -201,4 +206,4 @@ Soft-delete uses the same delete family as MCP. Restore uses undo-of-delete when
 
 ## Copy
 
-Empty Recents and empty collections: **Nothing yet.** Empty open-tasks: **No open tasks.** Filtered collection: **Nothing matches your filters.** Empty Home Today: **Write today** and the calendar day. Empty Trash: **Nothing in trash.** Unlock title: **Unlock.** The field is the vault key. Unlock error: **That key did not unlock.**
+Empty Recents and empty collections: **Nothing yet.** Empty open-tasks: **No open tasks.** Empty Since you last looked: **Nothing new.** Filtered collection: **Nothing matches your filters.** Empty Home Today: **Write today** and the calendar day. Empty Trash: **Nothing in trash.** Unlock title: **Unlock.** The field is the vault key. Unlock error: **That key did not unlock.**

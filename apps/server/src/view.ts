@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import type { Pool } from "@foundation/db";
 import type { Express, NextFunction, Request, Response } from "express";
 import express from "express";
-import { apiKeyCookieHeader, providedApiKey } from "./auth.js";
+import { apiKeyCookieHeader, homeLookedCookieHeader, providedApiKey, readHomeLooked } from "./auth.js";
 import { sendBlob } from "./blobs-http.js";
 import type { AppBindings } from "./config.js";
 import { attemptSource, presentedSecret, type ViewDoor } from "./view-door.js";
@@ -17,6 +17,7 @@ import {
   viewTasks,
   viewType,
 } from "./view-data.js";
+import { viewHomeDigestWindow } from "./view-digest.js";
 import { viewJournalToday, viewJournalTodayPeek } from "./view-journal.js";
 import {
   viewNodeActivity,
@@ -242,6 +243,19 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings
       );
     } catch (error) {
       console.error("View graph failed", error);
+      res.status(500).json({ error: "Could not load." });
+    }
+  });
+
+  app.get(`${VIEW_PATH}/api/digest`, gate, async (req, res) => {
+    try {
+      const now = new Date();
+      const lookedAt = readHomeLooked(req.header("cookie") ?? "");
+      const digest = await viewHomeDigestWindow(pool, lookedAt, now);
+      res.append("Set-Cookie", homeLookedCookieHeader(digest.looked_at));
+      res.json(digest);
+    } catch (error) {
+      console.error("View digest failed", error);
       res.status(500).json({ error: "Could not load." });
     }
   });

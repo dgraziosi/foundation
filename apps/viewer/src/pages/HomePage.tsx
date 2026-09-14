@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { fetchOntology, fetchRecents, fetchTasks, peekTodayJournal } from "../api";
+import { fetchHomeDigest, fetchOntology, fetchRecents, fetchTasks, peekTodayJournal } from "../api";
 import {
   HOME_WIDGET_LIMIT,
   RECENCY_GROUPS,
@@ -28,6 +28,11 @@ export function HomePage() {
   const lane = useThemeLane();
   const todayPeek = useQuery({ queryKey: ["journal-today-peek"], queryFn: peekTodayJournal });
   const ontology = useQuery({ queryKey: ["ontology"], queryFn: fetchOntology });
+  const digest = useQuery({
+    queryKey: ["home-digest"],
+    queryFn: fetchHomeDigest,
+    refetchOnWindowFocus: false,
+  });
   const recents = useQuery({
     queryKey: ["recents", HOME_WIDGET_LIMIT],
     queryFn: () => fetchRecents(HOME_WIDGET_LIMIT),
@@ -36,6 +41,7 @@ export function HomePage() {
     queryKey: ["tasks", HOME_WIDGET_LIMIT],
     queryFn: () => fetchTasks(HOME_WIDGET_LIMIT),
   });
+  const digestRows = (digest.data?.rows ?? []).slice(0, HOME_WIDGET_LIMIT);
   const openTasks = [...(tasks.data?.tasks ?? [])].sort(compareOpenTasks).slice(0, HOME_WIDGET_LIMIT);
   const recentRows = [...(recents.data?.rows ?? [])]
     .sort(compareRecentRows)
@@ -67,6 +73,35 @@ export function HomePage() {
               </>
             )}
           </Button>
+          <Card data-surface="home-digest">
+            <CardHeader>
+              <CardTitle>Since you last looked</CardTitle>
+            </CardHeader>
+            <CardContent className="overflow-auto p-0">
+              {digest.isLoading ? <Placeholders /> : null}
+              {digest.isError ? <LoadError onRetry={() => void digest.refetch()} /> : null}
+              {digest.data && digestRows.length === 0 ? <Quiet>Nothing new.</Quiet> : null}
+              {digestRows.map((row) => (
+                <Button
+                  key={row.id}
+                  type="button"
+                  variant="ghost"
+                  size="row"
+                  className="w-full justify-between rounded-none border-b border-hairline"
+                  data-digest-row={row.id}
+                  onClick={() => openDetail(row.target_id, row.title)}
+                >
+                  <span className="flex min-w-0 flex-col items-start gap-1">
+                    <span className="text-meta text-muted-foreground">
+                      {row.actor_label ?? "Agent"} · {row.summary}
+                    </span>
+                    <span className="break-words text-left font-medium">{row.title}</span>
+                  </span>
+                  <span className="text-meta text-muted-foreground">{relativeTime(row.created_at)}</span>
+                </Button>
+              ))}
+            </CardContent>
+          </Card>
           <div className="grid grid-cols-1 gap-md xl:grid-cols-2">
             <Card>
               <CardHeader className="flex-row items-center justify-between">

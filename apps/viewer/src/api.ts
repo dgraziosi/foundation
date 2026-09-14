@@ -237,6 +237,21 @@ export function fetchGraph(input: { focus?: string; type?: string; depth?: numbe
   return viewFetch<{ nodes: GraphNode[]; edges: GraphEdge[] }>(`/view/api/graph${suffix}`);
 }
 
+export type DigestRow = {
+  id: string;
+  actor: string;
+  actor_label: string | null;
+  action: string;
+  summary: string;
+  title: string;
+  target_id: string;
+  created_at: string;
+};
+
+export function fetchHomeDigest() {
+  return viewFetch<{ rows: DigestRow[]; looked_at: string }>("/view/api/digest");
+}
+
 export function fetchRecents(limit?: number) {
   const suffix = limit ? `?limit=${limit}` : "";
   return viewFetch<{ rows: RecentRow[] }>(`/view/api/recents${suffix}`);

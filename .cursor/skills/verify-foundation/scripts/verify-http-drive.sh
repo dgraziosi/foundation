@@ -49,7 +49,7 @@ verify_http_split_body() {
 
 verify_http_drive() {
   local helper evidence key_file view_key_file unlock_dir home_dir key view_key
-  local unlock_raw unlock_headers unlock_body session_body recents_body tasks_body today_body
+  local unlock_raw unlock_headers unlock_body session_body recents_body tasks_body today_body digest_body digest_again_body
   local reject_raw reject_headers reject_body mcp_unlock_raw mcp_unlock_headers mcp_unlock_body
   local cookie mcp_cookie_code mcp_none_code mcp_key_code throttle_raw throttle_headers throttle_body
   local i refuse_code
@@ -110,16 +110,23 @@ verify_http_drive() {
   recents_body="$(curl -sS "http://127.0.0.1:8788/view/api/recents?limit=5" -H "Authorization: ApiKey ${view_key}")"
   tasks_body="$(curl -sS "http://127.0.0.1:8788/view/api/tasks?limit=5" -H "Authorization: ApiKey ${view_key}")"
   today_body="$(curl -sS http://127.0.0.1:8788/view/api/journals/today -H "Authorization: ApiKey ${view_key}")"
+  digest_body="$(curl -sS http://127.0.0.1:8788/view/api/digest -H "Authorization: ApiKey ${view_key}" -H "Cookie: ${cookie}")"
+  digest_again_body="$(curl -sS http://127.0.0.1:8788/view/api/digest -H "Authorization: ApiKey ${view_key}" -H "Cookie: ${cookie}")"
   printf '%s\n' "${session_body}" >"${home_dir}/session.json"
   printf '%s\n' "${recents_body}" >"${home_dir}/recents.json"
   printf '%s\n' "${tasks_body}" >"${home_dir}/tasks.json"
   printf '%s\n' "${today_body}" >"${home_dir}/today.json"
+  printf '%s\n' "${digest_body}" >"${home_dir}/digest.json"
+  printf '%s\n' "${digest_again_body}" >"${home_dir}/digest-again.json"
   verify_http_drive_json_ok "${session_body}" || verify_http_drive_fail "session body is not JSON"
   [[ "${session_body}" == *'"ok":true'* ]] || verify_http_drive_fail "session was not ok"
   verify_http_drive_home_empty "${recents_body}" "${tasks_body}" "${today_body}" \
     || verify_http_drive_fail "Home empty copy failed (first-day recents/tasks/today)"
+  verify_http_drive_json_ok "${digest_body}" || verify_http_drive_fail "digest body is not JSON"
+  [[ "${digest_body}" == *'"rows":[]'* ]] || verify_http_drive_fail "first-day digest rows are not empty"
+  [[ "${digest_again_body}" == *'"rows":[]'* ]] || verify_http_drive_fail "second digest fetch was not empty"
   printf '%s\n' "home-empty" >"${home_dir}/feature-id"
-  printf '%s\n' "HTTP Unlock accept + Home widgets on a first-day vault. Recents Nothing yet. Open tasks No open tasks. Today peek node null (Write today)." \
+  printf '%s\n' "HTTP Unlock accept + Home widgets on a first-day vault. Recents Nothing yet. Open tasks No open tasks. Since you last looked Nothing new. Today peek node null (Write today)." \
     >"${home_dir}/result.txt"
 
   mcp_session="$(curl -sS -o /tmp/foundation-verify-mcp-session.$$ -w "%{http_code}" \

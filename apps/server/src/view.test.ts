@@ -1002,6 +1002,7 @@ test("view window writes journal, any-node, activity, and trash", async () => {
   assert.match(view, /app\.post\(`\$\{VIEW_PATH\}\/api\/nodes\/:id\/restore`/);
   assert.match(view, /app\.get\(`\$\{VIEW_PATH\}\/api\/graph`/);
   assert.match(view, /app\.get\(`\$\{VIEW_PATH\}\/api\/recents`/);
+  assert.match(view, /app\.get\(`\$\{VIEW_PATH\}\/api\/digest`/);
 });
 
 test("both publishes share one ViewDoor", async () => {
