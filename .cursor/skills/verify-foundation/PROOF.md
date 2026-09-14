@@ -29,6 +29,18 @@ What that run drove:
 
 Evidence: `.cursor/skills/verify-foundation/evidence/20260911Tmaintain/` (gitignored).
 
+## Named proof `resources-prompts-21`
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=resources-prompts-21`). Doctor green. `tools/list` returned 15 tools. No new tool.
+
+MCP on `http://127.0.0.1:8787/mcp`:
+
+1. `resources/list` returned 10 `foundation://guidance` documents. `resources/read` of `foundation://guidance/nodes` returned the how-to-extend nodes essay (`data.url: null clears the href`).
+2. `prompts/list` included `chief`, `vault-keeper`, and `executive-assistant`. `prompts/get` `chief` returned the recipe text from `prompts/chief.md`.
+3. `bootstrap` returned `{ spine, types, relations, rules }` only. No required `how_to_extend` essay.
+4. GitHub `verify` gates on this machine: schema 226 pass; viewer tests pass; viewer build; `skills-layout`, `drift-read`, `foundation-init`, `mint-api-key`, `require-database-url` ok; `verify-http-drive` and `verify-mcp-drive` ok. Server tests on the throwaway `DATABASE_URL` passed except the known host-cluster FTS headline miss (`fiancée` not in the payload snippet). That miss is not this slice.
+5. Evidence stayed under `.cursor/skills/verify-foundation/evidence/resources-prompts-21/`. Keys were redacted. The throwaway vault was left running.
+
 ## Named proof `generated-mcp-docs-15`
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=generated-mcp-docs-15`). Doctor green. `tools/list` returned 15 tools. No new tool.

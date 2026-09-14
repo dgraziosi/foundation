@@ -112,27 +112,9 @@ test(
       assert.ok(bootSlugs.includes("place"));
       assert.ok(bootSlugs.includes("company"));
       assert.ok(bootSlugs.includes("spend"));
-      assert.match((boot.how_to_extend as { search: string }).search, /data_equals/);
-      assert.equal((boot.how_to_extend as { nodes: string }).nodes.includes("upsert"), true);
-      const nodesHow = (boot.how_to_extend as { nodes: string }).nodes;
-      assert.match(nodesHow, /url: null clears that identity/);
-      assert.match(nodesHow, /data\.url: null clears the href/);
-      assert.equal(nodesHow.includes("Url is not unique"), false);
-      assert.equal(nodesHow.includes("url: null clears; omit the key to leave url unchanged"), false);
-      assert.equal((boot.how_to_extend as { activity: string }).activity.includes("list_activity"), true);
-      assert.equal((boot.how_to_extend as { search: string }).search.includes("full-text"), true);
-      assert.match((boot.how_to_extend as { lookup: string }).lookup, /lookup resolves/);
-      assert.match((boot.how_to_extend as { links: string }).links, /edges\[\]/);
-      assert.match((boot.how_to_extend as { links: string }).links, /one transaction writes all edges or none/);
-      assert.match((boot.how_to_extend as { lookup: string }).lookup, /not a probability/);
-      assert.match((boot.how_to_extend as { lookup: string }).lookup, /working_set/);
-      assert.match((boot.how_to_extend as { working_set: string }).working_set, /actionable working set/);
-      assert.match((boot.how_to_extend as { search: string }).search, /call lookup/);
-      const howTo = boot.how_to_extend as { summary: string };
-      assert.equal(howTo.summary.includes("instance routine"), true);
-      assert.equal(howTo.summary.includes("docs/VAULT_HEALTH.md"), true);
-      assert.equal(howTo.summary.includes("Vault health"), true);
-      assert.equal(howTo.summary.includes("Do not add get_vault_health"), true);
+      assert.deepEqual(Object.keys(boot).sort(), ["relations", "rules", "spine", "types"]);
+      assert.equal("how_to_extend" in boot, false);
+      assert.equal((boot.rules as { identity: string }).identity, "uuid");
 
       const area = asObject(
         await client.callTool({

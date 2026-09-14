@@ -4,6 +4,7 @@ import type { Pool } from "@foundation/db";
 import type { Request, Response } from "express";
 import type { AgentPrincipal } from "./keyring.js";
 import type { JobLeasePolicy } from "@foundation/schema";
+import { registerGuidanceSurfaces } from "./mcp-surfaces.js";
 import { registerTools } from "./tools/register.js";
 
 export function createMcpServer(
@@ -14,9 +15,10 @@ export function createMcpServer(
 ): McpServer {
   const server = new McpServer(
     { name: "foundation", version: "0.1.0" },
-    { capabilities: { tools: {} } },
+    { capabilities: { tools: {}, resources: {}, prompts: {} } },
   );
   registerTools(server, pool, dataDir, agent, policy);
+  registerGuidanceSurfaces(server);
   return server;
 }
 

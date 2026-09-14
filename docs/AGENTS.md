@@ -2,7 +2,7 @@
 
 After `/health` is green, paste these three bots into your harness. They use the vault MCP and the tools already on the server.
 
-`GET http://127.0.0.1:8787/health` should return `{ "ok": true, "service": "foundation", "db": "up" }`. How to attach MCP (URL, API key, confirm with `bootstrap` or a simple `search`): [`HARNESS.md`](./HARNESS.md).
+`GET http://127.0.0.1:8787/health` should return `{ "ok": true, "service": "foundation", "db": "up" }`. How to attach MCP (URL, API key, confirm with lean `bootstrap` and/or read guidance resources / bot prompts): [`HARNESS.md`](./HARNESS.md).
 
 Each recipe uses the same locked headings: Job, Responsibilities, Standards, Routines, Skills, Tools, Handoffs. Skills are named recipe folders under [`.agents/skills/`](../.agents/skills/). Tools are connectors and runtimes. Paste the bots. Their routines cite skill folders; do not paste those folders as extra bots.
 

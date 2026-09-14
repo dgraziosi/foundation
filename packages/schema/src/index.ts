@@ -281,6 +281,21 @@ export {
   type JobToken,
 } from "./job-lease.js";
 export {
+  ADVERTISED_MCP_PROMPTS,
+  ADVERTISED_MCP_RESOURCES,
+  FOUNDATION_GUIDANCE_PREFIX,
+  FOUNDATION_GUIDANCE_SCHEME,
+  STARTER_MCP_PROMPT_NAMES,
+  advertisedMcpPrompt,
+  advertisedMcpPromptBody,
+  advertisedMcpPromptNames,
+  advertisedMcpResource,
+  advertisedMcpResourceUris,
+  type AdvertisedMcpPrompt,
+  type AdvertisedMcpPromptName,
+  type AdvertisedMcpResource,
+} from "./mcp-guidance.js";
+export {
   ADVERTISED_MCP_INPUT_SCHEMAS,
   ADVERTISED_MCP_TOOLS,
   ADVERTISED_MCP_TOOL_NAMES,

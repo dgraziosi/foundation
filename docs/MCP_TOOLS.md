@@ -7,7 +7,7 @@ Destructive tools need a key with destructive scope or they return `{ error, sug
 <!-- generated:mcp-tool-table -->
 | Tool | Purpose |
 | --- | --- |
-| `bootstrap` | Return starter ontology, how to extend it, and current type/relation inventory. Call first. |
+| `bootstrap` | Return starter spine, compact rules, and current type/relation inventory. Call first. How-to-extend lives on foundation://guidance resources. |
 | `search` | Find nodes by text query and/or filters (`type`, `status`, `under`, `since`, `url`, `repo`, `receipt`, `due`, `due_on_or_before`, `due_on_or_after`, `data_equals`). Query is optional when a filter is set. Hits are id/type/title/snippet plus `due` when set. |
 | `lookup` | Resolve one or more names to live nodes. One result per input (`exact` / `alias` / `candidate` / `ambiguous` / `no_match`). Read-only. |
 | `get` | Return the record: payload, data, incident edges with neighbor titles, and `suggested_links` from title FTS. Does not return activity. Blob payloads return metadata, not bytes. |
@@ -24,7 +24,7 @@ Destructive tools need a key with destructive scope or they return `{ error, sug
 | `job` | Claim a named instance routine, keep the claim alive, finish or release it, or read who holds it and last run. Not a graph write. |
 <!-- /generated:mcp-tool-table -->
 
-Handler contract: each tool has one zod input schema and one output schema; JSON Schema on the wire is derived; every advertised input field uses Zod `.describe()` so `tools/list` parameter docs are non-empty; invalid input never reaches the domain; domain errors are `{ error, suggestion? }`. The tool table and each **In:** / parameter list below are generated from that advertised inventory in `packages/schema`. Hand-maintained prose after those blocks stays the write rules and gotchas. Regenerate with `pnpm --filter @foundation/schema generate-mcp-docs`.
+Handler contract: each tool has one zod input schema and one output schema; JSON Schema on the wire is derived; every advertised input field uses Zod `.describe()` so `tools/list` parameter docs are non-empty; invalid input never reaches the domain; domain errors are `{ error, suggestion? }`. The tool table and each **In:** / parameter list below are generated from that advertised inventory in `packages/schema`. Hand-maintained prose after those blocks stays the write rules and gotchas. Regenerate with `pnpm --filter @foundation/schema generate-mcp-docs`. Product guidance is MCP resources (`foundation://guidance/…`). Starter bot recipes are MCP prompts. Those are not a sixteenth tool.
 
 ## Parameters
 
@@ -33,8 +33,8 @@ Handler contract: each tool has one zod input schema and one output schema; JSON
 <!-- generated:mcp-params:bootstrap -->
 - **In:** `none`
 <!-- /generated:mcp-params:bootstrap -->
-- **Out:** `{ spine, types, relations, rules, how_to_extend }`
-- `how_to_extend` includes `manage_type`, `manage_relation`, `nodes`, `links`, `activity`, `search`, `lookup`, and `working_set`. After `lookup` binds a UUID, `working_set` is the one call for open work around that node. Summary notes that vault health, graph hygiene, and applying git updates are instance routines, not tools ([`docs/VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`docs/GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md), [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/)). No `get_vault_health` tool.
+- **Out:** `{ spine, types, relations, rules }`
+- Lean registry. `bootstrap` returns the starter spine, live types, live relations, and compact rules. It does not return the how-to-extend essay. Read `foundation://guidance` resources for how to extend (`how-to-extend`, `manage-type`, `manage-relation`, `nodes`, `links`, `activity`, `search`, `lookup`, `working-set`). After `lookup` binds a UUID, `working_set` is the one call for open work around that node. Vault health, graph hygiene, and applying git updates are instance routines, not tools ([`docs/VAULT_HEALTH.md`](./VAULT_HEALTH.md), [`docs/GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md), [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/)). No `get_vault_health` tool. Starter bot recipes are MCP prompts (`chief`, `vault-keeper`, `executive-assistant`).
 
 ### `get`
 
