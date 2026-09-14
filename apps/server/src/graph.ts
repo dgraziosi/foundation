@@ -864,7 +864,7 @@ export async function upsertGraphNode(
   const strict = input.strict === true;
   const createdBlobAbs: string[] = [];
   const pendingUploadUnlinks: string[] = [];
-  let discardCreatedBlob = false;
+  const discardCreatedBlobAbs: string[] = [];
   const writer = writerFrom(ctx);
 
   async function applyResolvedPayload(resolved: ResolvedStoredPayload): Promise<void> {
@@ -883,6 +883,8 @@ export async function upsertGraphNode(
     const result = await withTransaction(pool, async (client) => {
       const items: UpsertOneOk[] = [];
       for (const [index, item] of nodes.entries()) {
+        const createdBefore = createdBlobAbs.length;
+        const pendingBefore = pendingUploadUnlinks.length;
         const one = await upsertOneInTx(client, item, {
           form,
           index,
@@ -892,10 +894,10 @@ export async function upsertGraphNode(
           dryRun,
           applyResolvedPayload,
           markDiscardCreatedBlob: () => {
-            discardCreatedBlob = true;
+            discardCreatedBlobAbs.push(...createdBlobAbs.slice(createdBefore));
           },
           clearPendingUpload: () => {
-            pendingUploadUnlinks.length = 0;
+            pendingUploadUnlinks.length = pendingBefore;
           },
         });
         if (isToolError(one)) {
@@ -906,12 +908,16 @@ export async function upsertGraphNode(
       return dryRun ? { items, dry_run: true as const } : { items };
     });
 
-    if (isToolError(result) || discardCreatedBlob || dryRun) {
+    if (isToolError(result) || dryRun) {
       for (const abs of createdBlobAbs) {
         await unlinkQuiet(abs);
       }
       if (isToolError(result)) {
         return result;
+      }
+    } else {
+      for (const abs of discardCreatedBlobAbs) {
+        await unlinkQuiet(abs);
       }
     }
     if (!dryRun) {
