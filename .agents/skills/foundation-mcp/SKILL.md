@@ -9,7 +9,7 @@ This skill picks the vault call. It is not a tool list.
 
 The user is the human who runs this vault on this machine. The vault MCP is on this machine (`http://127.0.0.1:8787`). Stay on localhost. Do not tell anyone to expose it.
 
-Look up the live schema at call time (`bootstrap`, `inspect_ontology`, or the server tool list). Input parameter docs on that list come from Zod `.describe()`. Do not trust a dump in this file.
+Look up the live schema at call time (`bootstrap`, `inspect_ontology`, or the server tool list). `bootstrap` is lean (spine, types, relations, rules). Read `foundation://guidance` resources for how to extend. Starter bot recipes are MCP prompts. Input parameter docs on that list come from Zod `.describe()`. Do not trust a dump in this file.
 
 <!-- generated:mcp-skill-inventory -->
 Advertised tools (15): `bootstrap`, `search`, `lookup`, `get`, `working_set`, `upsert`, `delete`, `link`, `unlink`, `inspect_ontology`, `manage_type`, `manage_relation`, `list_activity`, `undo`, `job`.
@@ -18,7 +18,7 @@ Generated from the advertised inventory in `@foundation/schema`. Look up the liv
 
 ## Which call
 
-- `bootstrap` — first attach / what tools and spine exist
+- `bootstrap` — first attach / lean spine + live type and relation registry + compact rules. Read `foundation://guidance` for how to extend.
 - `lookup` — a name, not a UUID yet
 - `get` — already have a UUID, need the record (not activity)
 - `list_activity` — already have a UUID, need the diary for that record (`target`). After a full page, send `cursor`. Read `count`. Omit `fields` and `diff_only` for the full snapshot. `fields` asks for a subset of activity keys. `diff_only: true` returns a lean before/after. Undo still uses the stored snapshot.

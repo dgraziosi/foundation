@@ -521,14 +521,14 @@ fi
 if grep -Fq -- '--radius-sheet' "${repo_root}/apps/viewer/src/styles.css"; then
   fail "styles.css still has unused --radius-sheet"
 fi
-if ! grep -Fq -- 'data.url: null clears the href' "${repo_root}/apps/server/src/tools/bootstrap.ts"; then
-  fail "bootstrap how_to_extend.nodes does not clear href with data.url: null"
+if ! grep -Fq -- 'data.url: null clears the href' "${repo_root}/packages/schema/src/mcp-guidance.ts"; then
+  fail "guidance nodes resource does not clear href with data.url: null"
 fi
-if grep -Fq -- 'Url is not unique' "${repo_root}/apps/server/src/tools/bootstrap.ts"; then
-  fail "bootstrap how_to_extend.nodes still says Url is not unique"
+if grep -Fq -- 'Url is not unique' "${repo_root}/packages/schema/src/mcp-guidance.ts"; then
+  fail "guidance nodes resource still says Url is not unique"
 fi
-if grep -Fq -- 'url: null clears; omit the key to leave url unchanged' "${repo_root}/apps/server/src/tools/bootstrap.ts"; then
-  fail "bootstrap how_to_extend.nodes still says url: null clears data.url"
+if grep -Fq -- 'url: null clears; omit the key to leave url unchanged' "${repo_root}/packages/schema/src/mcp-guidance.ts"; then
+  fail "guidance nodes resource still says url: null clears data.url"
 fi
 
 foundation_mcp="${skills_root}/foundation-mcp/SKILL.md"
