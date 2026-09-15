@@ -609,6 +609,10 @@ done
 [[ "${map_blob}" != *"creates today's New York calendar journal"* ]] || fail "journal map must not freeze Today to New York"
 grep -Fq 'Prove `collection-filtered` on **List**, not Board.' "${map_root}/features/collection.md" \
   || fail "collection map must say prove filtered copy on List, not Board."
+grep -Fq 'A journal with inline markdown opens the write page (`[data-surface="journal-page"]`)' "${map_root}/features/collection.md" \
+  || fail "collection map must say a journal row opens the write page, not detail-page."
+grep -Fq 'The unlock cookie authenticates; the watermark is set on the digest GET.' "${map_root}/features/home.md" \
+  || fail "home map must not treat the unlock cookie as the digest watermark."
 grep -Fq '/usr/lib/postgresql/16/bin' "${helper}" || fail "helper must know the Docker/CI Postgres 16 bin path"
 grep -Fq 'verify_use_host_postgres16' "${helper}" || fail "helper must put host Postgres 16 bins on PATH when present"
 unlock_map="${map_root}/features/unlock.md"

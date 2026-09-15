@@ -9,7 +9,7 @@ Collection is one type's records in the layouts that type declared. The user ope
 - `collection-filtered` shows **Nothing matches your filters.** when records exist but the active view filter hides them.
 - `collection-views` lists only the view names that type declared (`aria-label="View"`).
 - `collection-show-completed` toggles **Show completed** for this window only. It does not write. It does not change Home, Recents, or Search.
-- `collection-open-record` opens a row, card, cell, board card, calendar item, outline row, or graph node as a detail page.
+- `collection-open-record` opens a row, card, cell, board card, calendar item, outline row, or graph node on `/view/nodes/<uuid>`. A journal with inline markdown opens the write page (`[data-surface="journal-page"]`). Any other live record opens `[data-surface="detail-page"]`.
 - `collection-no-views` shows **No views declared for this type.** when `views` is empty.
 
 ## How to get to it (user POV)
@@ -38,7 +38,7 @@ Preconditions:
 
 - The window does not add a ninth layout. Declared set: list, card, table, board, calendar, timeline, outline, graph.
 - Count in the heading is after the active view's filter, not always the live type count on Home folders.
-- `journal` as a collection is a list of journal records. **Today** on that heading leaves the list for [Journal write](./journal-write.md). Do not treat the list as the write page.
+- `journal` as a collection is a list of journal records. **Today** on that heading leaves the list for [Journal write](./journal-write.md). Choosing a journal row also opens that write page, not `[data-surface="detail-page"]`. Do not treat the list as the write page.
 - Do not treat MCP `search { type }` as a collection proof. Drive `/view/types/<slug>` or `GET /view/api/types/<slug>`.
-- Default task **board** columns hardcode **Nothing yet.** even when the page-level empty string is **Nothing matches your filters.** Prove `collection-filtered` on **List**, not Board.
+- Default task **board** columns hardcode **Nothing yet.** even when the page-level empty string is **Nothing matches your filters.** Prove `collection-filtered` on **List**, not Board. Graph ignores the active view filter and also hardcodes **Nothing yet.** Do not prove `collection-filtered` on Graph.
 - **May hang under** is ontology chrome from `parent_types`. First-day `task` shows it with an empty list. It is not a load error and not a live record.
