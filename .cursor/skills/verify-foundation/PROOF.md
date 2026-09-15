@@ -15,6 +15,35 @@ Evidence stays under `.cursor/skills/verify-foundation/evidence/export-import-45
 
 GitHub `verify` gates on this machine: schema tests pass including `generate-mcp-docs --check`; viewer tests + build pass; `skills-layout`, `drift-read`, `foundation-portability`, `foundation-init`, `mint-api-key`, `require-database-url` ok; `verify-http-drive`, `verify-mcp-drive`, and `verify-export-import-45.sh` ok on throwaway `VERIFY_RUN_ID=export-import-45`. `tools/list` count 16 including `merge`. Full `@foundation/server` suite had the known host-cluster FTS headline miss (`fiancée` not in the payload snippet). That miss is not this slice.
 
+## Maintain run (20260915Tmaintain)
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20260915Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20260915Tmaintain`.
+
+Map corrections this run (source + live HTTP on a throwaway vault):
+
+- Collection `collection-open-record` opens `/view/nodes/<uuid>`. A journal with inline markdown is the write page (`[data-surface="journal-page"]`), not `[data-surface="detail-page"]`. Choosing a journal row leaves the list the same way **Today** does.
+- Graph ignores the active view filter and hardcodes **Nothing yet.** Do not prove `collection-filtered` on Graph.
+- Home digest HTTP: keep a cookie jar so the last-looked watermark persists. The unlock cookie authenticates; the watermark is set on the digest GET.
+
+What that run drove:
+
+- `verify-foundation.test.sh` exited 0.
+- `pnpm --filter @foundation/viewer test` passed 78 tests.
+- Viewer build succeeded. Doctor: health `{ ok: true, service: foundation, db: up }`, Viewer GET 200, toolchain ok.
+- `verify-http-drive.sh` exited 0 (Unlock reject/accept, MCP key does not unlock, cookie does not open MCP, sixth wrong unlock 429, Home empty peek).
+- `verify-mcp-drive.sh` exited 0 (`POST /mcp` `tools/list`).
+- HTTP Collection: `GET /view/api/types/task` `type.label` Task, views board/list/calendar/timeline/outline, `parent_types` `["goal","project"]`, `nodes` `[]`. First-day `GET /view/api/types/journal` `parent_types` `[]`, `nodes` `[]`. After Today, journal collection listed that live id.
+- HTTP Detail: `GET /view/api/nodes/00000000-0000-4000-8000-000000000000` 404 `{"error":"Not found"}`.
+- HTTP Search: idle `{ searched: false, hits: [] }`; `q=zzzxnever` and `type=note` `{ searched: true, hits: [] }`. After journal write, `q=Morning` `{ searched: true }`.
+- HTTP Journal write: `POST /view/api/journals/today` created type `journal`, `text/markdown`, empty body. Second POST same id. `PATCH` title/body 200. Stale `base_updated_at` 409. GET that id is inline markdown (window renders journal-page).
+- HTTP Edit any node / Activity / Trash: Viewer `PATCH` on a live person (MCP upsert only to have a record) saved title/status/`org`, stale 409, empty title 400, `body` 403. Activity listed `actor` `user` / `actor_label` `Viewer`. Undo clash 409; undo restored the prior snapshot. `DELETE` 404 on GET; trash listed it; restore returned it live.
+- `verify-export-import-45.sh` exited 0 on this throwaway.
+- Browser chrome was not clicked. Same-path HTTP was the drive.
+
+GitHub `verify` gates on this machine: schema tests pass; viewer tests + build pass; `skills-layout`, `drift-read`, `foundation-portability`, `foundation-init`, `mint-api-key`, `require-database-url` ok; `verify-http-drive`, `verify-mcp-drive`, and `verify-export-import-45.sh` ok. Full `@foundation/server` suite on the throwaway `DATABASE_URL` had the known host-cluster FTS headline miss (`fiancée` not in the payload snippet). That miss is not this slice.
+
+Evidence: `.cursor/skills/verify-foundation/evidence/20260915Tmaintain/` (gitignored).
+
 ## Named proof `home-digest-33`
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=home-digest-33`). Doctor green after Viewer build. Viewer at `http://127.0.0.1:8788/view`. MCP at `http://127.0.0.1:8787/mcp`. `tools/list` returned 16 tools including `merge`. No new tool.
