@@ -24,7 +24,7 @@ Preconditions:
 - **HTTP delete.** `DELETE /view/api/nodes/<id>` `{ base_updated_at }`. Status `200`. GET that id is `404`. Recents no longer lists it.
 - **HTTP trash.** `GET /view/api/trash`. The row is present.
 - **HTTP restore.** `POST /view/api/nodes/<id>/restore` `{ base_updated_at }` from the trash row's `updated_at`. Status `200`. The record is live again.
-- **Window.** `[data-surface="trash-page"]`. Empty copy **Nothing in trash.**
+- **Window.** `[data-surface="trash-page"]`. Empty copy **Nothing in trash.** A row offers **Restore**.
 
 ## Gotchas
 

@@ -107,6 +107,7 @@ Stable handles (prefer these over coordinates):
 | button `Unlock` | Submit unlock |
 | `[data-surface="home"]` | Home |
 | `[data-surface="home-today"]` | Home Today. Empty: **Write today**. |
+| `[data-surface="home-digest"]` | Home Since you last looked. Empty: **Nothing new.** |
 | rail text `Home` / `Search` | Left rail. Collapsed Search uses `aria-label="Search"` |
 | `[data-surface="search-overlay"]` | Search overlay. Heading `Search`, search field placeholder `Search the graph`, button `Close` |
 | `[data-surface="view-strip"]` | Content-host strip. Pinned `Home` plus open collection/detail tabs |
@@ -152,7 +153,7 @@ curl -sS -D - http://127.0.0.1:8788/view/unlock \
 
 # session / Home widgets / collection / detail / search
 curl -sS http://127.0.0.1:8788/view/api/session -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
-# digest watermark is the Path=/view cookie; keep a jar across loads
+# digest watermark is foundation_home_looked (Path=/view); keep a jar across loads
 curl -sS "http://127.0.0.1:8788/view/api/digest" -H "Authorization: ApiKey $(cat "${KEY_FILE}")" -b /tmp/foundation-verify-view.cookies -c /tmp/foundation-verify-view.cookies
 curl -sS "http://127.0.0.1:8788/view/api/recents?limit=5" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
 curl -sS "http://127.0.0.1:8788/view/api/tasks?limit=5" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
