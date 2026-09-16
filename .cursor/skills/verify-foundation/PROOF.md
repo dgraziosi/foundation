@@ -39,7 +39,7 @@ What that run drove:
 - HTTP Edit any node / Activity / Trash: Viewer `PATCH` on a live person (MCP upsert only to have a record) saved title/status/`org`, stale 409. Activity listed `actor` `user` / `actor_label` `Viewer`. Undo restored the prior snapshot. `DELETE` 404 on GET; trash listed it; restore returned it live.
 - Live digest GET set cookie `foundation_home_looked` `Path=/view`. Built dist contains `home-digest` and **Restore**.
 - `verify-export-import-45.sh` exited 0 on this throwaway.
-- `verify-home-digest.sh` is re-driven on a fresh first-day launch after this cleanup fix.
+- After the cleanup PATH fix: `verify-home-digest.sh` exited 0 on a fresh first-day launch (`VERIFY_RUN_ID=20260916Tdigest`). Cleanup then left `5432` free. A second launch (`VERIFY_RUN_ID=20260916Trelaunch`) started and cleaned up with no leftover Postgres.
 - Browser chrome was not clicked. Same-path HTTP was the drive.
 
 Evidence: `.cursor/skills/verify-foundation/evidence/20260916Tmaintain/` (gitignored).
