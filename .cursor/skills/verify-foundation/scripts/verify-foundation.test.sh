@@ -195,6 +195,38 @@ fi
 rm -rf -- "/tmp/foundation-verify-${run_id}" "${evidence_dir}"
 rm -f -- "${last_file}"
 
+# Cleanup puts host Postgres 16 bins on PATH so keep-vault-up stop can run pg_ctl.
+run_id="cleanuppg16$$"
+last_file="/tmp/foundation-verify-last-run-test-$$"
+data_dir="/tmp/foundation-verify-${run_id}/data"
+state_file="/tmp/foundation-verify-${run_id}/state"
+evidence_dir="/tmp/foundation-verify-evidence-${run_id}"
+seen="/tmp/foundation-verify-cleanup-pgctl-$$"
+mkdir -p -- "${data_dir}" "${evidence_dir}"
+cat >"${state_file}" <<EOF
+RUN_ID=${run_id}
+DATA_DIR=${data_dir}
+STARTED=1
+APP_PID=1
+EOF
+printf '%s\n' "${run_id}" >"${last_file}"
+printf '%s\n' '#!/bin/sh' \
+  "if [ \"\${1:-}\" = stop ]; then command -v pg_ctl >'${seen}'; fi" \
+  'exit 0' >"${real_keep}"
+chmod +x "${real_keep}"
+cleanup_pg16_out="$(
+  PATH="/usr/bin:/bin" VERIFY_POSTGRES16_BIN="${real_bin}" \
+    env -u VERIFY_RUN_ID VERIFY_LAST_RUN_FILE="${last_file}" VERIFY_RUN_ID="${run_id}" \
+    VERIFY_DATA_DIR="${data_dir}" VERIFY_STATE_FILE="${state_file}" \
+    VERIFY_EVIDENCE_DIR="${evidence_dir}" VERIFY_KEEP_VAULT_UP="${real_keep}" \
+    "${helper}" cleanup 2>&1
+)" || fail "cleanup with host Postgres 16 bins should exit 0, got: ${cleanup_pg16_out}"
+[[ -f "${seen}" ]] || fail "cleanup should call keep-vault-up stop, got: ${cleanup_pg16_out}"
+[[ "$(tr -d '[:space:]' <"${seen}")" == "${real_bin}/pg_ctl" ]] \
+  || fail "cleanup stop should see host pg_ctl, got '$(cat -- "${seen}")'"
+rm -rf -- "/tmp/foundation-verify-${run_id}" "${evidence_dir}"
+rm -f -- "${last_file}" "${seen}"
+
 # 2. Real launch loads the run key file into this process (no $(…) drop).
 run_id="keyexport$$"
 last_file="/tmp/foundation-verify-last-run-test-$$"
@@ -613,6 +645,12 @@ grep -Fq 'A journal with inline markdown opens the write page (`[data-surface="j
   || fail "collection map must say a journal row opens the write page, not detail-page."
 grep -Fq 'The unlock cookie authenticates; the watermark is set on the digest GET.' "${map_root}/features/home.md" \
   || fail "home map must not treat the unlock cookie as the digest watermark."
+grep -Fq 'foundation_home_looked' "${map_root}/features/home.md" \
+  || fail "home map must name the digest watermark cookie foundation_home_looked."
+grep -Fq '[data-surface="home-digest"]' "${map_root}/features/home.md" \
+  || fail "home map must cite [data-surface=\"home-digest\"]."
+grep -Fq 'A row offers **Restore**.' "${map_root}/features/trash.md" \
+  || fail "trash map must name the Restore control."
 grep -Fq '/usr/lib/postgresql/16/bin' "${helper}" || fail "helper must know the Docker/CI Postgres 16 bin path"
 grep -Fq 'verify_use_host_postgres16' "${helper}" || fail "helper must put host Postgres 16 bins on PATH when present"
 unlock_map="${map_root}/features/unlock.md"

@@ -23,6 +23,7 @@ Map corrections this run (source + live HTTP on a throwaway vault):
 
 - Home digest handle is `[data-surface="home-digest"]`. The watermark cookie is `foundation_home_looked` (`Path=/view`). A Since you last looked row opens that live id the same way Recents and Open tasks do.
 - Trash window rows offer **Restore**.
+- Cleanup puts host Postgres 16 bins on PATH before `keep-vault-up.sh stop`, so `pg_ctl` can stop the cluster. Without that, cleanup removed the run root and left Postgres on `5432`.
 
 What that run drove:
 
@@ -38,7 +39,7 @@ What that run drove:
 - HTTP Edit any node / Activity / Trash: Viewer `PATCH` on a live person (MCP upsert only to have a record) saved title/status/`org`, stale 409. Activity listed `actor` `user` / `actor_label` `Viewer`. Undo restored the prior snapshot. `DELETE` 404 on GET; trash listed it; restore returned it live.
 - Live digest GET set cookie `foundation_home_looked` `Path=/view`. Built dist contains `home-digest` and **Restore**.
 - `verify-export-import-45.sh` exited 0 on this throwaway.
-- `verify-home-digest.sh` needs a clean first-day vault; it is re-driven after cleanup on a fresh launch.
+- `verify-home-digest.sh` is re-driven on a fresh first-day launch after this cleanup fix.
 - Browser chrome was not clicked. Same-path HTTP was the drive.
 
 Evidence: `.cursor/skills/verify-foundation/evidence/20260916Tmaintain/` (gitignored).
