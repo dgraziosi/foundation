@@ -15,6 +15,35 @@ Evidence stays under `.cursor/skills/verify-foundation/evidence/export-import-45
 
 GitHub `verify` gates on this machine: schema tests pass including `generate-mcp-docs --check`; viewer tests + build pass; `skills-layout`, `drift-read`, `foundation-portability`, `foundation-init`, `mint-api-key`, `require-database-url` ok; `verify-http-drive`, `verify-mcp-drive`, and `verify-export-import-45.sh` ok on throwaway `VERIFY_RUN_ID=export-import-45`. `tools/list` count 16 including `merge`. Full `@foundation/server` suite had the known host-cluster FTS headline miss (`fiancée` not in the payload snippet). That miss is not this slice.
 
+## Maintain run (20260916Tmaintain)
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20260916Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20260916Tmaintain`.
+
+Map corrections this run (source + live HTTP on a throwaway vault):
+
+- Home digest handle is `[data-surface="home-digest"]`. The watermark cookie is `foundation_home_looked` (`Path=/view`). A Since you last looked row opens that live id the same way Recents and Open tasks do.
+- Trash window rows offer **Restore**.
+- Cleanup puts host Postgres 16 bins on PATH before `keep-vault-up.sh stop`, so `pg_ctl` can stop the cluster. Without that, cleanup removed the run root and left Postgres on `5432`.
+
+What that run drove:
+
+- `verify-foundation.test.sh` exited 0.
+- `pnpm --filter @foundation/viewer test` passed 78 tests.
+- Viewer build succeeded. Doctor: health `{ ok: true, service: foundation, db: up }`, Viewer GET 200, toolchain ok.
+- `verify-http-drive.sh` exited 0 (Unlock reject/accept, MCP key does not unlock, cookie does not open MCP, sixth wrong unlock 429, Home empty peek, first-day digest `rows` `[]`).
+- `verify-mcp-drive.sh` exited 0 (`POST /mcp` `tools/list`, 16 tools including `merge`).
+- HTTP Collection: `GET /view/api/types/task` `type.label` Task, views board/list/calendar/timeline/outline, `parent_types` `["goal","project"]`, `nodes` `[]`. First-day `GET /view/api/types/journal` `parent_types` `[]`, `nodes` `[]`. After Today, journal collection listed that live id.
+- HTTP Detail: `GET /view/api/nodes/00000000-0000-4000-8000-000000000000` 404 `{"error":"Not found"}`.
+- HTTP Search: idle `{ searched: false, hits: [] }`; `q=zzzxnever` and `type=note` `{ searched: true, hits: [] }`. After journal write, `q=Morning` `{ searched: true }`.
+- HTTP Journal write: `POST /view/api/journals/today` created type `journal`, `text/markdown`, empty body, title `September 16, 2026`. Second POST same id. `PATCH` title/body 200. Stale `base_updated_at` 409. GET that id is inline markdown (window renders journal-page).
+- HTTP Edit any node / Activity / Trash: Viewer `PATCH` on a live person (MCP upsert only to have a record) saved title/status/`org`, stale 409. Activity listed `actor` `user` / `actor_label` `Viewer`. Undo restored the prior snapshot. `DELETE` 404 on GET; trash listed it; restore returned it live.
+- Live digest GET set cookie `foundation_home_looked` `Path=/view`. Built dist contains `home-digest` and **Restore**.
+- `verify-export-import-45.sh` exited 0 on this throwaway.
+- After the cleanup PATH fix: `verify-home-digest.sh` exited 0 on a fresh first-day launch (`VERIFY_RUN_ID=20260916Tdigest`). Cleanup then left `5432` free. A second launch (`VERIFY_RUN_ID=20260916Trelaunch`) started and cleaned up with no leftover Postgres.
+- Browser chrome was not clicked. Same-path HTTP was the drive.
+
+Evidence: `.cursor/skills/verify-foundation/evidence/20260916Tmaintain/` (gitignored).
+
 ## Maintain run (20260915Tmaintain)
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20260915Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20260915Tmaintain`.

@@ -107,6 +107,7 @@ Stable handles (prefer these over coordinates):
 | button `Unlock` | Submit unlock |
 | `[data-surface="home"]` | Home |
 | `[data-surface="home-today"]` | Home Today. Empty: **Write today**. |
+| `[data-surface="home-digest"]` | Home Since you last looked. Empty: **Nothing new.** |
 | rail text `Home` / `Search` | Left rail. Collapsed Search uses `aria-label="Search"` |
 | `[data-surface="search-overlay"]` | Search overlay. Heading `Search`, search field placeholder `Search the graph`, button `Close` |
 | `[data-surface="view-strip"]` | Content-host strip. Pinned `Home` plus open collection/detail tabs |
@@ -152,7 +153,7 @@ curl -sS -D - http://127.0.0.1:8788/view/unlock \
 
 # session / Home widgets / collection / detail / search
 curl -sS http://127.0.0.1:8788/view/api/session -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
-# digest watermark is the Path=/view cookie; keep a jar across loads
+# digest watermark is foundation_home_looked (Path=/view); keep a jar across loads
 curl -sS "http://127.0.0.1:8788/view/api/digest" -H "Authorization: ApiKey $(cat "${KEY_FILE}")" -b /tmp/foundation-verify-view.cookies -c /tmp/foundation-verify-view.cookies
 curl -sS "http://127.0.0.1:8788/view/api/recents?limit=5" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
 curl -sS "http://127.0.0.1:8788/view/api/tasks?limit=5" -H "Authorization: ApiKey $(cat "${KEY_FILE}")"
@@ -238,7 +239,7 @@ Proof standards:
 .cursor/skills/verify-foundation/scripts/verify-foundation.sh cleanup
 ```
 
-Stops only what **this run** started: the `APP_PID` from the helper state file (including a failed start that recorded `STARTED=0`), then `scripts/keep-vault-up.sh stop` with that `FOUNDATION_DATA`. Never `pkill` by process name. Does not delete `./data` on the clone. Does not delete evidence.
+Stops only what **this run** started: the `APP_PID` from the helper state file (including a failed start that recorded `STARTED=0`), then `scripts/keep-vault-up.sh stop` with that `FOUNDATION_DATA`. Puts host Postgres 16 bins on PATH the same way launch does, so stop can run `pg_ctl`. Never `pkill` by process name. Does not delete `./data` on the clone. Does not delete evidence.
 
 Cleanup may `rm -rf` only `/tmp/foundation-verify-<run-id>` when the recorded data dir is that folder or its `data/` child. A `VERIFY_DATA_DIR` that is a direct child of `/tmp` is that run root. Its parent is `/tmp` and is never removed. Any other data dir is left in place after stop.
 
@@ -264,7 +265,7 @@ Executable helper (from the clone root):
 | --- | --- |
 | `doctor` | Read-only health, window GET, toolchain, optional state-file check. Loads this run's key file when env is unset |
 | `launch` | Mint a run id (unless `VERIFY_RUN_ID` is set). Disposable first-day folder + `keep-vault-up.sh`. After keep succeeds: state with `APP_PID` and `STARTED=1`, last-run id, API key file, view key file, disposable backup root. A failed start that launched host programs records `STARTED=0` plus the app pid and last-run id, then stops those programs |
-| `cleanup` | Stop the recorded `APP_PID` (including a failed start), then `keep-vault-up.sh stop`; remove only a safe run root; keep evidence |
+| `cleanup` | Stop the recorded `APP_PID` (including a failed start), put host Postgres 16 bins on PATH, then `keep-vault-up.sh stop`; remove only a safe run root; keep evidence |
 | `evidence-dir` | Print the evidence path for the resolved run id |
 | `run-id` | Print the resolved run id |
 | `key-file` | Print the API key file path. Not the key |

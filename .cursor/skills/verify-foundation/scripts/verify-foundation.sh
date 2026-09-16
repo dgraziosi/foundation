@@ -587,6 +587,8 @@ verify_fail_after_keep() {
 
 verify_cmd_cleanup() {
   local repo_root id data_dir state keep evidence disposable app_pid
+  # Same PATH prepend as launch: keep-vault-up stop needs pg_ctl.
+  verify_use_host_postgres16
   repo_root="$(verify_repo_root)"
   id="$(verify_resolve_run_id)"
   state="$(verify_state_file "${id}")"
