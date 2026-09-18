@@ -28,10 +28,10 @@ Preconditions:
 
 - **Open tasks.** From Home, choose Open tasks **View all**, or go to `/view/types/task`. Heading includes **Task**. `[data-surface="view-strip"]` has a Task tab. First-day `task` also shows **May hang under** Goal, Project (`data-constraint="parent_types"`). Types with empty `parent_types` (seed `journal`) omit that line.
 - **Empty.** On a type with no live records, copy is **Nothing yet.**
-- **View switcher.** `aria-label="View"` lists only declared ids (task seed: Board, List, Calendar, Timeline, Outline). Choosing **List** keeps the same type and changes the layout, not the route.
+- **View switcher.** `aria-label="View"` lists only declared layouts by label (task seed: Board, List, Calendar, Timeline, Outline — no Graph). Choosing **List** keeps the same type and changes the layout, not the route.
 - **Show completed.** `aria-label="Show completed"` is a toggle. It widens an active status filter for this window. Home Open tasks must not change.
-- **Graph.** If the type names `graph`, that layout uses `[data-surface="graph"]` (floor 460px). Click a node: detail page. Right-click a node: local graph, depth 1–4, default 2.
-- **HTTP.** `GET /view/api/types/task` with the vault key (view-key-file when present). Body has `type.label`, `type.views`, `type.parent_types`, `nodes`. First-day: `nodes` is `[]`. Seed `task` `parent_types` is `["goal","project"]` (labels Goal, Project). Seed `journal` `parent_types` is `[]`.
+- **Graph.** First-day seed `task` and `journal` do not declare `graph`. If a type names `graph`, that layout uses `[data-surface="graph"]` (floor 460px). Click a node: detail page. Right-click a node: local graph, depth 1–4, default 2.
+- **HTTP.** `GET /view/api/types/task` with the vault key (view-key-file when present). Body has `type.label`, `type.views` (declaration objects with `id`, not a bare id array), `type.parent_types`, `nodes`. First-day: `nodes` is `[]`. Seed `task` views are `board`, `list`, `calendar`, `timeline`, `outline`. Seed `task` `parent_types` is `["goal","project"]` (labels Goal, Project). Seed `journal` `parent_types` is `[]`.
 - **Proof.** Screenshot the collection heading and empty copy, or save the type JSON. Feature id `collection-empty` or `collection-open`.
 
 ## Gotchas

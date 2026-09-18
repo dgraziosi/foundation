@@ -23,8 +23,10 @@ Preconditions:
 - A live non-journal node exists (seed or MCP `upsert` with the throwaway API key). Do not use MCP `upsert` to stand in for the Viewer save.
 
 - **HTTP edit.** `PATCH /view/api/nodes/<id>` `{ title, status, data, base_updated_at }`. Status `200`. Reload GET shows the new values.
-- **HTTP clash.** Repeat the same stale `base_updated_at`. Status `409`. GET still shows the saved values.
-- **Window.** Title field `aria-label="Title"`. Status `aria-label="Status"`. Empty title shows **Keep a title** and does not PATCH. Save copy **Saving** / **Saved** / **Couldn't save**. Clash offers **Reload**.
+- **HTTP clash.** Repeat the same stale `base_updated_at`. Status `409`. Body `{"error":"base_updated_at does not match current updated_at"}`. GET still shows the saved values.
+- **HTTP empty title.** `PATCH` `{ "title":"   ", "base_updated_at":"<current>" }`. Status `400`. GET still shows the prior title. Window copy **Keep a title** is not on the wire.
+- **HTTP journal-body gate.** `PATCH` `{ "title":"Hijack", "body":"no", "base_updated_at":"<current>" }` on that non-journal. Status `403`. Body `{"error":"Journal writes only."}`. GET title unchanged.
+- **Window.** Title field `aria-label="Title"`. Status `aria-label="Status"`. Declared scalars use the field **display** label (person `org` → **Org**). Empty title shows **Keep a title** and does not PATCH. Save copy **Saving** / **Saved** / **Couldn't save**. Clash offers **Reload** (keeps the draft and retries with a fresh `updated_at`; it does not put server fields back into the inputs).
 
 ## Gotchas
 
