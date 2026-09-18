@@ -27,7 +27,7 @@ Preconditions:
 - Session is unlocked (see [Unlock](./unlock.md)).
 - A first-day empty vault is enough for `home-empty` and `home-today`. Do not seed a fake life.
 
-- **Land.** After Unlock, `[data-surface="home"]` is in the page. **Today** is visible. Headings **Since you last looked**, **Recents**, and **Open tasks** are visible. Rail has **Home** and **Search**.
+- **Land.** After Unlock, `[data-surface="home"]` is in the page. **Today** is visible. Headings **Since you last looked**, **Recents**, and **Open tasks** are visible. Rail has **Home**, **Search**, and **Trash**.
 - **Digest empty.** First-day: Since you last looked shows **Nothing new.** `GET /view/api/digest` returns `rows` `[]` and sets `foundation_home_looked` (`Path=/view`). A second GET with that cookie stays empty until a bot writes.
 - **Today at count 0.** First-day: Today shows **Write today** and the calendar day. Choose Today. Path `/view/journal/today`. `[data-surface="journal-page"]`.
 - **Empty Recents.** When there are no non-task live records, Recents shows **Nothing yet.**
@@ -44,6 +44,6 @@ Preconditions:
 - Recents excludes tasks (open and completed). Open tasks is not Recents.
 - Open tasks reads the `task` type's `default_view` filter (seed: `status = active`). Completed tasks on that widget while the type still declares that filter is a bug.
 - Show completed lives on collection, not Home.
-- Theme Light / Dark / System is rail chrome. It is not a Home feature.
+- Theme Light / Dark / System is rail chrome. It is not a Home feature. **Trash** is also rail chrome; prove it under [Trash](./trash.md).
 - An ontology with zero live records hides the Types section. That is not a load error. Today still shows.
 - Today is on Home at journal count 0. Journal write also starts from the journal collection **Today** or `/view/journal/today`.

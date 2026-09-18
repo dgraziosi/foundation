@@ -5,7 +5,7 @@ Detail is one non-journal record as a page in the content host. It is not a dock
 ## Sub-features
 
 - `detail-open` fills the main pane at `/view/nodes/<uuid>` with `[data-surface="detail-page"]` and the record title as an editable field (non-journal, or a journal that is not inline markdown).
-- `detail-missing` shows **Not found.** for a bad or unknown id.
+- `detail-missing` shows **Not found.** for a bad or unknown id. A valid unknown UUID also paints heading `Not found` (no period) and never mounts `[data-surface="detail-page"]`.
 - `detail-properties` shows type, editable status, editable declared fields, related records, location, timestamps, Activity, and Move to trash. When the type has `parent_types`, the same **May hang under** line as collection appears (`data-constraint="parent_types"`). **Open** appears only when `data.url` is a well-formed https address.
 - `detail-structure` shows Structure when there are children, or an ancestor chain the type asks for.
 - `detail-close` closes the detail tab and activates the tab to its left, or Home when that was the last one.
@@ -24,7 +24,7 @@ Preconditions:
 
 - **Missing.** Open `/view/nodes/00000000-0000-4000-8000-000000000000`. Copy **Not found.**
 - **HTTP missing.** `GET /view/api/nodes/00000000-0000-4000-8000-000000000000` with the vault key (view-key-file when present). Status `404`. Body `{"error":"Not found"}`.
-- **Open from Home or collection.** When a real record exists on this vault, choose its title. Path `/view/nodes/<uuid>`. Heading is that title. `[data-surface="detail-page"]` is present. Properties column heading **Properties**.
+- **Open from Home or collection.** When a real record exists on this vault, choose its title. Path `/view/nodes/<uuid>`. Title field `aria-label="Title"` shows that title (not an `h1`). `[data-surface="detail-page"]` is present. Properties column heading **Properties**.
 - **Open from search.** From the search overlay, choose a hit. Same detail page. Overlay closes.
 - **Close.** Choose the strip button `aria-label="Close <title>"` after a click-open (the tab label is that title). A deep-link to `/view/nodes/:id` keeps the tab label `Detail`, so the control is `Close Detail`.
 - **HTTP get.** `GET /view/api/nodes/<uuid>` with the vault key (view-key-file when present). Body includes `node.title`, `node.type`, `node.status`, `node.data`. Writes use [Edit any node](./edit-any-node.md).
