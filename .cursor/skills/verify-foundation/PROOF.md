@@ -9,6 +9,7 @@ Map corrections this run (source + live HTTP on a throwaway vault):
 - Activity window on a tombstone is **Not found** because live GET is 404. HTTP `GET /view/api/nodes/:id/activity` still returns `200` and rows.
 - Search driving now names the status filter. First-day `GET /view/api/search?status=active` is `{ "searched": true, "hits": [] }`.
 - Skill handle `aria-label="Title"` is journal and detail, not journal only.
+- Detail How-to names Since you last looked and a collection timeline item. Both already `openDetail` in source.
 
 What that run drove:
 
