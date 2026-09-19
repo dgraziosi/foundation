@@ -26,5 +26,5 @@ Preconditions:
 
 ## Gotchas
 
-- Undo of a delete is Restore from Trash when the person starts from a soft-deleted row. `/view/nodes/:id/activity` on a tombstone shows **Not found** because live GET is 404.
+- Undo of a delete is Restore from Trash when the person starts from a soft-deleted row. `/view/nodes/:id/activity` on a tombstone shows **Not found** because live GET is 404. HTTP `GET /view/api/nodes/:id/activity` still returns `200` and `{ "rows": [...] }` for that same tombstone.
 - Missing or stale if-match is `409`, not a silent overwrite.

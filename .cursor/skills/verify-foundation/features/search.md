@@ -27,11 +27,12 @@ Preconditions:
 - **Idle.** With an empty query and Any / Any status, copy is **Search the graph, or filter by type.**
 - **Empty query.** Type a token that cannot match (`zzzxnever`) and submit the form (Enter). Copy **No matching nodes.**
 - **Type filter.** Choose a type in the first select (Any / type labels). The overlay searches even without a query. First-day note: `GET /view/api/search?type=note` returns `{ "searched": true, "hits": [] }`.
+- **Status filter.** Choose Active, Completed, or Archived in the second select (`Any status`). The overlay searches even without a query. First-day: `GET /view/api/search?status=active` returns `{ "searched": true, "hits": [] }`.
 - **Open hit.** When a hit exists, choose its title. Overlay closes. Path `/view/nodes/<uuid>`. A non-journal is `[data-surface="detail-page"]`. A journal with inline markdown is `[data-surface="journal-page"]`.
 - **Close.** Choose **Close**. Overlay is gone. The surface underneath is unchanged.
 - **HTTP idle.** `GET /view/api/search` with the vault key (view-key-file when present). `{ "searched": false, "hits": [] }`.
 - **HTTP miss.** `GET /view/api/search?q=zzzxnever` with the vault key (view-key-file when present). `{ "searched": true, "hits": [] }`.
-- **Proof.** Screenshot the overlay heading and idle or empty copy, or save the two JSON bodies. Feature id `search-idle` or `search-empty`.
+- **Proof.** Screenshot the overlay heading and idle or empty copy, or save the JSON bodies. Feature id `search-idle` or `search-empty`.
 
 ## Gotchas
 

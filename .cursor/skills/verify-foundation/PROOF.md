@@ -1,5 +1,33 @@
 # Proofs
 
+## Maintain run (20260919Tmaintain)
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20260919Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20260919Tmaintain`.
+
+Map corrections this run (source + live HTTP on a throwaway vault):
+
+- Activity window on a tombstone is **Not found** because live GET is 404. HTTP `GET /view/api/nodes/:id/activity` still returns `200` and rows.
+- Search driving now names the status filter. First-day `GET /view/api/search?status=active` is `{ "searched": true, "hits": [] }`.
+- Skill handle `aria-label="Title"` is journal and detail, not journal only.
+
+What that run drove:
+
+- `verify-foundation.test.sh` exited 0.
+- `pnpm --filter @foundation/viewer test` passed. Viewer build succeeded.
+- Doctor: health `{ ok: true, service: foundation, db: up }`, Viewer GET 200, toolchain ok.
+- `verify-http-drive.sh` exited 0 (Unlock reject, MCP key before accept, accept, cookie does not open MCP, sixth wrong unlock 429, Home empty peek, first-day digest `rows` `[]`).
+- `verify-mcp-drive.sh` exited 0 (`POST /mcp` `tools/list`).
+- HTTP Collection: `GET /view/api/types/task` `type.label` Task, view ids board/list/calendar/timeline/outline, `parent_types` `["goal","project"]`, `nodes` `[]`. First-day `GET /view/api/types/journal` `parent_types` `[]`, `nodes` `[]`. After Today, journal collection listed that live id.
+- HTTP Detail: `GET /view/api/nodes/00000000-0000-4000-8000-000000000000` 404 `{"error":"Not found"}`.
+- HTTP Search: idle `{ searched: false, hits: [] }`; `q=zzzxnever`, `type=note`, and `status=active` `{ searched: true, hits: [] }`. After journal write, `q=Morning` `{ searched: true }`.
+- HTTP Journal write: `POST /view/api/journals/today` same live id twice. `PATCH` title/body 200. Stale `base_updated_at` 409.
+- HTTP Edit any node / Activity / Trash: `verify-edit-any-node.sh` exited 0. After DELETE, live GET 404 and HTTP activity still 200 with rows. Restore returned the record live.
+- `verify-home-digest.sh` and `verify-export-import-45.sh` exited 0.
+- Built dist contained Unlock copy, `home-digest`, **Trash**, **Restore**, **Keep a title**, and **May hang under**.
+- Browser chrome was not clicked. Same-path HTTP was the drive.
+
+Evidence: `.cursor/skills/verify-foundation/evidence/20260919Tmaintain/` (gitignored).
+
 ## Maintain run (20260918Tmaintain)
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20260918Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20260918Tmaintain`.
