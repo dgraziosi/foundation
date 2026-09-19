@@ -12,7 +12,7 @@ Detail is one non-journal record as a page in the content host. It is not a dock
 
 ## How to get to it (user POV)
 
-- Choose a Recents row, an open-task row, a collection row/card/cell/board card/calendar item/outline row, a search hit, a related record on another detail page, or a graph node.
+- Choose a Recents row, an open-task row, a Since you last looked row, a collection row/card/cell/board card/calendar item/timeline item/outline row, a search hit, a related record on another detail page, or a graph node.
 - Go to `/view/nodes/<uuid>` after Unlock.
 
 ## Driving it with verify-foundation

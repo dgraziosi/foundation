@@ -117,7 +117,7 @@ Stable handles (prefer these over coordinates):
 | `[data-surface="journal-page"]` | Journal write page (not Properties) |
 | `[data-surface="activity-page"]` | That record's activity |
 | `[data-surface="trash-page"]` | Soft-deleted records |
-| `aria-label="Title"` | Journal title. Empty title shows **Keep a title** |
+| `aria-label="Title"` | Title field on journal and detail. Empty title shows **Keep a title** |
 | `[data-editor="live-markdown"]` | Journal body. Placeholder `Write a first sentence.` |
 | button `Today` | Home Today and journal collection → `/view/journal/today` |
 | `aria-label="View"` | Collection layout switcher |

@@ -9,7 +9,7 @@ Collection is one type's records in the layouts that type declared. The user ope
 - `collection-filtered` shows **Nothing matches your filters.** when records exist but the active view filter hides them.
 - `collection-views` lists only the view names that type declared (`aria-label="View"`).
 - `collection-show-completed` toggles **Show completed** for this window only. It does not write. It does not change Home, Recents, or Search.
-- `collection-open-record` opens a row, card, cell, board card, calendar item, outline row, or graph node on `/view/nodes/<uuid>`. A journal with inline markdown opens the write page (`[data-surface="journal-page"]`). Any other live record opens `[data-surface="detail-page"]`.
+- `collection-open-record` opens a row, card, cell, board card, calendar item, timeline item, outline row, or graph node on `/view/nodes/<uuid>`. A journal with inline markdown opens the write page (`[data-surface="journal-page"]`). Any other live record opens `[data-surface="detail-page"]`.
 - `collection-no-views` shows **No views declared for this type.** when `views` is empty.
 
 ## How to get to it (user POV)
