@@ -104,7 +104,10 @@ import {
   canonicalizeRepoInData,
   receiptConflictError,
   receiptFromData,
+  receiptUrlHomeError,
+  urlReceiptHomeError,
   canonicalizeReceiptInData,
+  RECEIPT_SYSTEMS,
   canonicalizeDueInData,
   dueFromData,
   dueKeyIsInvalid,
@@ -261,16 +264,69 @@ async function receiptUniqueError(
   return null;
 }
 
+async function receiptUrlHomeRefuse(
+  db: Queryable,
+  data: Record<string, unknown>,
+  selfId?: string,
+): Promise<ToolError | null> {
+  const receipt = receiptFromData(data);
+  if (!receipt || isToolError(receipt)) {
+    return null;
+  }
+  const existing = await getNodeByUrl(db, { system: receipt.system, id: receipt.id });
+  if (existing && existing.id !== selfId) {
+    return receiptUrlHomeError(existing.id, receipt);
+  }
+  return null;
+}
+
+async function urlReceiptHomeRefuse(
+  db: Queryable,
+  metadata: Record<string, unknown>,
+  selfId?: string,
+): Promise<ToolError | null> {
+  const url = urlIdentityFromMetadata(metadata);
+  if (!url || isToolError(url)) {
+    return null;
+  }
+  if (!(RECEIPT_SYSTEMS as readonly string[]).includes(url.system)) {
+    return null;
+  }
+  const existing = await getNodeByReceipt(db, { system: url.system, id: url.id });
+  if (existing && existing.id !== selfId) {
+    return urlReceiptHomeError(existing.id, url);
+  }
+  return null;
+}
+
+function leftoverWroteUrlIdentity(
+  before: Record<string, unknown> | undefined,
+  after: Record<string, unknown>,
+): boolean {
+  const next = urlIdentityFromMetadata(after);
+  if (!next || isToolError(next)) {
+    return false;
+  }
+  const prior = urlIdentityFromMetadata(before);
+  if (!prior || isToolError(prior)) {
+    return true;
+  }
+  return prior.system !== next.system || prior.id !== next.id;
+}
+
 async function uniqueDataError(
   db: Queryable,
   data: Record<string, unknown>,
   metadata: Record<string, unknown>,
   selfId?: string,
+  writing?: { url?: boolean; receipt?: boolean },
 ): Promise<ToolError | null> {
   return (
     (await urlUniqueError(db, metadata, selfId)) ??
+    (writing?.url ? await urlReceiptHomeRefuse(db, metadata, selfId) : null) ??
     (await repoUniqueError(db, data, selfId)) ??
-    (await receiptUniqueError(db, data, selfId))
+    (await receiptUniqueError(db, data, selfId)) ??
+    (writing?.receipt ? await receiptUrlHomeRefuse(db, data, selfId) : null)
   );
 }
 
@@ -654,6 +710,22 @@ async function upsertOneInTx(
       toolError(`Missing needed fields: ${warnings[0]!.fields.join(", ")}`, MISSING_NEEDED_SUGGESTION),
     );
   }
+  const writingPointers = {
+    url:
+      input.url !== undefined || leftoverWroteUrlIdentity(existing?.metadata, migrated.metadata),
+    receipt:
+      input.data !== undefined && Object.prototype.hasOwnProperty.call(input.data, "receipt"),
+  };
+  const pointerErr = await uniqueDataError(
+    client,
+    nextData,
+    nextMeta,
+    existing?.id,
+    writingPointers,
+  );
+  if (pointerErr) {
+    return fail(pointerErr);
+  }
 
   if (existing) {
     const resolved = await resolveStoredPayload(client, input.payload, ctx.blobs);
@@ -723,7 +795,13 @@ async function upsertOneInTx(
     } catch (error) {
       if (isUniqueViolation(error)) {
         await client.query("ROLLBACK TO SAVEPOINT upsert_update");
-        const pointerErr = await uniqueDataError(client, nextData, nextMeta, existing.id);
+        const pointerErr = await uniqueDataError(
+          client,
+          nextData,
+          nextMeta,
+          existing.id,
+          writingPointers,
+        );
         if (pointerErr) {
           return fail(pointerErr);
         }
@@ -798,7 +876,13 @@ async function upsertOneInTx(
           return isToolError(replayed) ? fail(replayed) : replayed;
         }
       }
-      const pointerErr = await uniqueDataError(client, nextData, nextMeta);
+      const pointerErr = await uniqueDataError(
+        client,
+        nextData,
+        nextMeta,
+        undefined,
+        writingPointers,
+      );
       if (pointerErr) {
         return fail(pointerErr);
       }

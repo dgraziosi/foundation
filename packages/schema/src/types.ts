@@ -59,12 +59,21 @@ export const RepoRefSchema = z.object({
 });
 export type RepoRef = z.infer<typeof RepoRefSchema>;
 
-/** Mail sent or calendar event gone. Store the ref only — never fetch or mirror bodies. */
+/** Mail or calendar act done. Store the ref only — never fetch or mirror bodies. */
 export const RECEIPT_SYSTEMS = ["gmail", "calendar"] as const;
 export type ReceiptSystem = (typeof RECEIPT_SYSTEMS)[number];
 
-export const RECEIPT_KINDS = ["sent", "cleared"] as const;
+export const RECEIPT_KINDS = ["drafted", "sent", "booked", "moved", "cleared"] as const;
 export type ReceiptKind = (typeof RECEIPT_KINDS)[number];
+
+/** Closed pairing: each kind has one system. */
+export const RECEIPT_KIND_SYSTEM = {
+  drafted: "gmail",
+  sent: "gmail",
+  booked: "calendar",
+  moved: "calendar",
+  cleared: "calendar",
+} as const satisfies Record<ReceiptKind, ReceiptSystem>;
 
 export const ReceiptSystemSchema = z.enum(RECEIPT_SYSTEMS);
 export const ReceiptKindSchema = z.enum(RECEIPT_KINDS);

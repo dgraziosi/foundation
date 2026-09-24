@@ -1,5 +1,6 @@
 import { toolError, type ToolError } from "./mcp-io.js";
 import {
+  RECEIPT_KIND_SYSTEM,
   RECEIPT_KINDS,
   RECEIPT_SYSTEMS,
   type ReceiptKind,
@@ -8,6 +9,7 @@ import {
 } from "./types.js";
 
 export {
+  RECEIPT_KIND_SYSTEM,
   RECEIPT_KINDS,
   RECEIPT_SYSTEMS,
   ReceiptKindSchema,
@@ -19,13 +21,13 @@ export {
 } from "./types.js";
 
 export const RECEIPT_INCOMPLETE_SUGGESTION =
-  "Set data.receipt.system to gmail | calendar, data.receipt.id to that system's stable id, and data.receipt.kind to sent | cleared. Foundation stores the ref only — do not fetch or mirror Gmail or Calendar bodies.";
+  "Set data.receipt.system to gmail | calendar, data.receipt.id to that system's stable id, and data.receipt.kind to drafted | sent | booked | moved | cleared. Foundation stores the ref only — do not fetch or mirror Gmail or Calendar bodies.";
 
 export const RECEIPT_UNKNOWN_SUGGESTION =
-  "Use system gmail | calendar and kind sent or cleared. Foundation stores the ref only — do not fetch or mirror those systems' bodies.";
+  "Use system gmail | calendar and kind drafted, sent, booked, moved, or cleared. Foundation stores the ref only — do not fetch or mirror those systems' bodies.";
 
 export const RECEIPT_PAIR_SUGGESTION =
-  "kind sent goes with system gmail. kind cleared goes with system calendar.";
+  "kind drafted or sent goes with system gmail. kind booked, moved, or cleared goes with system calendar.";
 
 export function receiptConflictError(existingId: string, receipt: ReceiptRef): ToolError {
   return toolError(
@@ -34,12 +36,32 @@ export function receiptConflictError(existingId: string, receipt: ReceiptRef): T
   );
 }
 
+export function receiptUrlHomeError(
+  existingId: string,
+  receipt: Pick<ReceiptRef, "system" | "id">,
+): ToolError {
+  return toolError(
+    `Receipt ${receipt.system}:${receipt.id} belongs with live url owner ${existingId}`,
+    `Call get with ${existingId}. Write data.receipt on that record. Do not split url and receipt.`,
+  );
+}
+
+export function urlReceiptHomeError(
+  existingId: string,
+  url: { system: string; id: string },
+): ToolError {
+  return toolError(
+    `Url ${url.system}:${url.id} belongs with live receipt owner ${existingId}`,
+    `Call get with ${existingId}. Clear that receipt (receipt: null) or write the url on that record. Do not split url and receipt.`,
+  );
+}
+
 function isBlank(value: unknown): boolean {
   return value === undefined || value === null || (typeof value === "string" && value.trim() === "");
 }
 
 function expectedSystemForKind(kind: ReceiptKind): ReceiptSystem {
-  return kind === "sent" ? "gmail" : "calendar";
+  return RECEIPT_KIND_SYSTEM[kind];
 }
 
 /**
