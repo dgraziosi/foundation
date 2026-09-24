@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createPool, migrate, seedSystemOntology, type Pool } from "@foundation/db";
+import { createPool, insertNode, migrate, seedSystemOntology, type Pool } from "@foundation/db";
 import {
+  DEFAULT_PAYLOAD,
   RECEIPT_HIT_SUGGESTION,
   RECEIPT_MISS_SUGGESTION,
   isToolError,
@@ -409,6 +410,115 @@ test(
             id: "evt-fixture-split-1",
             kind: "cleared",
           });
+        }
+      });
+
+      await t.test("leftover split still allows title, due, status, and payload updates", async () => {
+        const hold = await insertNode(pool, {
+          id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          type: "task",
+          title: "Throwaway leftover receipt",
+          status: "active",
+          payload: DEFAULT_PAYLOAD,
+          data: {
+            receipt: { system: "calendar", id: "evt-fixture-split-unrelated-1", kind: "booked" },
+          },
+          metadata: {},
+        });
+        const host = await insertNode(pool, {
+          id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+          type: "task",
+          title: "Throwaway leftover url",
+          status: "active",
+          payload: DEFAULT_PAYLOAD,
+          data: {},
+          metadata: { url: { system: "calendar", id: "evt-fixture-split-unrelated-1" } },
+        });
+
+        const titled = await upsertGraphNode(pool, {
+          id: hold.id,
+          type: "task",
+          title: "Throwaway leftover receipt renamed",
+          base_updated_at: hold.updated_at,
+        });
+        assert.equal(isToolError(titled), false);
+        if (isToolError(titled)) {
+          return;
+        }
+        assert.equal(titled.node.title, "Throwaway leftover receipt renamed");
+        assert.deepEqual(titled.node.data.receipt, {
+          system: "calendar",
+          id: "evt-fixture-split-unrelated-1",
+          kind: "booked",
+        });
+
+        const dueOnHost = await upsertGraphNode(pool, {
+          id: host.id,
+          type: "task",
+          title: host.title,
+          data: { due: "2026-09-24" },
+          base_updated_at: host.updated_at,
+        });
+        assert.equal(isToolError(dueOnHost), false);
+        if (isToolError(dueOnHost)) {
+          return;
+        }
+        assert.equal(dueOnHost.node.data.due, "2026-09-24");
+        assert.deepEqual(dueOnHost.node.metadata.url, {
+          system: "calendar",
+          id: "evt-fixture-split-unrelated-1",
+        });
+
+        const statusOnHold = await upsertGraphNode(pool, {
+          id: titled.node.id,
+          type: "task",
+          title: titled.node.title,
+          status: "completed",
+          base_updated_at: titled.node.updated_at,
+        });
+        assert.equal(isToolError(statusOnHold), false);
+        if (isToolError(statusOnHold)) {
+          return;
+        }
+        assert.equal(statusOnHold.node.status, "completed");
+
+        const payloadOnHost = await upsertGraphNode(pool, {
+          id: dueOnHost.node.id,
+          type: "task",
+          title: dueOnHost.node.title,
+          payload: { media_type: "text/plain", storage: "inline", body: "leftover split note" },
+          base_updated_at: dueOnHost.node.updated_at,
+        });
+        assert.equal(isToolError(payloadOnHost), false);
+        if (isToolError(payloadOnHost)) {
+          return;
+        }
+        assert.equal(payloadOnHost.node.payload.body, "leftover split note");
+
+        const rewriteUrl = await upsertGraphNode(pool, {
+          id: payloadOnHost.node.id,
+          type: "task",
+          title: payloadOnHost.node.title,
+          url: { system: "calendar", id: "evt-fixture-split-unrelated-1" },
+          base_updated_at: payloadOnHost.node.updated_at,
+        });
+        assert.equal(isToolError(rewriteUrl), true);
+        if (isToolError(rewriteUrl)) {
+          assert.match(rewriteUrl.error, /belongs with live receipt owner/);
+        }
+
+        const rewriteReceipt = await upsertGraphNode(pool, {
+          id: statusOnHold.node.id,
+          type: "task",
+          title: statusOnHold.node.title,
+          data: {
+            receipt: { system: "calendar", id: "evt-fixture-split-unrelated-1", kind: "cleared" },
+          },
+          base_updated_at: statusOnHold.node.updated_at,
+        });
+        assert.equal(isToolError(rewriteReceipt), true);
+        if (isToolError(rewriteReceipt)) {
+          assert.match(rewriteReceipt.error, /belongs with live url owner/);
         }
       });
 

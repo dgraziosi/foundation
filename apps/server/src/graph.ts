@@ -304,13 +304,14 @@ async function uniqueDataError(
   data: Record<string, unknown>,
   metadata: Record<string, unknown>,
   selfId?: string,
+  writing?: { url?: boolean; receipt?: boolean },
 ): Promise<ToolError | null> {
   return (
     (await urlUniqueError(db, metadata, selfId)) ??
-    (await urlReceiptHomeRefuse(db, metadata, selfId)) ??
+    (writing?.url ? await urlReceiptHomeRefuse(db, metadata, selfId) : null) ??
     (await repoUniqueError(db, data, selfId)) ??
     (await receiptUniqueError(db, data, selfId)) ??
-    (await receiptUrlHomeRefuse(db, data, selfId))
+    (writing?.receipt ? await receiptUrlHomeRefuse(db, data, selfId) : null)
   );
 }
 
@@ -694,7 +695,18 @@ async function upsertOneInTx(
       toolError(`Missing needed fields: ${warnings[0]!.fields.join(", ")}`, MISSING_NEEDED_SUGGESTION),
     );
   }
-  const pointerErr = await uniqueDataError(client, nextData, nextMeta, existing?.id);
+  const writingPointers = {
+    url: input.url !== undefined,
+    receipt:
+      input.data !== undefined && Object.prototype.hasOwnProperty.call(input.data, "receipt"),
+  };
+  const pointerErr = await uniqueDataError(
+    client,
+    nextData,
+    nextMeta,
+    existing?.id,
+    writingPointers,
+  );
   if (pointerErr) {
     return fail(pointerErr);
   }
@@ -767,7 +779,13 @@ async function upsertOneInTx(
     } catch (error) {
       if (isUniqueViolation(error)) {
         await client.query("ROLLBACK TO SAVEPOINT upsert_update");
-        const pointerErr = await uniqueDataError(client, nextData, nextMeta, existing.id);
+        const pointerErr = await uniqueDataError(
+          client,
+          nextData,
+          nextMeta,
+          existing.id,
+          writingPointers,
+        );
         if (pointerErr) {
           return fail(pointerErr);
         }
@@ -842,7 +860,13 @@ async function upsertOneInTx(
           return isToolError(replayed) ? fail(replayed) : replayed;
         }
       }
-      const pointerErr = await uniqueDataError(client, nextData, nextMeta);
+      const pointerErr = await uniqueDataError(
+        client,
+        nextData,
+        nextMeta,
+        undefined,
+        writingPointers,
+      );
       if (pointerErr) {
         return fail(pointerErr);
       }
