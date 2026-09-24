@@ -6,7 +6,7 @@ Detail is one non-journal record as a page in the content host. It is not a dock
 
 - `detail-open` fills the main pane at `/view/nodes/<uuid>` with `[data-surface="detail-page"]` and the record title as an editable field (non-journal, or a journal that is not inline markdown).
 - `detail-missing` shows **Not found.** for a bad or unknown id. A valid unknown UUID also paints heading `Not found` (no period) and never mounts `[data-surface="detail-page"]`.
-- `detail-properties` shows type, editable status, editable declared fields, related records, location, timestamps, Activity, and Move to trash. When the type has `parent_types`, the same **May hang under** line as collection appears (`data-constraint="parent_types"`). **Open** appears only when `data.url` is a well-formed https address.
+- `detail-properties` shows type, editable status, and editable declared fields, then **Open** only when `data.url` is a well-formed https address, then Activity and Move to trash, then related records, location, and timestamps. When the type has `parent_types`, the same **May hang under** line as collection appears (`data-constraint="parent_types"`).
 - `detail-structure` shows Structure when there are children, or an ancestor chain the type asks for.
 - `detail-close` closes the detail tab and activates the tab to its left, or Home when that was the last one.
 
