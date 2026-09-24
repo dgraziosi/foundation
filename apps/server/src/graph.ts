@@ -299,6 +299,21 @@ async function urlReceiptHomeRefuse(
   return null;
 }
 
+function leftoverWroteUrlIdentity(
+  before: Record<string, unknown> | undefined,
+  after: Record<string, unknown>,
+): boolean {
+  const next = urlIdentityFromMetadata(after);
+  if (!next || isToolError(next)) {
+    return false;
+  }
+  const prior = urlIdentityFromMetadata(before);
+  if (!prior || isToolError(prior)) {
+    return true;
+  }
+  return prior.system !== next.system || prior.id !== next.id;
+}
+
 async function uniqueDataError(
   db: Queryable,
   data: Record<string, unknown>,
@@ -696,7 +711,8 @@ async function upsertOneInTx(
     );
   }
   const writingPointers = {
-    url: input.url !== undefined,
+    url:
+      input.url !== undefined || leftoverWroteUrlIdentity(existing?.metadata, migrated.metadata),
     receipt:
       input.data !== undefined && Object.prototype.hasOwnProperty.call(input.data, "receipt"),
   };

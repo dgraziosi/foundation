@@ -413,6 +413,72 @@ test(
         }
       });
 
+      await t.test("leftover living, link, or origin url refuses a split receipt home", async () => {
+        const hold = await upsertGraphNode(pool, {
+          type: "task",
+          title: "Throwaway leftover home receipt",
+          data: {
+            receipt: { system: "calendar", id: "evt-fixture-leftover-home-1", kind: "booked" },
+          },
+        });
+        assert.equal(isToolError(hold), false);
+        if (isToolError(hold)) {
+          return;
+        }
+
+        const living = await upsertGraphNode(pool, {
+          type: "task",
+          title: "Throwaway leftover living url",
+          data: { living: { system: "calendar", id: "evt-fixture-leftover-home-1" } },
+        });
+        assert.equal(isToolError(living), true);
+        if (isToolError(living)) {
+          assert.match(living.error, /belongs with live receipt owner/);
+          assert.match(living.error, new RegExp(hold.node.id));
+        }
+
+        const origin = await upsertGraphNode(pool, {
+          type: "task",
+          title: "Throwaway leftover origin url",
+          data: { origin: { system: "calendar", id: "evt-fixture-leftover-home-1" } },
+        });
+        assert.equal(isToolError(origin), true);
+        if (isToolError(origin)) {
+          assert.match(origin.error, /belongs with live receipt owner/);
+        }
+
+        const link = await upsertGraphNode(pool, {
+          type: "task",
+          title: "Throwaway leftover link url",
+          data: { link: { system: "calendar", id: "evt-fixture-leftover-home-1" } },
+        });
+        assert.equal(isToolError(link), true);
+        if (isToolError(link)) {
+          assert.match(link.error, /belongs with live receipt owner/);
+        }
+
+        const host = await upsertGraphNode(pool, {
+          type: "task",
+          title: "Throwaway leftover home host",
+        });
+        assert.equal(isToolError(host), false);
+        if (isToolError(host)) {
+          return;
+        }
+        const livingOnHost = await upsertGraphNode(pool, {
+          id: host.node.id,
+          type: "task",
+          title: "Throwaway leftover home host",
+          data: { living: { system: "calendar", id: "evt-fixture-leftover-home-1" } },
+          base_updated_at: host.node.updated_at,
+        });
+        assert.equal(isToolError(livingOnHost), true);
+        if (isToolError(livingOnHost)) {
+          assert.match(livingOnHost.error, /belongs with live receipt owner/);
+          assert.match(livingOnHost.error, new RegExp(hold.node.id));
+        }
+      });
+
       await t.test("leftover split still allows title, due, status, and payload updates", async () => {
         const hold = await insertNode(pool, {
           id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
