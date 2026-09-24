@@ -23,7 +23,7 @@ Short analog: app / folder / links → Foundation / vault / graph.
 - **blob** — bytes on a node (`payload.storage: "blob"`), stored in the vault
 - **record** — the node
 - **activity** — the audit log
-- **receipt** — done after send or clear (`data.receipt { system, id, kind }`)
+- **receipt** — done after a mail or calendar act (`data.receipt { system, id, kind }`)
 - **ref** — a typed UUID field on `data`. Points at another node. Not an edge
 - **agent** — anything that can reach the vault MCP
 - **user** — the human who runs this vault on this machine
@@ -47,7 +47,7 @@ Viewer Open stays `data.url` (https string, not unique). That string is not whic
 
 GitHub is `data.repo { system, id }` and `search { repo }`. `system` is `github`. Refuses gmail / calendar / drive. Unique on live records. `repo: null` clears. Cursor Origin is not a vault key and not a `repo.system` value.
 
-Receipt is unchanged: `data.receipt { system, id, kind }` and `search { receipt }`.
+Receipt stays `data.receipt { system, id, kind }` and `search { receipt }`. Kind names the last mail or calendar act.
 
 Identity registry. One storage shape and one unique-index family: upsert `url`, `data.repo`, and `data.receipt`. No dual-read of leftover `living` / `code` / `origin` / `link`. `search { living }`, `search { code }`, `search { origin }`, and `search { link }` are gone. Leftover rows and leftover writes migrate into `url` or `repo` by system, then the leftover keys are stripped. There is no leftover refuse path. Do not reintroduce `origin` as a vault key.
 
@@ -56,7 +56,7 @@ Identity registry. One storage shape and one unique-index family: upsert `url`, 
 | Drive / Gmail / Calendar | upsert `url { system, id }` | This record is that Drive, Gmail, or Calendar object. Unique on live records. No `kind`. | `search { url }` then `get` |
 | Viewer Open | `data.url` | https address. Any type. Not unique. | `get`. FTS and `data_equals: { url }` |
 | GitHub | `data.repo { system, id }` | This record is that GitHub object. Unique on live records. No `kind`. | `search { repo }` then `get` |
-| Receipt | `data.receipt { system, id, kind }` | Done after send or clear. Unique on live `system`+`id`. | `search { receipt }` then `get` |
+| Receipt | `data.receipt { system, id, kind }` | Done after a mail or calendar act. Unique on live `system`+`id`. When a live url and a live receipt both exist for the same gmail or calendar id, they must be the same node. | `search { receipt }` then `get` |
 
 `data.url` is trimmed, https, no credentials, max 2048. `data.url: null` clears the https address. Missing is allowed. Not unique. Not which Drive / Gmail / Calendar object. Open leaves the window for that file.
 
@@ -141,7 +141,7 @@ These names are the current surface. Full parameters: [`docs/MCP_TOOLS.md`](./MC
 - Live records are unique on upsert `url { system, id }` for `gmail` | `calendar` | `drive`. That ref is which Drive, Gmail, or Calendar object. Look up with `search` `{ url }` (then `get`). Store the ref only — do not fetch or mirror those systems’ bodies.
 - Live records are unique on `data.repo.{system,id}` for `github`. That ref is which GitHub object. Look up with `search` `{ repo }` (then `get`). Store the ref only. GitHub is not a Drive/Sheet. [Url, repo, and link](#url-repo-and-link).
 - `data.url` is an optional https address on any type. It is how the Viewer opens a file that stays the source of truth. It is not the Drive / Gmail / Calendar url, and not a second identity.
-- After a bot sends mail or clears a calendar event, the same record holds `data.receipt` `{ system, id, kind }`. That is done after send or clear. [Mail and calendar receipt](#mail-and-calendar-receipt).
+- After a bot drafts or sends mail, or books, moves, or clears a calendar event, the same record holds `data.receipt` `{ system, id, kind }`. That is done after a mail or calendar act. [Mail and calendar receipt](#mail-and-calendar-receipt).
 - No `get_vault_health` / `run_maintenance` / `audit_links` tools — those jobs are instance routines the user can run ([`VAULT_HEALTH.md`](./VAULT_HEALTH.md): host script [`scripts/keep-vault-up.sh`](../scripts/keep-vault-up.sh) plus the weekday 9:15 written report, [`GRAPH_HYGIENE.md`](./GRAPH_HYGIENE.md), [`.agents/skills/update-foundation/`](../.agents/skills/update-foundation/), activity prune [`scripts/activity-prune.sh`](../scripts/activity-prune.sh))
 - `job` is instance coordination, not a graph write. A bot claims a named routine (`dream`, `vault-health`, `activity-prune`, …) and gets a token. A second claim of the same live name fails (`Held`). The token is the proof; the API key is only who. `finish` records last run and opens the name. `release` opens the name and leaves last run alone. An expired hold can be claimed again. `read` returns holder and last run. Not a queue, not `get_vault_health`, and not if-match on a node. Default hold is 900 seconds (`FOUNDATION_LEASE_TTL_SECONDS`).
 - No rewrite tool. `get` + `list_activity` + `upsert` is the loop. [Rewrite one record](#rewrite-one-record).
@@ -169,7 +169,7 @@ A bad body is rebuilt the same way. Activity already holds the snapshots. The bo
 
 ## Mail and calendar receipt
 
-When a bot sends mail or clears a calendar event, **done** is a graph fact on that record. Store the ref only.
+When a bot drafts or sends mail, or books, moves, or clears a calendar event, **done** is a graph fact on that record. Store the ref only.
 
 The user is the human who runs this vault on this machine. Named roles are bots. An agent is anything that can reach the vault.
 
@@ -179,7 +179,7 @@ Gmail and Calendar stay the source of truth. The vault does not hold message or 
 
 `url` `{ system, id }` is which Drive, Gmail, or Calendar object. Live records are unique on that pair for `gmail` | `calendar` | `drive`. `url: null` on upsert clears uniqueness. `search` `{ url }` finds that record. Extra keys on that object are not a contract. The url reads as `system` and `id` only. There is no `kind` on that url. Link is the edge tool.
 
-Activity is the diary of vault writes (`before` / `after` on `create` / `update` / `delete` / `merge`). `get` does not return those rows. A snapshot that happens to contain a url is not sent mail and not a cleared event.
+Activity is the diary of vault writes (`before` / `after` on `create` / `update` / `delete` / `merge`). `get` does not return those rows. A snapshot that happens to contain a url is not a mail or calendar act.
 
 `status: "completed"` is vault work state. It is not a mail or calendar receipt.
 
@@ -194,22 +194,26 @@ data.receipt: { system, id, kind }
 ```
 
 - **`system`** — `gmail` | `calendar`
-- **`id`** — that system’s stable id (the sent message, or the event that is gone)
-- **`kind`** — `sent` | `cleared`
+- **`id`** — that system’s stable id (the draft or sent message, or the calendar event)
+- **`kind`** — `drafted` | `sent` | `booked` | `moved` | `cleared`
 
-Pairing is closed: `sent` goes with `gmail`. `cleared` goes with `calendar`. One receipt object on the record. The latest receipt is done; earlier receipts stay in activity. `receipt: null` clears. Missing receipt is allowed. Incomplete or unknown values refuse.
+Pairing is closed: `drafted` and `sent` go with `gmail`. `booked`, `moved`, and `cleared` go with `calendar`. Clear and delete are one kind (`cleared`): that event id is gone. One receipt object on the record. The latest receipt is done; earlier receipts stay in activity. `receipt: null` clears. Missing receipt is allowed. Incomplete, unknown, or unpaired values refuse.
 
-Live records are unique on `data.receipt.{system,id}`. That uniqueness is independent of url. The same calendar id may be url on a record (this task is that event) and later receipt `cleared` on the same record (the event is gone).
+Live records are unique on `data.receipt.{system,id}`. Kind is not part of that key. `search` `{ receipt }` is `{ system, id }` only; kind lives on the node. That index is separate from url. The same calendar id may be url on a record (this task is that event) and later receipt `booked`, `moved`, or `cleared` on the same record.
+
+When a live `url` and a live `receipt` both exist for the same `gmail` or `calendar` id, they must be the same node. Writing a receipt refuses if a different live node holds that url. Writing that url refuses if a different live node holds the receipt. Suggestion names the other owner. Mail receipts with no url still write. Drive url is unchanged. Two connections racing a split can both write; `search` then `get` before upsert.
+
+`cleared` means the Google event that id names is gone. It is not “this vault hold was dropped.” Prefer the live url owner as the receipt home for calendar acts on that id. A soft-deleted hold does not occupy either index, so the host may take url and then `cleared`. A still-live hold that occupies url or receipt must release it (`url: null` and/or `receipt: null`) before another live node writes. Do not create a third node.
 
 Store the ref only. Do not fetch or mirror Gmail or Calendar bodies into `payload` or `data`.
 
-### Write after send or clear
+### Write after a mail or calendar act
 
 A named bot writes the receipt after the move in Gmail or Calendar. One node at a time. The server does not invent the receipt.
 
-1. Send the message, or clear the event, in Gmail or Calendar.
+1. Draft or send the message, or book, move, or clear the event, in Gmail or Calendar.
 2. `get` `{ id }` — the record and `updated_at`.
-3. `search` `{ receipt: { system, id } }` — if a live record already holds that receipt, `get` that id. Do not twin.
+3. `search` `{ receipt: { system, id } }` and `search` `{ url: { system, id } }` — if a live record already holds that receipt or that url, `get` that id. Write on that record, or release the leftover, then write. Do not twin.
 4. `upsert` the same record with `data.receipt` `{ system, id, kind }` and `base_updated_at` from `get`. Merge keeps due and the other live keys. Omit `payload` unless the written body also changes.
 5. The write leaves an activity row. That row is the diary of the patch, not the done fact. `undo` of the upsert restores the previous `data` while the row is reversible. It does not unsend mail or restore a calendar event.
 
@@ -217,7 +221,17 @@ Fixture writes (no personal ids, no bodies):
 
 ```text
 upsert id=<task uuid> base_updated_at=<from get>
+data: { receipt: { system: "gmail", id: "msg-fixture-draft-1", kind: "drafted" } }
+
+upsert id=<task uuid> base_updated_at=<from get>
 data: { receipt: { system: "gmail", id: "msg-fixture-sent-1", kind: "sent" } }
+
+upsert id=<task uuid> base_updated_at=<from get>
+url: { system: "calendar", id: "evt-fixture-1" }
+data: { receipt: { system: "calendar", id: "evt-fixture-1", kind: "booked" } }
+
+upsert id=<task uuid> base_updated_at=<from get>
+data: { receipt: { system: "calendar", id: "evt-fixture-1", kind: "moved" } }
 
 upsert id=<task uuid> base_updated_at=<from get>
 data: { receipt: { system: "calendar", id: "evt-fixture-1", kind: "cleared" } }
@@ -227,7 +241,7 @@ data: { receipt: { system: "calendar", id: "evt-fixture-1", kind: "cleared" } }
 
 `get` returns `node.data.receipt`. A well-formed receipt is done on the record.
 
-`search` `{ receipt: { system, id } }` looks up the unique live receipt, then `get`. Same tool as url lookup. No `list_nodes`. A miss means that receipt is free to write.
+`search` `{ receipt: { system, id } }` looks up the unique live receipt, then `get`. Same tool as url lookup. No `list_nodes`. A miss means that receipt is free to write, unless a different live node already holds the url for that gmail or calendar id — write on that url owner instead.
 
 `search` `{ url }` is which Drive, Gmail, or Calendar object, not done. `search` `{ repo }` is which GitHub object, not done.
 

@@ -104,7 +104,10 @@ import {
   canonicalizeRepoInData,
   receiptConflictError,
   receiptFromData,
+  receiptUrlHomeError,
+  urlReceiptHomeError,
   canonicalizeReceiptInData,
+  RECEIPT_SYSTEMS,
   canonicalizeDueInData,
   dueFromData,
   dueKeyIsInvalid,
@@ -261,6 +264,41 @@ async function receiptUniqueError(
   return null;
 }
 
+async function receiptUrlHomeRefuse(
+  db: Queryable,
+  data: Record<string, unknown>,
+  selfId?: string,
+): Promise<ToolError | null> {
+  const receipt = receiptFromData(data);
+  if (!receipt || isToolError(receipt)) {
+    return null;
+  }
+  const existing = await getNodeByUrl(db, { system: receipt.system, id: receipt.id });
+  if (existing && existing.id !== selfId) {
+    return receiptUrlHomeError(existing.id, receipt);
+  }
+  return null;
+}
+
+async function urlReceiptHomeRefuse(
+  db: Queryable,
+  metadata: Record<string, unknown>,
+  selfId?: string,
+): Promise<ToolError | null> {
+  const url = urlIdentityFromMetadata(metadata);
+  if (!url || isToolError(url)) {
+    return null;
+  }
+  if (!(RECEIPT_SYSTEMS as readonly string[]).includes(url.system)) {
+    return null;
+  }
+  const existing = await getNodeByReceipt(db, { system: url.system, id: url.id });
+  if (existing && existing.id !== selfId) {
+    return urlReceiptHomeError(existing.id, url);
+  }
+  return null;
+}
+
 async function uniqueDataError(
   db: Queryable,
   data: Record<string, unknown>,
@@ -269,8 +307,10 @@ async function uniqueDataError(
 ): Promise<ToolError | null> {
   return (
     (await urlUniqueError(db, metadata, selfId)) ??
+    (await urlReceiptHomeRefuse(db, metadata, selfId)) ??
     (await repoUniqueError(db, data, selfId)) ??
-    (await receiptUniqueError(db, data, selfId))
+    (await receiptUniqueError(db, data, selfId)) ??
+    (await receiptUrlHomeRefuse(db, data, selfId))
   );
 }
 
@@ -653,6 +693,10 @@ async function upsertOneInTx(
     return fail(
       toolError(`Missing needed fields: ${warnings[0]!.fields.join(", ")}`, MISSING_NEEDED_SUGGESTION),
     );
+  }
+  const pointerErr = await uniqueDataError(client, nextData, nextMeta, existing?.id);
+  if (pointerErr) {
+    return fail(pointerErr);
   }
 
   if (existing) {

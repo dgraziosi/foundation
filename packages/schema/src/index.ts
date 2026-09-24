@@ -404,6 +404,8 @@ export {
   isToolErrorReceipt,
   receiptConflictError,
   receiptFromData,
+  receiptUrlHomeError,
+  urlReceiptHomeError,
   canonicalizeReceiptInData,
 } from "./receipt.js";
 export {
@@ -571,6 +573,7 @@ export {
   REPO_SYSTEMS,
   RepoRefSchema,
   RepoSystemSchema,
+  RECEIPT_KIND_SYSTEM,
   RECEIPT_KINDS,
   RECEIPT_SYSTEMS,
   ReceiptKindSchema,

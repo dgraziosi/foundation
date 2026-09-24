@@ -6,7 +6,8 @@ import {
   RECEIPT_MISS_SUGGESTION,
   isToolError,
 } from "@foundation/schema";
-import { getGraphNode, searchGraphNodes, upsertGraphNode } from "./graph.js";
+import { deleteGraphNode, getGraphNode, searchGraphNodes, upsertGraphNode } from "./graph.js";
+import { DESTRUCTIVE } from "./write-context.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -211,6 +212,249 @@ test(
         if (!isToolError(still)) {
           assert.equal(still.node.data.receipt, undefined);
         }
+      });
+
+      await t.test("same record may hold url then booked, moved, and cleared", async () => {
+        const task = await upsertGraphNode(pool, {
+          type: "task",
+          title: "Throwaway booked calendar task",
+          url: { system: "calendar", id: "evt-fixture-booked-1" },
+          data: {
+            receipt: { system: "calendar", id: "evt-fixture-booked-1", kind: "booked" },
+          },
+        });
+        assert.equal(isToolError(task), false);
+        if (isToolError(task)) {
+          return;
+        }
+        assert.deepEqual(task.node.metadata.url, { system: "calendar", id: "evt-fixture-booked-1" });
+        assert.deepEqual(task.node.data.receipt, {
+          system: "calendar",
+          id: "evt-fixture-booked-1",
+          kind: "booked",
+        });
+
+        const moved = await upsertGraphNode(pool, {
+          id: task.node.id,
+          type: "task",
+          title: "Throwaway booked calendar task",
+          data: {
+            receipt: { system: "calendar", id: "evt-fixture-booked-1", kind: "moved" },
+          },
+          base_updated_at: task.node.updated_at,
+        });
+        assert.equal(isToolError(moved), false);
+        if (isToolError(moved)) {
+          return;
+        }
+        assert.deepEqual(moved.node.data.receipt, {
+          system: "calendar",
+          id: "evt-fixture-booked-1",
+          kind: "moved",
+        });
+
+        const cleared = await upsertGraphNode(pool, {
+          id: moved.node.id,
+          type: "task",
+          title: "Throwaway booked calendar task",
+          data: {
+            receipt: { system: "calendar", id: "evt-fixture-booked-1", kind: "cleared" },
+          },
+          base_updated_at: moved.node.updated_at,
+        });
+        assert.equal(isToolError(cleared), false);
+        if (isToolError(cleared)) {
+          return;
+        }
+        assert.deepEqual(cleared.node.data.receipt, {
+          system: "calendar",
+          id: "evt-fixture-booked-1",
+          kind: "cleared",
+        });
+        assert.deepEqual(cleared.node.metadata.url, { system: "calendar", id: "evt-fixture-booked-1" });
+      });
+
+      await t.test("deleted hold frees receipt so host can take url then cleared", async () => {
+        const hold = await upsertGraphNode(pool, {
+          type: "task",
+          title: "Throwaway hold calendar task",
+          url: { system: "calendar", id: "evt-fixture-hold-1" },
+          data: {
+            receipt: { system: "calendar", id: "evt-fixture-hold-1", kind: "booked" },
+          },
+        });
+        assert.equal(isToolError(hold), false);
+        if (isToolError(hold)) {
+          return;
+        }
+
+        const deleted = await deleteGraphNode(
+          pool,
+          { id: hold.node.id, base_updated_at: hold.node.updated_at },
+          DESTRUCTIVE,
+        );
+        assert.equal(isToolError(deleted), false);
+
+        const host = await upsertGraphNode(pool, {
+          type: "task",
+          title: "Throwaway host calendar task",
+          url: { system: "calendar", id: "evt-fixture-hold-1" },
+          data: {
+            receipt: { system: "calendar", id: "evt-fixture-hold-1", kind: "cleared" },
+          },
+        });
+        assert.equal(isToolError(host), false);
+        if (isToolError(host)) {
+          return;
+        }
+        assert.deepEqual(host.node.metadata.url, { system: "calendar", id: "evt-fixture-hold-1" });
+        assert.deepEqual(host.node.data.receipt, {
+          system: "calendar",
+          id: "evt-fixture-hold-1",
+          kind: "cleared",
+        });
+
+        const byReceipt = await searchGraphNodes(pool, {
+          receipt: { system: "calendar", id: "evt-fixture-hold-1" },
+        });
+        assert.equal(isToolError(byReceipt), false);
+        if (!isToolError(byReceipt)) {
+          assert.equal(byReceipt.nodes.length, 1);
+          assert.equal(byReceipt.nodes[0]?.id, host.node.id);
+        }
+      });
+
+      await t.test("live hold receipt and host url for the same id refuse", async () => {
+        const hold = await upsertGraphNode(pool, {
+          type: "task",
+          title: "Throwaway live hold receipt",
+          data: {
+            receipt: { system: "calendar", id: "evt-fixture-split-1", kind: "booked" },
+          },
+        });
+        assert.equal(isToolError(hold), false);
+        if (isToolError(hold)) {
+          return;
+        }
+
+        const hostUrl = await upsertGraphNode(pool, {
+          type: "task",
+          title: "Throwaway live host url",
+          url: { system: "calendar", id: "evt-fixture-split-1" },
+        });
+        assert.equal(isToolError(hostUrl), true);
+        if (isToolError(hostUrl)) {
+          assert.match(hostUrl.error, /belongs with live receipt owner/);
+          assert.match(hostUrl.error, new RegExp(hold.node.id));
+          assert.match(hostUrl.suggestion ?? "", /do not split url and receipt/i);
+        }
+
+        const host = await upsertGraphNode(pool, {
+          type: "task",
+          title: "Throwaway live host url",
+        });
+        assert.equal(isToolError(host), false);
+        if (isToolError(host)) {
+          return;
+        }
+        const holdHasUrl = await upsertGraphNode(pool, {
+          type: "task",
+          title: "Throwaway other url owner",
+          url: { system: "calendar", id: "evt-fixture-split-2" },
+        });
+        assert.equal(isToolError(holdHasUrl), false);
+        if (isToolError(holdHasUrl)) {
+          return;
+        }
+        const receiptOnOther = await upsertGraphNode(pool, {
+          id: host.node.id,
+          type: "task",
+          title: "Throwaway live host url",
+          data: {
+            receipt: { system: "calendar", id: "evt-fixture-split-2", kind: "cleared" },
+          },
+          base_updated_at: host.node.updated_at,
+        });
+        assert.equal(isToolError(receiptOnOther), true);
+        if (isToolError(receiptOnOther)) {
+          assert.match(receiptOnOther.error, /belongs with live url owner/);
+          assert.match(receiptOnOther.error, new RegExp(holdHasUrl.node.id));
+        }
+
+        const released = await upsertGraphNode(pool, {
+          id: hold.node.id,
+          type: "task",
+          title: "Throwaway live hold receipt",
+          data: { receipt: null },
+          base_updated_at: hold.node.updated_at,
+        });
+        assert.equal(isToolError(released), false);
+        if (isToolError(released)) {
+          return;
+        }
+        const hostTakes = await upsertGraphNode(pool, {
+          id: host.node.id,
+          type: "task",
+          title: "Throwaway live host url",
+          url: { system: "calendar", id: "evt-fixture-split-1" },
+          data: {
+            receipt: { system: "calendar", id: "evt-fixture-split-1", kind: "cleared" },
+          },
+          base_updated_at: host.node.updated_at,
+        });
+        assert.equal(isToolError(hostTakes), false);
+        if (!isToolError(hostTakes)) {
+          assert.deepEqual(hostTakes.node.data.receipt, {
+            system: "calendar",
+            id: "evt-fixture-split-1",
+            kind: "cleared",
+          });
+        }
+      });
+
+      await t.test("gmail drafted patches to sent; drive url does not take a receipt home", async () => {
+        const draft = await upsertGraphNode(pool, {
+          type: "task",
+          title: "Throwaway drafted mail task",
+          data: {
+            receipt: { system: "gmail", id: "msg-fixture-draft-1", kind: "drafted" },
+          },
+        });
+        assert.equal(isToolError(draft), false);
+        if (isToolError(draft)) {
+          return;
+        }
+        assert.deepEqual(draft.node.data.receipt, {
+          system: "gmail",
+          id: "msg-fixture-draft-1",
+          kind: "drafted",
+        });
+
+        const sent = await upsertGraphNode(pool, {
+          id: draft.node.id,
+          type: "task",
+          title: "Throwaway drafted mail task",
+          data: {
+            receipt: { system: "gmail", id: "msg-fixture-sent-mail-1", kind: "sent" },
+          },
+          base_updated_at: draft.node.updated_at,
+        });
+        assert.equal(isToolError(sent), false);
+        if (isToolError(sent)) {
+          return;
+        }
+        assert.deepEqual(sent.node.data.receipt, {
+          system: "gmail",
+          id: "msg-fixture-sent-mail-1",
+          kind: "sent",
+        });
+
+        const drive = await upsertGraphNode(pool, {
+          type: "note",
+          title: "Throwaway drive url",
+          url: { system: "drive", id: "file-fixture-1" },
+        });
+        assert.equal(isToolError(drive), false);
       });
 
       await t.test("receipt null clears; merge keeps url; padded id trims", async () => {
