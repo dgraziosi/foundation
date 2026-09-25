@@ -25,7 +25,7 @@ Preconditions:
 
 - **Open door.** Go to `http://127.0.0.1:8788/view`. The heading reads `Unlock.` The field label is `Vault key`.
 - **Reject.** Type a wrong key and choose **Unlock**. The door stays. Error copy: `That key did not unlock.`
-- **Accept.** Type the real key and choose **Unlock**. Home appears (`[data-surface="home"]`) with Today, Recents, and Open tasks. The rail shows Home, Search, and Trash.
+- **Accept.** Type the real key and choose **Unlock**. Home appears (`[data-surface="home"]`) with Today, Recents, and Open tasks. The rail shows Home, Trash, and Search.
 - **HTTP reject.** `curl -sS -o /tmp/unlock-bad.json -w "%{http_code}" http://127.0.0.1:8788/view/unlock -H "content-type: application/json" -H "accept: application/json" -d '{"api_key":"wrong"}'`. Status `401`. Body `{"error":"That key did not unlock."}`.
 - **MCP key does not unlock** when the view key exists. `API_KEY_FILE="$(.cursor/skills/verify-foundation/scripts/verify-foundation.sh key-file)"`. POST `/view/unlock` with that file's secret. Status `401`. Same copy: `That key did not unlock.` Do this *before* accept so the peer ledger stays empty for the rate-limit burst.
 - **HTTP accept.** `KEY_FILE="$(.cursor/skills/verify-foundation/scripts/verify-foundation.sh view-key-file)"`. If that file is missing, use `key-file`. `curl -sS -D - http://127.0.0.1:8788/view/unlock -H "content-type: application/json" -H "accept: application/json" -d "{\"api_key\":\"$(cat "${KEY_FILE}")\"}"`. Status `200`. Body `{"ok":true}`. `Set-Cookie` includes `foundation_key=` and `Path=/view` and `HttpOnly`. Redact the cookie value in evidence. A successful accept clears that peer's failure bucket.

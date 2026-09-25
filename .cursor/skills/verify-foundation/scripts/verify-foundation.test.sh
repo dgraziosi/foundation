@@ -653,10 +653,10 @@ grep -Fq 'A row offers **Restore**.' "${map_root}/features/trash.md" \
   || fail "trash map must name the Restore control."
 grep -Fq 'Do this *before* accept so the peer ledger stays empty' "${map_root}/features/unlock.md" \
   || fail "unlock map must refuse the MCP key before accept so the rate-limit burst stays honest."
-grep -Fq 'Rail has **Home**, **Search**, and **Trash**.' "${map_root}/features/home.md" \
-  || fail "home map must name Trash on the rail."
-grep -Fq 'rail text `Home` / `Search` / `Trash`' "${map_root}/SKILL.md" \
-  || fail "SKILL Drive handles must name Trash on the rail."
+grep -Fq 'Rail has **Home**, **Trash**, and **Search**.' "${map_root}/features/home.md" \
+  || fail "home map must name the rail in Home, Trash, Search order."
+grep -Fq 'rail text `Home` / `Trash` / `Search`' "${map_root}/SKILL.md" \
+  || fail "SKILL Drive handles must name the rail in Home, Trash, Search order."
 grep -Fq '/usr/lib/postgresql/16/bin' "${helper}" || fail "helper must know the Docker/CI Postgres 16 bin path"
 grep -Fq 'verify_use_host_postgres16' "${helper}" || fail "helper must put host Postgres 16 bins on PATH when present"
 unlock_map="${map_root}/features/unlock.md"
