@@ -27,7 +27,7 @@ Preconditions:
 - Session is unlocked (see [Unlock](./unlock.md)).
 - A first-day empty vault is enough for `home-empty` and `home-today`. Do not seed a fake life.
 
-- **Land.** After Unlock, `[data-surface="home"]` is in the page. **Today** is visible. Headings **Since you last looked**, **Recents**, and **Open tasks** are visible. Rail has **Home**, **Search**, and **Trash**.
+- **Land.** After Unlock, `[data-surface="home"]` is in the page. **Today** is visible. Headings **Since you last looked**, **Recents**, and **Open tasks** are visible. Rail has **Home**, **Trash**, and **Search**.
 - **Digest empty.** First-day: Since you last looked shows **Nothing new.** `GET /view/api/digest` returns `rows` `[]` and sets `foundation_home_looked` (`Path=/view`). A second GET with that cookie stays empty until a bot writes.
 - **Today at count 0.** First-day: Today shows **Write today** and the calendar day. Choose Today. Path `/view/journal/today`. `[data-surface="journal-page"]`.
 - **Empty Recents.** When there are no non-task live records, Recents shows **Nothing yet.**

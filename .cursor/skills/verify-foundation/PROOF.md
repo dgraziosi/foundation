@@ -1,5 +1,32 @@
 # Proofs
 
+## Maintain run (20260925Tmaintain)
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20260925Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20260925Tmaintain`.
+
+Map correction this run (source + the JS the live window served):
+
+- Left rail order is **Home**, **Trash**, **Search**. The map listed Search before Trash.
+
+What that run drove:
+
+- `verify-foundation.test.sh` exited 0.
+- `pnpm --filter @foundation/viewer test` passed. Viewer build succeeded.
+- Doctor: health `{ ok: true, service: foundation, db: up }`, Viewer GET 200, toolchain ok.
+- `verify-http-drive.sh` exited 0 (Unlock reject, MCP key before accept, accept, cookie does not open MCP, sixth wrong unlock 429, Home empty peek, first-day digest `rows` `[]`).
+- `verify-mcp-drive.sh` exited 0 (`POST /mcp` `tools/list`).
+- HTTP Collection: `GET /view/api/types/task` `type.label` Task, view ids board/list/calendar/timeline/outline, `parent_types` `["goal","project"]`, `nodes` `[]`. First-day `GET /view/api/types/journal` `parent_types` `[]`, `nodes` `[]`. After Today, journal collection listed that live id.
+- HTTP Detail: `GET /view/api/nodes/00000000-0000-4000-8000-000000000000` 404 `{"error":"Not found"}`.
+- HTTP Search: idle `{ searched: false, hits: [] }`; `q=zzzxnever`, `type=note`, and `status=active` `{ searched: true, hits: [] }`. After journal write, `q=Morning` `{ searched: true }`.
+- HTTP Journal write: `POST /view/api/journals/today` same live id twice. `PATCH` title/body 200. Stale `base_updated_at` 409.
+- HTTP Edit any node / Activity / Trash: `verify-edit-any-node.sh` exited 0.
+- Home digest first-day empty in `verify-http-drive`. After that look, a later bot note titled "Digest later bot" listed.
+- Named host proofs: `verify-export-import-45.sh` and `verify-receipt-model-calendar.sh` exited 0.
+- Live `/view` served `assets/index-BYAeSmrz.js`. That bundle and `Rail.tsx` label Home, then Trash, then Search.
+- Browser chrome was not clicked. Same-path HTTP was the drive.
+
+Evidence: `.cursor/skills/verify-foundation/evidence/20260925Tmaintain/` (gitignored).
+
 ## Maintain run (20260924Tmaintain)
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20260924Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20260924Tmaintain`.
