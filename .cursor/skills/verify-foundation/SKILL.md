@@ -114,6 +114,7 @@ Stable handles (prefer these over coordinates):
 | `[data-surface="detail-page"]` | Detail page |
 | `[data-surface="graph"]` | Collection graph layout |
 | `data-constraint="parent_types"` | Quiet **May hang under** plus allowed parent labels. Collection heading and detail Properties when the type has `parent_types` |
+| `data-constraint="target_types"` | Quiet **Targets** plus allowed target labels. Detail Properties related records when that relation names `target_types` |
 | `[data-surface="journal-page"]` | Journal write page (not Properties) |
 | `[data-surface="activity-page"]` | That record's activity |
 | `[data-surface="trash-page"]` | Soft-deleted records |
