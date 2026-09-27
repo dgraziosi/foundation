@@ -30,15 +30,15 @@ Preconditions:
 - **Empty.** On a type with no live records, copy is **Nothing yet.**
 - **View switcher.** `aria-label="View"` lists only declared layouts by label (task seed: Board, List, Calendar, Timeline, Outline — no Graph). Choosing **List** keeps the same type and changes the layout, not the route.
 - **Show completed.** `aria-label="Show completed"` is a toggle. It widens an active status filter for this window. Home Open tasks must not change.
-- **Graph.** First-day seed `task` and `journal` do not declare `graph`. If a type names `graph`, that layout uses `[data-surface="graph"]` (floor 460px). Click a node: detail page. Right-click a node: local graph, depth 1–4, default 2.
+- **Graph.** First-day seed `task` and `journal` do not declare `graph`. If a type names `graph`, that layout uses `[data-surface="graph"]` (floor 460px). Click a node: the same `/view/nodes/<uuid>` door as `collection-open-record` (inline markdown journal is the write page). Right-click a node: local graph, depth 1–4, default 2.
 - **HTTP.** `GET /view/api/types/task` with the vault key (view-key-file when present). Body has `type.label`, `type.views` (declaration objects with `id`, not a bare id array), `type.parent_types`, `nodes`. First-day: `nodes` is `[]`. Seed `task` views are `board`, `list`, `calendar`, `timeline`, `outline`. Seed `task` `parent_types` is `["goal","project"]` (labels Goal, Project). Seed `journal` `parent_types` is `[]`.
 - **Proof.** Screenshot the collection heading and empty copy, or save the type JSON. Feature id `collection-empty` or `collection-open`.
 
 ## Gotchas
 
 - The window does not add a ninth layout. Declared set: list, card, table, board, calendar, timeline, outline, graph.
-- Count in the heading is after the active view's filter, not always the live type count on Home folders.
-- `journal` as a collection is a list of journal records. **Today** on that heading leaves the list for [Journal write](./journal-write.md). Choosing a journal row also opens that write page, not `[data-surface="detail-page"]`. Do not treat the list as the write page.
+- Count in the heading is after the active view's filter, not always the live type count on Home folders. The type query is also capped at `list_limit_default` (seed 200) before that filter. Home folders use the full live count.
+- `journal` as a collection is a list of journal records. **Today** on that heading leaves the list for [Journal write](./journal-write.md). A journal row with inline `text/markdown` opens that write page, not `[data-surface="detail-page"]`. Any other journal payload opens detail. Do not treat the list as the write page.
 - Do not treat MCP `search { type }` as a collection proof. Drive `/view/types/<slug>` or `GET /view/api/types/<slug>`.
 - Default task **board** columns hardcode **Nothing yet.** even when the page-level empty string is **Nothing matches your filters.** Prove `collection-filtered` on **List**, not Board. Graph ignores the active view filter and also hardcodes **Nothing yet.** Do not prove `collection-filtered` on Graph.
 - **May hang under** is ontology chrome from `parent_types`. First-day `task` shows it with an empty list. It is not a load error and not a live record.

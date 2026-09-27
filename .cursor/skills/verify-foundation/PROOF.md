@@ -9,6 +9,7 @@ Map correction this run (source + live HTTP on a throwaway vault):
 - Detail Properties related records show **Targets** plus allowed target labels (`data-constraint="target_types"`) when that relation names `target_types`. Seed `about` is `["person"]` (Person). The line appears only after a live related row. Seed `relates_to` omits it.
 - Empty Location copy on Properties is **Home**.
 - First-day Home HTTP is digest `{ "rows": [], "looked_at" }`, recents `{ "rows": [] }`, and tasks `{ "tasks": [] }`, not a bare `[]` on each.
+- Collection graph node clicks use the same `/view/nodes/<uuid>` door as other layouts. A journal row opens the write page only when the payload is inline `text/markdown`. The heading count can also differ from Home because the type query caps at `list_limit_default` (seed 200).
 
 What that run drove:
 
