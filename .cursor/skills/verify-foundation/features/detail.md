@@ -6,7 +6,7 @@ Detail is one non-journal record as a page in the content host. It is not a dock
 
 - `detail-open` fills the main pane at `/view/nodes/<uuid>` with `[data-surface="detail-page"]` and the record title as an editable field (non-journal, or a journal that is not inline markdown).
 - `detail-missing` shows **Not found.** for a bad or unknown id. A valid unknown UUID also paints heading `Not found` (no period) and never mounts `[data-surface="detail-page"]`.
-- `detail-properties` shows type, editable status, and editable declared fields, then **Open** only when `data.url` is a well-formed https address, then Activity and Move to trash, then related records, location, and timestamps. When the type has `parent_types`, the same **May hang under** line as collection appears (`data-constraint="parent_types"`).
+- `detail-properties` shows type, editable status, and editable declared fields, then **Open** only when `data.url` is a well-formed https address, then Activity and Move to trash, then related records, location, and timestamps. When the type has `parent_types`, the same **May hang under** line as collection appears (`data-constraint="parent_types"`). A related relation that names `target_types` shows a quiet **Targets** line (`data-constraint="target_types"`) plus those type labels.
 - `detail-structure` shows Structure when there are children, or an ancestor chain the type asks for.
 - `detail-close` closes the detail tab and activates the tab to its left, or Home when that was the last one.
 
@@ -27,7 +27,7 @@ Preconditions:
 - **Open from Home or collection.** When a real record exists on this vault, choose its title. Path `/view/nodes/<uuid>`. Title field `aria-label="Title"` shows that title (not an `h1`). `[data-surface="detail-page"]` is present. Properties column heading **Properties**.
 - **Open from search.** From the search overlay, choose a hit. Same detail page. Overlay closes.
 - **Close.** Choose the strip button `aria-label="Close <title>"` after a click-open (the tab label is that title). A deep-link to `/view/nodes/:id` keeps the tab label `Detail`, so the control is `Close Detail`.
-- **HTTP get.** `GET /view/api/nodes/<uuid>` with the vault key (view-key-file when present). Body includes `node.title`, `node.type`, `node.status`, `node.data`. Writes use [Edit any node](./edit-any-node.md).
+- **HTTP get.** `GET /view/api/nodes/<uuid>` with the vault key (view-key-file when present). Body includes `node.title`, `node.type`, `node.status`, `node.data`, and `related`. After an `about` edge, `related` lists that neighbor. Window Properties then shows **Targets** Person. Prove seed `about.target_types` on `GET /view/api/ontology` (`["person"]`) instead of inventing a relation.
 - **Proof.** Screenshot the detail heading and Properties, or save the 404 body for `detail-missing`. Feature id `detail-missing` is enough on a first-day vault.
 
 ## Gotchas
@@ -37,4 +37,4 @@ Preconditions:
 - Blob body in the window is `GET /view/blobs/:id` (cookie or Authorization). Agents still use `GET /blobs/:id` with the header.
 - Do not prove detail by calling MCP `get` only. The user path is the page or `/view/api/nodes/:id`.
 - A journal with inline `text/markdown` does not get this chrome. The same `/view/nodes/:id` route renders [Journal write](./journal-write.md) (`[data-surface="journal-page"]`, no Properties). Do not score that as a failed `detail-open`.
-- First-day skip `detail-open`. The Properties **May hang under** line is the same chrome as collection. Prove `type.parent_types` on `GET /view/api/types/task` (`["goal","project"]`) instead of upserting a task.
+- First-day skip `detail-open`. The Properties **May hang under** line is the same chrome as collection. Prove `type.parent_types` on `GET /view/api/types/task` (`["goal","project"]`) instead of upserting a task. **Targets** is ontology chrome from a relation's `target_types`. It appears only when that record has a related row for a relation that names targets. Seed `about` is Person. Seed `relates_to` omits the line.
