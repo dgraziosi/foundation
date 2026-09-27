@@ -7,6 +7,8 @@ Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20260927Tmaint
 Map correction this run (source + live HTTP on a throwaway vault):
 
 - Detail Properties related records show **Targets** plus allowed target labels (`data-constraint="target_types"`) when that relation names `target_types`. Seed `about` is `["person"]` (Person). The line appears only after a live related row. Seed `relates_to` omits it.
+- Empty Location copy on Properties is **Home**.
+- First-day Home HTTP is digest `{ "rows": [], "looked_at" }`, recents `{ "rows": [] }`, and tasks `{ "tasks": [] }`, not a bare `[]` on each.
 
 What that run drove:
 
