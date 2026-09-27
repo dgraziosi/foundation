@@ -26,7 +26,7 @@ What that run drove:
 - Home digest first-day empty in `verify-http-drive`. After that look, a later bot note titled "Digest later bot 20260927" listed. Second look empty.
 - Named host proofs: `verify-export-import-45.sh` and `verify-receipt-model-calendar.sh` exited 0.
 - Live `/view` served `assets/index-BYAeSmrz.js`. That bundle contains **Targets**, `target_types`, Unlock copy, **May hang under**, **Trash**, and **Restore**.
-- Browser chrome was not clicked for the map correction. Same-path HTTP plus the JS the live window served was the drive.
+- Window: Unlock, Home (Today, digest, Recents, Open tasks, rail Home / Trash / Search), Search idle copy. Later Trash and node clicks hit this run's cleanup (instance already stopped). Same-path HTTP plus the JS the live window served proved Targets.
 
 Evidence: `.cursor/skills/verify-foundation/evidence/20260927Tmaintain/` (gitignored).
 
