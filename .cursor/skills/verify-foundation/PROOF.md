@@ -1,5 +1,24 @@
 # Proofs
 
+## Maintain run (20260928Ttrash)
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20260928Ttrash`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20260928Ttrash`.
+
+Map correction this run (source + live HTTP on a throwaway vault):
+
+- Choosing **Restore** opens `/view/nodes/<uuid>`. A non-journal is `[data-surface="detail-page"]`. A journal with inline markdown is `[data-surface="journal-page"]`. The map had said every Restore lands on detail.
+
+What that run drove:
+
+- `verify-foundation.test.sh` exited 0.
+- Doctor: health `{ ok: true, service: foundation, db: up }`, Viewer GET 200, toolchain ok.
+- HTTP journal restore: `POST /view/api/journals/today` created type `journal`, `text/markdown`, storage `inline`. `DELETE` then live GET 404. `GET /view/api/trash` listed that id. `POST /view/api/nodes/<id>/restore` 200 returned the same journal with inline markdown. Live GET showed that payload. The window on that path is the write page.
+- `verify-edit-any-node.sh` exited 0 (person Restore still returns the live node document).
+- Live `/view` served `assets/index-BYAeSmrz.js`. That bundle contains **Restore**, **Nothing in trash**, `journal-page`, and `detail-page`.
+- Browser chrome was not clicked. Same-path HTTP plus the JS the live window served was the drive.
+
+Evidence: `.cursor/skills/verify-foundation/evidence/20260928Ttrash/` (gitignored).
+
 ## Maintain run (20260927Tmaintain)
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20260927Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20260927Tmaintain`.

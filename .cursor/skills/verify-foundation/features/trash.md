@@ -24,10 +24,10 @@ Preconditions:
 - **HTTP delete.** `DELETE /view/api/nodes/<id>` `{ base_updated_at }`. Status `200`. GET that id is `404`. Recents no longer lists it.
 - **HTTP trash.** `GET /view/api/trash`. Body `{ "rows": [...] }` with `id`, `type`, `title`, `deleted_at`, `updated_at`. Empty HTTP is `{ "rows": [] }`. The row is present after delete.
 - **HTTP restore.** `POST /view/api/nodes/<id>/restore` `{ base_updated_at }` from the trash row's `updated_at`. Status `200` with the live node document (`node.id`, `node.title`). The record is live again.
-- **Window.** `[data-surface="trash-page"]`. Empty copy **Nothing in trash.** **Move to trash** leaves the detail page and opens Trash. A row offers **Restore**. Choosing **Restore** opens that live record (`[data-surface="detail-page"]`).
+- **Window.** `[data-surface="trash-page"]`. Empty copy **Nothing in trash.** **Move to trash** leaves the detail page and opens Trash. A row offers **Restore**. Choosing **Restore** opens that live record at `/view/nodes/<uuid>`. A non-journal is `[data-surface="detail-page"]`. A journal with inline markdown is `[data-surface="journal-page"]`.
 
 ## Gotchas
 
 - Blob bytes are not purged.
 - Restore prefers undo-of-delete when that activity row is still reversible.
-- Inline markdown journals have no **Move to trash**. Soft-delete them only over HTTP, not from the write page.
+- Inline markdown journals have no **Move to trash**. Soft-delete them only over HTTP, not from the write page. Restore of that journal is the write page, not Properties.
