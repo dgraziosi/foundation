@@ -651,6 +651,8 @@ grep -Fq '[data-surface="home-digest"]' "${map_root}/features/home.md" \
   || fail "home map must cite [data-surface=\"home-digest\"]."
 grep -Fq 'A row offers **Restore**.' "${map_root}/features/trash.md" \
   || fail "trash map must name the Restore control."
+grep -Fq 'A journal with inline markdown is `[data-surface="journal-page"]`' "${map_root}/features/trash.md" \
+  || fail "trash map must say Restore of an inline markdown journal opens the write page."
 grep -Fq 'Do this *before* accept so the peer ledger stays empty' "${map_root}/features/unlock.md" \
   || fail "unlock map must refuse the MCP key before accept so the rate-limit burst stays honest."
 grep -Fq 'Rail has **Home**, **Trash**, and **Search**.' "${map_root}/features/home.md" \
