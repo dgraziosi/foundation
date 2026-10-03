@@ -4,7 +4,7 @@ Home is the first surface after Unlock. It always offers **Today**, even when no
 
 ## Sub-features
 
-- `home-today` always shows Today (`[data-surface="home-today"]`). Empty body: **Write today** and the calendar day. After a write: the day and the first sentence. Choose it to open `/view/journal/today`.
+- `home-today` always shows Today (`[data-surface="home-today"]`). Empty body: **Write today** and the calendar day. After a write: the day and the first line of the body (ATX heading marks stripped). Choose it to open `/view/journal/today`.
 - `home-chrome` shows Recents, Open tasks, and a Types block when any type has a live count.
 - `home-digest` shows **Since you last looked** (`[data-surface="home-digest"]`). First visit reads bot activity (`actor` not `user`) from the last 24 hours, cap 5. After Home loads, the next fetch with no new bot writes shows **Nothing new.** The watermark cookie is `foundation_home_looked` (`Path=/view`).
 - `home-empty` shows **Nothing yet.** for Recents, **No open tasks.** for Open tasks, and **Nothing new.** for Since you last looked when those lists are empty.

@@ -5,7 +5,7 @@ From a non-journal detail page, Activity lists that record's writes. A reversibl
 ## Sub-features
 
 - `activity-list` GET `/view/api/nodes/<id>/activity` returns `rows` with action, actor, actor_label, `created_at`, `summary`, `can_undo`, and `base_updated_at` when Undo is offered.
-- `activity-undo` POST `/view/api/activity/<id>/undo` with `base_updated_at` inverts a reversible user **update**. The window button is gated on `can_undo` plus `base_updated_at`, not `reversible` alone.
+- `activity-undo` POST `/view/api/activity/<id>/undo` with `base_updated_at` inverts a reversible **create** or **update**. The window button is gated on `can_undo` plus `base_updated_at`, not `reversible` alone. A Viewer save row is the usual proof. A **Created** row can also offer Undo.
 - `activity-undo-clash` a stale or missing if-match refuses and does not invert.
 
 ## How to get to it (user POV)
