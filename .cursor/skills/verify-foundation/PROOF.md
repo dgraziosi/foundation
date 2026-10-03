@@ -1,5 +1,32 @@
 # Proofs
 
+## Maintain run (20261003Tmaintain)
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20261003Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20261003Tmaintain`.
+
+Map corrections this run (source + live HTTP on a throwaway vault):
+
+- Home Today after a write shows the day and the first line of the body (ATX heading marks stripped), not a later sentence. A body `# Morning` plus a following sentence peeks **Morning**.
+- Activity **Undo** is offered when `can_undo` is true. A **Created** row can carry that flag, not only a Viewer **update**.
+- Detail Properties is a column label **Properties**, not a heading.
+
+What that run drove:
+
+- `verify-foundation.test.sh` exited 0.
+- Viewer build succeeded. Doctor: health `{ ok: true, service: foundation, db: up }`, Viewer GET 200, toolchain ok.
+- `verify-http-drive.sh` exited 0 (Unlock reject, MCP key before accept, accept, cookie does not open MCP, sixth wrong unlock 429, Home empty peek, first-day digest `rows` `[]`).
+- `verify-mcp-drive.sh` exited 0 (`POST /mcp` `tools/list`).
+- HTTP Collection: `GET /view/api/types/task` `type.label` Task, view ids board/list/calendar/timeline/outline, `parent_types` `["goal","project"]`, `nodes` `[]`. First-day `GET /view/api/types/journal` `parent_types` `[]`, `nodes` `[]`. After Today, journal collection listed that live id.
+- HTTP Detail: `GET /view/api/nodes/00000000-0000-4000-8000-000000000000` 404 `{"error":"Not found"}`. `GET /view/api/ontology` seed `about.target_types` `["person"]`.
+- HTTP Search: idle `{ searched: false, hits: [] }`; `q=zzzxnever`, `type=note`, and `status=active` `{ searched: true, hits: [] }`. After journal write, `q=Morning` `{ searched: true }`.
+- HTTP Journal write: `POST /view/api/journals/today` same live id twice. `PATCH` title/body 200. Stale `base_updated_at` 409.
+- HTTP Edit any node / Activity / Trash: `verify-edit-any-node.sh` exited 0. After that cycle, activity listed a **Created** row with `can_undo` true. Journal `DELETE` then live GET 404; HTTP activity on the tombstone still 200. Restore returned type `journal`, storage `inline`.
+- Home digest first-day empty in `verify-http-drive`. Later bot title listed without a watermark cookie. Second look with a cookie jar empty.
+- Live `/view` served `assets/index-BYAeSmrz.js`. That bundle contains Unlock copy, **Write today**, **May hang under**, **Targets**, **Keep a title**, **Restore**, `journal-page`, and `detail-page`.
+- Browser chrome was not clicked. Same-path HTTP plus the JS the live window served was the drive.
+
+Evidence: `.cursor/skills/verify-foundation/evidence/20261003Tmaintain/` (gitignored).
+
 ## Maintain run (20260928Ttrash)
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20260928Ttrash`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20260928Ttrash`.
