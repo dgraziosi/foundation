@@ -1,5 +1,33 @@
 # Proofs
 
+## Maintain run (20261012Tmaintain)
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20261012Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20261012Tmaintain`. Evidence stayed.
+
+Map/harness correction this run (source + live HTTP on a throwaway vault):
+
+- Helper `verify-foundation.test.sh` refuses the HTTP empty-title error string in SKILL / features / PROOF so a cold agent learns window **Keep a title**. The 20261011 note had written that HTTP string. This run restates the 400 as window **Keep a title**. Live empty-title PATCH is still `400` and does not change the prior title.
+
+What that run drove:
+
+- Source readers for Unlock, Home, Collection, Detail, Edit any node, Activity, Trash, Search, and Journal write: no user-POV drift.
+- Viewer routes still match the map (`/`, `/recents`, `/trash`, `/journal/today`, `/types/:slug`, `/nodes/:id`, `/nodes/:id/activity`). Search stays overlay-only.
+- Helper test failed on main until this PROOF line, then exited 0.
+- Viewer build succeeded. Doctor: health `{ ok: true, service: foundation, db: up }`, Viewer GET 200, toolchain ok.
+- `verify-http-drive.sh` exited 0 (Unlock reject, MCP key before accept, accept, cookie does not open MCP, sixth wrong unlock 429, Home empty peek, first-day digest `rows` `[]`).
+- `verify-mcp-drive.sh` exited 0 (`POST /mcp` `tools/list`).
+- HTTP Collection: `GET /view/api/types/task` `type.label` Task, view ids board/list/calendar/timeline/outline, `parent_types` `["goal","project"]`, `nodes` `[]`. Seed `journal` `parent_types` `[]`. After Today, journal collection listed that live id.
+- HTTP Detail: `GET /view/api/nodes/00000000-0000-4000-8000-000000000000` 404 `{"error":"Not found"}`. `GET /view/api/ontology` seed `about.target_types` `["person"]` (relation `slug`).
+- HTTP Search: idle `{ searched: false, hits: [] }`; `q=zzzxnever`, `type=note`, and `status=active` `{ searched: true, hits: [] }`. After journal write, `q=Morning` `{ searched: true }`.
+- HTTP Journal write: `POST /view/api/journals/today` same live id twice. `PATCH` title/body 200. Stale `base_updated_at` 409.
+- HTTP Edit any node / Activity update Undo / Trash: `verify-edit-any-node.sh` exited 0. Empty title 400. Window **Keep a title**. `body` on a non-journal 403 `Journal writes only.`
+- HTTP Activity **Created** Undo: MCP upsert of a person titled "Create undo fixture". Stale if-match 409 left the record live. Undo `200` body keys `ok`, `activity_id` only. Live GET 404. Trash listed that id. Tombstone activity still 200.
+- Home digest first-day empty in `verify-http-drive`. Cookie-jar second look empty. Later bot title "Digest jar bot 20261012" listed, then empty. Watermark cookie `foundation_home_looked` `Path=/view`.
+- Live `/view` served `assets/index-BYAeSmrz.js`. That bundle contains Unlock copy, **Write today**, **May hang under**, **Targets**, **Keep a title**, **Restore**, `journal-page`, and `detail-page`.
+- Browser chrome was not clicked. Same-path HTTP plus the JS the live window served was the drive.
+
+Evidence: `.cursor/skills/verify-foundation/evidence/20261012Tmaintain/` (gitignored).
+
 ## Maintain run (20261011Tmaintain)
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20261011Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20261011Tmaintain`.
@@ -18,7 +46,7 @@ What that run drove:
 - HTTP Detail: `GET /view/api/nodes/00000000-0000-4000-8000-000000000000` 404 `{"error":"Not found"}`. `GET /view/api/ontology` seed `about.target_types` `["person"]`.
 - HTTP Search: idle `{ searched: false, hits: [] }`; `q=zzzxnever`, `type=note`, and `status=active` `{ searched: true, hits: [] }`. After journal write, `q=Morning` `{ searched: true }`.
 - HTTP Journal write: `POST /view/api/journals/today` same live id twice. `PATCH` title/body 200. Stale `base_updated_at` 409.
-- HTTP Edit any node / Activity update Undo / Trash: `verify-edit-any-node.sh` exited 0. Empty title 400 `Title is required.` `body` on a non-journal 403 `Journal writes only.` Journal `DELETE` then live GET 404; HTTP activity on the tombstone still 200. Restore returned type `journal`, storage `inline`.
+- HTTP Edit any node / Activity update Undo / Trash: `verify-edit-any-node.sh` exited 0. Empty title 400. Window **Keep a title**. `body` on a non-journal 403 `Journal writes only.` Journal `DELETE` then live GET 404; HTTP activity on the tombstone still 200. Restore returned type `journal`, storage `inline`.
 - HTTP Activity **Created** Undo: MCP upsert of a person titled "Create undo fixture". Activity listed a **Created** row with `can_undo` true. Stale if-match 409 left the record live. Undo `200` body keys `ok`, `activity_id` only. Live GET 404. Trash listed that id. Tombstone activity still 200.
 - Home digest first-day empty in `verify-http-drive`. Later bot title "Digest later bot 20261011" listed with a cookie jar. Second look empty. Watermark cookie `foundation_home_looked` `Path=/view`.
 - Live `/view` served `assets/index-BYAeSmrz.js`. That bundle contains Unlock copy, **Write today**, **May hang under**, **Targets**, **Keep a title**, **Restore**, `journal-page`, and `detail-page`.
