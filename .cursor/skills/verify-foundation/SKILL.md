@@ -45,11 +45,16 @@ curl -fsS http://127.0.0.1:8787/health
 
 Viewer is then `http://127.0.0.1:8788/view`. Off-box is `VIEW_HOST=0.0.0.0` (`http://<this-host>:8788/view`). MCP / health / agent blobs stay on `127.0.0.1:8787`.
 
-**Verification launch** (disposable folder, not a personal vault). Prefer the helper so the run records what it started:
+**Verification launch** (disposable folder, not a personal vault). Prefer the helper so the run records what it started.
+
+Viewer assets come from `apps/viewer/dist`. `pnpm start` mounts that folder when the process starts. Build first, then launch, so `/view/assets` is the React chrome:
 
 ```bash
+pnpm --filter @foundation/viewer build
 .cursor/skills/verify-foundation/scripts/verify-foundation.sh launch
 ```
+
+A build after launch does not remount. Restart the throwaway vault after that build. Without dist at start, `/view` still serves HTML (`Foundation` title, or the unlock fallback **Unlock.** / Vault key). The script tag then points at `/view/assets/…`, and that URL is the same HTML shell until restart.
 
 That script:
 
@@ -65,14 +70,6 @@ That script:
 Default ports (`8787`, `8788`, `5432`) are one-instance. Two side-by-side vaults need different `PORT`, `VIEW_PORT`, and a Postgres port in `DATABASE_URL`, plus a second data folder. This skill does not do that. Refuse a second drive on a shared instance.
 
 Teardown is Cleanup below. There is no short-lived CLI to keep alive: launch means the two host programs are up.
-
-Viewer assets come from `apps/viewer/dist`. `pnpm start` does not build them. Before a first window proof on a clean clone:
-
-```bash
-pnpm --filter @foundation/viewer build
-```
-
-Without that dist, `/view` still serves the unlock fallback HTML (`Unlock.` / Vault key). The React Home / collection / detail / search / journal chrome needs the build.
 
 ## Doctor
 
@@ -90,7 +87,7 @@ Worth driving only when all of these hold:
 | `GET http://127.0.0.1:8788/view` | HTTP 200 HTML. Body contains `Foundation` (built app) or `Unlock.` / `Vault key` (fallback or unlock gate) |
 | Ports | MCP/health on `8787`, Viewer on `8788`. If this run launched, the state file names the data dir and app pid we started |
 | Auth | `FOUNDATION_API_KEY` is set in the environment, else this run's key file (`verify-foundation.sh key-file`), else the clone `.env`. Do not print the key. Doctor also says whether the view key is set, without printing it |
-| Build | For a full window drive: `apps/viewer/dist/index.html` exists |
+| Build | For a full window drive: `apps/viewer/dist/index.html` exists, and GET of the `/view/assets/…js` from that HTML is JavaScript (not the HTML shell) |
 
 If health is down, the instance is not worth driving. Do not invent graph rows to make Home look populated. An empty first-day vault is a valid Viewer: Today **Write today**, Recents **Nothing yet.** and open tasks **No open tasks.**
 
