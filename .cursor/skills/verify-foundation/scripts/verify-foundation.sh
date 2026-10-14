@@ -388,6 +388,7 @@ verify_toolchain() {
 
 verify_cmd_doctor() {
   local repo_root id state health_url view_url body view_code view_body dist app_pid view_key_file
+  local script_src script_url script_ct script_head view_origin
   repo_root="$(verify_repo_root)"
   id="$(verify_resolve_run_id)"
   state="$(verify_state_file "${id}")"
@@ -461,6 +462,26 @@ verify_cmd_doctor() {
   else
     echo "doctor: view GET 200 but body did not look like Viewer"
     return 1
+  fi
+
+  # Live window script from GET /view (src="/view/assets/…js").
+  script_src="$(printf '%s\n' "${view_body}" | sed -n 's/.*src="\(\/view\/assets\/[^"]*\.js\)".*/\1/p' | head -n 1)"
+  if [[ -n "${script_src}" ]]; then
+    view_origin="${view_url%/view}"
+    script_url="${view_origin}${script_src}"
+    script_ct="$(
+      curl -sS -D /tmp/foundation-verify-view-js-h.$$ -o /tmp/foundation-verify-view-js.$$ \
+        -w "%{content_type}" --max-time 5 "${script_url}" 2>/dev/null || true
+    )"
+    script_head="$(head -c 64 /tmp/foundation-verify-view-js.$$ 2>/dev/null || true)"
+    rm -f /tmp/foundation-verify-view-js.$$ /tmp/foundation-verify-view-js-h.$$
+    if [[ "${script_ct}" == *javascript* ]]; then
+      echo "doctor: window script is JavaScript"
+    elif [[ -n "${script_head}" && "${script_head}" != *"<!DOCTYPE"* && "${script_head}" != *"<html"* && "${script_head}" != *"<!"* ]]; then
+      echo "doctor: window script is JavaScript"
+    else
+      echo "doctor: window script is the HTML shell. Build Viewer before launch (or restart after the build) so /view/assets is the React chrome."
+    fi
   fi
 
   echo "doctor: worth driving"

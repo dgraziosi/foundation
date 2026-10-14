@@ -1,5 +1,33 @@
 # Proofs
 
+## Maintain run (20261014Tmaintain)
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20261014Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20261014Tmaintain`. Evidence stayed.
+
+Map/harness correction this run (source + live HTTP on a throwaway vault):
+
+- The window serves `/view/assets` from `apps/viewer/dist` when the process starts. A Viewer build after launch leaves that URL as the HTML shell. Doctor now GETs the script from `GET /view` and says when it is JavaScript, or when to build before launch (or restart after the build). The skill launch block builds first.
+
+What that run drove:
+
+- Source readers for Unlock, Home, Collection, Detail, Edit any node, Activity, Trash, Search, and Journal write: no user-POV drift on those surfaces.
+- Viewer routes still match the map (`/`, `/recents`, `/trash`, `/journal/today`, `/types/:slug`, `/nodes/:id`, `/nodes/:id/activity`). Search stays overlay-only.
+- Helper test failed on main until this PROOF line, then exited 0.
+- Viewer build succeeded. First launch started while that build was still running. Doctor: health `{ ok: true, service: foundation, db: up }`, Viewer GET 200, dist present, live `/view/assets/index-BYAeSmrz.js` `text/html` 421 bytes (the shell). The updated doctor on that process printed `window script is the HTML shell`. Cleanup kept evidence. Relaunch `20261014Trestart` (dist already built): doctor printed `window script is JavaScript`; the same URL was `text/javascript` 715979 bytes.
+- `verify-http-drive.sh` exited 0 (Unlock reject, MCP key before accept, accept, cookie does not open MCP, sixth wrong unlock 429, Home empty peek, first-day digest `rows` `[]`).
+- `verify-mcp-drive.sh` exited 0 (`POST /mcp` `tools/list`).
+- HTTP Collection: `GET /view/api/types/task` `type.label` Task, view ids board/list/calendar/timeline/outline, `parent_types` `["goal","project"]`, `nodes` `[]`. Seed `journal` `parent_types` `[]`. After Today, journal collection listed that live id.
+- HTTP Detail: `GET /view/api/nodes/00000000-0000-4000-8000-000000000000` 404 `{"error":"Not found"}`. `GET /view/api/ontology` seed `about.target_types` `["person"]` (relation `slug`).
+- HTTP Search: idle `{ searched: false, hits: [] }`; `q=zzzxnever`, `type=note`, and `status=active` `{ searched: true, hits: [] }`. After journal write, `q=Morning` `{ searched: true }`.
+- HTTP Journal write: `POST /view/api/journals/today` same live id twice. `PATCH` title/body 200. Stale `base_updated_at` 409.
+- HTTP Edit any node / Activity update Undo / Trash: `verify-edit-any-node.sh` exited 0. Empty title 400. Window **Keep a title**. `body` on a non-journal 403 `Journal writes only.`
+- HTTP Activity **Created** Undo: MCP upsert of a person titled "Create undo fixture". Stale if-match 409 left the record live. Undo `200` body keys `ok`, `activity_id` only. Live GET 404. Trash listed that id. Tombstone activity still 200.
+- HTTP journal Restore: `DELETE` then live GET 404. Restore `200` type `journal`, storage `inline`.
+- Built dist `index-BYAeSmrz.js` contains Unlock copy, **Write today**, **May hang under**, **Targets**, **Keep a title**, **Restore**, `journal-page`, and `detail-page`.
+- Browser chrome was not clicked. Same-path HTTP plus the JS the live window served (after restart) was the drive.
+
+Evidence: `.cursor/skills/verify-foundation/evidence/20261014Tmaintain/` (gitignored).
+
 ## Maintain run (20261012Tmaintain)
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20261012Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20261012Tmaintain`. Evidence stayed.

@@ -673,6 +673,13 @@ skill_blob="$(cat "${map_root}/SKILL.md")"
 [[ "${skill_blob}" == *"/view/api/digest"* ]] || fail "SKILL Drive must show Home digest GET"
 [[ "${skill_blob}" == *"view-key-file"* ]] || fail "SKILL Drive must use view-key-file when present"
 grep -Fq -- 'curl -sS -L --max-redirs 3' "${helper}" || fail "doctor must follow the /view redirect a browser follows"
+grep -Fq -- '/view/assets/' "${helper}" || fail "doctor must GET the window script from /view HTML"
+grep -Fq -- 'window script is JavaScript' "${helper}" || fail "doctor must say when /view/assets is JavaScript"
+grep -Fq -- 'Build Viewer before launch' "${helper}" || fail "doctor must say to build before launch when the script is the HTML shell"
+grep -Fq -- 'pnpm --filter @foundation/viewer build' "${map_root}/SKILL.md" \
+  || fail "SKILL must still name the Viewer build"
+grep -Fq -- 'Build first, then launch' "${map_root}/SKILL.md" \
+  || fail "SKILL must build Viewer before launch so /view/assets mounts"
 [[ "${skill_blob}" == *"Does not create"* ]] || fail "SKILL Drive must say the Today peek GET does not create"
 [[ "${skill_blob}" == *"fail when it is unset"* ]] || fail "SKILL must fail server tests when DATABASE_URL is unset"
 [[ "${skill_blob}" != *"skip when it is unset"* ]] || fail "SKILL must not skip server tests when DATABASE_URL is unset"
