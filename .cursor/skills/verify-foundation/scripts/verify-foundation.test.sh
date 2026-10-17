@@ -643,6 +643,10 @@ grep -Fq 'Prove `collection-filtered` on **List**, not Board.' "${map_root}/feat
   || fail "collection map must say prove filtered copy on List, not Board."
 grep -Fq 'A journal with inline markdown opens the write page (`[data-surface="journal-page"]`)' "${map_root}/features/collection.md" \
   || fail "collection map must say a journal row opens the write page, not detail-page."
+grep -Fq '[data-surface="board"]' "${map_root}/features/collection.md" \
+  || fail "collection map must name [data-surface=\"board\"] for seed task Board."
+grep -Fq '[data-surface="collection-preview"]' "${map_root}/features/collection.md" \
+  || fail "collection map must name [data-surface=\"collection-preview\"] so List hover is not scored as detail."
 grep -Fq 'The unlock cookie authenticates; the watermark is set on the digest GET.' "${map_root}/features/home.md" \
   || fail "home map must not treat the unlock cookie as the digest watermark."
 grep -Fq 'foundation_home_looked' "${map_root}/features/home.md" \
@@ -657,8 +661,20 @@ grep -Fq 'Do this *before* accept so the peer ledger stays empty' "${map_root}/f
   || fail "unlock map must refuse the MCP key before accept so the rate-limit burst stays honest."
 grep -Fq 'Rail has **Home**, **Trash**, and **Search**.' "${map_root}/features/home.md" \
   || fail "home map must name the rail in Home, Trash, Search order."
+grep -Fq 'Record this before choosing Today.' "${map_root}/features/home.md" \
+  || fail "home map must prove empty Recents before Today creates a journal."
+grep -Fq 'The strip adds **Today**.' "${map_root}/features/home.md" \
+  || fail "home map must say the strip adds a Today tab."
+grep -Fq 'server cap 500' "${map_root}/features/home.md" \
+  || fail "home map must say Recents View all is not the Home card cap of 5."
 grep -Fq 'rail text `Home` / `Trash` / `Search`' "${map_root}/SKILL.md" \
   || fail "SKILL Drive handles must name the rail in Home, Trash, Search order."
+grep -Fq 'Pinned `Home` plus open Recents, Today, Trash, collection, and detail tabs' "${map_root}/SKILL.md" \
+  || fail "SKILL Drive handles must name Recents, Today, and Trash strip tabs."
+grep -Fq '[data-surface="board"]' "${map_root}/SKILL.md" \
+  || fail "SKILL Drive handles must name [data-surface=\"board\"]."
+grep -Fq '[data-surface="collection-preview"]' "${map_root}/SKILL.md" \
+  || fail "SKILL Drive handles must name [data-surface=\"collection-preview\"]."
 grep -Fq '/usr/lib/postgresql/16/bin' "${helper}" || fail "helper must know the Docker/CI Postgres 16 bin path"
 grep -Fq 'verify_use_host_postgres16' "${helper}" || fail "helper must put host Postgres 16 bins on PATH when present"
 unlock_map="${map_root}/features/unlock.md"

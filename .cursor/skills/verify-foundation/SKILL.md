@@ -107,8 +107,10 @@ Stable handles (prefer these over coordinates):
 | `[data-surface="home-digest"]` | Home Since you last looked. Empty: **Nothing new.** |
 | rail text `Home` / `Trash` / `Search` | Left rail in that order. Collapsed Search uses `aria-label="Search"`. Trash is rail chrome; see [Trash](features/trash.md) |
 | `[data-surface="search-overlay"]` | Search overlay. Heading `Search`, search field placeholder `Search the graph`, button `Close` |
-| `[data-surface="view-strip"]` | Content-host strip. Pinned `Home` plus open collection/detail tabs |
+| `[data-surface="view-strip"]` | Content-host strip. Pinned `Home` plus open Recents, Today, Trash, collection, and detail tabs |
 | `[data-surface="detail-page"]` | Detail page |
+| `[data-surface="board"]` | Collection Board layout. Seed task default. Column empty copy **Nothing yet.** |
+| `[data-surface="collection-preview"]` | Collection List hover aside. Not `[data-surface="detail-page"]` |
 | `[data-surface="graph"]` | Collection graph layout |
 | `data-constraint="parent_types"` | Quiet **May hang under** plus allowed parent labels. Collection heading and detail Properties when the type has `parent_types` |
 | `data-constraint="target_types"` | Quiet **Targets** plus allowed target labels. Detail Properties related records when that relation names `target_types` |
