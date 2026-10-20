@@ -1,5 +1,35 @@
 # Proofs
 
+## Maintain run (20261020Tmaintain)
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20261020Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20261020Tmaintain`. Evidence stayed.
+
+Map corrections this run (source + live HTTP and the JS the live window served):
+
+- Journal page day label includes the weekday. First create on this seed New York vault stored title `October 20, 2026`. The window formats `created_at` as `Tuesday, October 20, 2026`. Live `/view/assets/index-BYAeSmrz.js` uses `Intl.DateTimeFormat` with `weekday: "long"`. Collection heading **Today** is a link-styled button, not an `<a>`.
+
+What that run drove:
+
+- Source readers for Unlock, Home, Collection, Detail, Edit any node, Activity, Trash, Search, and Journal write.
+- Viewer routes still match the map (`/`, `/recents`, `/trash`, `/journal/today`, `/types/:slug`, `/nodes/:id`, `/nodes/:id/activity`). Search stays overlay-only.
+- `verify-foundation.test.sh` exited 0 after this PROOF line.
+- Viewer build succeeded. Doctor: health `{ ok: true, service: foundation, db: up }`, Viewer GET 200, dist present, live `/view/assets/index-BYAeSmrz.js` is JavaScript.
+- `verify-http-drive.sh` exited 0 (Unlock reject, MCP key before accept, accept, cookie does not open MCP, sixth wrong unlock 429, Home empty peek, first-day digest `rows` `[]`).
+- `verify-mcp-drive.sh` exited 0 (`POST /mcp` `tools/list`, 16 tools including `merge`).
+- HTTP Collection: `GET /view/api/types/task` `type.label` Task, view ids board/list/calendar/timeline/outline, `parent_types` `["goal","project"]`, `nodes` `[]`. Seed `journal` `parent_types` `[]`. After Today, journal collection listed that live id.
+- HTTP Detail: `GET /view/api/nodes/00000000-0000-4000-8000-000000000000` 404 `{"error":"Not found"}`. `GET /view/api/ontology` seed `about.target_types` `["person"]`.
+- HTTP Search: idle `{ searched: false, hits: [] }`; `q=zzzxnever`, `type=note`, and `status=active` `{ searched: true, hits: [] }`. After journal write, `q=Morning` `{ searched: true }`.
+- HTTP Journal write: `POST /view/api/journals/today` same live id twice. First create title `October 20, 2026`. Window day label `Tuesday, October 20, 2026`. `PATCH` title/body 200.
+- HTTP Edit any node / Activity update Undo / Trash: `verify-edit-any-node.sh` exited 0. Empty title 400. Window **Keep a title**. `body` on a non-journal 403 `Journal writes only.`
+- HTTP Activity **Created** Undo: MCP upsert of a person titled "Create undo fixture". Stale if-match 409 left the record live. Undo `200` body keys `ok`, `activity_id` only. Live GET 404. Trash listed that id. Tombstone activity still 200.
+- HTTP journal Restore: `DELETE` then live GET 404. Restore `200` type `journal`, storage `inline`.
+- Home Recents cap: Home card `GET /view/api/recents?limit=5` returns 5. Recents page `GET /view/api/recents` returns more than 5 when more live non-task rows exist.
+- Home digest first-day empty in `verify-http-drive`. Later bot title "Digest later bot 20261020" listed with a cookie jar. Second look empty. Watermark cookie `foundation_home_looked` `Path=/view`.
+- Built dist `index-BYAeSmrz.js` contains Unlock copy, **Write today**, **May hang under**, **Targets**, **Keep a title**, **Restore**, `journal-page`, `detail-page`, `board`, `collection-preview`, and `weekday:"long"`.
+- Browser chrome was not clicked. Same-path HTTP plus the JS the live window served was the drive.
+
+Evidence: `.cursor/skills/verify-foundation/evidence/20261020Tmaintain/` (gitignored).
+
 ## Maintain run (20261017Tmaintain)
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20261017Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20261017Tmaintain`. Evidence stayed.
