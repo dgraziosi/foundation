@@ -639,6 +639,10 @@ done
 [[ "${map_blob}" == *"Keep a title"* ]] || fail "verify-foundation map must show Keep a title"
 [[ "${map_blob}" == *"vault timezone"* ]] || fail "journal map must say Today follows the vault timezone"
 [[ "${map_blob}" != *"creates today's New York calendar journal"* ]] || fail "journal map must not freeze Today to New York"
+grep -Fq 'Day label includes the weekday' "${map_root}/features/journal-write.md" \
+  || fail "journal map must say the page day label includes the weekday."
+grep -Fq 'Button **Today** (link-styled).' "${map_root}/features/journal-write.md" \
+  || fail "journal map must name collection Today as a link-styled button."
 grep -Fq 'Prove `collection-filtered` on **List**, not Board.' "${map_root}/features/collection.md" \
   || fail "collection map must say prove filtered copy on List, not Board."
 grep -Fq 'A journal with inline markdown opens the write page (`[data-surface="journal-page"]`)' "${map_root}/features/collection.md" \

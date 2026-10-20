@@ -5,7 +5,7 @@ Journal write stays the dedicated writing page. After Unlock, **Today** on Home 
 ## Sub-features
 
 - `journal-write-today` opens `/view/journal/today`, POSTs `/view/api/journals/today`, and lands on today's journal (`[data-surface="journal-page"]`).
-- `journal-write-page` shows the day label, title field `aria-label="Title"`, and the editor (`data-editor="live-markdown"`, placeholder **Write a first sentence.**). An empty title keeps that journal's calendar day and shows **Keep a title**.
+- `journal-write-page` shows the day label (weekday plus the created calendar day), title field `aria-label="Title"`, and the editor (`data-editor="live-markdown"`, placeholder **Write a first sentence.**). An empty title keeps that journal's calendar day and shows **Keep a title**.
 - `journal-write-save` persists title and body (debounce) via `PATCH /view/api/nodes/:id`. A second Today returns the same live id. Copy is **Saving**, **Saved**, or **Couldn't save**. A clash offers **Reload** and keeps the draft.
 - `journal-write-leave` flushes a dirty draft when the person leaves. A clash or failed write on leave still keeps the draft and offers Reload / Couldn't save when they come back. A cached sibling journal that keeps the writing page mounted still flushes the journal they left. Coming back after a landed leave shows the flushed body.
 - `journal-write-only` refuses a PATCH that includes `body` on a non-journal record (`403` **Journal writes only.**). Title, status, and declared fields on that record use [Edit any node](./edit-any-node.md).
@@ -27,8 +27,8 @@ Preconditions:
 - If launch cannot start after the helper has tried `/usr/lib/postgresql/16/bin`, prove the source contract (`pnpm --filter @foundation/viewer test`, including `journal page is a document` and the mounted leave-flush test) and do not mark a live write verified.
 
 - **Home door.** Open Home. Today is visible at journal count 0. Choose **Today**.
-- **Collection door.** Open `/view/types/journal`. Heading includes **Journal**. First-day: **Nothing yet.** Link **Today**.
-- **Today.** Choose **Today** (or open `/view/journal/today`). `[data-surface="journal-page"]`. Day label is the created calendar day. Title `aria-label="Title"` (first create: that vault day's title, for example `September 4, 2026` on a seed New York vault). Editor placeholder **Write a first sentence.**
+- **Collection door.** Open `/view/types/journal`. Heading includes **Journal**. First-day: **Nothing yet.** Button **Today** (link-styled).
+- **Today.** Choose **Today** (or open `/view/journal/today`). `[data-surface="journal-page"]`. Day label includes the weekday (`Tuesday, October 20, 2026` on a seed New York vault). Title `aria-label="Title"` (first create: that vault day's title without the weekday, for example `October 20, 2026`). Editor placeholder **Write a first sentence.**
 - **Keep a title.** Clear the title. The page shows **Keep a title**. The write still uses that journal's calendar day, not wall-clock today on a past entry.
 - **Save.** Change the title and a sentence. Wait about a second. Reload the node or POST Today again. Title and body persisted.
 - **Leave flush.** Type, then leave before the debounce lands. Reopen. The flushed body is on the page when the person has not typed again. A clash or failed leave still shows the draft with **Couldn't save**, and a clash offers **Reload**.
