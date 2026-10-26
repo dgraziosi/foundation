@@ -28,7 +28,7 @@ Preconditions:
 
 - **Home door.** Open Home. Today is visible at journal count 0. Choose **Today**.
 - **Collection door.** Open `/view/types/journal`. Heading includes **Journal**. First-day: **Nothing yet.** Button **Today** (link-styled).
-- **Today.** Choose **Today** (or open `/view/journal/today`). `[data-surface="journal-page"]`. Day label includes the weekday (`Tuesday, October 20, 2026` on a seed New York vault). Title `aria-label="Title"` (first create: that vault day's title without the weekday, for example `October 20, 2026`). Editor placeholder **Write a first sentence.**
+- **Today.** Choose **Today** (or open `/view/journal/today`). `[data-surface="journal-page"]`. Day label includes the weekday (New York form of that journal's `created_at`). Title `aria-label="Title"` (first create: that vault day's title without the weekday). Editor placeholder **Write a first sentence.** The loading shell also uses `[data-surface="journal-page"]` with **Opening the page…** Wait for the Title field before scoring the loaded page.
 - **Keep a title.** Clear the title. The page shows **Keep a title**. The write still uses that journal's calendar day, not wall-clock today on a past entry.
 - **Save.** Change the title and a sentence. Wait about a second. Reload the node or POST Today again. Title and body persisted.
 - **Leave flush.** Type, then leave before the debounce lands. Reopen. The flushed body is on the page when the person has not typed again. A clash or failed leave still shows the draft with **Couldn't save**, and a clash offers **Reload**.
