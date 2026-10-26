@@ -641,6 +641,15 @@ done
 [[ "${map_blob}" != *"creates today's New York calendar journal"* ]] || fail "journal map must not freeze Today to New York"
 grep -Fq 'Day label includes the weekday' "${map_root}/features/journal-write.md" \
   || fail "journal map must say the page day label includes the weekday."
+if grep -Eq '[A-Z][a-z]+day, (January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{1,2}, [0-9]{4}' "${map_root}/features/journal-write.md"; then
+  fail "journal map must not freeze a weekday calendar date from a past proof"
+fi
+grep -Fq 'Opening the page' "${map_root}/features/journal-write.md" \
+  || fail "journal map must say the loading shell shows Opening the page before Title."
+grep -Fq '159 characters plus an ellipsis' "${map_root}/features/home.md" \
+  || fail "home map must say a first line longer than 160 characters becomes 159 plus an ellipsis."
+grep -Fq 'Max-Age=2592000' "${map_root}/features/unlock.md" \
+  || fail "unlock map must name Max-Age=2592000 on foundation_key."
 grep -Fq 'Button **Today** (link-styled).' "${map_root}/features/journal-write.md" \
   || fail "journal map must name collection Today as a link-styled button."
 grep -Fq 'Prove `collection-filtered` on **List**, not Board.' "${map_root}/features/collection.md" \
