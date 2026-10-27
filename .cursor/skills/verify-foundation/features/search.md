@@ -26,8 +26,8 @@ Preconditions:
 - **Open.** Choose rail **Search**. Overlay `[data-surface="search-overlay"]` appears. Heading **Search**. Focus is in the field whose placeholder is `Search the graph`.
 - **Idle.** With an empty query and Any / Any status, copy is **Search the graph, or filter by type.**
 - **Empty query.** Type a token that cannot match (`zzzxnever`) and submit the form (Enter). Copy **No matching nodes.**
-- **Type filter.** Choose a type in the first select (Any / type labels). The overlay searches even without a query. First-day note: `GET /view/api/search?type=note` returns `{ "searched": true, "hits": [] }`.
-- **Status filter.** Choose Active, Completed, or Archived in the second select (`Any status`). The overlay searches even without a query. First-day: `GET /view/api/search?status=active` returns `{ "searched": true, "hits": [] }`.
+- **Type filter.** Clear the field first. A type change still submits the leftover query. Then choose a type in the first select (Any / type labels). The overlay searches even without a query. First-day note: `GET /view/api/search?type=note` returns `{ "searched": true, "hits": [] }`.
+- **Status filter.** Clear the field first. A status change still submits the leftover query. Then choose Active, Completed, or Archived in the second select (`Any status`). The overlay searches even without a query. First-day: `GET /view/api/search?status=active` returns `{ "searched": true, "hits": [] }`.
 - **Open hit.** When a hit exists, choose its title. Overlay closes. Path `/view/nodes/<uuid>`. A non-journal is `[data-surface="detail-page"]`. A journal with inline markdown is `[data-surface="journal-page"]`.
 - **Close.** Choose **Close**. Overlay is gone. The surface underneath is unchanged.
 - **HTTP idle.** `GET /view/api/search` with the vault key (view-key-file when present). `{ "searched": false, "hits": [] }`.
@@ -38,5 +38,5 @@ Preconditions:
 
 - Search is not in the view strip and not in the rail as a page. Recents is Home chrome, not Search.
 - No default type or status filter. Home Open tasks does filter; Search does not inherit that.
-- The overlay may pass type or status. That is chrome, not a write.
+- The overlay may pass type or status. That is chrome, not a write. Changing either select submits `q.trim()` from the field. After a miss token such as `zzzxnever`, clear the field before those overlay steps. The HTTP notes with no `q` stay the no-query proof.
 - MCP `search` is how a bot queries the graph. A Viewer proof uses the overlay or `GET /view/api/search`.
