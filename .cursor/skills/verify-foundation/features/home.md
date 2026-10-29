@@ -6,7 +6,7 @@ Home is the first surface after Unlock. It always offers **Today**, even when no
 
 - `home-today` always shows Today (`[data-surface="home-today"]`). Empty body: **Write today** and the calendar day. After a write: the day and the first line of the body (ATX heading marks stripped). A first line longer than 160 characters becomes 159 characters plus an ellipsis. Choose it to open `/view/journal/today`. The strip adds a **Today** tab.
 - `home-chrome` shows Recents, Open tasks, and a Types block when any type has a live count.
-- `home-digest` shows **Since you last looked** (`[data-surface="home-digest"]`). First visit reads bot activity (`actor` not `user`) from the last 24 hours, cap 5. After Home loads, the next fetch with no new bot writes shows **Nothing new.** The watermark cookie is `foundation_home_looked` (`Path=/view`).
+- `home-digest` shows **Since you last looked** (`[data-surface="home-digest"]`). First visit reads bot activity (`actor` not `user`) on live node targets from the last 24 hours, cap 5. After Home loads, the next fetch with no new bot writes shows **Nothing new.** The watermark cookie is `foundation_home_looked` (`Path=/view`).
 - `home-empty` shows **Nothing yet.** for Recents, **No open tasks.** for Open tasks, and **Nothing new.** for Since you last looked when those lists are empty.
 - `home-recents-all` opens the Recents page from Recents **View all**.
 - `home-tasks-all` opens the task collection from Open tasks **View all**.
@@ -29,7 +29,7 @@ Preconditions:
 
 - **Land.** After Unlock, `[data-surface="home"]` is in the page. **Today** is visible. Headings **Since you last looked**, **Recents**, and **Open tasks** are visible. Rail has **Home**, **Trash**, and **Search**.
 - **Digest empty.** First-day: Since you last looked shows **Nothing new.** `GET /view/api/digest` returns `rows` `[]` and sets `foundation_home_looked` (`Path=/view`). A second GET with that cookie stays empty until a bot writes.
-- **Empty Recents.** When there are no non-task live records, Recents shows **Nothing yet.** Record this before choosing Today. Today creates a journal, and Recents includes that row.
+- **Empty Recents.** When there are no non-task live records, Recents shows **Nothing yet.** Record this before choosing Today. Today creates a journal. `GET /view/api/recents` includes that row at once. The Home Recents card can still show **Nothing yet.** until a body save, because create does not refresh that query.
 - **Empty tasks.** When the `task` default view filter has no rows, Open tasks shows **No open tasks.**
 - **Today at count 0.** First-day: Today shows **Write today** and the calendar day. Choose Today. Path `/view/journal/today`. The strip adds **Today**. `[data-surface="journal-page"]`.
 - **Recents View all.** Choose Recents **View all**. The strip adds **Recents**. The page heading is `Recents`. Path `/view/recents`. Home's card still asks for 5. This page calls `GET /view/api/recents` with no limit (server cap 500). A sixth live non-task row here is the page working.
@@ -45,5 +45,5 @@ Preconditions:
 - Open tasks reads the `task` type's `default_view` filter (seed: `status = active`). Completed tasks on that widget while the type still declares that filter is a bug.
 - Show completed lives on collection, not Home.
 - Theme Light / Dark / System is rail chrome. It is not a Home feature. **Trash** is also rail chrome; prove it under [Trash](./trash.md).
-- An ontology with zero live records hides the Types section. That is not a load error. Today still shows.
+- The Types heading can show while ontology is loading. After that request lands, an ontology with zero live records hides the Types section. That is not a load error. Today still shows.
 - Today is on Home at journal count 0. Journal write also starts from the journal collection **Today** or `/view/journal/today`.

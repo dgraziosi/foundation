@@ -32,4 +32,4 @@ Preconditions:
 
 - Journal body writes still go through the journal page (`body` on PATCH).
 - Do not edit relation edges from this page.
-- Recents shows the new title after a successful save.
+- Recents shows the new title after a successful save, except for a task. Recents excludes tasks.
