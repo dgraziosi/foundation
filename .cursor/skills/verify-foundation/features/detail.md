@@ -8,7 +8,7 @@ Detail is one non-journal record as a page in the content host. It is not a dock
 - `detail-missing` shows **Not found.** for a bad or unknown id. A valid unknown UUID also paints heading `Not found` (no period) and never mounts `[data-surface="detail-page"]`.
 - `detail-properties` shows type, editable status, and editable declared fields, then **Open** only when `data.url` is a well-formed https address, then Activity and Move to trash, then related records, location, and timestamps. Empty Location copy is **Home**. When the type has `parent_types`, the same **May hang under** line as collection appears (`data-constraint="parent_types"`). A related relation that names `target_types` shows a quiet **Targets** line (`data-constraint="target_types"`) plus those type labels.
 - `detail-structure` shows Structure when there are children, or an ancestor chain the type asks for.
-- `detail-close` closes the detail tab and activates the tab to its left, or Home when that was the last one.
+- `detail-close` closes the detail tab. If that tab is active, the strip activates the open tab to its left, or Home when there is no tab to the left. Home is pinned outside the open-tab list, so the leftmost content tab always lands on Home. A background close leaves the current page.
 
 ## How to get to it (user POV)
 

@@ -1,6 +1,6 @@
 # Collection
 
-Collection is one type's records in the layouts that type declared. The user opens it from a Home type folder, from Open tasks **View all** (tasks), or from a view-strip tab. The window reads the type's views. It does not invent a layout.
+Collection is one type's records in the layouts that type declared. The user opens it from Open tasks **View all** (tasks), from a Home type folder when that type has a live count, or from a view-strip tab. The window reads the type's views. It does not invent a layout.
 
 ## Sub-features
 
@@ -14,7 +14,7 @@ Collection is one type's records in the layouts that type declared. The user ope
 
 ## How to get to it (user POV)
 
-- Choose a type folder on Home.
+- Choose a type folder on Home after that type has a live count. First-day Home has no Types block.
 - Choose Open tasks **View all** (task collection).
 - Choose an already-open type tab in the view strip.
 - Go to `/view/types/<slug>` after Unlock (for example `/view/types/task`, `/view/types/journal`).
@@ -28,7 +28,7 @@ Preconditions:
 
 - **Open tasks.** From Home, choose Open tasks **View all**, or go to `/view/types/task`. Heading includes **Task**. `[data-surface="view-strip"]` has a Task tab. Seed `task` default is **Board** (`[data-surface="board"]`). First-day Active column copy **Nothing yet.** First-day `task` also shows **May hang under** Goal, Project (`data-constraint="parent_types"`). Types with empty `parent_types` (seed `journal`) omit that line.
 - **Empty.** On a type with no live records, page copy is **Nothing yet.** On Board that copy lives inside `[data-surface="board"]` columns, not as a page-level Quiet.
-- **View switcher.** `aria-label="View"` lists only declared layouts by label (task seed: Board, List, Calendar, Timeline, Outline — no Graph). Choosing **List** keeps the same type and changes the layout, not the route. List hover or focus on a visible row shows `[data-surface="collection-preview"]` (title, chips, due). That aside is not `[data-surface="detail-page"]`. Empty or fully filtered List has no preview.
+- **View switcher.** `aria-label="View"` lists only declared layouts by label (task seed: Board, List, Calendar, Timeline, Outline — no Graph). Choosing **List** keeps the same type and changes the layout, not the route. List hover or focus on a visible row shows `[data-surface="collection-preview"]` (title, subtitle chips when the type has subtitle fields, and due). Seed task has no subtitle field, so the aside is title and due only. That aside is not `[data-surface="detail-page"]`. Empty or fully filtered List has no preview.
 - **Show completed.** `aria-label="Show completed"` is a toggle. It widens an active status filter for this window. Home Open tasks must not change.
 - **Graph.** First-day seed `task` and `journal` do not declare `graph`. If a type names `graph`, that layout uses `[data-surface="graph"]` (floor 460px). Click a node: the same `/view/nodes/<uuid>` door as `collection-open-record` (inline markdown journal is the write page). Right-click a node: local graph, depth 1–4, default 2.
 - **HTTP.** `GET /view/api/types/task` with the vault key (view-key-file when present). Body has `type.label`, `type.views` (declaration objects with `id`, not a bare id array), `type.parent_types`, `nodes`. First-day: `nodes` is `[]`. Seed `task` views are `board`, `list`, `calendar`, `timeline`, `outline`. Seed `task` `parent_types` is `["goal","project"]` (labels Goal, Project). Seed `journal` `parent_types` is `[]`.
