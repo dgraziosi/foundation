@@ -1,5 +1,35 @@
 # Proofs
 
+## Maintain run (20261030Tmaintain)
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20261030Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20261030Tmaintain`. Evidence stayed.
+
+Map corrections this run (source + live HTTP and the JS the live window served):
+
+- Detail Properties paints **May hang under** after the type label and before **Status** when `parent_types` is set. The map had listed status right after type.
+- List `[data-surface="collection-preview"]` always shows the title. Subtitle chips appear only when those values are present. Due appears only when the row has a due. A seed task with no date is title only. The map had said that aside is title and due.
+
+What that run drove:
+
+- Source readers for Unlock, Home, Collection, Detail, Edit any node, Activity, Trash, Search, and Journal write.
+- Viewer routes still match the map (`/`, `/recents`, `/trash`, `/journal/today`, `/types/:slug`, `/nodes/:id`, `/nodes/:id/activity`). Search stays overlay-only.
+- `verify-foundation.test.sh` exited 0 after this PROOF line.
+- Viewer build succeeded. Doctor: health `{ ok: true, service: foundation, db: up }`, Viewer GET 200, dist present, live `/view/assets/index-BYAeSmrz.js` is JavaScript.
+- `verify-http-drive.sh` exited 0 (Unlock reject, MCP key before accept, accept, cookie does not open MCP, sixth wrong unlock 429, Home empty peek, first-day digest `rows` `[]`). Accept headers included `Max-Age=2592000`.
+- `verify-mcp-drive.sh` exited 0 (`POST /mcp` `tools/list`).
+- HTTP Collection: `GET /view/api/types/task` `type.label` Task, view ids board/list/calendar/timeline/outline, `parent_types` `["goal","project"]`, first-day `nodes` `[]`. After Today, journal collection listed that live id. After a task titled "No due fixture" with no date, the type list row had no `due` and no `chips`.
+- HTTP Detail: `GET /view/api/nodes/00000000-0000-4000-8000-000000000000` 404 `{"error":"Not found"}`. `GET /view/api/ontology` seed `about.target_types` `["person"]`. Live JS paints **May hang under** then **Status**.
+- HTTP Search: idle `{ searched: false, hits: [] }`; `q=zzzxnever`, `type=note`, and `status=active` `{ searched: true, hits: [] }`. Leftover `q=zzzxnever&type=note` `{ searched: true, hits: [] }`. After journal write, `q=Morning` `{ searched: true }`.
+- HTTP Journal write: `POST /view/api/journals/today` same live id twice. First create title `October 30, 2026`. `PATCH` title/body 200. Stale `base_updated_at` 409.
+- HTTP Edit any node / Activity update Undo / Trash: `verify-edit-any-node.sh` exited 0.
+- HTTP Activity **Created** Undo: MCP upsert of a person titled "Create undo fixture". Stale if-match 409 left the record live. Undo `200` body keys `ok`, `activity_id` only. Live GET 404. Trash listed that id. Tombstone activity still 200.
+- HTTP journal Restore: `DELETE` then live GET 404. Restore `200` type `journal`, storage `inline`.
+- Home digest first-day empty in `verify-http-drive`. Later bot title "Digest later bot 20261030" listed with a cookie jar. Second look empty. Watermark cookie `foundation_home_looked`.
+- Built dist `index-BYAeSmrz.js` contains Unlock copy, **Write today**, **Opening the page**, **May hang under**, **Targets**, **Keep a title**, **Restore**, `journal-page`, `detail-page`, `search-overlay`, `collection-preview`, and `weekday:"long"`. List preview in that bundle is title, then chips only when present, then due only when present.
+- Browser chrome was not clicked. Same-path HTTP plus the JS the live window served was the drive.
+
+Evidence: `.cursor/skills/verify-foundation/evidence/20261030Tmaintain/` (gitignored).
+
 ## Maintain run (20261027Tmaintain)
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20261027Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20261027Tmaintain`. Evidence stayed.
