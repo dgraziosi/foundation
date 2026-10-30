@@ -660,6 +660,10 @@ grep -Fq '[data-surface="board"]' "${map_root}/features/collection.md" \
   || fail "collection map must name [data-surface=\"board\"] for seed task Board."
 grep -Fq '[data-surface="collection-preview"]' "${map_root}/features/collection.md" \
   || fail "collection map must name [data-surface=\"collection-preview\"] so List hover is not scored as detail."
+grep -Fq 'A seed task with no date is title only.' "${map_root}/features/collection.md" \
+  || fail "collection map must say a seed task with no date is title-only in the List aside."
+grep -Fq 'then **May hang under**' "${map_root}/features/detail.md" \
+  || fail "detail map must put May hang under after type and before status."
 grep -Fq 'The unlock cookie authenticates; the watermark is set on the digest GET.' "${map_root}/features/home.md" \
   || fail "home map must not treat the unlock cookie as the digest watermark."
 grep -Fq 'foundation_home_looked' "${map_root}/features/home.md" \
