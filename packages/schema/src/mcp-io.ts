@@ -251,8 +251,19 @@ export const UPSERT_BATCH_MAX = 20;
 export const UPSERT_FORM_SUGGESTION =
   "Use type and title for one node, or nodes (max 20) for several.";
 
+export const UPSERT_TYPE_TITLE_RULE =
+  "Every node needs type and title on create and on update. A receipt-only update is still an update.";
+
 export const UPSERT_INCOMPLETE_SUGGESTION =
-  "Each node needs type and title. Updates also need id and base_updated_at from get.";
+  "Pass type and title. An update also needs id and base_updated_at from get. A receipt-only update is still an update.";
+
+export const UPSERT_TOP_LEVEL_DUE_ERROR = "Pass data.due, not due";
+
+export const UPSERT_TOP_LEVEL_DUE_SUGGESTION =
+  "A task due date lives at data.due as YYYY-MM-DD. Search hits also show due next to title. That field is not an upsert argument.";
+
+export const SEARCH_DUE_RULE =
+  "due accepts only today or overdue in the vault settings timezone. A specific day uses due_on_or_before and due_on_or_after on data.due.";
 
 export const UPSERT_BATCH_MAX_SUGGESTION =
   "Pass nodes with 1 to 20 items, or use type and title for one node.";
@@ -330,6 +341,39 @@ export const UpsertInputSchema = z.object({
     .describe("When true, missing needed fields refuse the write"),
 });
 export type UpsertInput = z.infer<typeof UpsertInputSchema>;
+
+export const UpsertNodeItemWireSchema = UpsertNodeItemSchema.extend({
+  due: z.unknown().optional(),
+});
+
+export const UpsertInputWireSchema = UpsertInputSchema.extend({
+  due: z.unknown().optional(),
+  nodes: z.array(UpsertNodeItemWireSchema).min(1).max(UPSERT_BATCH_MAX).optional(),
+});
+export type UpsertInputWire = z.infer<typeof UpsertInputWireSchema>;
+
+export function refuseTopLevelDue(input: {
+  due?: unknown;
+  nodes?: Array<{ due?: unknown; [key: string]: unknown }>;
+  [key: string]: unknown;
+}): ToolError | undefined {
+  if (input.due !== undefined) {
+    return toolError(UPSERT_TOP_LEVEL_DUE_ERROR, UPSERT_TOP_LEVEL_DUE_SUGGESTION);
+  }
+  const nodes = input.nodes;
+  if (!nodes) {
+    return undefined;
+  }
+  for (const [index, node] of nodes.entries()) {
+    if (node.due !== undefined) {
+      return toolError(
+        `nodes[${index}]: ${UPSERT_TOP_LEVEL_DUE_ERROR}`,
+        UPSERT_TOP_LEVEL_DUE_SUGGESTION,
+      );
+    }
+  }
+  return undefined;
+}
 
 const UPSERT_FLAT_KEYS = [
   "id",
@@ -757,9 +801,7 @@ export const SearchInputListedSchema = z.object({
   receipt: ReceiptLookupSchema.optional().describe(
     "Unique receipt lookup (gmail or calendar). Kind lives on the stored node",
   ),
-  due: SearchDueKindSchema.optional().describe(
-    "Due before today, or due today, in the vault settings timezone",
-  ),
+  due: SearchDueKindSchema.optional().describe(SEARCH_DUE_RULE),
   due_on_or_before: IsoDateSchema.optional().describe("Inclusive ISO date YYYY-MM-DD on data.due"),
   due_on_or_after: IsoDateSchema.optional().describe("Inclusive ISO date YYYY-MM-DD on data.due"),
   data_equals: DataEqualsSchema.optional().describe(
