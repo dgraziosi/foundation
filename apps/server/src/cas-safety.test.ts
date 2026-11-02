@@ -387,6 +387,7 @@ test(
         const created = await upsertGraphNode(pool, { type: "note", title: "Undo if-match" });
         assert.equal(isToolError(created), false);
         if (isToolError(created)) return;
+        assert.ok(created.activity_id);
 
         const stale = await undoGraphActivity(
           pool,

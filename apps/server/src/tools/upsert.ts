@@ -1,4 +1,9 @@
-import { advertisedMcpTool, UpsertInputSchema, UpsertSuccessSchema } from "@foundation/schema";
+import {
+  advertisedMcpTool,
+  UpsertInputSchema,
+  UpsertInputWireSchema,
+  UpsertSuccessSchema,
+} from "@foundation/schema";
 import type { Pool } from "@foundation/db";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { writeContextOf } from "../auth.js";
@@ -15,7 +20,9 @@ export function registerUpsertTool(
   defineTool(server, {
     name: "upsert",
     description: advertisedMcpTool("upsert").description,
-    input: UpsertInputSchema.shape,
+    input: UpsertInputWireSchema.shape,
+    listed: UpsertInputSchema.shape,
+    wire: UpsertInputWireSchema,
     output: UpsertSuccessSchema,
     handler: async (input) => upsertGraphNode(pool, input, { dataDir }, writeContextOf(agent)),
   });

@@ -42,6 +42,7 @@ test("activity undo inverses, filters, and destructive-scope gates", { skip: !da
       const created = await upsertGraphNode(pool, { type: "note", title: "scratch pad" });
       assert.equal(isToolError(created), false);
       if (isToolError(created)) return;
+      assert.ok(created.activity_id);
 
       const refused = await undoGraphActivity(pool, { id: created.activity_id });
       assert.equal(isToolError(refused), true);
@@ -89,6 +90,7 @@ test("activity undo inverses, filters, and destructive-scope gates", { skip: !da
       });
       assert.equal(isToolError(updated), false);
       if (isToolError(updated)) return;
+      assert.ok(updated.activity_id);
 
       const undone = await undoGraphActivity(pool, {
         id: updated.activity_id,
@@ -439,6 +441,7 @@ test("activity undo inverses, filters, and destructive-scope gates", { skip: !da
       });
       assert.equal(isToolError(created), false);
       if (isToolError(created)) return;
+      assert.ok(created.activity_id);
       const nodeUndone = await undoGraphActivity(pool, {
         id: created.activity_id,
         base_updated_at: created.node.updated_at,
@@ -600,6 +603,7 @@ test("activity undo inverses, filters, and destructive-scope gates", { skip: !da
       }, DESTRUCTIVE);
       assert.equal(isToolError(typeGone), false);
 
+      assert.ok(retyped.activity_id);
       const restored = await undoGraphActivity(pool, {
         id: retyped.activity_id,
         base_updated_at: retyped.node.updated_at,
@@ -639,6 +643,7 @@ test("activity undo inverses, filters, and destructive-scope gates", { skip: !da
       const created = await upsertGraphNode(pool, { type: "note", title: "stale token" });
       assert.equal(isToolError(created), false);
       if (isToolError(created)) return;
+      assert.ok(created.activity_id);
       await pool.query(`UPDATE activity SET token_expires_at = now() - interval '1 hour' WHERE id = $1`, [
         created.activity_id,
       ]);

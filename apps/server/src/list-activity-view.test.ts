@@ -110,6 +110,7 @@ test("list_activity fields, diff_only, and schema_version", { skip: !databaseUrl
       assert.equal(after.title, "diary note two");
       assert.equal(row.schema_version, ACTIVITY_SCHEMA_VERSION);
 
+      assert.ok(updated.activity_id);
       const undone = await undoGraphActivity(
         pool,
         { id: updated.activity_id, base_updated_at: updated.node.updated_at },
@@ -130,6 +131,7 @@ test("list_activity fields, diff_only, and schema_version", { skip: !databaseUrl
       if (isToolError(extra)) {
         return;
       }
+      assert.ok(extra.activity_id);
       await pool.query(`UPDATE activity SET schema_version = 2 WHERE id = $1`, [extra.activity_id]);
       const refused = await undoGraphActivity(
         pool,
