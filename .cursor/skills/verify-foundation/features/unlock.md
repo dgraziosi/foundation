@@ -1,12 +1,12 @@
 # Unlock
 
-Unlock is the door to the Viewer. The person types the vault key. When `FOUNDATION_VIEW_KEY` is set, that is the vault key; MCP keys do not open the window. When unset, the house key still opens it. A good key sets an HttpOnly cookie `Path=/view` and shows Home. A bad key stays on the door with **That key did not unlock.** That cookie unlocks Viewer routes (including journal write). It does not unlock MCP or agent blobs.
+Unlock is the door to the Viewer. The person types the vault key. When `FOUNDATION_VIEW_KEY` is set, that is the vault key; MCP keys do not open the window. When unset, the house key still opens it. A good key sets an HttpOnly cookie `Path=/view`. The window then shows the page for that address. `/view` is Home. A bad key stays on the door with **That key did not unlock.** That cookie unlocks Viewer routes (including journal write). It does not unlock MCP or agent blobs.
 
 ## Sub-features
 
 - `unlock-door` shows **Unlock.** when the session is missing or 401. The field is **Vault key**.
 - `unlock-reject` keeps the door and shows **That key did not unlock.** for a wrong key. JSON `POST /view/unlock` uses the same error.
-- `unlock-accept` accepts the key, sets `foundation_key` (`Path=/view`; HttpOnly; SameSite=Strict; Max-Age=2592000). JSON accept stays on the current `/view/...` path. Opening `/view` (or a non-JSON form POST) lands on Home.
+- `unlock-accept` accepts the key, sets `foundation_key` (`Path=/view`; HttpOnly; SameSite=Strict; Max-Age=2592000). The React door posts JSON and leaves the URL alone. A mapped Viewer path then paints there. `/view/unlock` and any other path paint Home. A non-JSON form POST is `303` to `/view` (Home).
 - `unlock-cookie-scope` proves the cookie does not unlock `/mcp` or `/blobs/:id`.
 
 ## How to get to it (user POV)
@@ -25,7 +25,9 @@ Preconditions:
 
 - **Open door.** Go to `http://127.0.0.1:8788/view`. The heading reads `Unlock.` The field label is `Vault key`.
 - **Reject.** Type a wrong key and choose **Unlock**. The door stays. Error copy: `That key did not unlock.`
-- **Accept.** Type the real key and choose **Unlock**. Home appears (`[data-surface="home"]`) with Today, Recents, and Open tasks. The rail shows Home, Trash, and Search.
+- **Accept.** From `/view`, type the real key and choose **Unlock**. Home appears (`[data-surface="home"]`) with Today, Recents, and Open tasks. The rail shows Home, Trash, and Search.
+- **Mapped path.** Open `/view/journal/today` with no cookie. Unlock. The address stays `/view/journal/today`. `[data-surface="journal-page"]`.
+- **Unlock URL.** Open `/view/unlock` with no cookie. Unlock. Home appears. `/unlock` is not a mapped route.
 - **HTTP reject.** `curl -sS -o /tmp/unlock-bad.json -w "%{http_code}" http://127.0.0.1:8788/view/unlock -H "content-type: application/json" -H "accept: application/json" -d '{"api_key":"wrong"}'`. Status `401`. Body `{"error":"That key did not unlock."}`.
 - **MCP key does not unlock** when the view key exists. `API_KEY_FILE="$(.cursor/skills/verify-foundation/scripts/verify-foundation.sh key-file)"`. POST `/view/unlock` with that file's secret. Status `401`. Same copy: `That key did not unlock.` Do this *before* accept so the peer ledger stays empty for the rate-limit burst.
 - **HTTP accept.** `KEY_FILE="$(.cursor/skills/verify-foundation/scripts/verify-foundation.sh view-key-file)"`. If that file is missing, use `key-file`. `curl -sS -D - http://127.0.0.1:8788/view/unlock -H "content-type: application/json" -H "accept: application/json" -d "{\"api_key\":\"$(cat "${KEY_FILE}")\"}"`. Status `200`. Body `{"ok":true}`. `Set-Cookie` includes `foundation_key=`, `Path=/view`, `HttpOnly`, and `Max-Age=2592000`. Redact the cookie value in evidence. A successful accept clears that peer's failure bucket.
@@ -41,4 +43,4 @@ Preconditions:
 - `Authorization: Bearer <key>` is accepted as an equivalent of `ApiKey`. The cookie is Viewer-only.
 - Do not write the key into evidence, git, or chat.
 - A 401 on `/view/api/session` without a key is expected. It is the gate, not a down vault. Confirm `/health` separately.
-- JSON accept stays on the current `/view/...` path. Only `/view` (or the non-JSON form POST) lands on Home.
+- The React door posts JSON and leaves the URL alone. A mapped Viewer path then paints there. `/view/unlock` and any other path paint Home. A non-JSON form POST is `303` to `/view` (Home).

@@ -696,6 +696,11 @@ grep -Fq '/usr/lib/postgresql/16/bin' "${helper}" || fail "helper must know the 
 grep -Fq 'verify_use_host_postgres16' "${helper}" || fail "helper must put host Postgres 16 bins on PATH when present"
 unlock_map="${map_root}/features/unlock.md"
 unlock_blob="$(cat "${unlock_map}")"
+[[ "${unlock_blob}" != *"JSON accept stays on the current"* ]] || fail "unlock map must not say JSON accept stays on every /view path"
+grep -Fq 'The React door posts JSON and leaves the URL alone.' "${unlock_map}" \
+  || fail "unlock map must say the React door leaves the URL alone."
+grep -Fq '`/view/unlock` and any other path paint Home' "${unlock_map}" \
+  || fail "unlock map must say /view/unlock paints Home."
 [[ "${unlock_blob}" == *"-X POST http://127.0.0.1:8787/mcp"* ]] || fail "unlock cookie-scope must POST /mcp"
 [[ "${unlock_blob}" == *"/blobs/"* ]] || fail "unlock cookie-scope must also prove agent /blobs/:id"
 if grep -Fq 'curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:8787/mcp' "${unlock_map}"; then

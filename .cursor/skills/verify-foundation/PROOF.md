@@ -1,5 +1,25 @@
 # Proofs
 
+## Maintain run (20261102Tunlock)
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20261102Tunlock`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20261102Tunlock`. Evidence stayed.
+
+Map correction this run (source + live HTTP and the JS the live window served):
+
+- JSON accept leaves the URL alone. A mapped Viewer path then paints there. `/view/unlock` and any other path paint Home because they are not mapped routes. A non-JSON form POST is `303` to `/view` (Home). The map had said JSON accept stays on every current `/view/...` path and that only `/view` lands on Home.
+
+What that run drove:
+
+- Source readers for Unlock, Home, Collection, Detail, Edit any node, Activity, Trash, Search, and Journal write. Unlock reported the landing overclaim. The others returned no user-POV drift.
+- Viewer routes still match the map (`/`, `/recents`, `/trash`, `/journal/today`, `/types/:slug`, `/nodes/:id`, `/nodes/:id/activity`). Search stays overlay-only.
+- `verify-foundation.test.sh` exited 0 after this PROOF line.
+- Viewer build succeeded. Doctor: health `{ ok: true, service: foundation, db: up }`, Viewer GET 200, dist present, live `/view/assets/index-BYAeSmrz.js` is JavaScript.
+- `verify-http-drive.sh` exited 0 (Unlock reject, MCP key before accept, accept, cookie does not open MCP, sixth wrong unlock 429, Home empty peek, first-day digest `rows` `[]`). Accept headers included `Max-Age=2592000`.
+- JSON `POST /view/unlock` with `accept: application/json` was `200` `{"ok":true}` and sent no `Location`. A non-JSON form POST was `303` `Location: /view`. `GET /view/unlock` still served the Viewer app. Live JS contains Unlock copy, `/journal/today`, `/recents`, `/trash`, and `Navigate`.
+- Browser chrome was not clicked. Same-path HTTP plus the JS the live window served was the drive.
+
+Evidence: `.cursor/skills/verify-foundation/evidence/20261102Tunlock/` (gitignored).
+
 ## Maintain run (20261030Tmaintain)
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20261030Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20261030Tmaintain`. Evidence stayed.
