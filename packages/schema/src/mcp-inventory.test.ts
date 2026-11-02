@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { test } from "node:test";
 import { z } from "zod";
+import { SEARCH_DUE_RULE, UPSERT_TYPE_TITLE_RULE } from "./mcp-io.js";
 import {
   ADVERTISED_MCP_INPUT_SCHEMAS,
   ADVERTISED_MCP_TOOL_NAMES,
@@ -61,8 +64,10 @@ test("generated parameter docs include Zod describe strings", () => {
   assert.match(search, /\*\*In:\*\*/);
   assert.match(search, /`query` — Lexical query\. Optional when a filter is set/);
   assert.match(search, /`url.system` — gmail, calendar, or drive/);
+  assert.match(search, new RegExp(`\`due\` — ${SEARCH_DUE_RULE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
   const upsert = renderMcpToolParamsMarkdown("upsert");
   assert.match(upsert, /`url` — Unique Drive, Gmail, or Calendar identity/);
+  assert.equal(upsert.includes("`due`"), false);
   const job = renderMcpToolParamsMarkdown("job");
   assert.match(job, /`action` — claim, finish, release, or read/);
   const activity = renderMcpToolParamsMarkdown("list_activity");
@@ -74,6 +79,19 @@ test("generated tool table lists every advertised tool", () => {
   for (const name of ADVERTISED_MCP_TOOL_NAMES) {
     assert.match(table, new RegExp(`\\| \`${name}\` \\|`));
   }
+});
+
+test("foundation-mcp skill repeats the upsert and search rule sentences", () => {
+  const skill = readFileSync(
+    path.join(schemaPackageRepoRoot(), ".agents/skills/foundation-mcp/SKILL.md"),
+    "utf8",
+  );
+  assert.ok(skill.includes(UPSERT_TYPE_TITLE_RULE));
+  assert.ok(skill.includes(SEARCH_DUE_RULE));
+  assert.ok(advertisedMcpTool("upsert").purpose.includes(UPSERT_TYPE_TITLE_RULE));
+  assert.ok(advertisedMcpTool("upsert").description.includes(UPSERT_TYPE_TITLE_RULE));
+  assert.ok(advertisedMcpTool("search").purpose.includes(SEARCH_DUE_RULE));
+  assert.ok(advertisedMcpTool("search").description.includes(SEARCH_DUE_RULE));
 });
 
 test("docs and skill generated regions match the advertised inventory", () => {

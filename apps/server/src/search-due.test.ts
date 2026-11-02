@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createPool, migrate, seedSystemOntology, type Pool } from "@foundation/db";
-import { isToolError, todayInNewYork } from "@foundation/schema";
+import { isToolError, SearchInputSchema, todayInNewYork } from "@foundation/schema";
 import { getGraphNode, inspectOntology, searchGraphNodes, upsertGraphNode } from "./graph.js";
 
 const databaseUrl = process.env.DATABASE_URL;
+
+test("search due rejects a calendar day token", () => {
+  assert.throws(() => SearchInputSchema.parse({ due: "2026-08-27" }));
+});
 
 async function poolForSchema(schema: string): Promise<Pool> {
   const admin = createPool(databaseUrl!);

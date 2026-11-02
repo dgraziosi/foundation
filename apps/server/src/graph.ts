@@ -63,6 +63,7 @@ import {
   findInBatchLinkDuplicate,
   normalizeLinkEdges,
   normalizeUpsertNodes,
+  refuseTopLevelDue,
   missingNeededFields,
   MISSING_NEEDED_SUGGESTION,
   LINK_CAS_AGREE_SUGGESTION,
@@ -601,6 +602,32 @@ export async function getGraphNode(
   };
 }
 
+function sameJson(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function upsertUpdateChangesNothing(
+  existing: Node,
+  input: UpsertNodeItem,
+  nextData: Record<string, unknown>,
+  nextMeta: Record<string, unknown>,
+  nextPayload: Payload | undefined,
+): boolean {
+  if (existing.type !== input.type || existing.title !== input.title) {
+    return false;
+  }
+  if ((input.status ?? existing.status) !== existing.status) {
+    return false;
+  }
+  if (nextPayload !== undefined && !sameJson(nextPayload, existing.payload)) {
+    return false;
+  }
+  if (!sameJson(nextData, existing.data ?? {})) {
+    return false;
+  }
+  return sameJson(nextMeta, existing.metadata ?? {});
+}
+
 function prefixNodeError(form: "flat" | "batch", index: number, error: ToolError): ToolError {
   if (form === "flat") {
     return error;
@@ -742,6 +769,11 @@ async function upsertOneInTx(
       if (edgeErr) {
         return fail(edgeErr);
       }
+    }
+    if (
+      upsertUpdateChangesNothing(existing, input, nextData, nextMeta, resolved.payload)
+    ) {
+      return { node: existing, ...(warnings ? { warnings } : {}) };
     }
     await client.query("SAVEPOINT upsert_update");
     try {
@@ -901,7 +933,7 @@ export type UpsertItemOut = {
 
 export type UpsertFlatSuccess = {
   node: Node;
-  activity_id: string;
+  activity_id?: string;
   suggested_links: SuggestedLink[];
   duplicate_warnings?: DuplicateWarning;
   warnings?: NeededWarning[];
@@ -940,6 +972,10 @@ export async function upsertGraphNode(
   blobs?: BlobRuntime,
   ctx?: WriteContext,
 ): Promise<UpsertFlatSuccess | UpsertFlatDryRunSuccess | UpsertBatchSuccess | ToolError> {
+  const dueErr = refuseTopLevelDue(input);
+  if (dueErr) {
+    return dueErr;
+  }
   const normalized = normalizeUpsertNodes(input);
   if (isToolError(normalized)) {
     return normalized;
@@ -1038,7 +1074,7 @@ export async function upsertGraphNode(
       }
       return {
         node: only.node,
-        activity_id: only.activity_id!,
+        ...(only.activity_id ? { activity_id: only.activity_id } : {}),
         suggested_links: only.suggested_links,
         ...(only.duplicate_warnings ? { duplicate_warnings: only.duplicate_warnings } : {}),
         ...(only.warnings ? { warnings: only.warnings } : {}),

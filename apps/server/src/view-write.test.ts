@@ -7,7 +7,7 @@ import type { AddressInfo, Server } from "node:net";
 import { createPool, getNodeById, migrate, seedSystemOntology, type Pool } from "@foundation/db";
 import { isToolError } from "@foundation/schema";
 import { createApp } from "./app.js";
-import { getGraphNode, upsertGraphNode } from "./graph.js";
+import { getGraphNode, listGraphActivity, upsertGraphNode } from "./graph.js";
 import { activityChangeSummary, pickEditableData, presentViewActivity } from "./view-write.js";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -329,6 +329,89 @@ test("viewer any-node write, activity undo, and trash restore", { skip: !databas
       }),
     });
     assert.equal(journalBodyOnPerson.status, 403);
+  } finally {
+    await new Promise<void>((resolve) => viewServer.close(() => resolve()));
+    await pool.end();
+  }
+});
+
+test("viewer no-op save keeps the stored node and writes no activity row", { skip: !databaseUrl }, async () => {
+  if (!databaseUrl) {
+    return;
+  }
+  const pool = await poolForSchema("view_noop_save");
+  const dataDir = await mkdtemp(join(tmpdir(), "foundation-view-noop-"));
+  const bindings = {
+    FOUNDATION_API_KEY: apiKey,
+    DATABASE_URL: databaseUrl,
+    FOUNDATION_DATA: dataDir,
+    PORT: 0,
+    HOST: "127.0.0.1",
+    VIEW_PORT: 0,
+    VIEW_HOST: "0.0.0.0",
+  };
+  const viewApp = createApp(pool, bindings, "view");
+  const viewServer = viewApp.listen(0);
+  const viewOrigin = await listenOrigin(viewServer);
+  const cookie = await unlockCookie(viewOrigin);
+
+  try {
+    const created = await upsertGraphNode(pool, {
+      type: "person",
+      title: "Fixture viewer person",
+      status: "active",
+    });
+    assert.equal(isToolError(created), false);
+    if (isToolError(created)) {
+      return;
+    }
+    const before = await listGraphActivity(pool, { target: created.node.id, limit: 50 });
+    assert.equal(isToolError(before), false);
+    if (isToolError(before)) {
+      return;
+    }
+
+    const noop = await fetch(`${viewOrigin}/view/api/nodes/${created.node.id}`, {
+      method: "PATCH",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({
+        title: "Fixture viewer person",
+        base_updated_at: created.node.updated_at,
+      }),
+    });
+    assert.equal(noop.status, 200);
+    const noopBody = (await noop.json()) as {
+      node: { title: string; updated_at: string };
+    };
+    assert.equal(noopBody.node.title, "Fixture viewer person");
+    assert.equal(noopBody.node.updated_at, created.node.updated_at);
+    const afterNoop = await listGraphActivity(pool, { target: created.node.id, limit: 50 });
+    assert.equal(isToolError(afterNoop), false);
+    if (isToolError(afterNoop)) {
+      return;
+    }
+    assert.equal(afterNoop.count, before.count);
+
+    const changed = await fetch(`${viewOrigin}/view/api/nodes/${created.node.id}`, {
+      method: "PATCH",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({
+        title: "Fixture viewer person renamed",
+        base_updated_at: created.node.updated_at,
+      }),
+    });
+    assert.equal(changed.status, 200);
+    const changedBody = (await changed.json()) as {
+      node: { title: string; updated_at: string };
+    };
+    assert.equal(changedBody.node.title, "Fixture viewer person renamed");
+    assert.notEqual(changedBody.node.updated_at, created.node.updated_at);
+    const afterChange = await listGraphActivity(pool, { target: created.node.id, limit: 50 });
+    assert.equal(isToolError(afterChange), false);
+    if (isToolError(afterChange)) {
+      return;
+    }
+    assert.equal(afterChange.count, before.count + 1);
   } finally {
     await new Promise<void>((resolve) => viewServer.close(() => resolve()));
     await pool.end();

@@ -21,11 +21,17 @@ import {
   SuggestedLinkSchema,
   UndoInputSchema,
   UnlinkInputSchema,
+  UPSERT_INCOMPLETE_SUGGESTION,
+  UPSERT_TOP_LEVEL_DUE_ERROR,
+  UPSERT_TOP_LEVEL_DUE_SUGGESTION,
+  SEARCH_DUE_RULE,
   UpsertInputSchema,
+  UpsertInputWireSchema,
   UpsertSuccessSchema,
   isToolError,
   normalizeLinkEdges,
   normalizeUpsertNodes,
+  refuseTopLevelDue,
   searchHasSelector,
 } from "./mcp-io.js";
 
@@ -391,7 +397,44 @@ test("upsert accepts nodes[], dry_run, and strict", () => {
   assert.equal(normalized.form, "batch");
   assert.equal(normalized.nodes.length, 2);
   assert.equal(isToolError(normalizeUpsertNodes({ type: "note", title: "One", nodes: parsed.nodes })), true);
-  assert.equal(isToolError(normalizeUpsertNodes({})), true);
+  const incomplete = normalizeUpsertNodes({});
+  assert.equal(isToolError(incomplete), true);
+  if (isToolError(incomplete)) {
+    assert.equal(incomplete.error, "Pass type and title for one node, or nodes (1 to 20) for several");
+    assert.equal(incomplete.suggestion, UPSERT_INCOMPLETE_SUGGESTION);
+  }
+});
+
+test("refuseTopLevelDue names data.due on one node and on nodes[]", () => {
+  const one = refuseTopLevelDue({
+    type: "task",
+    title: "Fixture due",
+    due: "2026-08-27",
+  });
+  assert.equal(one?.error, UPSERT_TOP_LEVEL_DUE_ERROR);
+  assert.equal(one?.suggestion, UPSERT_TOP_LEVEL_DUE_SUGGESTION);
+  const batch = refuseTopLevelDue({
+    nodes: [
+      { type: "task", title: "Fixture due A" },
+      { type: "task", title: "Fixture due B", due: "2026-08-27" },
+    ],
+  });
+  assert.equal(batch?.error, `nodes[1]: ${UPSERT_TOP_LEVEL_DUE_ERROR}`);
+  assert.equal(batch?.suggestion, UPSERT_TOP_LEVEL_DUE_SUGGESTION);
+  assert.equal(refuseTopLevelDue({ type: "task", title: "Fixture due", data: { due: "2026-08-27" } }), undefined);
+  const wire = UpsertInputWireSchema.parse({
+    id: "11111111-1111-4111-8111-111111111111",
+    type: "task",
+    title: "Fixture due",
+    due: "2026-08-27",
+  });
+  assert.equal(wire.due, "2026-08-27");
+  assert.equal("due" in UpsertInputSchema.shape, false);
+});
+
+test("search due describe is SEARCH_DUE_RULE", () => {
+  assert.equal(SearchInputListedSchema.shape.due.description, SEARCH_DUE_RULE);
+  assert.throws(() => SearchInputSchema.parse({ due: "2026-08-27" }));
 });
 
 test("upsert success keeps one-node shape and allows dry_run batch", () => {
