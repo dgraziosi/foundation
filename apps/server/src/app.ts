@@ -1,12 +1,12 @@
 import { pingDb, type Pool } from "@foundation/db";
 import express, { type Express } from "express";
-import { headerApiKey, requireApiKey } from "./auth.js";
+import { healthKeyMatches, requireApiKey } from "./auth.js";
 import { sendBlob } from "./blobs-http.js";
 import type { AppBindings } from "./config.js";
 import { Keyring } from "./keyring.js";
 import { handleMcpRequest } from "./mcp.js";
 import { isAgentPath } from "./security.js";
-import { ViewDoor } from "./view-door.js";
+import { FailureLedger, ViewDoor } from "./view-door.js";
 import { registerViewRoutes } from "./view.js";
 
 /** 20MB blob cap as base64 plus JSON-RPC envelope. */
@@ -27,7 +27,20 @@ function refuseAgentPaths(req: express.Request, res: express.Response, next: exp
   next();
 }
 
-function registerHealth(app: Express, pool: Pool, config: AppBindings, keyring: Keyring): void {
+/** State both doors share in one process, so a ledger or session seen on one door holds on the other. */
+export type DoorShared = {
+  readonly viewDoor: ViewDoor;
+  readonly headerLedger: FailureLedger;
+};
+
+export function doorSharedOf(config: AppBindings): DoorShared {
+  return {
+    viewDoor: ViewDoor.fromBindings(config),
+    headerLedger: new FailureLedger(),
+  };
+}
+
+function registerHealth(app: Express, pool: Pool, config: AppBindings, keyring: Keyring, shared: DoorShared): void {
   app.get("/health", async (req, res) => {
     const db = await pingDb(pool);
     const body: Record<string, unknown> = {
@@ -35,7 +48,7 @@ function registerHealth(app: Express, pool: Pool, config: AppBindings, keyring: 
       service: "foundation",
       db: db ? "up" : "down",
     };
-    if (keyring.resolve(headerApiKey(req))) {
+    if (healthKeyMatches(req, keyring, shared.headerLedger)) {
       if (config.HOST !== undefined) {
         body.host = config.HOST;
       }
@@ -54,8 +67,15 @@ function registerHealth(app: Express, pool: Pool, config: AppBindings, keyring: 
   });
 }
 
-function registerMcpAndBlobs(app: Express, pool: Pool, config: AppBindings, keyring: Keyring): void {
-  app.get("/blobs/:id", requireApiKey(keyring), async (req, res) => {
+function registerMcpAndBlobs(
+  app: Express,
+  pool: Pool,
+  config: AppBindings,
+  keyring: Keyring,
+  shared: DoorShared,
+): void {
+  const gate = requireApiKey(keyring, shared.headerLedger);
+  app.get("/blobs/:id", gate, async (req, res) => {
     try {
       await sendBlob(pool, config, req, res);
     } catch (error) {
@@ -66,7 +86,7 @@ function registerMcpAndBlobs(app: Express, pool: Pool, config: AppBindings, keyr
     }
   });
 
-  app.use("/mcp", requireApiKey(keyring));
+  app.use("/mcp", gate);
 
   app.post("/mcp", async (req, res) => {
     try {
@@ -123,23 +143,23 @@ export function createApp(
   config: AppBindings,
   door: AppDoor = "mcp",
   keyring?: Keyring,
-  viewDoor?: ViewDoor,
+  shared?: DoorShared,
 ): Express {
   const ring = keyring ?? Keyring.fromBindings(config);
-  const window = viewDoor ?? ViewDoor.fromBindings(config);
+  const state = shared ?? doorSharedOf(config);
   const app = express();
   app.use(express.json({ limit: JSON_BODY_LIMIT }));
   app.use(express.urlencoded({ extended: false }));
 
   if (door === "view") {
     app.use(refuseAgentPaths);
-    registerHealth(app, pool, config, ring);
-    registerViewRoutes(app, pool, config, window);
+    registerHealth(app, pool, config, ring, state);
+    registerViewRoutes(app, pool, config, state.viewDoor, state.headerLedger);
     return app;
   }
 
-  registerHealth(app, pool, config, ring);
-  registerViewRoutes(app, pool, config, window);
-  registerMcpAndBlobs(app, pool, config, ring);
+  registerHealth(app, pool, config, ring, state);
+  registerViewRoutes(app, pool, config, state.viewDoor, state.headerLedger);
+  registerMcpAndBlobs(app, pool, config, ring, state);
   return app;
 }

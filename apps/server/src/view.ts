@@ -4,10 +4,17 @@ import { fileURLToPath } from "node:url";
 import type { Pool } from "@foundation/db";
 import type { Express, NextFunction, Request, Response } from "express";
 import express from "express";
-import { apiKeyCookieHeader, homeLookedCookieHeader, providedApiKey, readHomeLooked } from "./auth.js";
+import {
+  API_KEY_COOKIE,
+  apiKeyCookieHeader,
+  cookieValue,
+  headerApiKey,
+  homeLookedCookieHeader,
+  readHomeLooked,
+} from "./auth.js";
 import { sendBlob } from "./blobs-http.js";
 import type { AppBindings } from "./config.js";
-import { attemptSource, presentedSecret, type ViewDoor } from "./view-door.js";
+import { attemptSource, presentedSecret, type FailureLedger, type ViewDoor } from "./view-door.js";
 import {
   viewGraph,
   viewNode,
@@ -92,11 +99,36 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
-function requireViewAuth(viewDoor: ViewDoor) {
+function refuseView(res: Response, status: 401 | 429): void {
+  res.setHeader("WWW-Authenticate", 'ApiKey realm="foundation"');
+  res.status(status).json({ error: "API key required" });
+}
+
+/**
+ * A view key on Authorization spends the header ledger, never the Unlock one.
+ * The cookie is checked without a ledger: Gate loads `/view/api/session` on every page.
+ */
+function requireViewAuth(viewDoor: ViewDoor, headerLedger: FailureLedger) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    if (!viewDoor.admit(presentedSecret(providedApiKey(req)))) {
-      res.setHeader("WWW-Authenticate", 'ApiKey realm="foundation"');
-      res.status(401).json({ error: "API key required" });
+    const header = headerApiKey(req);
+    if (header !== undefined) {
+      const source = attemptSource(req);
+      const retryAfterSec = headerLedger.lockedFor(source);
+      if (retryAfterSec !== undefined) {
+        res.setHeader("Retry-After", String(retryAfterSec));
+        refuseView(res, 429);
+        return;
+      }
+      if (viewDoor.admit(presentedSecret(header))) {
+        next();
+        return;
+      }
+      headerLedger.fail(source);
+      refuseView(res, 401);
+      return;
+    }
+    if (!viewDoor.admit(presentedSecret(cookieValue(req.header("cookie") ?? "", API_KEY_COOKIE)))) {
+      refuseView(res, 401);
       return;
     }
     next();
@@ -156,8 +188,14 @@ function sendWriteResult(res: Response, got: unknown): void {
   res.status(status).json({ error: message });
 }
 
-export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings, viewDoor: ViewDoor): void {
-  const gate = requireViewAuth(viewDoor);
+export function registerViewRoutes(
+  app: Express,
+  pool: Pool,
+  config: AppBindings,
+  viewDoor: ViewDoor,
+  headerLedger: FailureLedger,
+): void {
+  const gate = requireViewAuth(viewDoor, headerLedger);
   const dist = viewerDistDir();
 
   app.get(`${VIEW_PATH}/unlock`, (_req, res) => {

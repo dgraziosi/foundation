@@ -1020,12 +1020,12 @@ test("view window writes journal, any-node, activity, and trash", async () => {
   assert.match(view, /app\.get\(`\$\{VIEW_PATH\}\/api\/digest`/);
 });
 
-test("both publishes share one ViewDoor", async () => {
+test("both publishes share one ViewDoor and one header ledger", async () => {
   const here = dirname(fileURLToPath(import.meta.url));
   const index = await readFile(join(here, "index.ts"), "utf8");
-  assert.match(index, /ViewDoor\.fromBindings/);
-  assert.match(index, /createApp\(pool, config, "mcp", keyring, viewDoor\)/);
-  assert.match(index, /createApp\(pool, config, "view", keyring, viewDoor\)/);
+  assert.match(index, /const shared = doorSharedOf\(config\)/);
+  assert.match(index, /createApp\(pool, config, "mcp", keyring, shared\)/);
+  assert.match(index, /createApp\(pool, config, "view", keyring, shared\)/);
 });
 
 function stubPool(): Pool {
@@ -1126,6 +1126,61 @@ test("FOUNDATION_VIEW_KEY is the vault key; MCP keys do not open the window", as
     assert.equal(throttled.status, 429);
     assert.ok(Number(throttled.headers.get("retry-after")) > 0);
     assert.deepEqual(await throttled.json(), { error: "That key did not unlock." });
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+test("bad header keys lock the header ledger and leave Unlock open", async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), "foundation-view-ledgers-"));
+  const app = createApp(
+    stubPool(),
+    { FOUNDATION_API_KEY: apiKey, FOUNDATION_VIEW_KEY: viewKey, FOUNDATION_DATA: dataDir },
+    "mcp",
+  );
+  const server = app.listen(0);
+  const origin = await listenOrigin(server);
+  const mcpHeaders = (key: string) => ({
+    authorization: `ApiKey ${key}`,
+    "content-type": "application/json",
+    accept: "application/json, text/event-stream",
+  });
+  const toolsList = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} });
+
+  try {
+    for (let i = 0; i < 5; i += 1) {
+      const wrong = await fetch(`${origin}/mcp`, { method: "POST", headers: mcpHeaders("nope"), body: toolsList });
+      assert.equal(wrong.status, 401, `wrong ${i + 1}`);
+    }
+    const locked = await fetch(`${origin}/mcp`, { method: "POST", headers: mcpHeaders("nope"), body: toolsList });
+    assert.equal(locked.status, 429);
+    assert.ok(Number(locked.headers.get("retry-after")) > 0);
+    assert.deepEqual(await locked.json(), {
+      jsonrpc: "2.0",
+      error: { code: -32001, message: "Unauthorized" },
+      id: null,
+    });
+    const lockedRight = await fetch(`${origin}/mcp`, { method: "POST", headers: mcpHeaders(apiKey), body: toolsList });
+    assert.equal(lockedRight.status, 429);
+
+    const viewHeader = await fetch(`${origin}/view/api/session`, { headers: viewAuthHeader() });
+    assert.equal(viewHeader.status, 429);
+    assert.ok(viewHeader.headers.get("retry-after"));
+
+    const health = await fetch(`${origin}/health`, { headers: authHeader() });
+    assert.equal(health.status, 200);
+    assert.deepEqual(Object.keys((await health.json()) as Record<string, unknown>), ["ok", "service", "db"]);
+
+    const unlock = await fetch(`${origin}/view/unlock`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({ api_key: viewKey }),
+    });
+    assert.equal(unlock.status, 200);
+    const cookie = (unlock.headers.get("set-cookie") ?? "").split(";")[0];
+    assert.ok(cookie);
+    const session = await fetch(`${origin}/view/api/session`, { headers: { cookie } });
+    assert.equal(session.status, 200);
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }

@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import type { AgentPrincipal, Keyring } from "./keyring.js";
+import { attemptSource, type FailureLedger } from "./view-door.js";
 import type { WriteContext } from "./write-context.js";
 
 /**
@@ -41,11 +42,6 @@ export function headerApiKey(req: Request): string | undefined {
   return match?.[2];
 }
 
-/** Header first; cookie only for the `/view` window. */
-export function providedApiKey(req: Request): string | undefined {
-  return headerApiKey(req) ?? cookieValue(req.header("cookie") ?? "", API_KEY_COOKIE);
-}
-
 export function apiKeyCookieHeader(key: string): string {
   return `${API_KEY_COOKIE}=${encodeURIComponent(key)}; Path=/view; HttpOnly; SameSite=Strict; Max-Age=${VIEW_COOKIE_MAX_AGE}`;
 }
@@ -76,26 +72,65 @@ export function writeContextOf(principal: AgentPrincipal): WriteContext {
   };
 }
 
-export function requireApiKey(keyring: Keyring) {
+function refuseApiKey(req: Request, res: Response, status: 401 | 429): void {
+  res.setHeader("WWW-Authenticate", 'ApiKey realm="foundation"');
+  const mcp = req.baseUrl === "/mcp" || req.originalUrl.startsWith("/mcp");
+  if (mcp) {
+    res.status(status).json({
+      jsonrpc: "2.0",
+      error: { code: -32001, message: "Unauthorized" },
+      id: null,
+    });
+    return;
+  }
+  res.status(status).json({ error: "Unauthorized" });
+}
+
+/**
+ * Header ledger, apart from Unlock so a bad bot key on loopback never locks the window.
+ * A success does not clear it: every local account shares 127.0.0.1, and a busy bot would
+ * otherwise reset a neighbor's guesses.
+ */
+export function requireApiKey(keyring: Pick<Keyring, "resolve">, ledger: FailureLedger) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const principal = keyring.resolve(headerApiKey(req));
+    const provided = headerApiKey(req);
+    if (provided === undefined) {
+      refuseApiKey(req, res, 401);
+      return;
+    }
+    const source = attemptSource(req);
+    const retryAfterSec = ledger.lockedFor(source);
+    if (retryAfterSec !== undefined) {
+      res.setHeader("Retry-After", String(retryAfterSec));
+      refuseApiKey(req, res, 429);
+      return;
+    }
+    const principal = keyring.resolve(provided);
     if (!principal) {
-      res.setHeader("WWW-Authenticate", 'ApiKey realm="foundation"');
-      const mcp = req.baseUrl === "/mcp" || req.originalUrl.startsWith("/mcp");
-      if (mcp) {
-        res.status(401).json({
-          jsonrpc: "2.0",
-          error: { code: -32001, message: "Unauthorized" },
-          id: null,
-        });
-        return;
-      }
-      res.status(401).json({ error: "Unauthorized" });
+      ledger.fail(source);
+      refuseApiKey(req, res, 401);
       return;
     }
     req.agent = principal;
     next();
   };
+}
+
+/** Keyed `/health` adds bind fields. It spends the header ledger and never answers 429. */
+export function healthKeyMatches(req: Request, keyring: Pick<Keyring, "resolve">, ledger: FailureLedger): boolean {
+  const provided = headerApiKey(req);
+  if (provided === undefined) {
+    return false;
+  }
+  const source = attemptSource(req);
+  if (ledger.lockedFor(source) !== undefined) {
+    return false;
+  }
+  if (keyring.resolve(provided)) {
+    return true;
+  }
+  ledger.fail(source);
+  return false;
 }
 
 declare global {
