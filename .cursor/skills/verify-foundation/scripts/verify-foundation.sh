@@ -438,7 +438,7 @@ verify_cmd_doctor() {
   elif [[ -f "${view_key_file}" && -s "${view_key_file}" ]]; then
     echo "doctor: view key is set (not printed)"
   else
-    echo "doctor: view key is not set (house key still opens the window)"
+    echo "doctor: view key is not set (window stays closed; house key does not open it)"
   fi
 
   body="$(curl -fsS --max-time 5 "${health_url}" 2>/dev/null || true)"

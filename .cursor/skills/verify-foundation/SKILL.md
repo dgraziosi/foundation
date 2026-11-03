@@ -86,7 +86,7 @@ Worth driving only when all of these hold:
 | `GET http://127.0.0.1:8787/health` | HTTP 200 and `{ "ok": true, "service": "foundation", "db": "up" }` |
 | `GET http://127.0.0.1:8788/view` | HTTP 200 HTML. Body contains `Foundation` (built app) or `Unlock.` / `Vault key` (fallback or unlock gate) |
 | Ports | MCP/health on `8787`, Viewer on `8788`. If this run launched, the state file names the data dir and app pid we started |
-| Auth | `FOUNDATION_API_KEY` is set in the environment, else this run's key file (`verify-foundation.sh key-file`), else the clone `.env`. Do not print the key. Doctor also says whether the view key is set, without printing it |
+| Auth | `FOUNDATION_API_KEY` is set in the environment, else this run's key file (`verify-foundation.sh key-file`), else the clone `.env`. Do not print the key. Doctor also says whether the view key is set, without printing it. A missing view key closes the window; the house key does not open it |
 | Build | For a full window drive: `apps/viewer/dist/index.html` exists, and GET of the `/view/assets/…js` from that HTML is JavaScript (not the HTML shell) |
 
 If health is down, the instance is not worth driving. Do not invent graph rows to make Home look populated. An empty first-day vault is a valid Viewer: Today **Write today**, Recents **Nothing yet.** and open tasks **No open tasks.**
@@ -140,10 +140,12 @@ HTTP the window already uses (cookie `foundation_key` with `Path=/view`, or `Aut
 
 ```bash
 # Vault key this vault accepted. Path only. Do not print the file body.
-# Prefer view-key-file when present (throwaway launch always writes it).
+# Throwaway launch always writes view-key-file. If it is missing, stop —
+# the house key does not open the window.
 KEY_FILE="$(.cursor/skills/verify-foundation/scripts/verify-foundation.sh view-key-file)"
 if [[ ! -f "${KEY_FILE}" ]]; then
-  KEY_FILE="$(.cursor/skills/verify-foundation/scripts/verify-foundation.sh key-file)"
+  echo "view-key-file is missing; the window stays closed" >&2
+  exit 1
 fi
 
 # unlock (same door as the form; JSON so you get { ok: true } + Set-Cookie)

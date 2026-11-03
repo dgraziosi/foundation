@@ -701,6 +701,19 @@ grep -Fq 'The React door posts JSON and leaves the URL alone.' "${unlock_map}" \
   || fail "unlock map must say the React door leaves the URL alone."
 grep -Fq '`/view/unlock` and any other path paint Home' "${unlock_map}" \
   || fail "unlock map must say /view/unlock paints Home."
+[[ "${unlock_blob}" != *"Otherwise \`verify-foundation.sh key-file\`"* ]] \
+  || fail "unlock map must not fall back to the house key"
+[[ "${unlock_blob}" != *"If that file is missing, use \`key-file\`"* ]] \
+  || fail "unlock map must not unlock with key-file when view-key-file is missing"
+grep -Fq 'Without a view key the window stays closed' "${unlock_map}" \
+  || fail "unlock map must say a missing view key closes the window."
+grep -Fq 'the right key is still `429`' "${unlock_map}" \
+  || fail "unlock map must say the right key is still 429 while the peer is locked."
+if grep -Fq 'house key still opens the window' "${helper}"; then
+  fail "doctor must not say the house key still opens the window"
+fi
+grep -Fq 'window stays closed; house key does not open it' "${helper}" \
+  || fail "doctor must say a missing view key keeps the window closed"
 [[ "${unlock_blob}" == *"-X POST http://127.0.0.1:8787/mcp"* ]] || fail "unlock cookie-scope must POST /mcp"
 [[ "${unlock_blob}" == *"/blobs/"* ]] || fail "unlock cookie-scope must also prove agent /blobs/:id"
 if grep -Fq 'curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:8787/mcp' "${unlock_map}"; then
@@ -710,6 +723,9 @@ skill_blob="$(cat "${map_root}/SKILL.md")"
 [[ "${skill_blob}" == *"curl -sS http://127.0.0.1:8788/view/api/journals/today"* ]] || fail "SKILL Drive must show Today peek GET"
 [[ "${skill_blob}" == *"/view/api/digest"* ]] || fail "SKILL Drive must show Home digest GET"
 [[ "${skill_blob}" == *"view-key-file"* ]] || fail "SKILL Drive must use view-key-file when present"
+if grep -Fq 'KEY_FILE="$(.cursor/skills/verify-foundation/scripts/verify-foundation.sh key-file)"' "${map_root}/SKILL.md"; then
+  fail "SKILL Drive must not fall back to key-file for Viewer unlock"
+fi
 grep -Fq -- 'curl -sS -L --max-redirs 3' "${helper}" || fail "doctor must follow the /view redirect a browser follows"
 grep -Fq -- '/view/assets/' "${helper}" || fail "doctor must GET the window script from /view HTML"
 grep -Fq -- 'window script is JavaScript' "${helper}" || fail "doctor must say when /view/assets is JavaScript"
