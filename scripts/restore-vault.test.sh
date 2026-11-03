@@ -61,6 +61,12 @@ fi
 if ! grep -Fq -- 'foundation_keep_vault_up_psql_local' "${restore_script}"; then
   fail "restore-vault.sh must recreate through the vault socket as the OS superuser"
 fi
+if ! grep -Fq -- 'foundation_keep_vault_up_start_postgres' "${restore_script}"; then
+  fail "restore-vault.sh must start this vault's Postgres before DROP when it is down"
+fi
+if ! grep -Fq -- 'foundation_keep_vault_up_pg_running' "${restore_script}"; then
+  fail "restore-vault.sh must check this data dir is the running cluster before DROP"
+fi
 
 if [[ ! -f "${backup_doc}" ]]; then
   fail "missing docs/BACKUP.md"
@@ -322,6 +328,90 @@ if foundation_restore_recreate_database "postgres://foundation:change-me@localho
 fi
 if ! grep -Fq -- 'postgres' "${tmp}/sys/nag"; then
   fail "refused system database nag must name postgres (got: $(cat "${tmp}/sys/nag"))"
+fi
+
+# Stopped vault: start this data dir's cluster before DROP. Never a default psql.
+pg_state="${tmp}/pg-state"
+: >"${pg_state}"
+set +e
+out="$(
+  foundation_keep_vault_up_pg_running() { return 1; }
+  foundation_keep_vault_up_start_postgres() {
+    echo START_PG >>"${pg_state}"
+    printf '%s\n' "$1" >>"${pg_state}"
+    return 0
+  }
+  foundation_keep_vault_up_psql_local() {
+    echo PSQL_LOCAL >>"${pg_state}"
+    return 0
+  }
+  foundation_restore_recreate_database "postgres://foundation:change-me@localhost:1/foundation" "${tmp}/data" 2>&1
+)"
+rc=$?
+set -e
+if ((rc != 0)); then
+  fail "recreate should start a stopped vault cluster (got ${rc}: ${out})"
+fi
+if ! grep -Fq -- 'START_PG' "${pg_state}"; then
+  fail "stopped vault restore must start this data dir's Postgres (got: $(cat "${pg_state}"))"
+fi
+if ! grep -Fq -- "${tmp}/data" "${pg_state}"; then
+  fail "restore must start Postgres from this FOUNDATION_DATA (got: $(cat "${pg_state}"))"
+fi
+if ! grep -Fq -- 'PSQL_LOCAL' "${pg_state}"; then
+  fail "restore must recreate through the vault socket after start (got: $(cat "${pg_state}"))"
+fi
+
+: >"${pg_state}"
+set +e
+out="$(
+  foundation_keep_vault_up_pg_running() { return 0; }
+  foundation_keep_vault_up_start_postgres() {
+    echo START_PG >>"${pg_state}"
+    return 0
+  }
+  foundation_keep_vault_up_psql_local() {
+    echo PSQL_LOCAL >>"${pg_state}"
+    return 0
+  }
+  foundation_restore_recreate_database "postgres://foundation:change-me@localhost:1/foundation" "${tmp}/data" 2>&1
+)"
+rc=$?
+set -e
+if ((rc != 0)); then
+  fail "recreate on a running vault cluster should finish (got ${rc}: ${out})"
+fi
+if grep -Fq -- 'START_PG' "${pg_state}"; then
+  fail "running vault restore must not start Postgres again"
+fi
+if ! grep -Fq -- 'PSQL_LOCAL' "${pg_state}"; then
+  fail "running vault restore must still recreate through the vault socket"
+fi
+
+: >"${pg_state}"
+set +e
+out="$(
+  foundation_keep_vault_up_pg_running() { return 1; }
+  foundation_keep_vault_up_start_postgres() {
+    echo START_PG >>"${pg_state}"
+    return 1
+  }
+  foundation_keep_vault_up_psql_local() {
+    echo PSQL_LOCAL >>"${pg_state}"
+    return 0
+  }
+  foundation_restore_recreate_database "postgres://foundation:change-me@localhost:1/foundation" "${tmp}/data" 2>&1
+)"
+rc=$?
+set -e
+if ((rc == 0)); then
+  fail "recreate must fail when this vault's Postgres does not start"
+fi
+if grep -Fq -- 'PSQL_LOCAL' "${pg_state}"; then
+  fail "failed cluster start must not DROP through any psql"
+fi
+if ! grep -Fq -- 'did not start' <<<"${out}"; then
+  fail "failed cluster start must nag (got: ${out})"
 fi
 
 echo "restore-vault.test: ok"

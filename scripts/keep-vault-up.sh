@@ -39,7 +39,6 @@ FOUNDATION_PUBLISHED_API_KEY="change-me-to-a-long-random-string"
 FOUNDATION_PUBLISHED_DB_PASSWORD="change-me-to-a-password"
 FOUNDATION_MIN_KEY_LENGTH=32
 FOUNDATION_KEEP_VAULT_UP_ENV_CHANGED=0
-FOUNDATION_KEEP_VAULT_UP_VIEW_KEY_MINTED=0
 
 # Names loadConfig reads. env -i forwards these plus PATH/HOME/TMPDIR/LANG/LC_ALL/USER.
 FOUNDATION_KEEP_VAULT_UP_ENV_NAMES=(
@@ -164,7 +163,6 @@ foundation_keep_vault_up_ensure_env_secrets() {
   local env_file="${repo_root}/.env"
   local api view url password minted
   FOUNDATION_KEEP_VAULT_UP_ENV_CHANGED=0
-  FOUNDATION_KEEP_VAULT_UP_VIEW_KEY_MINTED=0
 
   api="$(foundation_keep_vault_up_env_value "${repo_root}" FOUNDATION_API_KEY)"
   view="$(foundation_keep_vault_up_env_value "${repo_root}" FOUNDATION_VIEW_KEY)"
@@ -185,7 +183,6 @@ foundation_keep_vault_up_ensure_env_secrets() {
     printf '%s\n' "${view}" | foundation_keep_vault_up_upsert_env "${env_file}" FOUNDATION_VIEW_KEY
     export FOUNDATION_VIEW_KEY="${view}"
     FOUNDATION_KEEP_VAULT_UP_ENV_CHANGED=1
-    FOUNDATION_KEEP_VAULT_UP_VIEW_KEY_MINTED=1
   fi
 
   password="$(printf '%s\n' "${url}" | foundation_keep_vault_up_url_password)"
@@ -769,25 +766,40 @@ foundation_keep_vault_up_postgres_listen_args() {
 }
 
 # Local socket into this cluster (OS superuser from initdb). Not DATABASE_URL.
-# Optional: --dbname NAME before psql args.
+# Optional: --dbname NAME before psql args. Refuses when this data dir is
+# not the running cluster. Never a default libpq socket.
 foundation_keep_vault_up_psql_local() {
   local postgres="$1"
   shift
   local pid_file="${postgres}/postmaster.pid"
-  local socket_dir="" port="" db="postgres"
+  local data_dir socket_dir port="5432" db="postgres" socket pid_port pid_sock
   if [[ "${1:-}" == "--dbname" ]]; then
     db="$2"
     shift 2
   fi
+  if ! foundation_keep_vault_up_pg_running "${postgres}"; then
+    return 1
+  fi
+  data_dir="$(dirname -- "${postgres}")"
+  socket_dir="$(foundation_keep_vault_up_socket_dir "${data_dir}")"
   if [[ -f "${pid_file}" ]]; then
-    port="$(sed -n '4p' "${pid_file}" | tr -d '[:space:]')"
-    socket_dir="$(sed -n '5p' "${pid_file}" | tr -d '[:space:]')"
+    pid_port="$(sed -n '4p' "${pid_file}" | tr -d '[:space:]')"
+    pid_sock="$(sed -n '5p' "${pid_file}" | tr -d '[:space:]')"
+    if [[ -n "${pid_port}" ]]; then
+      port="${pid_port}"
+    fi
+    if [[ -n "${pid_sock}" ]]; then
+      socket_dir="${pid_sock}"
+    fi
   fi
-  if [[ -n "${socket_dir}" && -n "${port}" ]]; then
-    psql -q -h "${socket_dir}" -p "${port}" -d "${db}" -v ON_ERROR_STOP=1 "$@"
-  else
-    psql -q -d "${db}" -p "${port:-5432}" -v ON_ERROR_STOP=1 "$@"
+  if [[ -z "${socket_dir}" || -z "${port}" ]]; then
+    return 1
   fi
+  socket="${socket_dir}/.s.PGSQL.${port}"
+  if [[ ! -S "${socket}" ]]; then
+    return 1
+  fi
+  psql -q -h "${socket_dir}" -p "${port}" -d "${db}" -v ON_ERROR_STOP=1 "$@"
 }
 
 foundation_keep_vault_up_reload_postgres() {
@@ -1086,6 +1098,51 @@ foundation_keep_vault_up_stop_pid_tree() {
   kill "-${sig}" "${pid}" 2>/dev/null || true
 }
 
+# PID listening on this clone's health URL. Empty when the listener is
+# not this repo (official `pnpm start` has no app.pid).
+foundation_keep_vault_up_health_listener_pid() {
+  local repo_root="$1"
+  local url host port pid cwd
+  url="$(foundation_keep_vault_up_health_url)"
+  host="$(python3 -c 'from urllib.parse import urlparse; import sys; print(urlparse(sys.argv[1]).hostname or "127.0.0.1")' "${url}")"
+  port="$(python3 -c 'from urllib.parse import urlparse; import sys; u=urlparse(sys.argv[1]); print(u.port or (443 if u.scheme=="https" else 80))' "${url}")"
+  foundation_keep_vault_up_is_loopback_bind "${host}" || return 1
+  if ! command -v lsof >/dev/null 2>&1; then
+    return 1
+  fi
+  pid="$(lsof -nP -iTCP:"${port}" -sTCP:LISTEN -t 2>/dev/null | sort -u | head -n 1 || true)"
+  [[ "${pid}" =~ ^[0-9]+$ ]] || return 1
+  if [[ -L "/proc/${pid}/cwd" ]]; then
+    cwd="$(readlink "/proc/${pid}/cwd" 2>/dev/null || true)"
+  else
+    cwd="$(lsof -a -p "${pid}" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1 || true)"
+  fi
+  [[ "${cwd}" == "${repo_root}" ]] || return 1
+  printf '%s\n' "${pid}"
+}
+
+# Official `pnpm start` never writes app.pid. Stop that listener only
+# when it is this clone. Leaves a foreign process.
+foundation_keep_vault_up_stop_unrecorded_app() {
+  local repo_root="$1"
+  local pid i
+  pid="$(foundation_keep_vault_up_health_listener_pid "${repo_root}" || true)"
+  [[ "${pid}" =~ ^[0-9]+$ ]] || return 1
+  foundation_keep_vault_up_stop_pid_tree "${pid}" TERM
+  i=0
+  while ((i < 5)) && kill -0 "${pid}" 2>/dev/null; do
+    sleep 1
+    i=$((i + 1))
+  done
+  if kill -0 "${pid}" 2>/dev/null; then
+    foundation_keep_vault_up_stop_pid_tree "${pid}" KILL
+  fi
+  if kill -0 "${pid}" 2>/dev/null; then
+    return 1
+  fi
+  return 0
+}
+
 # Stop this vault's app only (this FOUNDATION_DATA app.pid). Leaves Postgres up.
 # Kills the pnpm wrapper and the Node listener (process group + tree).
 # Does not wait(1) a pid from another process.
@@ -1205,13 +1262,20 @@ foundation_keep_vault_up_main() {
     fi
   fi
 
-  if ((FOUNDATION_KEEP_VAULT_UP_VIEW_KEY_MINTED)); then
+  if ((FOUNDATION_KEEP_VAULT_UP_ENV_CHANGED)); then
     if [[ -f "$(foundation_keep_vault_up_app_pid_file "${data_dir}")" ]] \
       && kill -0 "$(tr -d '[:space:]' <"$(foundation_keep_vault_up_app_pid_file "${data_dir}")")" 2>/dev/null; then
       foundation_keep_vault_up_stop_app "${data_dir}" || true
       if ! foundation_keep_vault_up_start_app "${repo_root}" "${data_dir}"; then
         foundation_keep_vault_up_nag "start failed. The app did not start (pnpm start)."
         return 1
+      fi
+    elif foundation_keep_vault_up_health_ok; then
+      if foundation_keep_vault_up_stop_unrecorded_app "${repo_root}"; then
+        if ! foundation_keep_vault_up_start_app "${repo_root}" "${data_dir}"; then
+          foundation_keep_vault_up_nag "start failed. The app did not start (pnpm start)."
+          return 1
+        fi
       fi
     fi
   fi

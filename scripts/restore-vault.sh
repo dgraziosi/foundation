@@ -118,6 +118,12 @@ foundation_restore_recreate_database() {
     data_dir="$(foundation_keep_vault_up_data_dir "$(foundation_keep_vault_up_repo_root)")"
   fi
   postgres="${data_dir%/}/postgres"
+  if ! foundation_keep_vault_up_pg_running "${postgres}"; then
+    if ! foundation_keep_vault_up_start_postgres "${data_dir}"; then
+      echo "restore-vault: vault Postgres did not start from the data dir" >&2
+      return 1
+    fi
+  fi
   # OS socket superuser. The app role does not create databases.
   foundation_keep_vault_up_psql_local "${postgres}" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = ${lit_db} AND pid <> pg_backend_pid();" >/dev/null
   foundation_keep_vault_up_psql_local "${postgres}" -c "DROP DATABASE IF EXISTS ${ident_db};"

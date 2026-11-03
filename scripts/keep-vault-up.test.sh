@@ -98,6 +98,15 @@ fi
 if ! grep -Fq -- 'env -i' "${keep_script}"; then
   fail "keep-vault-up.sh must start the app with env -i"
 fi
+if ! awk '/^foundation_keep_vault_up_main\(\)/,/^}/' "${keep_script}" | grep -Fq -- 'FOUNDATION_KEEP_VAULT_UP_ENV_CHANGED'; then
+  fail "main must restart the app when minted secrets change .env"
+fi
+if awk '/^foundation_keep_vault_up_main\(\)/,/^}/' "${keep_script}" | grep -Fq -- 'FOUNDATION_KEEP_VAULT_UP_VIEW_KEY_MINTED'; then
+  fail "main must not restart only when a view key was minted"
+fi
+if grep -Fq -- '${port:-5432}' "${keep_script}"; then
+  fail "psql_local must not fall back to a default cluster"
+fi
 if ! grep -Fq -- 'listen_addresses' "${keep_script}"; then
   fail "keep-vault-up.sh must pin listen_addresses"
 fi
@@ -1281,6 +1290,129 @@ keep_api="${minted_api}"
 foundation_keep_vault_up_ensure_env_secrets "${mint_clone}"
 if [[ "$(foundation_keep_vault_up_env_value "${mint_clone}" FOUNDATION_API_KEY)" != "${keep_api}" ]]; then
   fail "a second mint must keep a 32+ custom API key"
+fi
+
+# Minted secrets restart a live keep-up app (any door key or database password).
+restart_dir="${tmp_root}/mint-restart"
+mkdir -p "${restart_dir}"
+(
+  sleep 120
+) &
+restart_pid=$!
+echo "${restart_pid}" >"${restart_dir}/app.pid"
+restart_log="${tmp_root}/mint-restart.log"
+: >"${restart_log}"
+set +e
+out="$(
+  FOUNDATION_DATA="${restart_dir}"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_data_dir() { printf '%s\n' "${restart_dir}"; }
+  foundation_keep_vault_up_refuse_restore_lock() { return 0; }
+  foundation_keep_vault_up_refuse_restore_failed() { return 0; }
+  foundation_keep_vault_up_refuse_missing_folder() { return 0; }
+  foundation_keep_vault_up_refuse_miss() { return 0; }
+  foundation_keep_vault_up_refuse_empty_next_to_real() { return 0; }
+  foundation_keep_vault_up_ensure_env_secrets() {
+    FOUNDATION_KEEP_VAULT_UP_ENV_CHANGED=1
+    return 0
+  }
+  foundation_keep_vault_up_pg_running() { return 1; }
+  foundation_keep_vault_up_health_ok() { return 0; }
+  foundation_keep_vault_up_cluster_ok() { return 0; }
+  foundation_keep_vault_up_start_app() {
+    echo start_app >>"${restart_log}"
+    return 0
+  }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+set -e
+if ((rc != 0)); then
+  fail "mint + live app.pid should restart (got ${rc}: ${out})"
+fi
+if kill -0 "${restart_pid}" 2>/dev/null; then
+  kill "${restart_pid}" 2>/dev/null || true
+  wait "${restart_pid}" 2>/dev/null || true
+  fail "minted secrets must stop the live keep-up app"
+fi
+if ! grep -Fq -- 'start_app' "${restart_log}"; then
+  fail "minted secrets must start the app again (log: $(cat "${restart_log}"))"
+fi
+
+# No mint: a live pid and green /health stay quiet.
+keep_dir="${tmp_root}/keep-running"
+mkdir -p "${keep_dir}"
+(
+  sleep 120
+) &
+keep_pid=$!
+echo "${keep_pid}" >"${keep_dir}/app.pid"
+: >"${restart_log}"
+set +e
+out="$(
+  FOUNDATION_DATA="${keep_dir}"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_data_dir() { printf '%s\n' "${keep_dir}"; }
+  foundation_keep_vault_up_refuse_restore_lock() { return 0; }
+  foundation_keep_vault_up_refuse_restore_failed() { return 0; }
+  foundation_keep_vault_up_refuse_missing_folder() { return 0; }
+  foundation_keep_vault_up_refuse_miss() { return 0; }
+  foundation_keep_vault_up_refuse_empty_next_to_real() { return 0; }
+  foundation_keep_vault_up_ensure_env_secrets() {
+    FOUNDATION_KEEP_VAULT_UP_ENV_CHANGED=0
+    return 0
+  }
+  foundation_keep_vault_up_pg_running() { return 1; }
+  foundation_keep_vault_up_health_ok() { return 0; }
+  foundation_keep_vault_up_cluster_ok() { return 0; }
+  foundation_keep_vault_up_start_app() {
+    echo start_app >>"${restart_log}"
+    return 0
+  }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+set -e
+if ((rc != 0)); then
+  kill "${keep_pid}" 2>/dev/null || true
+  wait "${keep_pid}" 2>/dev/null || true
+  fail "green /health without a mint should stay quiet (got ${rc}: ${out})"
+fi
+if ! kill -0 "${keep_pid}" 2>/dev/null; then
+  fail "green /health without a mint must not stop the live app"
+fi
+if [[ -s "${restart_log}" ]]; then
+  kill "${keep_pid}" 2>/dev/null || true
+  wait "${keep_pid}" 2>/dev/null || true
+  fail "green /health without a mint must not start the app again"
+fi
+kill "${keep_pid}" 2>/dev/null || true
+wait "${keep_pid}" 2>/dev/null || true
+
+# Stopped cluster: psql_local must not hit a default Postgres.
+psql_probe="${tmp_root}/psql-probe"
+mkdir -p "${psql_probe}/bin" "${psql_probe}/data/postgres"
+cat >"${psql_probe}/bin/psql" <<'EOF'
+#!/bin/sh
+echo "HIT_DEFAULT_PSQL $*" >> "${PSQL_PROBE_LOG:?}"
+exit 0
+EOF
+cat >"${psql_probe}/bin/pg_ctl" <<'EOF'
+#!/bin/sh
+exit 1
+EOF
+chmod +x "${psql_probe}/bin/psql" "${psql_probe}/bin/pg_ctl"
+: >"${psql_probe}/log"
+set +e
+PSQL_PROBE_LOG="${psql_probe}/log" PATH="${psql_probe}/bin:${PATH}" \
+  foundation_keep_vault_up_psql_local "${psql_probe}/data/postgres" -c 'SELECT 1'
+psql_rc=$?
+set -e
+if ((psql_rc == 0)); then
+  fail "psql_local must refuse when this data dir is not the running cluster"
+fi
+if [[ -s "${psql_probe}/log" ]]; then
+  fail "psql_local must not fall back to a default psql (got: $(cat "${psql_probe}/log"))"
 fi
 
 # Live cluster: peer + scram, listen pin, non-superuser, extensions, second run is a no-op.
