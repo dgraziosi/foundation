@@ -104,6 +104,12 @@ fi
 if awk '/^foundation_keep_vault_up_main\(\)/,/^}/' "${keep_script}" | grep -Fq -- 'FOUNDATION_KEEP_VAULT_UP_VIEW_KEY_MINTED'; then
   fail "main must not restart only when a view key was minted"
 fi
+if ! awk '/^foundation_keep_vault_up_health_listener_pid\(\)/,/^}/' "${keep_script}" | grep -Fq -- '"${repo_root}/"*'; then
+  fail "health_listener_pid must accept official pnpm start cwd under the clone"
+fi
+if awk '/^foundation_keep_vault_up_main\(\)/,/^}/' "${keep_script}" | grep -Fq -- 'elif foundation_keep_vault_up_health_ok'; then
+  fail "main must stop an unrecorded app after a mint even when /health is down"
+fi
 if grep -Fq -- '${port:-5432}' "${keep_script}"; then
   fail "psql_local must not fall back to a default cluster"
 fi
@@ -1337,6 +1343,126 @@ if kill -0 "${restart_pid}" 2>/dev/null; then
 fi
 if ! grep -Fq -- 'start_app' "${restart_log}"; then
   fail "minted secrets must start the app again (log: $(cat "${restart_log}"))"
+fi
+
+# Mint + official `pnpm start` (no app.pid): stop even when /health is down
+# (rotated database password). Do not fall through to a second start.
+unrec_dir="${tmp_root}/mint-unrecorded"
+mkdir -p "${unrec_dir}"
+: >"${restart_log}"
+set +e
+out="$(
+  FOUNDATION_DATA="${unrec_dir}"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_data_dir() { printf '%s\n' "${unrec_dir}"; }
+  foundation_keep_vault_up_refuse_restore_lock() { return 0; }
+  foundation_keep_vault_up_refuse_restore_failed() { return 0; }
+  foundation_keep_vault_up_refuse_missing_folder() { return 0; }
+  foundation_keep_vault_up_refuse_miss() { return 0; }
+  foundation_keep_vault_up_refuse_empty_next_to_real() { return 0; }
+  foundation_keep_vault_up_ensure_env_secrets() {
+    FOUNDATION_KEEP_VAULT_UP_ENV_CHANGED=1
+    return 0
+  }
+  foundation_keep_vault_up_pg_running() { return 1; }
+  foundation_keep_vault_up_health_ok() {
+    if grep -Fq -- 'start_app' "${restart_log}" 2>/dev/null; then
+      return 0
+    fi
+    return 1
+  }
+  foundation_keep_vault_up_cluster_ok() { return 0; }
+  foundation_keep_vault_up_stop_unrecorded_app() {
+    echo stop_unrecorded >>"${restart_log}"
+    return 0
+  }
+  foundation_keep_vault_up_start_app() {
+    echo start_app >>"${restart_log}"
+    return 0
+  }
+  foundation_keep_vault_up_start() {
+    echo start >>"${restart_log}"
+    return 1
+  }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+set -e
+if ((rc != 0)); then
+  fail "mint + unrecorded app with /health down should restart (got ${rc}: ${out})"
+fi
+if ! grep -Fq -- 'stop_unrecorded' "${restart_log}"; then
+  fail "minted secrets must stop official pnpm start even when /health is down"
+fi
+if ! grep -Fq -- 'start_app' "${restart_log}"; then
+  fail "minted secrets must start the app after stopping official pnpm start"
+fi
+if grep -Fxq -- 'start' "${restart_log}"; then
+  fail "mint + unrecorded stop must not fall through to a second start (log: $(cat "${restart_log}"))"
+fi
+
+# Official `pnpm start` listener cwd is apps/server, not the clone root.
+if command -v lsof >/dev/null 2>&1; then
+  listener_root="${tmp_root}/listener-clone"
+  mkdir -p "${listener_root}/apps/server"
+  listener_port="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')"
+  (
+    cd "${listener_root}/apps/server" || exit 1
+    exec python3 -c '
+import socket, time, sys
+port = int(sys.argv[1])
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(("127.0.0.1", port))
+s.listen(1)
+time.sleep(60)
+' "${listener_port}"
+  ) &
+  listener_pid=$!
+  i=0
+  while ((i < 20)) && ! lsof -nP -iTCP:"${listener_port}" -sTCP:LISTEN -t >/dev/null 2>&1; do
+    sleep 0.1
+    i=$((i + 1))
+  done
+  set +e
+  got="$(FOUNDATION_HEALTH_URL="http://127.0.0.1:${listener_port}/health" foundation_keep_vault_up_health_listener_pid "${listener_root}")"
+  listener_rc=$?
+  set -e
+  kill "${listener_pid}" 2>/dev/null || true
+  wait "${listener_pid}" 2>/dev/null || true
+  if ((listener_rc != 0)) || [[ "${got}" != "${listener_pid}" ]]; then
+    fail "health_listener_pid must accept official pnpm start cwd apps/server (got rc=${listener_rc} pid=${got} want=${listener_pid})"
+  fi
+
+  foreign_port="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')"
+  (
+    cd "${tmp_root}" || exit 1
+    exec python3 -c '
+import socket, time, sys
+port = int(sys.argv[1])
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(("127.0.0.1", port))
+s.listen(1)
+time.sleep(60)
+' "${foreign_port}"
+  ) &
+  foreign_pid=$!
+  i=0
+  while ((i < 20)) && ! lsof -nP -iTCP:"${foreign_port}" -sTCP:LISTEN -t >/dev/null 2>&1; do
+    sleep 0.1
+    i=$((i + 1))
+  done
+  set +e
+  FOUNDATION_HEALTH_URL="http://127.0.0.1:${foreign_port}/health" \
+    foundation_keep_vault_up_health_listener_pid "${listener_root}"
+  foreign_rc=$?
+  set -e
+  kill "${foreign_pid}" 2>/dev/null || true
+  wait "${foreign_pid}" 2>/dev/null || true
+  if ((foreign_rc == 0)); then
+    fail "health_listener_pid must leave a listener whose cwd is outside the clone"
+  fi
 fi
 
 # No mint: a live pid and green /health stay quiet.

@@ -1099,7 +1099,8 @@ foundation_keep_vault_up_stop_pid_tree() {
 }
 
 # PID listening on this clone's health URL. Empty when the listener is
-# not this repo (official `pnpm start` has no app.pid).
+# not this repo. Official `pnpm start` has no app.pid; the Node
+# listener cwd is apps/server, not the clone root.
 foundation_keep_vault_up_health_listener_pid() {
   local repo_root="$1"
   local url host port pid cwd
@@ -1117,7 +1118,7 @@ foundation_keep_vault_up_health_listener_pid() {
   else
     cwd="$(lsof -a -p "${pid}" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1 || true)"
   fi
-  [[ "${cwd}" == "${repo_root}" ]] || return 1
+  [[ "${cwd}" == "${repo_root}" || "${cwd}" == "${repo_root}/"* ]] || return 1
   printf '%s\n' "${pid}"
 }
 
@@ -1270,12 +1271,10 @@ foundation_keep_vault_up_main() {
         foundation_keep_vault_up_nag "start failed. The app did not start (pnpm start)."
         return 1
       fi
-    elif foundation_keep_vault_up_health_ok; then
-      if foundation_keep_vault_up_stop_unrecorded_app "${repo_root}"; then
-        if ! foundation_keep_vault_up_start_app "${repo_root}" "${data_dir}"; then
-          foundation_keep_vault_up_nag "start failed. The app did not start (pnpm start)."
-          return 1
-        fi
+    elif foundation_keep_vault_up_stop_unrecorded_app "${repo_root}"; then
+      if ! foundation_keep_vault_up_start_app "${repo_root}" "${data_dir}"; then
+        foundation_keep_vault_up_nag "start failed. The app did not start (pnpm start)."
+        return 1
       fi
     fi
   fi
