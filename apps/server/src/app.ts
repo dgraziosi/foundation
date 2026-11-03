@@ -10,13 +10,42 @@ import { FailureLedger, ViewDoor, windowLockOf } from "./view-door.js";
 import { ViewSessions } from "./view-session.js";
 import { registerViewRoutes } from "./view.js";
 
-/** 20MB blob cap as base64 plus JSON-RPC envelope. */
-const JSON_BODY_LIMIT = "32mb";
+/** 20MB blob cap as base64 plus JSON-RPC envelope. Parsed only after the key check. */
+const MCP_BODY_LIMIT = "32mb";
 
 export type AppDoor = "mcp" | "view";
 
 function requestPath(req: express.Request): string {
   return (req.originalUrl.split("?")[0] ?? "").replace(/\/+$/, "") || "/";
+}
+
+/** Body-parse and route errors as JSON. Express's default page would print a stack. */
+function sendJsonError(
+  error: unknown,
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction,
+): void {
+  if (res.headersSent) {
+    next(error);
+    return;
+  }
+  const raw = error && typeof error === "object" && "status" in error ? Number(error.status) : 500;
+  const status = raw >= 400 && raw < 600 ? raw : 500;
+  if (status >= 500) {
+    console.error("Request failed", error);
+  }
+  const message =
+    status === 413 ? "Request body too large" : status >= 500 ? "Internal server error" : "Bad request";
+  if (isAgentPath(requestPath(req))) {
+    res.status(status).json({
+      jsonrpc: "2.0",
+      error: { code: status === 400 ? -32700 : -32000, message },
+      id: null,
+    });
+    return;
+  }
+  res.status(status).json({ error: message });
 }
 
 /** View publish must not serve write-capable agent routes, Host header or not. */
@@ -91,7 +120,7 @@ function registerMcpAndBlobs(
 
   app.use("/mcp", gate);
 
-  app.post("/mcp", async (req, res) => {
+  app.post("/mcp", express.json({ limit: MCP_BODY_LIMIT }), async (req, res) => {
     try {
       const agent = req.agent;
       if (!agent) {
@@ -152,18 +181,15 @@ export function createApp(
   const state = shared ?? doorSharedOf(config);
   const app = express();
   app.use(guardHostAndOrigin(hostPolicyOf(config)));
-  app.use(express.json({ limit: JSON_BODY_LIMIT }));
-  app.use(express.urlencoded({ extended: false }));
 
   if (door === "view") {
     app.use(refuseAgentPaths);
-    registerHealth(app, pool, config, ring, state);
-    registerViewRoutes(app, pool, config, state);
-    return app;
   }
-
   registerHealth(app, pool, config, ring, state);
   registerViewRoutes(app, pool, config, state);
-  registerMcpAndBlobs(app, pool, config, ring, state);
+  if (door === "mcp") {
+    registerMcpAndBlobs(app, pool, config, ring, state);
+  }
+  app.use(sendJsonError);
   return app;
 }

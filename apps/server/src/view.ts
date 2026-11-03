@@ -39,6 +39,10 @@ import {
 
 export const VIEW_PATH = "/view";
 const UNLOCK_REJECT = "That key did not unlock.";
+/** Unlock parses before any key is known, so it stays small. */
+const UNLOCK_BODY_LIMIT = "16kb";
+/** Writes parse only after the gate. A journal body is as long as the person wrote it. */
+const VIEW_WRITE_BODY_LIMIT = "32mb";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -193,13 +197,18 @@ function sendWriteResult(res: Response, got: unknown): void {
 export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings, shared: DoorShared): void {
   const { viewDoor, sessions } = shared;
   const gate = requireViewAuth(shared);
+  const unlockBody = [
+    express.json({ limit: UNLOCK_BODY_LIMIT }),
+    express.urlencoded({ extended: false, limit: UNLOCK_BODY_LIMIT }),
+  ];
+  const writeBody = express.json({ limit: VIEW_WRITE_BODY_LIMIT });
   const dist = viewerDistDir();
 
   app.get(`${VIEW_PATH}/unlock`, (_req, res) => {
     sendViewerApp(res);
   });
 
-  app.post(`${VIEW_PATH}/unlock`, (req, res) => {
+  app.post(`${VIEW_PATH}/unlock`, ...unlockBody, (req, res) => {
     const presented = presentedSecret(req.body?.api_key);
     const decision = viewDoor.tryUnlock(presented, attemptSource(req));
     if (decision.kind === "open") {
@@ -383,7 +392,7 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings
     }
   });
 
-  app.patch(`${VIEW_PATH}/api/nodes/:id`, gate, async (req, res) => {
+  app.patch(`${VIEW_PATH}/api/nodes/:id`, gate, writeBody, async (req, res) => {
     try {
       sendWriteResult(
         res,
@@ -402,7 +411,7 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings
     }
   });
 
-  app.delete(`${VIEW_PATH}/api/nodes/:id`, gate, async (req, res) => {
+  app.delete(`${VIEW_PATH}/api/nodes/:id`, gate, writeBody, async (req, res) => {
     try {
       sendWriteResult(
         res,
@@ -417,7 +426,7 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings
     }
   });
 
-  app.post(`${VIEW_PATH}/api/nodes/:id/restore`, gate, async (req, res) => {
+  app.post(`${VIEW_PATH}/api/nodes/:id/restore`, gate, writeBody, async (req, res) => {
     try {
       sendWriteResult(
         res,
@@ -432,7 +441,7 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings
     }
   });
 
-  app.post(`${VIEW_PATH}/api/activity/:id/undo`, gate, async (req, res) => {
+  app.post(`${VIEW_PATH}/api/activity/:id/undo`, gate, writeBody, async (req, res) => {
     try {
       sendWriteResult(
         res,

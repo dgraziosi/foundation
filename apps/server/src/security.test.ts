@@ -196,6 +196,66 @@ test("the tunnel Host of an https VIEW_PUBLIC_ORIGIN unlocks with a Secure cooki
   }
 });
 
+test("bodies parse after the key check; Unlock parses small", async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), "foundation-security-body-"));
+  const bindings = { FOUNDATION_API_KEY: apiKey, FOUNDATION_VIEW_KEY: viewKey, FOUNDATION_DATA: dataDir };
+  const server = createApp(stubPool(), bindings, "mcp").listen(0);
+  await new Promise<void>((resolve) => server.once("listening", () => resolve()));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const origin = `http://127.0.0.1:${address.port}`;
+  const mcpHeaders = { "content-type": "application/json", accept: "application/json, text/event-stream" };
+
+  try {
+    const huge = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: { pad: "x".repeat(33 * 1024 * 1024) } });
+    const anonymous = await fetch(`${origin}/mcp`, { method: "POST", headers: mcpHeaders, body: huge });
+    assert.equal(anonymous.status, 401);
+
+    const blobSized = JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/list",
+      params: { _meta: { pad: "x".repeat(21 * 1024 * 1024) } },
+    });
+    const keyed = await fetch(`${origin}/mcp`, {
+      method: "POST",
+      headers: { ...mcpHeaders, authorization: `ApiKey ${apiKey}` },
+      body: blobSized,
+    });
+    assert.equal(keyed.status, 200);
+
+    const malformed = await fetch(`${origin}/mcp`, {
+      method: "POST",
+      headers: { ...mcpHeaders, authorization: `ApiKey ${apiKey}` },
+      body: "{not json",
+    });
+    assert.equal(malformed.status, 400);
+    assert.deepEqual(await malformed.json(), {
+      jsonrpc: "2.0",
+      error: { code: -32700, message: "Bad request" },
+      id: null,
+    });
+
+    const bigUnlock = await fetch(`${origin}/view/unlock`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({ api_key: viewKey, pad: "x".repeat(17 * 1024) }),
+    });
+    assert.equal(bigUnlock.status, 413);
+    assert.deepEqual(await bigUnlock.json(), { error: "Request body too large" });
+    assert.equal(bigUnlock.headers.get("set-cookie"), null);
+
+    const anonymousWrite = await fetch(`${origin}/view/api/nodes/11111111-1111-4111-8111-111111111111`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ body: "x".repeat(1024 * 1024) }),
+    });
+    assert.equal(anonymousWrite.status, 401);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
 test("a bind beyond loopback needs a named origin and TLS or a cleartext opt-in", () => {
   const local = { HOST: "127.0.0.1", VIEW_HOST: "127.0.0.1", FOUNDATION_ALLOW_CLEARTEXT: false };
   assert.equal(bindRefusal(local), undefined);
