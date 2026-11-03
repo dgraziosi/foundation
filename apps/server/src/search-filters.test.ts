@@ -301,10 +301,9 @@ test(
       });
 
       await t.test("schema miss on upsert returns error and suggestion", async () => {
-        const typed = await manageType(pool, {
+        const refused = await manageType(pool, {
           action: "create",
-          slug: "labeled_fixture",
-          description: "Throwaway type with a required name field",
+          slug: "raw_schema_fixture",
           kind: "artifact",
           json_schema: {
             type: "object",
@@ -312,6 +311,24 @@ test(
             required: ["name"],
             properties: { name: { type: "string", minLength: 1 } },
           },
+        });
+        assert.equal(isToolError(refused), true);
+        if (!isToolError(refused)) {
+          return;
+        }
+        assert.match(refused.error, /raw json_schema/);
+        assert.match(refused.suggestion ?? "", /fields/);
+        const hidden = (await inspectOntology(pool, "types")).types.find(
+          (type) => type.slug === "raw_schema_fixture",
+        );
+        assert.equal(hidden, undefined);
+
+        const typed = await manageType(pool, {
+          action: "create",
+          slug: "labeled_fixture",
+          description: "Throwaway type with a name field",
+          kind: "artifact",
+          fields: [{ name: "name", kind: "string", display: "Name" }],
         });
         assert.equal(isToolError(typed), false);
         if (isToolError(typed)) {
@@ -321,7 +338,7 @@ test(
         const miss = await upsertGraphNode(pool, {
           type: "labeled_fixture",
           title: "Throwaway schema miss",
-          data: { other: 1 },
+          data: { name: 1 },
         });
         assert.equal(isToolError(miss), true);
         if (!isToolError(miss)) {

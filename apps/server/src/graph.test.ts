@@ -967,3 +967,157 @@ test(
     }
   },
 );
+
+function refLoopSchema(): Record<string, unknown> {
+  const properties: Record<string, unknown> = {};
+  const width = 64;
+  for (let index = 0; index < width; index += 1) {
+    const next = (index + 1) % width;
+    properties[`field_${index}`] = { $ref: `#/properties/field_${next}` };
+  }
+  return { type: "object", properties };
+}
+
+test(
+  "manage_type refuses a raw json_schema with no fields and stores nothing",
+  { skip: !databaseUrl },
+  async () => {
+    if (!databaseUrl) {
+      return;
+    }
+    const pool = await poolForSchema("graph_raw_schema");
+    const hostile = refLoopSchema();
+    try {
+      const created = await manageType(pool, {
+        action: "create",
+        slug: "ref_loop_create",
+        kind: "artifact",
+        fields: [],
+        json_schema: hostile,
+      }, DESTRUCTIVE);
+      assert.equal(isToolError(created), true);
+      if (!isToolError(created)) {
+        return;
+      }
+      assert.match(created.error, /raw json_schema/);
+      assert.match(created.suggestion ?? "", /fields/);
+      const { rows: createdRows } = await pool.query<{ n: string }>(
+        `SELECT COUNT(*)::text AS n FROM node_types WHERE slug = $1`,
+        ["ref_loop_create"],
+      );
+      assert.equal(createdRows[0]?.n, "0");
+      const ontology = await inspectOntology(pool, "types");
+      assert.equal(
+        ontology.types.some((type) => type.slug === "ref_loop_create"),
+        false,
+      );
+
+      const open = await manageType(pool, {
+        action: "create",
+        slug: "ref_loop_update",
+        kind: "artifact",
+        fields: [],
+      }, DESTRUCTIVE);
+      assert.equal(isToolError(open), false);
+      if (isToolError(open)) {
+        return;
+      }
+      assert.equal(open.type.json_schema, null);
+
+      const updated = await manageType(pool, {
+        action: "update",
+        slug: "ref_loop_update",
+        json_schema: hostile,
+      }, DESTRUCTIVE);
+      assert.equal(isToolError(updated), true);
+      if (!isToolError(updated)) {
+        return;
+      }
+      assert.match(updated.error, /raw json_schema/);
+      const { rows: updatedRows } = await pool.query<{ json_schema: unknown }>(
+        `SELECT json_schema FROM node_types WHERE slug = $1`,
+        ["ref_loop_update"],
+      );
+      assert.equal(updatedRows.length, 1);
+      assert.equal(updatedRows[0]?.json_schema, null);
+      const seen = (await inspectOntology(pool, "types")).types.find(
+        (type) => type.slug === "ref_loop_update",
+      );
+      assert.equal(seen?.json_schema, null);
+      assert.deepEqual(seen?.fields, []);
+    } finally {
+      await pool.end();
+    }
+  },
+);
+
+test(
+  "upsert validates from fields when a stored json_schema column disagrees",
+  { skip: !databaseUrl },
+  async () => {
+    if (!databaseUrl) {
+      return;
+    }
+    const pool = await poolForSchema("graph_field_schema");
+    try {
+      const typed = await manageType(pool, {
+        action: "create",
+        slug: "field_compiled",
+        kind: "artifact",
+        fields: [{ name: "label", kind: "string", display: "Label" }],
+      }, DESTRUCTIVE);
+      assert.equal(isToolError(typed), false);
+      if (isToolError(typed)) {
+        return;
+      }
+      await pool.query(
+        `UPDATE node_types SET json_schema = $1::jsonb WHERE slug = $2`,
+        [JSON.stringify({ type: "object", additionalProperties: false }), "field_compiled"],
+      );
+      const ok = await upsertGraphNode(pool, {
+        type: "field_compiled",
+        title: "Compiled label",
+        data: { label: "ok" },
+      });
+      assert.equal(isToolError(ok), false);
+      if (isToolError(ok)) {
+        return;
+      }
+      assert.equal(ok.node.data.label, "ok");
+      const miss = await upsertGraphNode(pool, {
+        type: "field_compiled",
+        title: "Compiled miss",
+        data: { label: 1 },
+      });
+      assert.equal(isToolError(miss), true);
+      if (!isToolError(miss)) {
+        return;
+      }
+      assert.match(miss.error, /does not match json_schema for type "field_compiled"/);
+
+      const empty = await manageType(pool, {
+        action: "create",
+        slug: "empty_column",
+        kind: "artifact",
+        fields: [],
+      }, DESTRUCTIVE);
+      assert.equal(isToolError(empty), false);
+      await pool.query(
+        `UPDATE node_types SET json_schema = $1::jsonb WHERE slug = $2`,
+        [JSON.stringify({ type: "object", required: ["blocked"] }), "empty_column"],
+      );
+      const dumped = await upsertGraphNode(pool, {
+        type: "empty_column",
+        title: "Ignored column",
+        data: { extra: true },
+      });
+      assert.equal(isToolError(dumped), false);
+      if (isToolError(dumped)) {
+        return;
+      }
+      assert.equal(dumped.node.data.extra, true);
+    } finally {
+      await pool.end();
+    }
+  },
+);
