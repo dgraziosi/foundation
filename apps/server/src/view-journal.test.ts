@@ -13,6 +13,7 @@ import { journalDayTitle, journalMarkdownPayload } from "./view-journal.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 const apiKey = "test-foundation-key";
+const viewKey = "test-viewer-vault-key-0123456789abcdef";
 
 test("journalDayTitle is a calendar day, not a form label", () => {
   assert.equal(journalDayTitle("2026-09-01"), "September 1, 2026");
@@ -48,10 +49,17 @@ async function listenOrigin(server: Server): Promise<string> {
 }
 
 async function unlockCookie(origin: string): Promise<string> {
-  const unlock = await fetch(`${origin}/view/unlock`, {
+  const houseKey = await fetch(`${origin}/view/unlock`, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: `api_key=${encodeURIComponent(apiKey)}`,
+    redirect: "manual",
+  });
+  assert.equal(houseKey.status, 401);
+  const unlock = await fetch(`${origin}/view/unlock`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: `api_key=${encodeURIComponent(viewKey)}`,
     redirect: "manual",
   });
   assert.equal(unlock.status, 303);
@@ -68,6 +76,7 @@ test("viewer journal write gate: today, patch, types, if-match, cookie is not MC
   const dataDir = await mkdtemp(join(tmpdir(), "foundation-journal-view-"));
   const bindings = {
     FOUNDATION_API_KEY: apiKey,
+    FOUNDATION_VIEW_KEY: viewKey,
     DATABASE_URL: databaseUrl,
     FOUNDATION_DATA: dataDir,
     PORT: 0,
@@ -209,6 +218,7 @@ test("Today after a deleted same-day journal makes a new entry", { skip: !databa
   const dataDir = await mkdtemp(join(tmpdir(), "foundation-journal-today-"));
   const bindings = {
     FOUNDATION_API_KEY: apiKey,
+    FOUNDATION_VIEW_KEY: viewKey,
     DATABASE_URL: databaseUrl,
     FOUNDATION_DATA: dataDir,
     PORT: 0,

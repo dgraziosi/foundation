@@ -126,7 +126,7 @@ export function createApp(
   viewDoor?: ViewDoor,
 ): Express {
   const ring = keyring ?? Keyring.fromBindings(config);
-  const window = viewDoor ?? ViewDoor.fromBindings(config, ring);
+  const window = viewDoor ?? ViewDoor.fromBindings(config);
   const app = express();
   app.use(express.json({ limit: JSON_BODY_LIMIT }));
   app.use(express.urlencoded({ extended: false }));

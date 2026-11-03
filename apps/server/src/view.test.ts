@@ -21,6 +21,7 @@ import { viewerDistDir } from "./view.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 const apiKey = "test-foundation-key";
+const viewKey = "test-viewer-vault-key-0123456789abcdef";
 
 async function poolForSchema(schema: string): Promise<Pool> {
   const admin = createPool(databaseUrl!);
@@ -37,6 +38,10 @@ async function poolForSchema(schema: string): Promise<Pool> {
 
 function authHeader(): { authorization: string } {
   return { authorization: `ApiKey ${apiKey}` };
+}
+
+function viewAuthHeader(): { authorization: string } {
+  return { authorization: `ApiKey ${viewKey}` };
 }
 
 function mcpUpsertBody(title: string): string {
@@ -64,7 +69,7 @@ async function unlockCookie(origin: string): Promise<string> {
   const unlock = await fetch(`${origin}/view/unlock`, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: `api_key=${encodeURIComponent(apiKey)}`,
+    body: `api_key=${encodeURIComponent(viewKey)}`,
     redirect: "manual",
   });
   assert.equal(unlock.status, 303);
@@ -82,6 +87,7 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
   const dataDir = await mkdtemp(join(tmpdir(), "foundation-view-"));
   const bindings = {
     FOUNDATION_API_KEY: apiKey,
+    FOUNDATION_VIEW_KEY: viewKey,
     DATABASE_URL: databaseUrl,
     FOUNDATION_DATA: dataDir,
     PORT: 0,
@@ -137,38 +143,38 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
     });
 
     await t.test("succeeds with the API key; empty graph is empty, not an error", async () => {
-      const session = await fetch(`${origin}/view/api/session`, { headers: authHeader() });
+      const session = await fetch(`${origin}/view/api/session`, { headers: viewAuthHeader() });
       assert.equal(session.status, 200);
 
-      const graph = await fetch(`${origin}/view/api/graph`, { headers: authHeader() });
+      const graph = await fetch(`${origin}/view/api/graph`, { headers: viewAuthHeader() });
       assert.equal(graph.status, 200);
       const graphBody = (await graph.json()) as { nodes: unknown[]; edges: unknown[] };
       assert.deepEqual(graphBody.nodes, []);
       assert.deepEqual(graphBody.edges, []);
 
-      const search = await fetch(`${origin}/view/api/search`, { headers: authHeader() });
+      const search = await fetch(`${origin}/view/api/search`, { headers: viewAuthHeader() });
       assert.equal(search.status, 200);
       const searchBody = (await search.json()) as { searched: boolean; hits: unknown[] };
       assert.equal(searchBody.searched, false);
       assert.deepEqual(searchBody.hits, []);
 
-      const listed = await fetch(`${origin}/view/api/search?type=note`, { headers: authHeader() });
+      const listed = await fetch(`${origin}/view/api/search?type=note`, { headers: viewAuthHeader() });
       assert.equal(listed.status, 200);
       const listedBody = (await listed.json()) as { searched: boolean; hits: unknown[] };
       assert.equal(listedBody.searched, true);
       assert.deepEqual(listedBody.hits, []);
 
-      const recents = await fetch(`${origin}/view/api/recents`, { headers: authHeader() });
+      const recents = await fetch(`${origin}/view/api/recents`, { headers: viewAuthHeader() });
       assert.equal(recents.status, 200);
       const recentsBody = (await recents.json()) as { rows: unknown[] };
       assert.deepEqual(recentsBody.rows, []);
 
-      const tasks = await fetch(`${origin}/view/api/tasks`, { headers: authHeader() });
+      const tasks = await fetch(`${origin}/view/api/tasks`, { headers: viewAuthHeader() });
       assert.equal(tasks.status, 200);
       const tasksBody = (await tasks.json()) as { tasks: unknown[] };
       assert.deepEqual(tasksBody.tasks, []);
 
-      const ontology = await fetch(`${origin}/view/api/ontology`, { headers: authHeader() });
+      const ontology = await fetch(`${origin}/view/api/ontology`, { headers: viewAuthHeader() });
       assert.equal(ontology.status, 200);
       const ontologyBody = (await ontology.json()) as {
         types: Array<{
@@ -198,7 +204,7 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       assert.deepEqual(noteType?.views, ["list"]);
       assert.equal(noteType?.default_view, "list");
 
-      const typeView = await fetch(`${origin}/view/api/types/task`, { headers: authHeader() });
+      const typeView = await fetch(`${origin}/view/api/types/task`, { headers: viewAuthHeader() });
       assert.equal(typeView.status, 200);
       const typeBody = (await typeView.json()) as {
         type: { views: Array<string | { id: string }>; default_view?: string; fields?: Array<{ name: string }> };
@@ -214,7 +220,7 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
 
       const blank = await manageType(pool, { action: "create", slug: "blank_view", kind: "artifact" });
       assert.equal(isToolError(blank), false);
-      const blankView = await fetch(`${origin}/view/api/types/blank_view`, { headers: authHeader() });
+      const blankView = await fetch(`${origin}/view/api/types/blank_view`, { headers: viewAuthHeader() });
       assert.equal(blankView.status, 200);
       const blankBody = (await blankView.json()) as { type: { views: Array<string | { id: string }>; default_view?: string } };
       assert.deepEqual(blankBody.type.views, []);
@@ -239,10 +245,18 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       assert.equal(deniedJson.status, 401);
       assert.deepEqual(await deniedJson.json(), { error: "That key did not unlock." });
 
+      const houseKey = await fetch(`${origin}/view/unlock`, {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ api_key: apiKey }),
+      });
+      assert.equal(houseKey.status, 401);
+      assert.equal(houseKey.headers.get("set-cookie"), null);
+
       const unlock = await fetch(`${origin}/view/unlock`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `api_key=${encodeURIComponent(apiKey)}`,
+        body: `api_key=${encodeURIComponent(viewKey)}`,
         redirect: "manual",
       });
       assert.equal(unlock.status, 303);
@@ -320,7 +334,7 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
           "content-type": "application/json",
           accept: "application/json",
         },
-        body: JSON.stringify({ api_key: apiKey }),
+        body: JSON.stringify({ api_key: viewKey }),
       });
       assert.equal(unlock.status, 200);
       const setCookie = unlock.headers.get("set-cookie") ?? "";
@@ -470,7 +484,7 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
     await t.test("search results show title, type, and due", async () => {
       const res = await fetch(
         `${origin}/view/api/search?q=${encodeURIComponent("Fixture due")}&type=task`,
-        { headers: authHeader() },
+        { headers: viewAuthHeader() },
       );
       assert.equal(res.status, 200);
       const body = (await res.json()) as {
@@ -491,7 +505,7 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       });
       assert.equal(isToolError(hierarchy), false);
 
-      const res = await fetch(`${origin}/view/api/graph`, { headers: authHeader() });
+      const res = await fetch(`${origin}/view/api/graph`, { headers: viewAuthHeader() });
       assert.equal(res.status, 200);
       const body = (await res.json()) as {
         nodes: Array<{ title: string }>;
@@ -521,7 +535,7 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
 
       const write = await fetch(`${origin}/view/api/graph`, {
         method: "POST",
-        headers: { ...authHeader(), "content-type": "application/json" },
+        headers: { ...viewAuthHeader(), "content-type": "application/json" },
         body: JSON.stringify({ title: "must not write" }),
       });
       assert.equal(write.status, 404);
@@ -542,7 +556,7 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       });
       assert.equal(isToolError(hung), false);
 
-      const res = await fetch(`${origin}/view/api/nodes/${dueTask.node.id}`, { headers: authHeader() });
+      const res = await fetch(`${origin}/view/api/nodes/${dueTask.node.id}`, { headers: viewAuthHeader() });
       assert.equal(res.status, 200);
       const body = (await res.json()) as { ancestors: Array<{ title: string }> };
       assert.deepEqual(
@@ -552,7 +566,7 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
     });
 
     await t.test("node API shows title, payload, neighbors, and no write controls", async () => {
-      const res = await fetch(`${origin}/view/api/nodes/${note.node.id}`, { headers: authHeader() });
+      const res = await fetch(`${origin}/view/api/nodes/${note.node.id}`, { headers: viewAuthHeader() });
       assert.equal(res.status, 200);
       const body = (await res.json()) as {
         node: { title: string; type: string; status: string; payload: { body?: string } };
@@ -565,14 +579,14 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       assert.equal(body.edges[0]?.neighbor.title, "Fixture project");
       assert.equal(body.edges[0]?.neighbor.id, project.node.id);
 
-      const page = await fetch(`${origin}/view/nodes/${note.node.id}`, { headers: authHeader() });
+      const page = await fetch(`${origin}/view/nodes/${note.node.id}`, { headers: viewAuthHeader() });
       assert.equal(page.status, 200);
       const html = await page.text();
       assert.doesNotMatch(html, />\s*(Upsert|Delete|Link|Unlink|Undo|Confirm)\s*</i);
     });
 
     await t.test("tasks board lists the fixture task; widget cap is 5 in due order", async () => {
-      const res = await fetch(`${origin}/view/api/tasks`, { headers: authHeader() });
+      const res = await fetch(`${origin}/view/api/tasks`, { headers: viewAuthHeader() });
       assert.equal(res.status, 200);
       const body = (await res.json()) as {
         tasks: Array<{ title: string; status: string; due?: string }>;
@@ -603,7 +617,7 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       assert.equal(isToolError(completed), false);
       assert.equal(isToolError(archived), false);
 
-      const limited = await fetch(`${origin}/view/api/tasks?limit=5`, { headers: authHeader() });
+      const limited = await fetch(`${origin}/view/api/tasks?limit=5`, { headers: viewAuthHeader() });
       assert.equal(limited.status, 200);
       const limitedBody = (await limited.json()) as {
         tasks: Array<{ title: string; status?: string; due?: string }>;
@@ -647,7 +661,7 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
         [[olderTie.node.id, newerTie.node.id]],
       );
 
-      const res = await fetch(`${origin}/view/api/recents?limit=5`, { headers: authHeader() });
+      const res = await fetch(`${origin}/view/api/recents?limit=5`, { headers: viewAuthHeader() });
       assert.equal(res.status, 200);
       const body = (await res.json()) as {
         rows: Array<{ title: string; type: string; updated_at: string }>;
@@ -664,7 +678,7 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
         assert.ok(body.rows[i - 1]!.updated_at >= body.rows[i]!.updated_at);
       }
 
-      const all = await fetch(`${origin}/view/api/recents`, { headers: authHeader() });
+      const all = await fetch(`${origin}/view/api/recents`, { headers: viewAuthHeader() });
       const allBody = (await all.json()) as { rows: Array<{ title: string; type: string }> };
       assert.ok(allBody.rows.every((row) => row.type !== "task"));
       assert.ok(allBody.rows.some((row) => row.title === "Fixture note"));
@@ -699,7 +713,7 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
         return;
       }
       const res = await fetch(`${origin}/view/api/nodes/${blobNote.node.id}`, {
-        headers: authHeader(),
+        headers: viewAuthHeader(),
       });
       assert.equal(res.status, 200);
       const body = (await res.json()) as {
@@ -765,7 +779,7 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
         return;
       }
       const page = await fetch(`${origin}/view/api/nodes/${htmlBlobNote.node.id}`, {
-        headers: authHeader(),
+        headers: viewAuthHeader(),
       });
       assert.equal(page.status, 200);
       const detail = (await page.json()) as { blob?: { id: string } };
@@ -825,16 +839,16 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
         "SELECT COUNT(*)::text AS n FROM nodes WHERE deleted_at IS NULL",
       );
 
-      const home = await fetch(`${origin}/view/api/search?q=Fixture`, { headers: authHeader() });
+      const home = await fetch(`${origin}/view/api/search?q=Fixture`, { headers: viewAuthHeader() });
       assert.equal(home.status, 200);
       const nodePage = await fetch(`${origin}/view/api/nodes/${note.node.id}`, {
-        headers: authHeader(),
+        headers: viewAuthHeader(),
       });
       assert.equal(nodePage.status, 200);
-      const typed = await fetch(`${origin}/view/api/search?type=note`, { headers: authHeader() });
+      const typed = await fetch(`${origin}/view/api/search?type=note`, { headers: viewAuthHeader() });
       assert.equal(typed.status, 200);
       const graph = await fetch(`${origin}/view/api/graph?focus=${note.node.id}`, {
-        headers: authHeader(),
+        headers: viewAuthHeader(),
       });
       assert.equal(graph.status, 200);
 
@@ -878,6 +892,7 @@ test(
     const dataDir = await mkdtemp(join(tmpdir(), "foundation-view-filter-"));
     const bindings = {
       FOUNDATION_API_KEY: apiKey,
+      FOUNDATION_VIEW_KEY: viewKey,
       DATABASE_URL: databaseUrl,
       FOUNDATION_DATA: dataDir,
       PORT: 0,
@@ -1020,7 +1035,6 @@ function stubPool(): Pool {
 }
 
 test("FOUNDATION_VIEW_KEY is the vault key; MCP keys do not open the window", async () => {
-  const viewKey = "test-viewer-vault-key";
   const dataDir = await mkdtemp(join(tmpdir(), "foundation-view-exclusive-"));
   const bindings = {
     FOUNDATION_API_KEY: apiKey,
@@ -1112,6 +1126,40 @@ test("FOUNDATION_VIEW_KEY is the vault key; MCP keys do not open the window", as
     assert.equal(throttled.status, 429);
     assert.ok(Number(throttled.headers.get("retry-after")) > 0);
     assert.deepEqual(await throttled.json(), { error: "That key did not unlock." });
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+test("without FOUNDATION_VIEW_KEY the window stays closed and MCP still serves", async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), "foundation-view-closed-"));
+  const app = createApp(stubPool(), { FOUNDATION_API_KEY: apiKey, FOUNDATION_DATA: dataDir }, "mcp");
+  const server = app.listen(0);
+  const origin = await listenOrigin(server);
+
+  try {
+    for (const key of [apiKey, viewKey]) {
+      const unlock = await fetch(`${origin}/view/unlock`, {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ api_key: key }),
+      });
+      assert.equal(unlock.status, 401);
+      assert.equal(unlock.headers.get("set-cookie"), null);
+      const session = await fetch(`${origin}/view/api/session`, { headers: { authorization: `ApiKey ${key}` } });
+      assert.equal(session.status, 401);
+    }
+
+    const listed = await fetch(`${origin}/mcp`, {
+      method: "POST",
+      headers: {
+        ...authHeader(),
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
+    });
+    assert.equal(listed.status, 200);
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }

@@ -13,6 +13,7 @@ import { digestWindow, HOME_DIGEST_LIMIT, viewHomeDigest } from "./view-digest.j
 
 const databaseUrl = process.env.DATABASE_URL;
 const apiKey = "test-foundation-key";
+const viewKey = "test-viewer-vault-key-0123456789abcdef";
 
 async function poolForSchema(schema: string): Promise<Pool> {
   const admin = createPool(databaseUrl!);
@@ -82,6 +83,7 @@ test("Home digest lists bot activity since the look watermark", { skip: !databas
   const dataDir = await mkdtemp(join(tmpdir(), "foundation-digest-"));
   const bindings = {
     FOUNDATION_API_KEY: apiKey,
+    FOUNDATION_VIEW_KEY: viewKey,
     DATABASE_URL: databaseUrl,
     FOUNDATION_DATA: dataDir,
     PORT: 0,
@@ -94,10 +96,16 @@ test("Home digest lists bot activity since the look watermark", { skip: !databas
   const viewOrigin = await listenOrigin(viewServer);
 
   try {
-    const unlock = await fetch(`${viewOrigin}/view/unlock`, {
+    const houseKey = await fetch(`${viewOrigin}/view/unlock`, {
       method: "POST",
       headers: { "content-type": "application/json", accept: "application/json" },
       body: JSON.stringify({ api_key: apiKey }),
+    });
+    assert.equal(houseKey.status, 401);
+    const unlock = await fetch(`${viewOrigin}/view/unlock`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({ api_key: viewKey }),
     });
     assert.equal(unlock.status, 200);
     let cookie = cookieJar(unlock);

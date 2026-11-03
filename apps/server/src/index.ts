@@ -16,7 +16,7 @@ if (ran.length) {
 }
 
 const keyring = Keyring.fromBindings(config);
-const viewDoor = ViewDoor.fromBindings(config, keyring);
+const viewDoor = ViewDoor.fromBindings(config);
 
 const mcp = createApp(pool, config, "mcp", keyring, viewDoor);
 const view = createApp(pool, config, "view", keyring, viewDoor);
