@@ -2,7 +2,7 @@
 
 Window on a running vault. Same ontology as MCP. Same objects. Same types. Same relations. The window writes with the same if-match and soft-delete family as MCP. Journal keeps a dedicated writing page. Other live records edit title, status, and declared scalar fields on the detail page.
 
-Live at `/view`. The person types the vault key. When `FOUNDATION_VIEW_KEY` is set, that is the vault key; MCP keys do not open the window. When unset, the house key (`FOUNDATION_API_KEY` / named keys) still opens it. Session is an HttpOnly cookie, `Path=/view`. That cookie does not unlock `/mcp` or `/blobs/:id`. Ports: `8787` MCP, `8788` `/view`. Both doors bind localhost by default. Off-box is `VIEW_HOST=0.0.0.0`.
+Live at `/view`. The person types the vault key (`FOUNDATION_VIEW_KEY`). MCP keys do not open the window. Session is an HttpOnly cookie, `Path=/view`. That cookie does not unlock `/mcp` or `/blobs/:id`. Ports: `8787` MCP, `8788` `/view`. Both doors bind localhost by default. Off-box names the tunnel Host as `VIEW_PUBLIC_ORIGIN` and may set `VIEW_HOST=0.0.0.0`.
 
 ---
 

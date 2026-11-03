@@ -46,16 +46,14 @@ Do not commit personal life data, documents, or secrets to this repository. Thos
 
 Mac and Linux. Clone this repo. Node 22 + pnpm. Postgres 16. PATH must include `initdb`, `pg_ctl`, and `psql`. Migrations create `pgcrypto`, `unaccent`, `pg_trgm`, and `vector`. If a package name is not already in this repo, it is unknown here — do not guess an installer. Pull requests against main run the `verify` check. Cloud agents and GitHub `verify` boot a throwaway vault with the helper.
 
-1. Copy the env file. The human sets the API key (do not commit `.env`):
+1. Copy the env file. Init mints the door keys and database password into `.env` (mode 600). Do not commit `.env`.
 
    ```bash
    cp .env.example .env
-   # set FOUNDATION_API_KEY to a long random string (bootstrap / root key)
-   # optional FOUNDATION_VIEW_KEY: vault key the person types (MCP keys then do not open /view)
    # more bots: scripts/mint-api-key.sh --name chief  (hash under FOUNDATION_DATA)
    ```
 
-2. Init the first-day vault, then start. Official init is `./scripts/foundation-init.sh` (copies `.env` when it is missing, mkdir the data folder, then keep-up). Official app start is `pnpm start` (wait for the database, migrate, seed). Keep-up starts Postgres from the data folder’s `postgres` tree, then `pnpm start`. Durable files go under `FOUNDATION_DATA`. Empty first-day folder may init. Missing folder, or `postgres/` without `PG_VERSION`: refuse.
+2. Init the first-day vault, then start. Official init is `./scripts/foundation-init.sh` (copies `.env` when it is missing, mints secrets, mkdir the data folder, then keep-up). Official app start is `pnpm start` (wait for the database, migrate, seed). Keep-up starts Postgres from the data folder’s `postgres` tree, then `pnpm start`. Durable files go under `FOUNDATION_DATA`. Empty first-day folder may init. Missing folder, or `postgres/` without `PG_VERSION`: refuse.
 
    ```bash
    mkdir -p ./data
@@ -107,7 +105,7 @@ Mac and Linux. Clone this repo. Node 22 + pnpm. Postgres 16. PATH must include `
 
    **Health** (no auth): `GET http://127.0.0.1:8787/health` — `{ ok, service, db }`. The same path with `Authorization: ApiKey` (or Bearer) may add bind hosts, ports, and the data dir.
 
-   **Window:** user window at `/view`. The person types the vault key. When `FOUNDATION_VIEW_KEY` is set, that is the vault key; MCP keys do not open the window. When unset, the house key (`FOUNDATION_API_KEY` / named keys) still opens it. Default bind is localhost: `http://127.0.0.1:8788/view`. Off-box: set `VIEW_HOST=0.0.0.0`, then `http://<this-host>:8788/view`. Unlock, then Home (Recents, open tasks, type folders), Collection, and Detail as a page. A journal is a writing page. Other records edit title, status, and declared fields on detail. Activity and Trash live in the window. Search is a rail overlay. The cookie does not open MCP.
+   **Window:** user window at `/view`. The person types the vault key (`FOUNDATION_VIEW_KEY`). MCP keys do not open the window. Default bind is localhost (`http://127.0.0.1:8788/view`). Off-box names the tunnel Host as `VIEW_PUBLIC_ORIGIN` (https, or http with `FOUNDATION_ALLOW_CLEARTEXT=1`) and may set `VIEW_HOST=0.0.0.0`. Unlock, then Home (Recents, open tasks, type folders), Collection, and Detail as a page. A journal is a writing page. Other records edit title, status, and declared fields on detail. Activity and Trash live in the window. Search is a rail overlay. The cookie does not open MCP.
 
    **Blobs:** large files are `$FOUNDATION_DATA/blobs/<uuid>` (not git, not agent-data). Ingest with `upsert` (`payload.storage = "blob"` plus `bytes_base64`, or drop a file in `$FOUNDATION_DATA/uploads` and pass `source_path`). Cap 20MB. Fetch bytes: `GET /blobs/:id` with the API key. `get` returns blob metadata, not the file body.
 
@@ -170,7 +168,7 @@ trailer<</Root 1 0 R>>
      -o /tmp/sample.pdf
    ```
 
-   User drop-box (no base64): copy a file into `$FOUNDATION_DATA/uploads/` then `upsert` with `payload.source_path` set to the filename. The server moves it to `blobs/<uuid>`. `uploads/` is mode 1777 (sticky); `blobs/` stays 0700.
+   User drop-box (no base64). Copy a file into `$FOUNDATION_DATA/uploads/` then `upsert` with `payload.source_path` set to the filename. The server moves it to `blobs/<uuid>`.
 
    `FOUNDATION_DATA` is the vault. Keep that directory. Stop the app, then Postgres. Do not delete the data folder.
 
