@@ -71,8 +71,11 @@ Each live lane runs on its own cloud VM at the PR head. Drive Viewer through `.c
 - [ ] Edit `scripts/keep-vault-up.test.sh`.
 - [ ] Edit `scripts/foundation-init.sh`.
 - [ ] Edit `scripts/foundation-init.test.sh`.
+- [ ] Edit `scripts/restore-vault.sh`.
+- [ ] Edit `scripts/restore-vault.test.sh`.
 - [ ] Edit `apps/server/src/config.ts`.
 - [ ] Edit `apps/server/src/config.test.ts`.
+- [ ] Edit `apps/server/src/index.ts`.
 - [ ] Edit `apps/server/src/app.ts`.
 - [ ] Edit `apps/server/src/auth.ts`.
 - [ ] Edit `apps/server/src/auth.test.ts`.
@@ -106,12 +109,14 @@ Each live lane runs on its own cloud VM at the PR head. Drive Viewer through `.c
 
 **Build.**
 
-- [ ] Mint `FOUNDATION_API_KEY` and `FOUNDATION_VIEW_KEY` in `foundation_init_ensure_env` when `.env` is missing, and mint a missing view key on an existing `.env`. Write `.env` mode 600. Write `FOUNDATION_DATA` mode 700. Never print a key.
-- [ ] Refuse published placeholder strings and short secrets in `loadConfig`. The published API key and the published database password in `.env.example` must not start the server.
+- [ ] Mint keys and a database password in keep-up, which init and cron already run. Replace a missing or published `FOUNDATION_API_KEY`. Mint `FOUNDATION_VIEW_KEY` when it is missing or published. Write `.env` mode 600. Do not chmod `FOUNDATION_DATA` 700 in this PR. `uploads/` is still a 1777 drop box until `harden-2`. Never print a key.
+- [ ] Refuse published placeholder strings in `loadConfig`. Refuse an API key or view key shorter than 32 characters. Do not put a length floor on the database password. CI uses `ci-verify`. The published example password must still not start the server.
 - [ ] Run `initdb` with `--auth-local=peer --auth-host=scram-sha-256`. Pin `listen_addresses` to localhost in `postgresql.conf`. Keep the existing `pg_ctl` `-h 127.0.0.1` flag.
-- [ ] Create the app role as `LOGIN` without `SUPERUSER`. Grant it ownership of the app database. Create `pgcrypto`, `unaccent`, `pg_trgm`, and `vector` as the OS superuser over the vault socket before `pnpm start` migrate.
-- [ ] Add an idempotent keep-up upgrade that rewrites `pg_hba.conf`, sets a random password when the URL is missing or published, updates `DATABASE_URL` in `.env`, reloads Postgres, then `ALTER ROLE ... NOSUPERUSER` only after extensions and grants exist. Leave graph data in place.
-- [ ] Start the app with `env -i` and only the variables `pnpm start` needs, plus the config keys. Do not inherit the launching shell.
+- [ ] Create the app role as `LOGIN` without `SUPERUSER`. Grant it ownership of the app database. Do not grant `CREATEDB` or `CREATEROLE`. Do not `ALTER` the initdb OS bootstrap role to `NOSUPERUSER` when that role is the URL user.
+- [ ] Create `vector` as the OS superuser over the vault socket before migrate. On Postgres 16 here, `vector.control` has no `trusted` line and a non-superuser owner cannot create it. `pgcrypto`, `unaccent`, and `pg_trgm` are trusted. Still create all four as the OS superuser so the first migrate is a no-op `IF NOT EXISTS`. Leave the statements in the migration files.
+- [ ] Add an idempotent keep-up upgrade that rewrites every `trust` line in `pg_hba.conf`, including replication. Trust today accepts any password, so `foundation_keep_vault_up_ensure_app_database` returns early and never `ALTER ROLE`. Always set the role password through the peer socket, then write `DATABASE_URL` into `.env`, then reload. Drop app-role superuser only after extensions exist. Leave graph data in place. A second run that already sees peer, scram, and a non-superuser app role does nothing.
+- [ ] Start the app with `env -i` and this allowlist when set. `PATH`, `HOME`, `TMPDIR`, `LANG`, `LC_ALL`, `USER`, and the `EnvSchema` names. After `loadConfig`, drop every other key on `process.env` in `index.ts` so a direct `pnpm start` does not keep shell secrets.
+- [ ] Pass `DATABASE_URL` to `psql`, `python3`, and `pg_ctl` helpers on stdin or a mode-600 file, not argv. Restore drops the database and creates it again as the OS socket superuser. The app role does not get `CREATEDB`.
 - [ ] Compare secrets as SHA-256 digests of equal width in `secret-compare.ts`. Use that helper from `ViewDoor` and `Keyring`.
 - [ ] In `ViewDoor.tryUnlock`, return throttle before any compare when that source is locked. Count a failed header on `/mcp` and `/view/api` against the same kind of budget and return 429 before compare when locked.
 - [ ] Require `FOUNDATION_VIEW_KEY`. Delete the fallback lock that treats a bot key as the vault key. Keep Viewer writes on `VIEWER_WRITE` with destructive true, because the person who typed the vault key owns the vault.
@@ -125,7 +130,7 @@ Each live lane runs on its own cloud VM at the PR head. Drive Viewer through `.c
 **You see.**
 
 - [ ] A first-day `scripts/foundation-init.sh` produces a mode-600 `.env` with two minted keys and a random `DATABASE_URL` password, then a healthy `/health` of only `ok`, `service`, and `db`.
-- [ ] `psql` as a stranger on the same machine using trust fails. The app role is not a superuser. `listen_addresses` is localhost.
+- [ ] `psql` as a stranger on the same machine using trust fails. The app role is not a superuser. `listen_addresses` is localhost. `vector` exists. Restore recreate still works without `CREATEDB` on the app role.
 - [ ] `loadConfig` throws on `change-me-to-a-long-random-string` and on `change-me-to-a-password`.
 - [ ] Unlock with the house key returns 401. Unlock with the view key sets a cookie whose value is not the view key.
 - [ ] Five failed unlocks, then a sixth while locked, return 429 without a successful compare. A later correct key during cooldown also returns 429.
@@ -143,15 +148,16 @@ Each live lane runs on its own cloud VM at the PR head. Drive Viewer through `.c
 - [ ] `apps/server/src/host-guard.test.ts` rejects a foreign Host and a foreign Origin on a view write.
 - [ ] `apps/server/src/access-log.test.ts` writes the five fields and redacts secrets.
 - [ ] `apps/server/src/health.test.ts` still asserts the public shape.
-- [ ] `scripts/foundation-init.test.sh` asserts mint, mode 600, and no key on stdout.
-- [ ] `scripts/keep-vault-up.test.sh` asserts peer plus scram, localhost listen, non-superuser role, env -i start, and a second run that does not rewrite a healthy cluster.
+- [ ] `scripts/foundation-init.test.sh` asserts mint, mode 600, and no key on stdout. It no longer expects a verbatim copy of `.env.example`.
+- [ ] `scripts/keep-vault-up.test.sh` asserts peer plus scram, rewritten replication lines, localhost listen, non-superuser app role, OS-superuser `vector`, env allowlist start, no URL on argv, and a second run that does not rewrite a healthy cluster.
+- [ ] `scripts/restore-vault.test.sh` asserts recreate goes through the vault socket as the OS superuser and that the app role never receives `CREATEDB`.
 - [ ] `bash scripts/harness-docs.test.sh` still passes after the positive-copy doc edit.
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `grok-4.7-xhigh-fast` at the PR head, per the boot recipe.
 
 - [ ] Lane 1. Regression lane against trunk. Run first-day keep-up plus Unlock plus Home at trunk and head. Trunk still accepts the house key when `FOUNDATION_VIEW_KEY` is unset. Head refuses the house key and opens only with the minted view key, then paints Home. Save `harden-1-regression.png`. Pass when both sides reach a healthy `/health` and head Home is the Today page.
-- [ ] Lane 2. First-day init on an empty clone. Save `harden-1-init-modes.png`. Pass when `.env` is 600, `FOUNDATION_DATA` is 700, both keys exist, and process stdout has no secret.
-- [ ] Lane 3. Inspect the throwaway cluster. Save `harden-1-pg-hba.png`. Pass when `pg_hba.conf` has no `trust` line for local or loopback, `listen_addresses` is localhost, and `pg_roles.rolsuper` is false for the app role.
+- [ ] Lane 2. First-day init on an empty clone. Save `harden-1-init-modes.png`. Pass when `.env` is 600, both keys exist, the database password is not the published example, and process stdout has no secret.
+- [ ] Lane 3. Inspect the throwaway cluster. Save `harden-1-pg-hba.png`. Pass when `pg_hba.conf` has no `trust` line, including replication, `listen_addresses` is localhost, the app role is not a superuser, and `\dx vector` is present.
 - [ ] Lane 4. POST `/view/unlock` with a foreign Host. Save `harden-1-host-reject.png`. Pass when the status is 400 or 403 and no session cookie is set.
 - [ ] Lane 5. Five wrong unlocks, then a sixth, then the correct view key while locked. Save `harden-1-unlock-429.png`. Pass when the locked tries are 429 with `Retry-After` and Unlock still shows **That key did not unlock.**
 - [ ] Lane 6. Five wrong `Authorization` headers on `/mcp`, then a sixth. Save `harden-1-mcp-429.png`. Pass when the locked try is 429 and the JSON-RPC body is unauthorized, not a tool result.
@@ -254,13 +260,13 @@ Each live lane runs on its own cloud VM at the PR head. Drive Viewer through `.c
 
 ## Appendix A. Prototype evidence
 
-No prototype ran. Each contested audit line was settled by reading the files on `main` at `f0e0708`.
+No product prototype ran. [Verify init DB env findings](bc-7d38682b-a83a-513b-a762-6673775bb371) measured a throwaway Postgres 16 cluster on this machine. The contested first-run lines below use that run plus the files on `main` at `f0e0708`.
 
-Settled from the tree.
+Settled from the tree and the cluster.
 
-- Finding 1 is confirmed for trust and `SUPERUSER`. `foundation_keep_vault_up_init_postgres` calls `initdb` with no `--auth`. `foundation_keep_vault_up_app_role_sql` creates `LOGIN SUPERUSER`. Listen is already pinned at start by `foundation_keep_vault_up_postgres_listen_args` (`-h 127.0.0.1`). Still write `listen_addresses` in `postgresql.conf` so a manual `pg_ctl` without `-h` does not widen the bind. The app already uses TCP `DATABASE_URL` on localhost. keep-up already talks to the OS superuser over the vault socket. `--auth-local=peer --auth-host=scram-sha-256` matches that split.
-- Finding 2 is confirmed. `foundation_init_ensure_env` copies `.env.example` and does not mint. `loadConfig` accepts any nonempty `FOUNDATION_API_KEY`. `.env.example` ships `change-me-to-a-long-random-string` and `change-me-to-a-password`.
-- Finding 3 is confirmed. `cp` writes `.env` at the umask, usually 644. There is no `keys/` directory. Treat `FOUNDATION_DATA` as the secret directory (700) and `.env` plus `api-keys.json` as 600. `mint-api-key.sh` already chmods the keys file.
+- Finding 1 is confirmed for trust and `SUPERUSER`. `foundation_keep_vault_up_init_postgres` calls `initdb` with no `--auth`. A stock `initdb` wrote `trust` for `local`, `127.0.0.1/32`, `::1/128`, and the matching replication lines. `--auth-local=peer --auth-host=scram-sha-256` wrote peer and scram on those same lines. `foundation_keep_vault_up_app_role_sql` creates `LOGIN SUPERUSER`. Under trust, `psql` as the app role with the wrong password still connected. `foundation_keep_vault_up_ensure_app_database` returns when `psql` of the URL succeeds, so a later password edit never reaches `ALTER ROLE`. Listen is already pinned at start by `foundation_keep_vault_up_postgres_listen_args` (`-h 127.0.0.1`). `SHOW listen_addresses` was `127.0.0.1`. `postgresql.conf` still comments `listen_addresses`. A start without `-h` uses the compiled default. The app uses TCP `DATABASE_URL`. keep-up talks to the OS superuser over the vault socket. Peer on that socket was measured. The OS user connected with no `-U` and was superuser. On this image, `vector.control` is `0.6.0` with no `trusted` line. `CREATE EXTENSION vector` as a non-superuser owner failed. After the superuser created it, `IF NOT EXISTS` as the owner succeeded. `pgcrypto`, `unaccent`, and `pg_trgm` are trusted. The owner created those three and ordinary migrate DDL. Runtime does not need `SUPERUSER`, `CREATEDB`, or `CREATEROLE`. `foundation_restore_recreate_database` drops as the URL role, then `CREATE DATABASE` fails without `CREATEDB`. Give recreate to the OS socket superuser. Do not grant the app role `CREATEDB`. Do not demote the initdb bootstrap role when it is the URL user.
+- Finding 2 is confirmed. `foundation_init_ensure_env` copies `.env.example` and does not mint. `loadConfig` accepts any nonempty `FOUNDATION_API_KEY`. `.env.example` ships `change-me-to-a-long-random-string` and `change-me-to-a-password`. Init copies both. Keep-up then sets the role password from that URL, so the published password works. A 32 character floor belongs on the API key and the view key, not on the database password. CI uses `ci-verify`.
+- Finding 3 is partial. `cp` writes `.env` at the umask, usually 644. `.env.example` is 644. There is no `keys/` directory. `mint-api-key.sh` already chmods `api-keys.json` to 600. `initdb` already makes `postgres/` 700. Do not chmod `FOUNDATION_DATA` 700 in `harden-1`. That would hide the 1777 uploads drop box before `harden-2` changes it.
 - Finding 4 is confirmed. `StreamableHTTPServerTransport` is constructed with only `sessionIdGenerator`. `security.ts` has no Host check. `view.test.ts` even unlocks with an off-box Host.
 - Finding 5 is confirmed. `ViewDoor.tryUnlock` compares, then checks cooldown. `view-door.test.ts` currently requires a correct key to open during cooldown. `requireViewAuth` uses `admit`, which has no budget. `requireApiKey` has no budget.
 - Finding 6 is confirmed as documented behavior, not a coding accident. `windowLockOf` falls back to the keyring. `VIEWER_WRITE` is always destructive. The fix is a dedicated view key, not a carry of the bot flag. Init mints the view key so first-run stays one command.
@@ -273,13 +279,13 @@ Settled from the tree.
 - Finding 13 is confirmed in part. `manageType` compiles from fields when a field list exists, and already refuses a raw schema in that case. An empty field list still persists `input.json_schema`. `validateDataAgainstJsonSchema` then `ajv.compile`s whatever was stored.
 - Finding 14 is confirmed. `createApp` runs `express.json({ limit: "32mb" })` before `requireApiKey`. `@modelcontextprotocol/sdk` is `^1.30.0`. `pnpm audit --prod` reports high or critical on that SDK, `express` then `body-parser` / `proxy-addr` / `qs`, `zod`, `ajv` then `fast-uri`, and Viewer `dompurify`.
 - Finding 15 is confirmed. `.github/workflows/verify.yml` uses `actions/checkout@v4`, `pnpm/action-setup@v4`, and `actions/setup-node@v4`, with no `permissions` block.
-- Finding 16 is confirmed. `foundation_keep_vault_up_start_app` runs `nohup pnpm start` in a subshell that inherits the whole environment.
-- Finding 17 is already done and stronger than the ask. `scripts/backup-vault.sh` already requires `BACKUP_AGE_RECIPIENT`, encrypts with age, writes mode 0600, and prunes with `BACKUP_KEEP_DAYS` (default 14). Do not make encryption optional. Do not turn it off by default.
+- Finding 16 is confirmed. `foundation_keep_vault_up_start_app` runs `nohup pnpm start` in a subshell that inherits the whole environment. An empty `env -i` breaks `pnpm` and breaks verify launch, which passes `DATABASE_URL` in the environment because dotenv will not override it. The planned allowlist is `PATH`, `HOME`, `TMPDIR`, `LANG`, `LC_ALL`, `USER`, and the `EnvSchema` names. Keep-up, restore, and `psql "${url}"` also put the URL on argv. Move those to stdin or a mode-600 file while this PR already edits those scripts. `scripts/mint-api-key.sh` still prints a new secret once. That is the documented mint.
+- Finding 17 is already done and stronger than the ask. `scripts/backup-vault.sh` already requires `BACKUP_AGE_RECIPIENT`, encrypts with age, writes mode 0600, and prunes with `BACKUP_KEEP_DAYS` (default 14). Blob files in the backup tree stay in the clear. A fresh clone with a commented recipient refuses the first dump. That is already the safe behavior. Do not add an off switch. Do not edit `scripts/backup-vault.sh` in this program.
 
 Still unproven until `harden-1` runs on a throwaway vault.
 
-- The exact `GRANT` list that lets migrate and runtime work after `NOSUPERUSER`. Owner of the database plus keep-up-created extensions is the planned set. Prove it by running migrate on a non-superuser role.
-- Whether `env -i` must pass extra Node or pnpm variables beyond PATH, HOME, and the config keys. Prove it by starting the app from a dirty shell and a clean allowlist.
+- Whether `pnpm start` needs any name beyond the allowlist above. Prove it by starting the app from a dirty shell and that list.
+- Whether a `pg_hba.conf` rewrite that also touches replication still reloads on an existing personal cluster, not only on the measured throwaway.
 
 ## Appendix B. Alternatives rejected
 
@@ -291,6 +297,14 @@ Carry the bot's destructive flag into Viewer writes. That still lets any bot key
 
 Keep the house-key fallback and only document the risk. A fresh clone that copies `.env.example` would still open `/view` with a published key.
 
+Leave `FOUNDATION_VIEW_KEY` optional after a custom API key is already set. [Verify init DB env findings](bc-7d38682b-a83a-513b-a762-6673775bb371) recommended that so an existing vault keeps the house-key window. That leaves finding 6 open for every vault that skipped the mint. keep-up mints the view key into `.env` before `pnpm start` and does not print it.
+
+Grant the app role `CREATEDB` so restore can recreate. Measured. The owner can drop the database and then fail the create, which writes `.restore-failed` and blocks keep-up. Recreate as the OS socket superuser.
+
+Floor the database password at 32 characters. That rejects CI's `ci-verify` and the `change-me` fixture in `config.test.ts`. Refuse only the published example password.
+
+chmod `FOUNDATION_DATA` 700 in `harden-1`. That hides `uploads/` from other local accounts before `harden-2` changes the drop-box mode.
+
 `--auth-local=scram` for the vault socket. keep-up's `psql` is the OS superuser over that socket. Peer matches that path. Scram stays on TCP for the app.
 
 Leave backup encryption optional. The script already fails closed without a recipient. Weakening it would move the product backward.
@@ -301,7 +315,10 @@ Reopen `/health`. The public shape is already the one the audit asked for.
 
 - Lockout on an existing `.env` that still has the published API key or password. `harden-1` keep-up mints replacements into `.env` and does not print them. The owner re-reads `.env`. A start that still sees a published value refuses to boot.
 - Lockout on an existing vault with no `FOUNDATION_VIEW_KEY`. keep-up mints one into `.env` on the first head start. Viewer then accepts only that key. The house key stops opening `/view`.
-- Lockout if `ALTER ROLE NOSUPERUSER` runs before extensions exist. The upgrade creates extensions first, then grants, then drops superuser. A failed step leaves the previous `pg_hba` in place when the rewrite is a temp file plus rename.
+- Lockout if `ALTER ROLE NOSUPERUSER` runs before `vector` exists. The upgrade creates extensions as the OS superuser first, then drops app-role superuser. A failed step leaves the previous `pg_hba` in place when the rewrite is a temp file plus rename.
+- Lockout if the upgrade demotes the initdb bootstrap role. Skip `NOSUPERUSER` when the URL user is that OS user.
+- Lockout if restore drops the database as the app role and then cannot create it. Recreate on the vault socket as the OS superuser.
+- Lockout if scram is reloaded while the role password still differs from `DATABASE_URL`. Trust hid that drift. Always `ALTER ROLE` through the socket before reload.
 - Lockout from throttle-before-compare. Five failures lock that source for the budget cooldown, including a later correct key. That is the fail-closed choice. Unlock already shows **That key did not unlock.** and `Retry-After`.
 - Lockout for an owner who already binds `VIEW_HOST=0.0.0.0` on plain HTTP. Head refuses that bind until they set TLS or `VIEW_PUBLIC_ORIGIN`. Document the named-origin path in README with positive copy.
 - `env -i` drops a variable `pnpm` needs. The live lane starts from a dirty shell. If boot fails, add only the missing name to the allowlist.
@@ -312,7 +329,7 @@ Reopen `/health`. The public shape is already the one the audit asked for.
 
 Read before editing.
 
-- `scripts/keep-vault-up.sh`, `scripts/foundation-init.sh`, `apps/server/src/config.ts`, `apps/server/src/view-door.ts`, `apps/server/src/auth.ts`, `apps/server/src/app.ts`, `apps/server/src/mcp.ts`, `apps/server/src/view-write.ts`, `packages/db/src/blobs.ts`, `scripts/lib/foundation_portability.py`, `apps/server/src/graph.ts` (`manageType`), `.github/workflows/verify.yml`, `scripts/backup-vault.sh`, `apps/server/src/health.test.ts`
+- `scripts/keep-vault-up.sh`, `scripts/foundation-init.sh`, `scripts/restore-vault.sh`, `apps/server/src/config.ts`, `apps/server/src/index.ts`, `apps/server/src/view-door.ts`, `apps/server/src/auth.ts`, `apps/server/src/app.ts`, `apps/server/src/mcp.ts`, `apps/server/src/view-write.ts`, `packages/db/src/blobs.ts`, `scripts/lib/foundation_portability.py`, `apps/server/src/graph.ts` (`manageType`), `.github/workflows/verify.yml`, `scripts/backup-vault.sh`, `apps/server/src/health.test.ts`
 - `.cursor/skills/verify-foundation/SKILL.md` and `features/unlock.md`
 - `.agents/skills/foundation-mcp/SKILL.md`
 
