@@ -756,6 +756,13 @@ workflow_blob="$(cat "${workflow}")"
 [[ "${workflow_blob}" == *"require-database-url.test.sh"* ]] || fail "verify.yml must fail when DATABASE_URL is unset"
 [[ "${workflow_blob}" == *"pnpm --filter @foundation/viewer build"* ]] || fail "verify.yml dropped the Viewer build"
 [[ "${workflow_blob}" == *"pgvector/pgvector:pg16"* ]] || fail "verify.yml dropped the pgvector service"
+[[ "${workflow_blob}" == *"actions/checkout@11d5960a326750d5838078e36cf38b85af677262"* ]] \
+  || fail "verify.yml must pin actions/checkout to a full SHA"
+[[ "${workflow_blob}" == *"pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1"* ]] \
+  || fail "verify.yml must pin pnpm/action-setup to a full SHA"
+[[ "${workflow_blob}" == *"actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020"* ]] \
+  || fail "verify.yml must pin actions/setup-node to a full SHA"
+[[ "${workflow_blob}" == *"contents: read"* ]] || fail "verify.yml must set permissions contents to read"
 [[ "${workflow_blob}" == *"verify-foundation.sh launch"* ]] || fail "verify.yml must launch a throwaway vault"
 [[ "${workflow_blob}" == *"verify-foundation.sh doctor"* ]] || fail "verify.yml must doctor the throwaway vault"
 [[ "${workflow_blob}" == *"verify-http-drive.sh"* ]] || fail "verify.yml must HTTP-prove Unlock and Home"
