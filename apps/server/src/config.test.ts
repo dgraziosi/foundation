@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DEFAULT_LEASE_TTL_SECONDS } from "@foundation/schema";
-import { MIN_KEY_LENGTH, PUBLISHED_API_KEY, PUBLISHED_DATABASE_PASSWORD, loadConfig } from "./config.js";
+import {
+  MIN_KEY_LENGTH,
+  PUBLISHED_API_KEY,
+  PUBLISHED_DATABASE_PASSWORD,
+  keepAllowedEnv,
+  loadConfig,
+} from "./config.js";
 
 const apiKey = "config-test-api-key-0123456789abcdef";
 const viewKey = "config-test-view-key-0123456789abcdef";
@@ -129,4 +135,18 @@ test("FOUNDATION_LEASE_TTL_SECONDS defaults and refuses out of range", () => {
   assert.equal(set.FOUNDATION_LEASE_TTL_SECONDS, 120);
 
   assert.throws(() => loadConfig({ ...required, FOUNDATION_LEASE_TTL_SECONDS: "10" }));
+});
+
+test("after loadConfig only the shell basics and EnvSchema names stay on the environment", () => {
+  const env: NodeJS.ProcessEnv = {
+    ...required,
+    PATH: "/usr/bin",
+    HOME: "/home/owner",
+    LANG: "C.UTF-8",
+    PGPASSWORD: "stray-password",
+    AWS_SECRET_ACCESS_KEY: "stray-token",
+    NODE_OPTIONS: "--require /tmp/evil.js",
+  };
+  keepAllowedEnv(env);
+  assert.deepEqual(Object.keys(env).sort(), [...Object.keys(required), "HOME", "LANG", "PATH"].sort());
 });

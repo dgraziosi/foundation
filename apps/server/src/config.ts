@@ -159,6 +159,18 @@ const EnvSchema = EnvFields.refine(
 /** Every name `loadConfig` reads. keep-up forwards exactly these plus a few shell basics under `env -i`. */
 export const ENV_NAMES = Object.keys(EnvFields.shape) as ReadonlyArray<keyof z.infer<typeof EnvFields>>;
 
+export const SHELL_ENV_NAMES = ["PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "USER"] as const;
+
+/** A library that reads a stray `PG*` or cloud token from the environment cannot see it after this. */
+export function keepAllowedEnv(env: NodeJS.ProcessEnv = process.env): void {
+  const keep = new Set<string>([...SHELL_ENV_NAMES, ...ENV_NAMES]);
+  for (const name of Object.keys(env)) {
+    if (!keep.has(name)) {
+      delete env[name];
+    }
+  }
+}
+
 export type AppConfig = z.infer<typeof EnvSchema>;
 export type AppBindings = Pick<AppConfig, "FOUNDATION_API_KEY" | "FOUNDATION_DATA"> &
   Partial<

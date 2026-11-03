@@ -1,10 +1,11 @@
 import { createPool, ensureBlobLayout, migrate, seedSystemOntology, waitForDb } from "@foundation/db";
 import { createApp, doorSharedOf } from "./app.js";
-import { loadConfig } from "./config.js";
+import { keepAllowedEnv, loadConfig } from "./config.js";
 import { Keyring } from "./keyring.js";
 import { bindRefusal } from "./security.js";
 
 const config = loadConfig();
+keepAllowedEnv();
 const offBox = bindRefusal(config);
 if (offBox) {
   console.error(offBox);
@@ -34,6 +35,9 @@ const mcpServer = mcp.listen(config.PORT, config.HOST, () => {
 
 const viewServer = view.listen(config.VIEW_PORT, config.VIEW_HOST, () => {
   console.log(`View:   http://${config.VIEW_HOST}:${config.VIEW_PORT}/view`);
+  if (shared.viewDoor.mode === "closed") {
+    console.log("View opens once FOUNDATION_VIEW_KEY is in .env. Run scripts/keep-vault-up.sh to mint one.");
+  }
 });
 
 async function shutdown(signal: string): Promise<void> {
