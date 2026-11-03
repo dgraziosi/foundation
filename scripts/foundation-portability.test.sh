@@ -287,4 +287,49 @@ if header[:4] != ["id", "title", "status", "updated_at"]:
     raise SystemExit("csv header")
 ' "${out}" || fail "export writers"
 
+write_snapshot_type() {
+  local slug="$1"
+  local dest="$2"
+  python3 -c '
+import json, pathlib, sys
+snap = json.loads(pathlib.Path(sys.argv[1]).read_text())
+snap["nodes"][0]["type"] = sys.argv[3]
+pathlib.Path(sys.argv[2]).write_text(json.dumps(snap) + "\n")
+' "${snapshot}" "${dest}" "${slug}"
+}
+
+escape_snapshot="${work}/escape-snapshot.json"
+escape_out="${work}/escape-out"
+mkdir -p "${work}/logs"
+write_snapshot_type "../../escape" "${escape_snapshot}"
+parent="$(dirname "${escape_out}")"
+before="$(find "${parent}" -mindepth 1 -maxdepth 1 -printf '%f\n' | sort)"
+if python3 "${lib_py}" export --out "${escape_out}" --from-snapshot "${escape_snapshot}" \
+  >"${work}/logs/escape.out" 2>"${work}/logs/escape.err"; then
+  fail "traversal type slug must exit nonzero"
+fi
+after="$(find "${parent}" -mindepth 1 -maxdepth 1 -printf '%f\n' | sort)"
+[[ "${before}" == "${after}" ]] || fail "traversal export wrote outside --out"
+[[ ! -e "${work}/escape" ]] || fail "traversal export created escape"
+[[ ! -e "${escape_out}" ]] || fail "refused traversal slug must not create --out"
+
+note_snapshot="${work}/note-slug-snapshot.json"
+note_out="${work}/note-slug-out"
+write_snapshot_type "Note" "${note_snapshot}"
+if python3 "${lib_py}" export --out "${note_out}" --from-snapshot "${note_snapshot}" \
+  >"${work}/note-slug.out" 2>"${work}/note-slug.err"; then
+  fail "type slug Note must exit nonzero"
+fi
+[[ ! -e "${note_out}" ]] || fail "refused type slug must not create --out"
+
+outside="${work}/outside-out"
+inside="${work}/inside-out"
+mkdir -p "${outside}" "${inside}"
+ln -s "${outside}" "${inside}/markdown"
+if python3 "${lib_py}" export --out "${inside}" --from-snapshot "${snapshot}" \
+  >"${work}/inside.out" 2>"${work}/inside.err"; then
+  fail "export through a symlink must exit nonzero"
+fi
+[[ -z "$(find "${outside}" -mindepth 1 -print)" ]] || fail "export wrote through a symlink outside --out"
+
 echo "foundation-portability.test: ok"

@@ -32,6 +32,7 @@ WRITE_TOOLS = frozenset({"upsert"})
 ALLOWED_TOOLS = READ_TOOLS | WRITE_TOOLS
 DAILY_NOTE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
 ISO_DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
+EXPORT_SLUG_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 SECRET_KEY_RE = re.compile(r"(api_?key|secret|token|password|authorization)", re.I)
 SKIP_DIR_NAMES = frozenset({".obsidian", ".trash", ".git", "__macosx", "node_modules"})
 NOTE_SUFFIXES = (".md", ".markdown", ".html", ".htm")
@@ -385,41 +386,84 @@ def markdown_for_node(node: dict[str, Any], scalar_names: list[str]) -> str:
     return "\n".join(lines)
 
 
+def export_type_slug(node: dict[str, Any]) -> str:
+    slug = str(node.get("type") or "unknown")
+    if EXPORT_SLUG_RE.fullmatch(slug) is None:
+        raise SystemExit("foundation-export: refused a type slug")
+    return slug
+
+
+def assert_inside_out(root: Path, path: Path) -> None:
+    resolved = path.resolve()
+    if resolved != root and root not in resolved.parents:
+        raise SystemExit("foundation-export: refused a path outside --out")
+
+
 def write_export(snapshot: dict[str, Any], out_dir: Path, formats: set[str]) -> dict[str, Any]:
-    out_dir.mkdir(parents=True, exist_ok=True)
+    root = out_dir.resolve()
     types = snapshot.get("ontology", {}).get("types") if isinstance(snapshot.get("ontology"), dict) else []
     type_rows = [row for row in types if isinstance(row, dict)] if isinstance(types, list) else []
     by_slug = {str(row["slug"]): row for row in type_rows if isinstance(row.get("slug"), str)}
     nodes = [row for row in snapshot.get("nodes", []) if isinstance(row, dict)]
+    slugs = [export_type_slug(node) for node in nodes]
+    planned: list[Path] = []
+    if "json" in formats:
+        planned.append(root / "foundation.json")
+    if "markdown" in formats:
+        planned.append(root / "markdown")
+        for node, slug in zip(nodes, slugs):
+            folder = root / "markdown" / slug
+            name = safe_filename(str(node.get("title") or ""), str(node.get("id") or ""))
+            planned.append(folder)
+            planned.append(folder / name)
+    if "csv" in formats:
+        planned.append(root / "csv")
+        seen_csv: set[str] = set()
+        for slug in slugs:
+            if slug in seen_csv:
+                continue
+            seen_csv.add(slug)
+            planned.append(root / "csv" / f"{slug}.csv")
+    for path in planned:
+        assert_inside_out(root, path)
+
+    root.mkdir(parents=True, exist_ok=True)
     written: dict[str, Any] = {"out": str(out_dir), "formats": sorted(formats)}
     if "json" in formats:
-        path = out_dir / "foundation.json"
+        path = root / "foundation.json"
+        assert_inside_out(root, path)
         path.write_text(json.dumps(snapshot, indent=2) + "\n", encoding="utf-8")
         written["json"] = str(path)
     if "markdown" in formats:
-        md_root = out_dir / "markdown"
+        md_root = root / "markdown"
+        assert_inside_out(root, md_root)
+        md_root.mkdir(parents=True, exist_ok=True)
         count = 0
-        for node in nodes:
-            slug = str(node.get("type") or "unknown")
+        for node, slug in zip(nodes, slugs):
             folder = md_root / slug
+            assert_inside_out(root, folder)
             folder.mkdir(parents=True, exist_ok=True)
             scalars = scalar_field_names(by_slug.get(slug, {}))
             name = safe_filename(str(node.get("title") or ""), str(node.get("id") or ""))
-            (folder / name).write_text(markdown_for_node(node, scalars), encoding="utf-8")
+            file_path = folder / name
+            assert_inside_out(root, file_path)
+            file_path.write_text(markdown_for_node(node, scalars), encoding="utf-8")
             count += 1
         written["markdown_files"] = count
         written["markdown"] = str(md_root)
     if "csv" in formats:
-        csv_root = out_dir / "csv"
+        csv_root = root / "csv"
+        assert_inside_out(root, csv_root)
         csv_root.mkdir(parents=True, exist_ok=True)
         grouped: dict[str, list[dict[str, Any]]] = {}
-        for node in nodes:
-            grouped.setdefault(str(node.get("type") or "unknown"), []).append(node)
+        for node, slug in zip(nodes, slugs):
+            grouped.setdefault(slug, []).append(node)
         csv_files: list[str] = []
         for slug, rows in grouped.items():
             scalars = scalar_field_names(by_slug.get(slug, {}))
             header = ["id", "title", "status", "updated_at", *scalars]
             path = csv_root / f"{slug}.csv"
+            assert_inside_out(root, path)
             with path.open("w", encoding="utf-8", newline="") as handle:
                 writer = csv.DictWriter(handle, fieldnames=header, extrasaction="ignore")
                 writer.writeheader()
