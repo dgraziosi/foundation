@@ -12,6 +12,7 @@ import { activityChangeSummary, pickEditableData, presentViewActivity } from "./
 
 const databaseUrl = process.env.DATABASE_URL;
 const apiKey = "test-foundation-key";
+const viewKey = "test-viewer-vault-key-0123456789abcdef";
 
 test("pickEditableData keeps declared scalars and drops refs", () => {
   const fields = [
@@ -100,10 +101,17 @@ async function listenOrigin(server: Server): Promise<string> {
 }
 
 async function unlockCookie(origin: string): Promise<string> {
-  const unlock = await fetch(`${origin}/view/unlock`, {
+  const houseKey = await fetch(`${origin}/view/unlock`, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: `api_key=${encodeURIComponent(apiKey)}`,
+    redirect: "manual",
+  });
+  assert.equal(houseKey.status, 401);
+  const unlock = await fetch(`${origin}/view/unlock`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: `api_key=${encodeURIComponent(viewKey)}`,
     redirect: "manual",
   });
   assert.equal(unlock.status, 303);
@@ -120,6 +128,7 @@ test("viewer any-node write, activity undo, and trash restore", { skip: !databas
   const dataDir = await mkdtemp(join(tmpdir(), "foundation-view-write-"));
   const bindings = {
     FOUNDATION_API_KEY: apiKey,
+    FOUNDATION_VIEW_KEY: viewKey,
     DATABASE_URL: databaseUrl,
     FOUNDATION_DATA: dataDir,
     PORT: 0,
@@ -343,6 +352,7 @@ test("viewer no-op save keeps the stored node and writes no activity row", { ski
   const dataDir = await mkdtemp(join(tmpdir(), "foundation-view-noop-"));
   const bindings = {
     FOUNDATION_API_KEY: apiKey,
+    FOUNDATION_VIEW_KEY: viewKey,
     DATABASE_URL: databaseUrl,
     FOUNDATION_DATA: dataDir,
     PORT: 0,

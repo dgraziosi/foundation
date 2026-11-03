@@ -4,10 +4,20 @@ import { fileURLToPath } from "node:url";
 import type { Pool } from "@foundation/db";
 import type { Express, NextFunction, Request, Response } from "express";
 import express from "express";
-import { apiKeyCookieHeader, homeLookedCookieHeader, providedApiKey, readHomeLooked } from "./auth.js";
+import type { DoorShared } from "./app.js";
+import {
+  API_KEY_COOKIE,
+  cookieValue,
+  headerApiKey,
+  homeLookedCookieHeader,
+  readHomeLooked,
+  viewSessionCookieHeader,
+} from "./auth.js";
+import { setAccessLabel } from "./access-log.js";
 import { sendBlob } from "./blobs-http.js";
 import type { AppBindings } from "./config.js";
-import { attemptSource, presentedSecret, type ViewDoor } from "./view-door.js";
+import { attemptSource, presentedSecret } from "./view-door.js";
+import { browserIsHttps } from "./view-session.js";
 import {
   viewGraph,
   viewNode,
@@ -30,6 +40,10 @@ import {
 
 export const VIEW_PATH = "/view";
 const UNLOCK_REJECT = "That key did not unlock.";
+/** Unlock parses before any key is known, so it stays small. */
+const UNLOCK_BODY_LIMIT = "16kb";
+/** Writes parse only after the gate. A journal body is as long as the person wrote it. */
+const VIEW_WRITE_BODY_LIMIT = "32mb";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -92,11 +106,37 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
-function requireViewAuth(viewDoor: ViewDoor) {
+function refuseView(res: Response, status: 401 | 429): void {
+  res.setHeader("WWW-Authenticate", 'ApiKey realm="foundation"');
+  res.status(status).json({ error: "API key required" });
+}
+
+/**
+ * A view key on Authorization spends the header ledger, never the Unlock one.
+ * The cookie is checked without a ledger: Gate loads `/view/api/session` on every page.
+ */
+function requireViewAuth({ viewDoor, sessions, headerLedger }: DoorShared) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    if (!viewDoor.admit(presentedSecret(providedApiKey(req)))) {
-      res.setHeader("WWW-Authenticate", 'ApiKey realm="foundation"');
-      res.status(401).json({ error: "API key required" });
+    setAccessLabel(res, "window");
+    const header = headerApiKey(req);
+    if (header !== undefined) {
+      const source = attemptSource(req);
+      const retryAfterSec = headerLedger.lockedFor(source);
+      if (retryAfterSec !== undefined) {
+        res.setHeader("Retry-After", String(retryAfterSec));
+        refuseView(res, 429);
+        return;
+      }
+      if (viewDoor.admit(presentedSecret(header))) {
+        next();
+        return;
+      }
+      headerLedger.fail(source);
+      refuseView(res, 401);
+      return;
+    }
+    if (!sessions.resolve(cookieValue(req.header("cookie") ?? "", API_KEY_COOKIE))) {
+      refuseView(res, 401);
       return;
     }
     next();
@@ -156,19 +196,29 @@ function sendWriteResult(res: Response, got: unknown): void {
   res.status(status).json({ error: message });
 }
 
-export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings, viewDoor: ViewDoor): void {
-  const gate = requireViewAuth(viewDoor);
+export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings, shared: DoorShared): void {
+  const { viewDoor, sessions } = shared;
+  const gate = requireViewAuth(shared);
+  const unlockBody = [
+    express.json({ limit: UNLOCK_BODY_LIMIT }),
+    express.urlencoded({ extended: false, limit: UNLOCK_BODY_LIMIT }),
+  ];
+  const writeBody = express.json({ limit: VIEW_WRITE_BODY_LIMIT });
   const dist = viewerDistDir();
 
   app.get(`${VIEW_PATH}/unlock`, (_req, res) => {
     sendViewerApp(res);
   });
 
-  app.post(`${VIEW_PATH}/unlock`, (req, res) => {
+  app.post(`${VIEW_PATH}/unlock`, ...unlockBody, (req, res) => {
+    setAccessLabel(res, "window");
     const presented = presentedSecret(req.body?.api_key);
     const decision = viewDoor.tryUnlock(presented, attemptSource(req));
     if (decision.kind === "open") {
-      res.setHeader("Set-Cookie", apiKeyCookieHeader(presented!));
+      res.setHeader(
+        "Set-Cookie",
+        viewSessionCookieHeader(sessions.mint(), browserIsHttps(req, config.VIEW_PUBLIC_ORIGIN)),
+      );
       if (wantsJson(req)) {
         res.json({ ok: true });
         return;
@@ -252,7 +302,10 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings
       const now = new Date();
       const lookedAt = readHomeLooked(req.header("cookie") ?? "");
       const digest = await viewHomeDigestWindow(pool, lookedAt, now);
-      res.append("Set-Cookie", homeLookedCookieHeader(digest.looked_at));
+      res.append(
+        "Set-Cookie",
+        homeLookedCookieHeader(digest.looked_at, browserIsHttps(req, config.VIEW_PUBLIC_ORIGIN)),
+      );
       res.json(digest);
     } catch (error) {
       console.error("View digest failed", error);
@@ -342,7 +395,7 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings
     }
   });
 
-  app.patch(`${VIEW_PATH}/api/nodes/:id`, gate, async (req, res) => {
+  app.patch(`${VIEW_PATH}/api/nodes/:id`, gate, writeBody, async (req, res) => {
     try {
       sendWriteResult(
         res,
@@ -361,7 +414,7 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings
     }
   });
 
-  app.delete(`${VIEW_PATH}/api/nodes/:id`, gate, async (req, res) => {
+  app.delete(`${VIEW_PATH}/api/nodes/:id`, gate, writeBody, async (req, res) => {
     try {
       sendWriteResult(
         res,
@@ -376,7 +429,7 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings
     }
   });
 
-  app.post(`${VIEW_PATH}/api/nodes/:id/restore`, gate, async (req, res) => {
+  app.post(`${VIEW_PATH}/api/nodes/:id/restore`, gate, writeBody, async (req, res) => {
     try {
       sendWriteResult(
         res,
@@ -391,7 +444,7 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings
     }
   });
 
-  app.post(`${VIEW_PATH}/api/activity/:id/undo`, gate, async (req, res) => {
+  app.post(`${VIEW_PATH}/api/activity/:id/undo`, gate, writeBody, async (req, res) => {
     try {
       sendWriteResult(
         res,

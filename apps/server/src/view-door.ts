@@ -1,19 +1,18 @@
-import { timingSafeEqual } from "node:crypto";
 import type { AppBindings } from "./config.js";
-import type { Keyring } from "./keyring.js";
+import { digestsMatch, secretDigest, type SecretDigest } from "./secret-compare.js";
 
 /**
- * The window's lock. Closed union: exclusive physically cannot see Keyring.
- * If a Viewer credential exists, an MCP key is not a way in.
+ * The window's lock. Closed union with no Keyring arm, so an MCP key is never a way in.
+ * Without a view key the window stays closed and MCP still serves.
  */
 export type WindowLock =
-  | { readonly mode: "exclusive"; readonly viewerSecret: string }
-  | { readonly mode: "fallback"; readonly keyring: Keyring };
+  | { readonly mode: "exclusive"; readonly viewerDigest: SecretDigest }
+  | { readonly mode: "closed" };
 
-/** Wire `api_key` / cookie / header after boundary parse. Empty is not a secret. */
+/** Wire `api_key` / header after boundary parse. Empty is not a secret. */
 export type PresentedSecret = string & { readonly __brand: "PresentedSecret" };
 
-/** One client. Unlock writers do not share a bucket. */
+/** One client. Writers from different addresses do not share a bucket. */
 export type AttemptSource = string & { readonly __brand: "AttemptSource" };
 
 export type UnlockBudget = {
@@ -42,20 +41,53 @@ type SourceBucket = {
 
 const systemClock: Clock = { now: () => Date.now() };
 
-function safeEqualUtf8(left: string, right: string): boolean {
-  const a = Buffer.from(left, "utf8");
-  const b = Buffer.from(right, "utf8");
-  if (a.length === 0 || a.length !== b.length) {
-    return false;
-  }
-  return timingSafeEqual(a, b);
-}
-
 function budgetOf(budget: UnlockBudget): UnlockBudget {
   if (budget.maxFailures < 1 || budget.windowMs <= 0 || budget.cooldownMs <= 0) {
     throw new Error("Unlock budget needs at least one failure and windows above zero");
   }
   return budget;
+}
+
+/**
+ * Failed presented secrets per source. Callers ask `lockedFor` before any compare,
+ * so a locked source learns nothing, not even from the right key.
+ */
+export class FailureLedger {
+  private readonly budget: UnlockBudget;
+  private readonly clock: Clock;
+  private readonly buckets = new Map<AttemptSource, SourceBucket>();
+
+  constructor(opts?: { budget?: UnlockBudget; clock?: Clock }) {
+    this.budget = budgetOf(opts?.budget ?? DEFAULT_UNLOCK_BUDGET);
+    this.clock = opts?.clock ?? systemClock;
+  }
+
+  /** Seconds left on this source's cooldown, or undefined when it may try. */
+  lockedFor(source: AttemptSource): number | undefined {
+    const bucket = this.buckets.get(source);
+    if (bucket?.lockedUntil === undefined) {
+      return undefined;
+    }
+    const now = this.clock.now();
+    if (now >= bucket.lockedUntil) {
+      this.buckets.delete(source);
+      return undefined;
+    }
+    return Math.max(1, Math.ceil((bucket.lockedUntil - now) / 1000));
+  }
+
+  fail(source: AttemptSource): void {
+    const now = this.clock.now();
+    const cutoff = now - this.budget.windowMs;
+    const failures = (this.buckets.get(source)?.failures ?? []).filter((stamp) => stamp > cutoff);
+    failures.push(now);
+    const lockedUntil = failures.length >= this.budget.maxFailures ? now + this.budget.cooldownMs : undefined;
+    this.buckets.set(source, { failures, lockedUntil });
+  }
+
+  clear(source: AttemptSource): void {
+    this.buckets.delete(source);
+  }
 }
 
 export function presentedSecret(raw: unknown): PresentedSecret | undefined {
@@ -78,65 +110,57 @@ export function attemptSource(req: { socket: { remoteAddress?: string } }): Atte
   return attemptSourceFrom(req.socket.remoteAddress ?? "unknown");
 }
 
-export function windowLockOf(config: AppBindings, keyring: Keyring): WindowLock {
+export function windowLockOf(config: Pick<AppBindings, "FOUNDATION_VIEW_KEY">): WindowLock {
   const secret = config.FOUNDATION_VIEW_KEY?.trim() ?? "";
   if (secret.length > 0) {
-    return { mode: "exclusive", viewerSecret: secret };
+    return { mode: "exclusive", viewerDigest: secretDigest(secret) };
   }
-  return { mode: "fallback", keyring };
+  return { mode: "closed" };
 }
 
-function secretsMatch(lock: WindowLock, presented: PresentedSecret): boolean {
-  if (lock.mode === "exclusive") {
-    return safeEqualUtf8(presented, lock.viewerSecret);
+function opens(lock: WindowLock, presented: PresentedSecret): boolean {
+  if (lock.mode === "closed") {
+    return false;
   }
-  return lock.keyring.resolve(presented) != null;
+  return digestsMatch(secretDigest(presented), lock.viewerDigest);
 }
 
 export class ViewDoor {
   private constructor(
     private readonly lock: WindowLock,
-    private readonly budget: UnlockBudget,
-    private readonly clock: Clock,
-    private readonly buckets: Map<AttemptSource, SourceBucket>,
+    private readonly ledger: FailureLedger,
   ) {}
 
   static fromBindings(
-    config: AppBindings,
-    keyring: Keyring,
+    config: Pick<AppBindings, "FOUNDATION_VIEW_KEY">,
     opts?: { budget?: UnlockBudget; clock?: Clock },
   ): ViewDoor {
-    return new ViewDoor(
-      windowLockOf(config, keyring),
-      budgetOf(opts?.budget ?? DEFAULT_UNLOCK_BUDGET),
-      opts?.clock ?? systemClock,
-      new Map(),
-    );
+    return new ViewDoor(windowLockOf(config), new FailureLedger(opts));
   }
 
+  get mode(): WindowLock["mode"] {
+    return this.lock.mode;
+  }
+
+  /** Unlock ledger. A missing secret is a page load, not a guess, so it never counts. */
   tryUnlock(presented: PresentedSecret | undefined, source: AttemptSource): UnlockDecision {
-    const now = this.clock.now();
-    if (presented && secretsMatch(this.lock, presented)) {
-      this.buckets.delete(source);
+    const retryAfterSec = this.ledger.lockedFor(source);
+    if (retryAfterSec !== undefined) {
+      return { kind: "throttle", retryAfterSec };
+    }
+    if (!presented) {
+      return { kind: "refuse" };
+    }
+    if (opens(this.lock, presented)) {
+      this.ledger.clear(source);
       return { kind: "open" };
     }
-    const existing = this.buckets.get(source);
-    if (existing?.lockedUntil !== undefined && now < existing.lockedUntil) {
-      return {
-        kind: "throttle",
-        retryAfterSec: Math.max(1, Math.ceil((existing.lockedUntil - now) / 1000)),
-      };
-    }
-    const cutoff = now - this.budget.windowMs;
-    const failures = (existing?.failures ?? []).filter((stamp) => stamp > cutoff);
-    failures.push(now);
-    const lockedUntil =
-      failures.length >= this.budget.maxFailures ? now + this.budget.cooldownMs : undefined;
-    this.buckets.set(source, { failures, lockedUntil });
+    this.ledger.fail(source);
     return { kind: "refuse" };
   }
 
+  /** Pure compare. Callers that take a header run their own ledger first. */
   admit(presented: PresentedSecret | undefined): boolean {
-    return presented != null && secretsMatch(this.lock, presented);
+    return presented != null && opens(this.lock, presented);
   }
 }

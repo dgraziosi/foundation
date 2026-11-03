@@ -1,6 +1,6 @@
 # Unlock
 
-Unlock is the door to the Viewer. The person types the vault key. When `FOUNDATION_VIEW_KEY` is set, that is the vault key; MCP keys do not open the window. When unset, the house key still opens it. A good key sets an HttpOnly cookie `Path=/view`. The window then shows the page for that address. `/view` is Home. A bad key stays on the door with **That key did not unlock.** That cookie unlocks Viewer routes (including journal write). It does not unlock MCP or agent blobs.
+Unlock is the door to the Viewer. The person types the vault key (`FOUNDATION_VIEW_KEY`). MCP keys do not open the window. A good key sets an HttpOnly cookie `Path=/view`. The window then shows the page for that address. `/view` is Home. A bad key stays on the door with **That key did not unlock.** That cookie unlocks Viewer routes (including journal write). It does not unlock MCP or agent blobs.
 
 ## Sub-features
 
@@ -11,7 +11,7 @@ Unlock is the door to the Viewer. The person types the vault key. When `FOUNDATI
 
 ## How to get to it (user POV)
 
-- Open `http://127.0.0.1:8788/view` with no session cookie. Off-box is `VIEW_HOST=0.0.0.0`, then `http://<this-host>:8788/view`.
+- Open `http://127.0.0.1:8788/view` with no session cookie. Off-box names the tunnel Host as `VIEW_PUBLIC_ORIGIN` and may set `VIEW_HOST=0.0.0.0`.
 - Open any `/view/...` route while the session is missing; the gate is the same door.
 - Submit the form labeled **Unlock**, password field `name="api_key"` labeled **Vault key**, button **Unlock**.
 

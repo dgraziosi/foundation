@@ -1,83 +1,80 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Keyring } from "./keyring.js";
+import { secretDigest } from "./secret-compare.js";
 import {
+  FailureLedger,
   ViewDoor,
   attemptSourceFrom,
   presentedSecret,
   windowLockOf,
 } from "./view-door.js";
 
-const apiKey = "mcp-bootstrap-secret";
+const houseKey = "mcp-bootstrap-secret";
 const viewKey = "viewer-vault-secret";
 const namedKey = "chief-named-secret";
-const dataDir = "/tmp/foundation-view-door-test";
+const budget = { maxFailures: 5, windowMs: 60_000, cooldownMs: 60_000 };
 
-const exclusiveBindings = {
-  FOUNDATION_API_KEY: apiKey,
-  FOUNDATION_VIEW_KEY: viewKey,
-  FOUNDATION_DATA: dataDir,
-};
-
-const fallbackBindings = {
-  FOUNDATION_API_KEY: apiKey,
-  FOUNDATION_DATA: dataDir,
-};
-
-function ring(): Keyring {
-  return Keyring.fromSecrets(apiKey, [{ secret: namedKey, name: "chief", actor_label: "Chief of Staff" }]);
+function exclusiveDoor(clock?: { now(): number }): ViewDoor {
+  return ViewDoor.fromBindings({ FOUNDATION_VIEW_KEY: viewKey }, { budget, clock });
 }
 
-function exclusiveDoor(opts?: { clock?: { now(): number } }): ViewDoor {
-  return ViewDoor.fromBindings(exclusiveBindings, ring(), {
-    budget: { maxFailures: 5, windowMs: 60_000, cooldownMs: 60_000 },
-    clock: opts?.clock,
-  });
+function closedDoor(clock?: { now(): number }): ViewDoor {
+  return ViewDoor.fromBindings({}, { budget, clock });
 }
 
-function fallbackDoor(): ViewDoor {
-  return ViewDoor.fromBindings(fallbackBindings, ring());
+function lockOut(door: ViewDoor, source: ReturnType<typeof attemptSourceFrom>): void {
+  for (let i = 0; i < 5; i += 1) {
+    assert.equal(door.tryUnlock(presentedSecret("nope"), source).kind, "refuse", `refuse ${i + 1}`);
+  }
 }
 
-test("exclusive lock holds the vault key and no keyring", () => {
-  const lock = windowLockOf(exclusiveBindings, ring());
+test("exclusive lock holds only the view key digest", () => {
+  const lock = windowLockOf({ FOUNDATION_VIEW_KEY: viewKey });
   assert.equal(lock.mode, "exclusive");
   if (lock.mode !== "exclusive") {
     return;
   }
-  assert.equal(lock.viewerSecret, viewKey);
-  assert.equal("keyring" in lock, false);
+  assert.deepEqual(lock.viewerDigest, secretDigest(viewKey));
+  assert.deepEqual(Object.keys(lock).sort(), ["mode", "viewerDigest"]);
 });
 
-test("blank view key is a fallback lock", () => {
-  const lock = windowLockOf({ ...exclusiveBindings, FOUNDATION_VIEW_KEY: "  " }, ring());
-  assert.equal(lock.mode, "fallback");
-  if (lock.mode !== "fallback") {
-    return;
-  }
-  assert.equal("viewerSecret" in lock, false);
+test("missing or blank view key is a closed lock", () => {
+  assert.deepEqual(windowLockOf({}), { mode: "closed" });
+  assert.deepEqual(windowLockOf({ FOUNDATION_VIEW_KEY: "  " }), { mode: "closed" });
 });
 
-test("exclusive ignores bootstrap and named MCP keys", () => {
+test("exclusive ignores the house key and named keys", () => {
   const door = exclusiveDoor();
   const source = attemptSourceFrom("203.0.113.9");
-  assert.equal(door.tryUnlock(presentedSecret(apiKey), source).kind, "refuse");
+  assert.equal(door.tryUnlock(presentedSecret(houseKey), source).kind, "refuse");
   assert.equal(door.tryUnlock(presentedSecret(namedKey), source).kind, "refuse");
   assert.equal(door.tryUnlock(presentedSecret(viewKey), source).kind, "open");
-  assert.equal(door.admit(presentedSecret(apiKey)), false);
+  assert.equal(door.admit(presentedSecret(houseKey)), false);
   assert.equal(door.admit(presentedSecret(namedKey)), false);
   assert.equal(door.admit(presentedSecret(viewKey)), true);
 });
 
-test("fallback accepts bootstrap and named keys", () => {
-  const door = fallbackDoor();
+test("closed lock refuses every presented secret and counts the tries", () => {
+  const door = closedDoor();
   const source = attemptSourceFrom("203.0.113.10");
-  assert.equal(door.tryUnlock(presentedSecret(apiKey), source).kind, "open");
-  assert.equal(door.tryUnlock(presentedSecret(namedKey), source).kind, "open");
-  assert.equal(door.tryUnlock(presentedSecret("nope"), source).kind, "refuse");
-  assert.equal(door.admit(presentedSecret(apiKey)), true);
-  assert.equal(door.admit(presentedSecret(namedKey)), true);
-  assert.equal(door.admit(presentedSecret(viewKey)), false);
+  for (const key of [houseKey, namedKey, viewKey, "nope", "another"]) {
+    assert.equal(door.tryUnlock(presentedSecret(key), source).kind, "refuse");
+    assert.equal(door.admit(presentedSecret(key)), false);
+  }
+  assert.equal(door.tryUnlock(presentedSecret(houseKey), source).kind, "throttle");
+});
+
+test("five missing secrets do not lock the window", () => {
+  const door = exclusiveDoor();
+  const source = attemptSourceFrom("203.0.113.14");
+  for (let i = 0; i < 20; i += 1) {
+    assert.equal(door.tryUnlock(undefined, source).kind, "refuse");
+    assert.equal(door.tryUnlock(presentedSecret("   "), source).kind, "refuse");
+  }
+  for (let i = 0; i < 4; i += 1) {
+    assert.equal(door.tryUnlock(presentedSecret("nope"), source).kind, "refuse");
+  }
+  assert.equal(door.tryUnlock(presentedSecret(viewKey), source).kind, "open");
 });
 
 test("admit does not count against the unlock ledger", () => {
@@ -90,60 +87,58 @@ test("admit does not count against the unlock ledger", () => {
   assert.equal(door.tryUnlock(presentedSecret("nope"), source).kind, "refuse");
 });
 
-test("five refuse then throttle; further wrong tries do not extend the wait", () => {
+test("a sixth try while locked throttles before any compare and does not extend the wait", () => {
   let now = 0;
-  const door = exclusiveDoor({ clock: { now: () => now } });
+  const door = exclusiveDoor({ now: () => now });
   const source = attemptSourceFrom("203.0.113.12");
-  for (let i = 0; i < 5; i += 1) {
-    assert.equal(door.tryUnlock(presentedSecret("nope"), source).kind, "refuse", `refuse ${i + 1}`);
-  }
+  lockOut(door, source);
   const first = door.tryUnlock(presentedSecret("nope"), source);
-  assert.equal(first.kind, "throttle");
-  if (first.kind !== "throttle") {
-    return;
-  }
-  assert.equal(first.retryAfterSec, 60);
+  assert.deepEqual(first, { kind: "throttle", retryAfterSec: 60 });
   now = 10_000;
-  const again = door.tryUnlock(presentedSecret("nope"), source);
-  assert.equal(again.kind, "throttle");
-  if (again.kind !== "throttle") {
-    return;
-  }
-  assert.equal(again.retryAfterSec, 50);
+  assert.deepEqual(door.tryUnlock(presentedSecret("nope"), source), { kind: "throttle", retryAfterSec: 50 });
+  assert.deepEqual(door.tryUnlock(undefined, source), { kind: "throttle", retryAfterSec: 50 });
 });
 
-test("the correct vault key opens and clears that source during cooldown", () => {
-  const clock = { now: () => 0 };
-  const door = exclusiveDoor({ clock });
+test("the correct view key during cooldown is still throttled", () => {
+  let now = 0;
+  const door = exclusiveDoor({ now: () => now });
   const source = attemptSourceFrom("203.0.113.13");
-  for (let i = 0; i < 5; i += 1) {
-    assert.equal(door.tryUnlock(presentedSecret("nope"), source).kind, "refuse");
-  }
-  assert.equal(door.tryUnlock(presentedSecret("nope"), source).kind, "throttle");
+  lockOut(door, source);
+  assert.equal(door.tryUnlock(presentedSecret(viewKey), source).kind, "throttle");
+  now = 59_999;
+  assert.equal(door.tryUnlock(presentedSecret(viewKey), source).kind, "throttle");
+  now = 60_000;
   assert.equal(door.tryUnlock(presentedSecret(viewKey), source).kind, "open");
   assert.equal(door.tryUnlock(presentedSecret("nope"), source).kind, "refuse");
-});
-
-test("missing secret spends a failure", () => {
-  const door = exclusiveDoor();
-  const source = attemptSourceFrom("203.0.113.14");
-  assert.equal(door.tryUnlock(undefined, source).kind, "refuse");
-  assert.equal(door.tryUnlock(presentedSecret("   "), source).kind, "refuse");
 });
 
 test("ledgers are isolated per door and per source", () => {
   let now = 0;
   const clock = { now: () => now };
-  const left = exclusiveDoor({ clock });
-  const right = exclusiveDoor({ clock });
+  const left = exclusiveDoor(clock);
+  const right = exclusiveDoor(clock);
   const alice = attemptSourceFrom("203.0.113.15");
   const bob = attemptSourceFrom("203.0.113.16");
-  for (let i = 0; i < 5; i += 1) {
-    assert.equal(left.tryUnlock(presentedSecret("nope"), alice).kind, "refuse");
-  }
+  lockOut(left, alice);
   assert.equal(left.tryUnlock(presentedSecret("nope"), alice).kind, "throttle");
   assert.equal(left.tryUnlock(presentedSecret("nope"), bob).kind, "refuse");
   assert.equal(right.tryUnlock(presentedSecret("nope"), alice).kind, "refuse");
   now = 60_000;
   assert.equal(left.tryUnlock(presentedSecret("nope"), alice).kind, "refuse");
+});
+
+test("failures older than the window fall out of the ledger", () => {
+  let now = 0;
+  const ledger = new FailureLedger({ budget, clock: { now: () => now } });
+  const source = attemptSourceFrom("203.0.113.17");
+  for (let i = 0; i < 4; i += 1) {
+    ledger.fail(source);
+  }
+  now = 60_001;
+  ledger.fail(source);
+  assert.equal(ledger.lockedFor(source), undefined);
+  for (let i = 0; i < 4; i += 1) {
+    ledger.fail(source);
+  }
+  assert.equal(ledger.lockedFor(source), 60);
 });

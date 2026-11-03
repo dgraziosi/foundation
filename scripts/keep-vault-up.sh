@@ -9,7 +9,7 @@
 #                           Default: sibling of the data dir.
 #                           Relative paths are under the clone.
 #   DATABASE_URL          — required. Environment, else the clone .env.
-#                           No silent default. Copy .env.example and fill it.
+#                           Missing or published values are minted into .env.
 #
 # Starts Postgres 16 (the data folder's postgres tree) and the app
 # (`pnpm start`) when /health is down. Postgres listens on
@@ -33,6 +33,29 @@
 #                                     Does not delete the data folder.
 # Refuses start while .restore-lock is live or .restore-failed is present.
 set -euo pipefail
+
+# Published strings from .env.example. A running vault must not keep these.
+FOUNDATION_PUBLISHED_API_KEY="change-me-to-a-long-random-string"
+FOUNDATION_PUBLISHED_DB_PASSWORD="change-me-to-a-password"
+FOUNDATION_MIN_KEY_LENGTH=32
+FOUNDATION_KEEP_VAULT_UP_ENV_CHANGED=0
+
+# Names loadConfig reads. env -i forwards these plus PATH/HOME/TMPDIR/LANG/LC_ALL/USER.
+FOUNDATION_KEEP_VAULT_UP_ENV_NAMES=(
+  FOUNDATION_API_KEY
+  FOUNDATION_API_KEY_LABEL
+  FOUNDATION_VIEW_KEY
+  DATABASE_URL
+  FOUNDATION_DATA
+  PORT
+  HOST
+  VIEW_PORT
+  VIEW_HOST
+  FOUNDATION_ALLOWED_HOSTS
+  VIEW_PUBLIC_ORIGIN
+  FOUNDATION_ALLOW_CLEARTEXT
+  FOUNDATION_LEASE_TTL_SECONDS
+)
 
 foundation_keep_vault_up_repo_root() {
   local script_dir
@@ -62,6 +85,306 @@ foundation_keep_vault_up_env_value() {
     fi
   fi
   printf '%s\n' "${raw}"
+}
+
+foundation_keep_vault_up_key_needs_mint() {
+  local value="$1"
+  [[ -z "${value}" || "${value}" == "${FOUNDATION_PUBLISHED_API_KEY}" || "${#value}" -lt "${FOUNDATION_MIN_KEY_LENGTH}" ]]
+}
+
+foundation_keep_vault_up_mint_secret() {
+  if ! command -v openssl >/dev/null 2>&1; then
+    foundation_keep_vault_up_nag "openssl is not on PATH. Cannot mint a vault secret."
+    return 1
+  fi
+  openssl rand -hex 32
+}
+
+# Write KEY=value into .env without printing the value. Value arrives on stdin.
+foundation_keep_vault_up_upsert_env() {
+  local dest="$1"
+  local key="$2"
+  python3 -c '
+import pathlib, sys
+dest = pathlib.Path(sys.argv[1])
+key = sys.argv[2]
+value = sys.stdin.read().rstrip("\n")
+lines = dest.read_text().splitlines() if dest.exists() else []
+prefix = key + "="
+out = []
+found = False
+for line in lines:
+    raw = line.strip()
+    if raw.startswith(prefix):
+        out.append(prefix + value)
+        found = True
+        continue
+    out.append(line)
+if not found:
+    out.append(prefix + value)
+dest.write_text(("\n".join(out) + "\n") if out else prefix + value + "\n")
+' "${dest}" "${key}"
+  chmod 600 -- "${dest}"
+}
+
+foundation_keep_vault_up_url_password() {
+  python3 -c '
+from urllib.parse import urlparse, unquote
+import sys
+raw = sys.stdin.read().strip()
+if not raw:
+    raise SystemExit(0)
+u = urlparse(raw)
+if u.password:
+    sys.stdout.write(unquote(u.password))
+'
+}
+
+foundation_keep_vault_up_rewrite_url_password() {
+  python3 -c '
+from urllib.parse import urlparse, quote, unquote
+import sys
+raw = sys.stdin.readline().rstrip("\n")
+password = sys.stdin.read().rstrip("\n")
+u = urlparse(raw)
+user = unquote(u.username or "foundation")
+host = u.hostname or "127.0.0.1"
+port = u.port or 5432
+database = unquote((u.path or "").lstrip("/") or "foundation").split("?", 1)[0] or "foundation"
+auth = "%s:%s" % (quote(user, safe=""), quote(password, safe=""))
+sys.stdout.write("%s://%s@%s:%s/%s" % (u.scheme or "postgres", auth, host, port, database))
+'
+}
+
+# Mint missing, published, or short door keys and a published database password.
+# Quiet. Writes .env mode 600. Does not print a secret.
+foundation_keep_vault_up_ensure_env_secrets() {
+  local repo_root="$1"
+  local env_file="${repo_root}/.env"
+  local api view url password minted
+  FOUNDATION_KEEP_VAULT_UP_ENV_CHANGED=0
+
+  api="$(foundation_keep_vault_up_env_value "${repo_root}" FOUNDATION_API_KEY)"
+  view="$(foundation_keep_vault_up_env_value "${repo_root}" FOUNDATION_VIEW_KEY)"
+  url="$(foundation_keep_vault_up_env_value "${repo_root}" DATABASE_URL)"
+
+  if foundation_keep_vault_up_key_needs_mint "${api}"; then
+    api="$(foundation_keep_vault_up_mint_secret)" || return 1
+    printf '%s\n' "${api}" | foundation_keep_vault_up_upsert_env "${env_file}" FOUNDATION_API_KEY
+    export FOUNDATION_API_KEY="${api}"
+    FOUNDATION_KEEP_VAULT_UP_ENV_CHANGED=1
+  fi
+
+  if foundation_keep_vault_up_key_needs_mint "${view}"; then
+    view="$(foundation_keep_vault_up_mint_secret)" || return 1
+    while [[ "${view}" == "${api}" ]]; do
+      view="$(foundation_keep_vault_up_mint_secret)" || return 1
+    done
+    printf '%s\n' "${view}" | foundation_keep_vault_up_upsert_env "${env_file}" FOUNDATION_VIEW_KEY
+    export FOUNDATION_VIEW_KEY="${view}"
+    FOUNDATION_KEEP_VAULT_UP_ENV_CHANGED=1
+  fi
+
+  password="$(printf '%s\n' "${url}" | foundation_keep_vault_up_url_password)"
+  if [[ -z "${url}" || -z "${password}" || "${password}" == "${FOUNDATION_PUBLISHED_DB_PASSWORD}" ]]; then
+    minted="$(foundation_keep_vault_up_mint_secret)" || return 1
+    if [[ -z "${url}" ]]; then
+      url="postgres://foundation:x@127.0.0.1:5432/foundation"
+    fi
+    url="$(printf '%s\n%s\n' "${url}" "${minted}" | foundation_keep_vault_up_rewrite_url_password)"
+    printf '%s\n' "${url}" | foundation_keep_vault_up_upsert_env "${env_file}" DATABASE_URL
+    export DATABASE_URL="${url}"
+    FOUNDATION_KEEP_VAULT_UP_ENV_CHANGED=1
+  fi
+
+  if [[ -f "${env_file}" ]]; then
+    chmod 600 -- "${env_file}"
+  fi
+  return 0
+}
+
+foundation_keep_vault_up_write_url_file() {
+  local repo_root="$1"
+  local dest="$2"
+  umask 077
+  foundation_keep_vault_up_env_value "${repo_root}" DATABASE_URL >"${dest}"
+  chmod 600 -- "${dest}"
+}
+
+# Parse a mode-600 URL file into host, port, user, database (tab-separated). Password stays out.
+foundation_keep_vault_up_url_fields() {
+  python3 -c '
+from urllib.parse import urlparse, unquote
+import pathlib, sys
+u = urlparse(pathlib.Path(sys.argv[1]).read_text().strip())
+database = unquote((u.path or "").lstrip("/") or "foundation")
+database = database.split("?", 1)[0].split("/", 1)[0] or "foundation"
+sys.stdout.write("\t".join([
+    u.hostname or "127.0.0.1",
+    str(u.port or 5432),
+    unquote(u.username or "foundation"),
+    database,
+]))
+' "$1"
+}
+
+foundation_keep_vault_up_url_password_file() {
+  python3 -c '
+from urllib.parse import urlparse, unquote
+import pathlib, sys
+u = urlparse(pathlib.Path(sys.argv[1]).read_text().strip())
+if not u.password:
+    sys.stderr.write("DATABASE_URL has no password. Copy .env.example to .env and fill it.\n")
+    raise SystemExit(1)
+sys.stdout.write(unquote(u.password))
+' "$1"
+}
+
+# App psql using discrete args. URL stays in a mode-600 file, not argv.
+foundation_keep_vault_up_psql_app() {
+  local url_file="$1"
+  shift
+  local fields host port user database password
+  fields="$(foundation_keep_vault_up_url_fields "${url_file}")" || return 1
+  IFS=$'\t' read -r host port user database <<<"${fields}"
+  password="$(foundation_keep_vault_up_url_password_file "${url_file}")" || return 1
+  PGPASSWORD="${password}" psql -h "${host}" -p "${port}" -U "${user}" -d "${database}" -v ON_ERROR_STOP=1 "$@"
+}
+
+foundation_keep_vault_up_hba_has_trust() {
+  local hba="$1"
+  python3 -c '
+import pathlib, re, sys
+text = pathlib.Path(sys.argv[1]).read_text() if pathlib.Path(sys.argv[1]).exists() else ""
+for line in text.splitlines():
+    raw = line.split("#", 1)[0]
+    if re.match(r"^\s*(local|host)\b", raw) and re.search(r"\btrust\b", raw):
+        raise SystemExit(0)
+raise SystemExit(1)
+' "${hba}"
+}
+
+# Rewrite every uncommented trust line, including replication. Exit 0 when the file changed.
+foundation_keep_vault_up_rewrite_hba() {
+  local hba="$1"
+  python3 -c '
+import pathlib, re, sys
+path = pathlib.Path(sys.argv[1])
+changed = False
+out = []
+for line in path.read_text().splitlines(True):
+    raw = line.split("#", 1)[0]
+    if re.match(r"^\s*local\b", raw) and re.search(r"\btrust\b", raw):
+        line = re.sub(r"\btrust\b", "peer", line, count=1)
+        changed = True
+    elif re.match(r"^\s*host\b", raw) and re.search(r"\btrust\b", raw):
+        line = re.sub(r"\btrust\b", "scram-sha-256", line, count=1)
+        changed = True
+    out.append(line)
+if changed:
+    path.write_text("".join(out))
+    raise SystemExit(0)
+raise SystemExit(1)
+' "${hba}"
+}
+
+foundation_keep_vault_up_listen_pinned() {
+  local conf="$1"
+  python3 -c '
+import pathlib, re, sys
+text = pathlib.Path(sys.argv[1]).read_text() if pathlib.Path(sys.argv[1]).exists() else ""
+raise SystemExit(0 if re.search(r"(?m)^\s*listen_addresses\s*=\s*'\''127\.0\.0\.1'\''", text) else 1)
+' "${conf}"
+}
+
+foundation_keep_vault_up_pin_listen() {
+  local conf="$1"
+  python3 -c '
+import pathlib, re, sys
+path = pathlib.Path(sys.argv[1])
+text = path.read_text() if path.exists() else ""
+wanted = "listen_addresses = '\''127.0.0.1'\''"
+if re.search(r"(?m)^\s*listen_addresses\s*=\s*'\''127\.0\.0\.1'\''", text):
+    raise SystemExit(1)
+new, n = re.subn(r"(?m)^\s*#?\s*listen_addresses\s*=.*$", wanted, text, count=1)
+if n == 0:
+    new = text.rstrip() + "\n" + wanted + "\n"
+path.write_text(new)
+' "${conf}"
+}
+
+foundation_keep_vault_up_is_loopback_bind() {
+  local host="$1"
+  [[ -z "${host}" ]] && return 0
+  host="${host,,}"
+  [[ "${host}" == "localhost" || "${host}" == "127.0.0.1" || "${host}" == "::1" || "${host}" == "[::1]" ]] && return 0
+  [[ "${host}" =~ ^127\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
+}
+
+# Refuse a bind beyond this machine unless the tunnel Host is named.
+foundation_keep_vault_up_bind_ok() {
+  local repo_root="$1"
+  local host view_host origin clear names
+  host="$(foundation_keep_vault_up_env_value "${repo_root}" HOST)"
+  view_host="$(foundation_keep_vault_up_env_value "${repo_root}" VIEW_HOST)"
+  origin="$(foundation_keep_vault_up_env_value "${repo_root}" VIEW_PUBLIC_ORIGIN)"
+  clear="$(foundation_keep_vault_up_env_value "${repo_root}" FOUNDATION_ALLOW_CLEARTEXT)"
+  host="${host:-127.0.0.1}"
+  view_host="${view_host:-127.0.0.1}"
+  names=""
+  if ! foundation_keep_vault_up_is_loopback_bind "${host}"; then
+    names="HOST=${host}"
+  fi
+  if ! foundation_keep_vault_up_is_loopback_bind "${view_host}"; then
+    if [[ -n "${names}" ]]; then
+      names="${names} and VIEW_HOST=${view_host}"
+    else
+      names="VIEW_HOST=${view_host}"
+    fi
+  fi
+  if [[ -z "${names}" ]]; then
+    return 0
+  fi
+  if [[ -z "${origin}" ]]; then
+    foundation_keep_vault_up_nag "${names} listens beyond this machine. Set VIEW_PUBLIC_ORIGIN to the origin the browser opens."
+    return 1
+  fi
+  if [[ "${origin}" != https://* ]] && [[ "${clear}" != "1" && "${clear}" != "true" && "${clear}" != "yes" ]]; then
+    foundation_keep_vault_up_nag "${names} listens beyond this machine on plain http. Serve VIEW_PUBLIC_ORIGIN over https, or set FOUNDATION_ALLOW_CLEARTEXT=1."
+    return 1
+  fi
+  return 0
+}
+
+foundation_keep_vault_up_write_allowlist() {
+  local repo_root="$1"
+  local dest="$2"
+  python3 -c '
+import os, pathlib, shlex, sys
+repo = pathlib.Path(sys.argv[1])
+dest = pathlib.Path(sys.argv[2])
+names = sys.argv[3].split(",")
+lines = []
+for name in ["PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "USER"]:
+    value = os.environ.get(name, "")
+    if value:
+        lines.append("%s=%s" % (name, shlex.quote(value)))
+env_text = repo.joinpath(".env").read_text() if repo.joinpath(".env").exists() else ""
+for name in names:
+    value = os.environ.get(name, "")
+    if not value:
+        for line in env_text.splitlines():
+            raw = line.strip()
+            if raw.startswith(name + "="):
+                value = raw[len(name) + 1:]
+                if len(value) >= 2 and value[0] == value[-1] == "\"":
+                    value = value[1:-1]
+                break
+    if value:
+        lines.append("%s=%s" % (name, shlex.quote(value)))
+dest.write_text("\n".join(lines) + ("\n" if lines else ""))
+' "${repo_root}" "${dest}" "$(IFS=','; echo "${FOUNDATION_KEEP_VAULT_UP_ENV_NAMES[*]}")"
+  chmod 600 -- "${dest}"
 }
 
 # FOUNDATION_DATA from the environment, else the clone .env, else ./data.
@@ -372,13 +695,13 @@ foundation_keep_vault_up_init_postgres() {
     foundation_keep_vault_up_nag "Postgres 16 is not on PATH (initdb). The package name is unknown in this repo."
     return 1
   fi
-  initdb -D "${postgres}" --no-instructions >/dev/null
+  initdb -D "${postgres}" --auth-local=peer --auth-host=scram-sha-256 --no-instructions >/dev/null
 }
 
-# SQL for the DATABASE_URL role/database. kind is role|exists|createdb.
+# SQL for the DATABASE_URL role/database. kind is role|exists|createdb|user.
+# URL arrives on stdin, never argv.
 foundation_keep_vault_up_app_role_sql() {
-  local url="$1"
-  local kind="$2"
+  local kind="$1"
   python3 -c '
 from urllib.parse import urlparse, unquote
 import sys
@@ -390,7 +713,7 @@ def literal(s):
     q = chr(39)
     return q + s.replace(q, q + q) + q
 
-u = urlparse(sys.argv[1])
+u = urlparse(sys.stdin.read().strip())
 user = unquote(u.username or "foundation")
 if not u.password:
     sys.stderr.write("DATABASE_URL has no password. Copy .env.example to .env and fill it.\n")
@@ -398,8 +721,10 @@ if not u.password:
 password = unquote(u.password)
 database = unquote((u.path or "").lstrip("/") or "foundation")
 database = database.split("?", 1)[0].split("/", 1)[0] or "foundation"
-kind = sys.argv[2]
-if kind == "role":
+kind = sys.argv[1]
+if kind == "user":
+    print(user)
+elif kind == "role":
     tag = "do"
     n = 0
     while ("$" + tag + "$") in user or ("$" + tag + "$") in password:
@@ -408,9 +733,9 @@ if kind == "role":
     print("DO $%s$" % tag)
     print("BEGIN")
     print("  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = %s) THEN" % literal(user))
-    print("    CREATE ROLE %s LOGIN SUPERUSER PASSWORD %s;" % (ident(user), literal(password)))
+    print("    CREATE ROLE %s LOGIN PASSWORD %s;" % (ident(user), literal(password)))
     print("  ELSE")
-    print("    ALTER ROLE %s WITH LOGIN SUPERUSER PASSWORD %s;" % (ident(user), literal(password)))
+    print("    ALTER ROLE %s WITH LOGIN PASSWORD %s;" % (ident(user), literal(password)))
     print("  END IF;")
     print("END")
     print("$%s$;" % tag)
@@ -418,7 +743,7 @@ elif kind == "exists":
     print("SELECT 1 FROM pg_database WHERE datname = %s" % literal(database))
 elif kind == "createdb":
     print("CREATE DATABASE %s OWNER %s;" % (ident(database), ident(user)))
-' "${url}" "${kind}"
+' "${kind}"
 }
 
 # Unix socket directory for this vault. Under the data folder, not
@@ -441,51 +766,140 @@ foundation_keep_vault_up_postgres_listen_args() {
 }
 
 # Local socket into this cluster (OS superuser from initdb). Not DATABASE_URL.
+# Optional: --dbname NAME before psql args. Refuses when this data dir is
+# not the running cluster. Never a default libpq socket.
 foundation_keep_vault_up_psql_local() {
   local postgres="$1"
   shift
   local pid_file="${postgres}/postmaster.pid"
-  local socket_dir="" port=""
-  if [[ -f "${pid_file}" ]]; then
-    port="$(sed -n '4p' "${pid_file}" | tr -d '[:space:]')"
-    socket_dir="$(sed -n '5p' "${pid_file}" | tr -d '[:space:]')"
+  local data_dir socket_dir port="5432" db="postgres" socket pid_port pid_sock
+  if [[ "${1:-}" == "--dbname" ]]; then
+    db="$2"
+    shift 2
   fi
-  if [[ -n "${socket_dir}" && -n "${port}" ]]; then
-    psql -h "${socket_dir}" -p "${port}" -d postgres -v ON_ERROR_STOP=1 "$@"
-  else
-    psql -d postgres -p "${port:-5432}" -v ON_ERROR_STOP=1 "$@"
+  if ! foundation_keep_vault_up_pg_running "${postgres}"; then
+    return 1
+  fi
+  data_dir="$(dirname -- "${postgres}")"
+  socket_dir="$(foundation_keep_vault_up_socket_dir "${data_dir}")"
+  if [[ -f "${pid_file}" ]]; then
+    pid_port="$(sed -n '4p' "${pid_file}" | tr -d '[:space:]')"
+    pid_sock="$(sed -n '5p' "${pid_file}" | tr -d '[:space:]')"
+    if [[ -n "${pid_port}" ]]; then
+      port="${pid_port}"
+    fi
+    if [[ -n "${pid_sock}" ]]; then
+      socket_dir="${pid_sock}"
+    fi
+  fi
+  if [[ -z "${socket_dir}" || -z "${port}" ]]; then
+    return 1
+  fi
+  socket="${socket_dir}/.s.PGSQL.${port}"
+  if [[ ! -S "${socket}" ]]; then
+    return 1
+  fi
+  psql -q -h "${socket_dir}" -p "${port}" -d "${db}" -v ON_ERROR_STOP=1 "$@"
+}
+
+foundation_keep_vault_up_reload_postgres() {
+  local postgres="$1"
+  if foundation_keep_vault_up_pg_running "${postgres}"; then
+    pg_ctl -D "${postgres}" reload >/dev/null 2>&1 || true
   fi
 }
 
-# App URL already works, or create that role/database in this cluster.
+# Rewrite leftover trust and pin listen only when those files still need it.
+foundation_keep_vault_up_harden_cluster_files() {
+  local data_dir="$1"
+  local postgres="${data_dir%/}/postgres"
+  local hba="${postgres}/pg_hba.conf"
+  local conf="${postgres}/postgresql.conf"
+  local reload=0
+  if foundation_keep_vault_up_hba_has_trust "${hba}"; then
+    foundation_keep_vault_up_rewrite_hba "${hba}" || true
+    reload=1
+  fi
+  if ! foundation_keep_vault_up_listen_pinned "${conf}"; then
+    foundation_keep_vault_up_pin_listen "${conf}" || true
+    reload=1
+  fi
+  if ((reload)); then
+    foundation_keep_vault_up_reload_postgres "${postgres}"
+  fi
+}
+
+# Create the app role without SUPERUSER, own the database, install extensions
+# as the OS superuser, then drop SUPERUSER unless the URL user is the initdb role.
+# Always ALTER ROLE password through the peer socket. A second healthy run
+# skips file rewrites and NOSUPERUSER.
 foundation_keep_vault_up_ensure_app_database() {
   local repo_root="$1"
   local data_dir="$2"
   local postgres="${data_dir%/}/postgres"
-  local url role_sql exists_sql create_sql exists
+  local url_file role_sql exists_sql create_sql exists user os_user super fields database
 
-  url="$(foundation_keep_vault_up_database_url "${repo_root}")"
   if ! command -v psql >/dev/null 2>&1; then
     foundation_keep_vault_up_nag "psql is not on PATH. Cannot create the app database role."
     return 1
   fi
-  if psql "${url}" -tAc "SELECT 1" >/dev/null 2>&1; then
-    return 0
+
+  foundation_keep_vault_up_harden_cluster_files "${data_dir}"
+
+  url_file="$(mktemp "${data_dir%/}/.database-url.XXXXXX")"
+  chmod 600 -- "${url_file}"
+  foundation_keep_vault_up_write_url_file "${repo_root}" "${url_file}"
+  if [[ ! -s "${url_file}" ]]; then
+    rm -f -- "${url_file}"
+    foundation_keep_vault_up_nag "DATABASE_URL is unset. Copy .env.example to .env and fill it."
+    return 1
   fi
-  role_sql="$(foundation_keep_vault_up_app_role_sql "${url}" role)" || return 1
-  exists_sql="$(foundation_keep_vault_up_app_role_sql "${url}" exists)" || return 1
-  create_sql="$(foundation_keep_vault_up_app_role_sql "${url}" createdb)" || return 1
+
+  role_sql="$(foundation_keep_vault_up_app_role_sql role <"${url_file}")" || { rm -f -- "${url_file}"; return 1; }
+  exists_sql="$(foundation_keep_vault_up_app_role_sql exists <"${url_file}")" || { rm -f -- "${url_file}"; return 1; }
+  create_sql="$(foundation_keep_vault_up_app_role_sql createdb <"${url_file}")" || { rm -f -- "${url_file}"; return 1; }
+  user="$(foundation_keep_vault_up_app_role_sql user <"${url_file}")" || { rm -f -- "${url_file}"; return 1; }
+  fields="$(foundation_keep_vault_up_url_fields "${url_file}")" || { rm -f -- "${url_file}"; return 1; }
+  IFS=$'\t' read -r _ _ _ database <<<"${fields}"
+  os_user="$(id -un)"
+
   if ! foundation_keep_vault_up_psql_local "${postgres}" -c "${role_sql}"; then
+    rm -f -- "${url_file}"
     foundation_keep_vault_up_nag "start failed. Could not create the app database role."
     return 1
   fi
   exists="$(foundation_keep_vault_up_psql_local "${postgres}" -tAc "${exists_sql}" | tr -d '[:space:]')"
   if [[ "${exists}" != "1" ]]; then
     if ! foundation_keep_vault_up_psql_local "${postgres}" -c "${create_sql}"; then
+      rm -f -- "${url_file}"
       foundation_keep_vault_up_nag "start failed. Could not create the app database."
       return 1
     fi
   fi
+
+  ext_ok="$(foundation_keep_vault_up_psql_local "${postgres}" --dbname "${database}" -tAc \
+    "SELECT COUNT(*) FROM pg_extension WHERE extname IN ('vector','pgcrypto','unaccent','pg_trgm')" | tr -d '[:space:]')"
+  if [[ "${ext_ok}" != "4" ]]; then
+    if ! foundation_keep_vault_up_psql_local "${postgres}" --dbname "${database}" -c \
+      "CREATE EXTENSION IF NOT EXISTS vector; CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS unaccent; CREATE EXTENSION IF NOT EXISTS pg_trgm;" >/dev/null; then
+      rm -f -- "${url_file}"
+      foundation_keep_vault_up_nag "start failed. Could not create database extensions."
+      return 1
+    fi
+  fi
+
+  if [[ "${user}" != "${os_user}" ]]; then
+    super="$(foundation_keep_vault_up_psql_local "${postgres}" -tAc "SELECT rolsuper FROM pg_roles WHERE rolname = '${user//\'/\'\'}'" | tr -d '[:space:]')"
+    if [[ "${super}" == "t" ]]; then
+      if ! foundation_keep_vault_up_psql_local "${postgres}" -c "ALTER ROLE \"${user//\"/\"\"}\" NOSUPERUSER NOCREATEDB NOCREATEROLE;"; then
+        rm -f -- "${url_file}"
+        foundation_keep_vault_up_nag "start failed. Could not drop app-role superuser."
+        return 1
+      fi
+    fi
+  fi
+
+  rm -f -- "${url_file}"
   return 0
 }
 
@@ -518,13 +932,15 @@ foundation_keep_vault_up_app_pid_file() {
 }
 
 # Official app start: pnpm start (wait db, migrate, seed). Background.
-# Quiet so a healed run writes nothing.
+# Quiet so a healed run writes nothing. env -i plus the allowlist file
+# (mode 600) so secrets never sit on argv.
 foundation_keep_vault_up_start_app() {
   local repo_root="$1"
   local data_dir="$2"
-  local pid_file log_file
+  local pid_file log_file allowlist
   pid_file="$(foundation_keep_vault_up_app_pid_file "${data_dir}")"
   log_file="${data_dir%/}/app.log"
+  allowlist="${data_dir%/}/.app-env"
 
   if [[ -f "${pid_file}" ]]; then
     if kill -0 "$(cat "${pid_file}")" 2>/dev/null; then
@@ -536,10 +952,20 @@ foundation_keep_vault_up_start_app() {
     foundation_keep_vault_up_nag "pnpm is not on PATH. Node 22 + pnpm are required to start the app."
     return 1
   fi
+  if ! foundation_keep_vault_up_bind_ok "${repo_root}"; then
+    return 1
+  fi
+  foundation_keep_vault_up_write_allowlist "${repo_root}" "${allowlist}"
   (
     set -m
     cd "${repo_root}" || exit 1
-    nohup pnpm start >>"${log_file}" 2>&1 &
+    env -i bash -c '
+      set -a
+      # shellcheck disable=SC1090
+      . "$1"
+      set +a
+      exec nohup pnpm start >>"$2" 2>&1
+    ' _ "${allowlist}" "${log_file}" &
     echo $! >"${pid_file}"
   ) >/dev/null 2>&1
 }
@@ -561,14 +987,26 @@ foundation_keep_vault_up_wait_health() {
 }
 
 # Live user records only (nodes, not seed types). Localhost psql.
+# URL stays in a mode-600 file, not argv.
 foundation_keep_vault_up_live_user_record_count() {
   local repo_root="$1"
-  local url
-  url="$(foundation_keep_vault_up_database_url "${repo_root}")"
+  local url_file count
   if ! command -v psql >/dev/null 2>&1; then
     return 1
   fi
-  psql "${url}" -tAc "SELECT COUNT(*) FROM nodes WHERE deleted_at IS NULL" 2>/dev/null
+  url_file="$(mktemp)"
+  chmod 600 -- "${url_file}"
+  foundation_keep_vault_up_write_url_file "${repo_root}" "${url_file}"
+  if [[ ! -s "${url_file}" ]]; then
+    rm -f -- "${url_file}"
+    return 1
+  fi
+  count="$(foundation_keep_vault_up_psql_app "${url_file}" -tAc "SELECT COUNT(*) FROM nodes WHERE deleted_at IS NULL" 2>/dev/null || true)"
+  rm -f -- "${url_file}"
+  if [[ -z "${count}" ]]; then
+    return 1
+  fi
+  printf '%s\n' "${count}"
 }
 
 # After a start (or when /health is already green): existing data dir
@@ -634,6 +1072,10 @@ foundation_keep_vault_up_start() {
     return 1
   fi
 
+  if ! foundation_keep_vault_up_bind_ok "${repo_root}"; then
+    return 1
+  fi
+
   if ! foundation_keep_vault_up_start_app "${repo_root}" "${data_dir}"; then
     foundation_keep_vault_up_nag "start failed. The app did not start (pnpm start)."
     return 1
@@ -654,6 +1096,52 @@ foundation_keep_vault_up_stop_pid_tree() {
     foundation_keep_vault_up_stop_pid_tree "${child}" "${sig}"
   done < <(pgrep -P "${pid}" 2>/dev/null || true)
   kill "-${sig}" "${pid}" 2>/dev/null || true
+}
+
+# PID listening on this clone's health URL. Empty when the listener is
+# not this repo. Official `pnpm start` has no app.pid; the Node
+# listener cwd is apps/server, not the clone root.
+foundation_keep_vault_up_health_listener_pid() {
+  local repo_root="$1"
+  local url host port pid cwd
+  url="$(foundation_keep_vault_up_health_url)"
+  host="$(python3 -c 'from urllib.parse import urlparse; import sys; print(urlparse(sys.argv[1]).hostname or "127.0.0.1")' "${url}")"
+  port="$(python3 -c 'from urllib.parse import urlparse; import sys; u=urlparse(sys.argv[1]); print(u.port or (443 if u.scheme=="https" else 80))' "${url}")"
+  foundation_keep_vault_up_is_loopback_bind "${host}" || return 1
+  if ! command -v lsof >/dev/null 2>&1; then
+    return 1
+  fi
+  pid="$(lsof -nP -iTCP:"${port}" -sTCP:LISTEN -t 2>/dev/null | sort -u | head -n 1 || true)"
+  [[ "${pid}" =~ ^[0-9]+$ ]] || return 1
+  if [[ -L "/proc/${pid}/cwd" ]]; then
+    cwd="$(readlink "/proc/${pid}/cwd" 2>/dev/null || true)"
+  else
+    cwd="$(lsof -a -p "${pid}" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1 || true)"
+  fi
+  [[ "${cwd}" == "${repo_root}" || "${cwd}" == "${repo_root}/"* ]] || return 1
+  printf '%s\n' "${pid}"
+}
+
+# Official `pnpm start` never writes app.pid. Stop that listener only
+# when it is this clone. Leaves a foreign process.
+foundation_keep_vault_up_stop_unrecorded_app() {
+  local repo_root="$1"
+  local pid i
+  pid="$(foundation_keep_vault_up_health_listener_pid "${repo_root}" || true)"
+  [[ "${pid}" =~ ^[0-9]+$ ]] || return 1
+  foundation_keep_vault_up_stop_pid_tree "${pid}" TERM
+  i=0
+  while ((i < 5)) && kill -0 "${pid}" 2>/dev/null; do
+    sleep 1
+    i=$((i + 1))
+  done
+  if kill -0 "${pid}" 2>/dev/null; then
+    foundation_keep_vault_up_stop_pid_tree "${pid}" KILL
+  fi
+  if kill -0 "${pid}" 2>/dev/null; then
+    return 1
+  fi
+  return 0
 }
 
 # Stop this vault's app only (this FOUNDATION_DATA app.pid). Leaves Postgres up.
@@ -763,6 +1251,32 @@ foundation_keep_vault_up_main() {
   fi
   if ! foundation_keep_vault_up_refuse_empty_next_to_real "${repo_root}" "${data_dir}" "${backup_root}"; then
     return 1
+  fi
+
+  if ! foundation_keep_vault_up_ensure_env_secrets "${repo_root}"; then
+    return 1
+  fi
+
+  if foundation_keep_vault_up_pg_running "${data_dir%/}/postgres"; then
+    if ! foundation_keep_vault_up_ensure_app_database "${repo_root}" "${data_dir}"; then
+      return 1
+    fi
+  fi
+
+  if ((FOUNDATION_KEEP_VAULT_UP_ENV_CHANGED)); then
+    if [[ -f "$(foundation_keep_vault_up_app_pid_file "${data_dir}")" ]] \
+      && kill -0 "$(tr -d '[:space:]' <"$(foundation_keep_vault_up_app_pid_file "${data_dir}")")" 2>/dev/null; then
+      foundation_keep_vault_up_stop_app "${data_dir}" || true
+      if ! foundation_keep_vault_up_start_app "${repo_root}" "${data_dir}"; then
+        foundation_keep_vault_up_nag "start failed. The app did not start (pnpm start)."
+        return 1
+      fi
+    elif foundation_keep_vault_up_stop_unrecorded_app "${repo_root}"; then
+      if ! foundation_keep_vault_up_start_app "${repo_root}" "${data_dir}"; then
+        foundation_keep_vault_up_nag "start failed. The app did not start (pnpm start)."
+        return 1
+      fi
+    fi
   fi
 
   if foundation_keep_vault_up_health_ok; then

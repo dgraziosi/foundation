@@ -1,10 +1,16 @@
 import { createPool, ensureBlobLayout, migrate, seedSystemOntology, waitForDb } from "@foundation/db";
-import { createApp } from "./app.js";
-import { loadConfig } from "./config.js";
+import { createApp, doorSharedOf } from "./app.js";
+import { keepAllowedEnv, loadConfig } from "./config.js";
 import { Keyring } from "./keyring.js";
-import { ViewDoor } from "./view-door.js";
+import { bindRefusal } from "./security.js";
 
 const config = loadConfig();
+keepAllowedEnv();
+const offBox = bindRefusal(config);
+if (offBox) {
+  console.error(offBox);
+  process.exit(1);
+}
 await ensureBlobLayout(config.FOUNDATION_DATA);
 
 const pool = createPool(config.DATABASE_URL);
@@ -16,10 +22,10 @@ if (ran.length) {
 }
 
 const keyring = Keyring.fromBindings(config);
-const viewDoor = ViewDoor.fromBindings(config, keyring);
+const shared = doorSharedOf(config);
 
-const mcp = createApp(pool, config, "mcp", keyring, viewDoor);
-const view = createApp(pool, config, "view", keyring, viewDoor);
+const mcp = createApp(pool, config, "mcp", keyring, shared);
+const view = createApp(pool, config, "view", keyring, shared);
 
 const mcpServer = mcp.listen(config.PORT, config.HOST, () => {
   console.log(`Foundation MCP listening on http://${config.HOST}:${config.PORT}/mcp`);
@@ -29,6 +35,9 @@ const mcpServer = mcp.listen(config.PORT, config.HOST, () => {
 
 const viewServer = view.listen(config.VIEW_PORT, config.VIEW_HOST, () => {
   console.log(`View:   http://${config.VIEW_HOST}:${config.VIEW_PORT}/view`);
+  if (shared.viewDoor.mode === "closed") {
+    console.log("View opens once FOUNDATION_VIEW_KEY is in .env. Run scripts/keep-vault-up.sh to mint one.");
+  }
 });
 
 async function shutdown(signal: string): Promise<void> {

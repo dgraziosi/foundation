@@ -83,6 +83,39 @@ fi
 if ! grep -Fq -- 'CREATE ROLE' "${keep_script}"; then
   fail "keep-vault-up.sh must create the app database role after initdb"
 fi
+if ! grep -Fq -- '--auth-local=peer' "${keep_script}"; then
+  fail "keep-vault-up.sh must initdb with peer local auth"
+fi
+if ! grep -Fq -- '--auth-host=scram-sha-256' "${keep_script}"; then
+  fail "keep-vault-up.sh must initdb with scram host auth"
+fi
+if grep -Fq -- 'LOGIN SUPERUSER' "${keep_script}"; then
+  fail "keep-vault-up.sh must not create the app role as SUPERUSER"
+fi
+if grep -Fq -- 'psql "${url}"' "${keep_script}"; then
+  fail "keep-vault-up.sh must not pass DATABASE_URL on the psql argv"
+fi
+if ! grep -Fq -- 'env -i' "${keep_script}"; then
+  fail "keep-vault-up.sh must start the app with env -i"
+fi
+if ! awk '/^foundation_keep_vault_up_main\(\)/,/^}/' "${keep_script}" | grep -Fq -- 'FOUNDATION_KEEP_VAULT_UP_ENV_CHANGED'; then
+  fail "main must restart the app when minted secrets change .env"
+fi
+if awk '/^foundation_keep_vault_up_main\(\)/,/^}/' "${keep_script}" | grep -Fq -- 'FOUNDATION_KEEP_VAULT_UP_VIEW_KEY_MINTED'; then
+  fail "main must not restart only when a view key was minted"
+fi
+if ! awk '/^foundation_keep_vault_up_health_listener_pid\(\)/,/^}/' "${keep_script}" | grep -Fq -- '"${repo_root}/"*'; then
+  fail "health_listener_pid must accept official pnpm start cwd under the clone"
+fi
+if awk '/^foundation_keep_vault_up_main\(\)/,/^}/' "${keep_script}" | grep -Fq -- 'elif foundation_keep_vault_up_health_ok'; then
+  fail "main must stop an unrecorded app after a mint even when /health is down"
+fi
+if grep -Fq -- '${port:-5432}' "${keep_script}"; then
+  fail "psql_local must not fall back to a default cluster"
+fi
+if ! grep -Fq -- 'listen_addresses' "${keep_script}"; then
+  fail "keep-vault-up.sh must pin listen_addresses"
+fi
 if ! grep -Fq -- 'pg_ctl' "${keep_script}"; then
   fail "keep-vault-up.sh must start Postgres with pg_ctl"
 fi
@@ -191,7 +224,7 @@ chmod u+r -- "${dump_bad}"
   fi
 )
 
-if role_sql="$(foundation_keep_vault_up_app_role_sql 'postgres://foundation@localhost:5432/foundation' role 2>/dev/null)"; then
+if role_sql="$(printf '%s\n' 'postgres://foundation@localhost:5432/foundation' | foundation_keep_vault_up_app_role_sql role 2>/dev/null)"; then
   fail "role SQL must refuse a URL with no password (got: ${role_sql})"
 fi
 if grep -Fq -- "PASSWORD 'foundation'" <<<"${role_sql:-}"; then
@@ -208,20 +241,23 @@ if ! grep -Fq -- '.env.example' "${empty_clone}/nag"; then
 fi
 export DATABASE_URL="postgres://foundation:foundation@127.0.0.1:1/foundation"
 
-role_sql="$(foundation_keep_vault_up_app_role_sql 'postgres://foundation:foundation@localhost:5432/foundation' role)"
+role_sql="$(printf '%s\n' 'postgres://foundation:foundation@localhost:5432/foundation' | foundation_keep_vault_up_app_role_sql role)"
 if ! grep -Fq -- 'CREATE ROLE "foundation"' <<<"${role_sql}"; then
   fail "app role SQL must CREATE ROLE foundation (got: ${role_sql})"
+fi
+if grep -Fq -- 'SUPERUSER' <<<"${role_sql}"; then
+  fail "app role SQL must not grant SUPERUSER (got: ${role_sql})"
 fi
 if ! grep -Fq -- 'DO $do$' <<<"${role_sql}"; then
   fail "default role SQL should use \$do\$ (got: ${role_sql})"
 fi
 if ! grep -Fq -- 'CREATE DATABASE "foundation" OWNER "foundation"' \
-  <<<"$(foundation_keep_vault_up_app_role_sql 'postgres://foundation:foundation@localhost:5432/foundation' createdb)"; then
+  <<<"$(printf '%s\n' 'postgres://foundation:foundation@localhost:5432/foundation' | foundation_keep_vault_up_app_role_sql createdb)"; then
   fail "app role SQL must CREATE DATABASE foundation"
 fi
 
 # Password (or user) containing $do$ must pick $do1$, not a broken quote.
-odd_sql="$(foundation_keep_vault_up_app_role_sql 'postgres://foundation:pass$do$word@localhost:5432/foundation' role)"
+odd_sql="$(printf '%s\n' 'postgres://foundation:pass$do$word@localhost:5432/foundation' | foundation_keep_vault_up_app_role_sql role)"
 if grep -Fq -- 'DO $do$' <<<"${odd_sql}"; then
   fail "role SQL must not use \$do\$ when the password contains that tag (got: ${odd_sql})"
 fi
@@ -231,7 +267,7 @@ fi
 if ! grep -Fq -- "PASSWORD 'pass\$do\$word'" <<<"${odd_sql}"; then
   fail "role SQL must keep a \$do\$ password intact (got: ${odd_sql})"
 fi
-odd_user_sql="$(foundation_keep_vault_up_app_role_sql 'postgres://user$do$1:foundation@localhost:5432/foundation' role)"
+odd_user_sql="$(printf '%s\n' 'postgres://user$do$1:foundation@localhost:5432/foundation' | foundation_keep_vault_up_app_role_sql role)"
 if grep -Fq -- 'DO $do$' <<<"${odd_user_sql}"; then
   fail "role SQL must not use \$do\$ when the user contains that tag (got: ${odd_user_sql})"
 fi
@@ -1224,6 +1260,367 @@ if [[ -s "${start_log}" ]]; then
 fi
 if [[ ! -e "${crashed_drop}/.restore-failed" ]]; then
   fail "keep-up must not remove .restore-failed"
+fi
+
+# Mint replaces published and short keys. A 32+ custom key stays.
+mint_clone="${tmp_root}/mint-clone"
+mkdir -p "${mint_clone}"
+printf '%s\n' \
+  'FOUNDATION_API_KEY=change-me-to-a-long-random-string' \
+  'DATABASE_URL=postgres://foundation:change-me-to-a-password@127.0.0.1:5432/foundation' \
+  >"${mint_clone}/.env"
+chmod 600 -- "${mint_clone}/.env"
+mint_out="$(foundation_keep_vault_up_ensure_env_secrets "${mint_clone}" 2>&1)"
+if [[ -n "${mint_out}" ]]; then
+  fail "mint must write nothing to stdout or stderr (got: ${mint_out})"
+fi
+minted_api="$(foundation_keep_vault_up_env_value "${mint_clone}" FOUNDATION_API_KEY)"
+minted_view="$(foundation_keep_vault_up_env_value "${mint_clone}" FOUNDATION_VIEW_KEY)"
+minted_url="$(foundation_keep_vault_up_env_value "${mint_clone}" DATABASE_URL)"
+if [[ "${minted_api}" == "${FOUNDATION_PUBLISHED_API_KEY}" || "${#minted_api}" -lt 32 ]]; then
+  fail "mint must replace the published API key"
+fi
+if [[ "${minted_view}" == "${FOUNDATION_PUBLISHED_API_KEY}" || "${#minted_view}" -lt 32 ]]; then
+  fail "mint must set a view key"
+fi
+if [[ "${minted_view}" == "${minted_api}" ]]; then
+  fail "minted view key must differ from the API key"
+fi
+if printf '%s\n' "${minted_url}" | foundation_keep_vault_up_url_password | grep -Fxq -- "${FOUNDATION_PUBLISHED_DB_PASSWORD}"; then
+  fail "mint must replace the published database password"
+fi
+if [[ "$(stat -c '%a' "${mint_clone}/.env")" != "600" ]]; then
+  fail "minted .env must be mode 600"
+fi
+keep_api="${minted_api}"
+foundation_keep_vault_up_ensure_env_secrets "${mint_clone}"
+if [[ "$(foundation_keep_vault_up_env_value "${mint_clone}" FOUNDATION_API_KEY)" != "${keep_api}" ]]; then
+  fail "a second mint must keep a 32+ custom API key"
+fi
+
+# Minted secrets restart a live keep-up app (any door key or database password).
+restart_dir="${tmp_root}/mint-restart"
+mkdir -p "${restart_dir}"
+(
+  sleep 120
+) &
+restart_pid=$!
+echo "${restart_pid}" >"${restart_dir}/app.pid"
+restart_log="${tmp_root}/mint-restart.log"
+: >"${restart_log}"
+set +e
+out="$(
+  FOUNDATION_DATA="${restart_dir}"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_data_dir() { printf '%s\n' "${restart_dir}"; }
+  foundation_keep_vault_up_refuse_restore_lock() { return 0; }
+  foundation_keep_vault_up_refuse_restore_failed() { return 0; }
+  foundation_keep_vault_up_refuse_missing_folder() { return 0; }
+  foundation_keep_vault_up_refuse_miss() { return 0; }
+  foundation_keep_vault_up_refuse_empty_next_to_real() { return 0; }
+  foundation_keep_vault_up_ensure_env_secrets() {
+    FOUNDATION_KEEP_VAULT_UP_ENV_CHANGED=1
+    return 0
+  }
+  foundation_keep_vault_up_pg_running() { return 1; }
+  foundation_keep_vault_up_health_ok() { return 0; }
+  foundation_keep_vault_up_cluster_ok() { return 0; }
+  foundation_keep_vault_up_start_app() {
+    echo start_app >>"${restart_log}"
+    return 0
+  }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+set -e
+if ((rc != 0)); then
+  fail "mint + live app.pid should restart (got ${rc}: ${out})"
+fi
+if kill -0 "${restart_pid}" 2>/dev/null; then
+  kill "${restart_pid}" 2>/dev/null || true
+  wait "${restart_pid}" 2>/dev/null || true
+  fail "minted secrets must stop the live keep-up app"
+fi
+if ! grep -Fq -- 'start_app' "${restart_log}"; then
+  fail "minted secrets must start the app again (log: $(cat "${restart_log}"))"
+fi
+
+# Mint + official `pnpm start` (no app.pid): stop even when /health is down
+# (rotated database password). Do not fall through to a second start.
+unrec_dir="${tmp_root}/mint-unrecorded"
+mkdir -p "${unrec_dir}"
+: >"${restart_log}"
+set +e
+out="$(
+  FOUNDATION_DATA="${unrec_dir}"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_data_dir() { printf '%s\n' "${unrec_dir}"; }
+  foundation_keep_vault_up_refuse_restore_lock() { return 0; }
+  foundation_keep_vault_up_refuse_restore_failed() { return 0; }
+  foundation_keep_vault_up_refuse_missing_folder() { return 0; }
+  foundation_keep_vault_up_refuse_miss() { return 0; }
+  foundation_keep_vault_up_refuse_empty_next_to_real() { return 0; }
+  foundation_keep_vault_up_ensure_env_secrets() {
+    FOUNDATION_KEEP_VAULT_UP_ENV_CHANGED=1
+    return 0
+  }
+  foundation_keep_vault_up_pg_running() { return 1; }
+  foundation_keep_vault_up_health_ok() {
+    if grep -Fq -- 'start_app' "${restart_log}" 2>/dev/null; then
+      return 0
+    fi
+    return 1
+  }
+  foundation_keep_vault_up_cluster_ok() { return 0; }
+  foundation_keep_vault_up_stop_unrecorded_app() {
+    echo stop_unrecorded >>"${restart_log}"
+    return 0
+  }
+  foundation_keep_vault_up_start_app() {
+    echo start_app >>"${restart_log}"
+    return 0
+  }
+  foundation_keep_vault_up_start() {
+    echo start >>"${restart_log}"
+    return 1
+  }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+set -e
+if ((rc != 0)); then
+  fail "mint + unrecorded app with /health down should restart (got ${rc}: ${out})"
+fi
+if ! grep -Fq -- 'stop_unrecorded' "${restart_log}"; then
+  fail "minted secrets must stop official pnpm start even when /health is down"
+fi
+if ! grep -Fq -- 'start_app' "${restart_log}"; then
+  fail "minted secrets must start the app after stopping official pnpm start"
+fi
+if grep -Fxq -- 'start' "${restart_log}"; then
+  fail "mint + unrecorded stop must not fall through to a second start (log: $(cat "${restart_log}"))"
+fi
+
+# Official `pnpm start` listener cwd is apps/server, not the clone root.
+if command -v lsof >/dev/null 2>&1; then
+  listener_root="${tmp_root}/listener-clone"
+  mkdir -p "${listener_root}/apps/server"
+  listener_port="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')"
+  (
+    cd "${listener_root}/apps/server" || exit 1
+    exec python3 -c '
+import socket, time, sys
+port = int(sys.argv[1])
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(("127.0.0.1", port))
+s.listen(1)
+time.sleep(60)
+' "${listener_port}"
+  ) &
+  listener_pid=$!
+  i=0
+  while ((i < 20)) && ! lsof -nP -iTCP:"${listener_port}" -sTCP:LISTEN -t >/dev/null 2>&1; do
+    sleep 0.1
+    i=$((i + 1))
+  done
+  set +e
+  got="$(FOUNDATION_HEALTH_URL="http://127.0.0.1:${listener_port}/health" foundation_keep_vault_up_health_listener_pid "${listener_root}")"
+  listener_rc=$?
+  set -e
+  kill "${listener_pid}" 2>/dev/null || true
+  wait "${listener_pid}" 2>/dev/null || true
+  if ((listener_rc != 0)) || [[ "${got}" != "${listener_pid}" ]]; then
+    fail "health_listener_pid must accept official pnpm start cwd apps/server (got rc=${listener_rc} pid=${got} want=${listener_pid})"
+  fi
+
+  foreign_port="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')"
+  (
+    cd "${tmp_root}" || exit 1
+    exec python3 -c '
+import socket, time, sys
+port = int(sys.argv[1])
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(("127.0.0.1", port))
+s.listen(1)
+time.sleep(60)
+' "${foreign_port}"
+  ) &
+  foreign_pid=$!
+  i=0
+  while ((i < 20)) && ! lsof -nP -iTCP:"${foreign_port}" -sTCP:LISTEN -t >/dev/null 2>&1; do
+    sleep 0.1
+    i=$((i + 1))
+  done
+  set +e
+  FOUNDATION_HEALTH_URL="http://127.0.0.1:${foreign_port}/health" \
+    foundation_keep_vault_up_health_listener_pid "${listener_root}"
+  foreign_rc=$?
+  set -e
+  kill "${foreign_pid}" 2>/dev/null || true
+  wait "${foreign_pid}" 2>/dev/null || true
+  if ((foreign_rc == 0)); then
+    fail "health_listener_pid must leave a listener whose cwd is outside the clone"
+  fi
+fi
+
+# No mint: a live pid and green /health stay quiet.
+keep_dir="${tmp_root}/keep-running"
+mkdir -p "${keep_dir}"
+(
+  sleep 120
+) &
+keep_pid=$!
+echo "${keep_pid}" >"${keep_dir}/app.pid"
+: >"${restart_log}"
+set +e
+out="$(
+  FOUNDATION_DATA="${keep_dir}"
+  foundation_keep_vault_up_repo_root() { printf '%s\n' "${tmp_root}"; }
+  foundation_keep_vault_up_data_dir() { printf '%s\n' "${keep_dir}"; }
+  foundation_keep_vault_up_refuse_restore_lock() { return 0; }
+  foundation_keep_vault_up_refuse_restore_failed() { return 0; }
+  foundation_keep_vault_up_refuse_missing_folder() { return 0; }
+  foundation_keep_vault_up_refuse_miss() { return 0; }
+  foundation_keep_vault_up_refuse_empty_next_to_real() { return 0; }
+  foundation_keep_vault_up_ensure_env_secrets() {
+    FOUNDATION_KEEP_VAULT_UP_ENV_CHANGED=0
+    return 0
+  }
+  foundation_keep_vault_up_pg_running() { return 1; }
+  foundation_keep_vault_up_health_ok() { return 0; }
+  foundation_keep_vault_up_cluster_ok() { return 0; }
+  foundation_keep_vault_up_start_app() {
+    echo start_app >>"${restart_log}"
+    return 0
+  }
+  foundation_keep_vault_up_main 2>&1
+)"
+rc=$?
+set -e
+if ((rc != 0)); then
+  kill "${keep_pid}" 2>/dev/null || true
+  wait "${keep_pid}" 2>/dev/null || true
+  fail "green /health without a mint should stay quiet (got ${rc}: ${out})"
+fi
+if ! kill -0 "${keep_pid}" 2>/dev/null; then
+  fail "green /health without a mint must not stop the live app"
+fi
+if [[ -s "${restart_log}" ]]; then
+  kill "${keep_pid}" 2>/dev/null || true
+  wait "${keep_pid}" 2>/dev/null || true
+  fail "green /health without a mint must not start the app again"
+fi
+kill "${keep_pid}" 2>/dev/null || true
+wait "${keep_pid}" 2>/dev/null || true
+
+# Stopped cluster: psql_local must not hit a default Postgres.
+psql_probe="${tmp_root}/psql-probe"
+mkdir -p "${psql_probe}/bin" "${psql_probe}/data/postgres"
+cat >"${psql_probe}/bin/psql" <<'EOF'
+#!/bin/sh
+echo "HIT_DEFAULT_PSQL $*" >> "${PSQL_PROBE_LOG:?}"
+exit 0
+EOF
+cat >"${psql_probe}/bin/pg_ctl" <<'EOF'
+#!/bin/sh
+exit 1
+EOF
+chmod +x "${psql_probe}/bin/psql" "${psql_probe}/bin/pg_ctl"
+: >"${psql_probe}/log"
+set +e
+PSQL_PROBE_LOG="${psql_probe}/log" PATH="${psql_probe}/bin:${PATH}" \
+  foundation_keep_vault_up_psql_local "${psql_probe}/data/postgres" -c 'SELECT 1'
+psql_rc=$?
+set -e
+if ((psql_rc == 0)); then
+  fail "psql_local must refuse when this data dir is not the running cluster"
+fi
+if [[ -s "${psql_probe}/log" ]]; then
+  fail "psql_local must not fall back to a default psql (got: $(cat "${psql_probe}/log"))"
+fi
+
+# Live cluster: peer + scram, listen pin, non-superuser, extensions, second run is a no-op.
+PATH="/usr/lib/postgresql/16/bin:${PATH}"
+if command -v initdb >/dev/null 2>&1 && command -v pg_ctl >/dev/null 2>&1 && command -v psql >/dev/null 2>&1; then
+  live="${tmp_root}/live-cluster"
+  mkdir -p "${live}"
+  unset FOUNDATION_API_KEY FOUNDATION_VIEW_KEY DATABASE_URL
+  printf '%s\n' \
+    'FOUNDATION_DATA=./data' \
+    'DATABASE_URL=postgres://foundation:change-me-to-a-password@127.0.0.1:5432/foundation' \
+    >"${live}/.env"
+  chmod 600 -- "${live}/.env"
+  mkdir -p "${live}/data"
+  foundation_keep_vault_up_ensure_env_secrets "${live}"
+  if ! foundation_keep_vault_up_init_postgres "${live}/data"; then
+    fail "live initdb should succeed"
+  fi
+  if ! foundation_keep_vault_up_start_postgres "${live}/data"; then
+    fail "live pg_ctl start should succeed"
+  fi
+  if ! foundation_keep_vault_up_ensure_app_database "${live}" "${live}/data"; then
+    foundation_keep_vault_up_pg_running "${live}/data/postgres" && pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "live ensure_app_database should succeed"
+  fi
+  hba="${live}/data/postgres/pg_hba.conf"
+  conf="${live}/data/postgres/postgresql.conf"
+  if ! grep -E '^[[:space:]]*local[[:space:]].*[[:space:]]peer' "${hba}" >/dev/null; then
+    pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "live pg_hba must use peer for local"
+  fi
+  if ! grep -E '^[[:space:]]*host[[:space:]].*[[:space:]]scram-sha-256' "${hba}" >/dev/null; then
+    pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "live pg_hba must use scram-sha-256 for host"
+  fi
+  if grep -E '^[[:space:]]*(local|host)[[:space:]].*[[:space:]]trust' "${hba}" >/dev/null; then
+    pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "live pg_hba must not leave an uncommented trust line"
+  fi
+  if ! grep -E '^[[:space:]]*host[[:space:]]+replication[[:space:]].*[[:space:]]scram-sha-256' "${hba}" >/dev/null \
+    && ! grep -E '^[[:space:]]*local[[:space:]]+replication[[:space:]].*[[:space:]]peer' "${hba}" >/dev/null; then
+    pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "live pg_hba must rewrite replication auth"
+  fi
+  if ! grep -Eq "^listen_addresses = '127.0.0.1'" "${conf}"; then
+    pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "live postgresql.conf must pin listen_addresses"
+  fi
+  hba_sum="$(cksum "${hba}")"
+  conf_sum="$(cksum "${conf}")"
+  super="$(foundation_keep_vault_up_psql_local "${live}/data/postgres" -tAc "SELECT CASE WHEN rolsuper THEN 't' ELSE 'f' END FROM pg_roles WHERE rolname = 'foundation'" | tr -d '[:space:]')"
+  createdb="$(foundation_keep_vault_up_psql_local "${live}/data/postgres" -tAc "SELECT CASE WHEN rolcreatedb THEN 't' ELSE 'f' END FROM pg_roles WHERE rolname = 'foundation'" | tr -d '[:space:]')"
+  if [[ "${super}" != "f" ]]; then
+    pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "live app role must not be SUPERUSER (got ${super})"
+  fi
+  if [[ "${createdb}" != "f" ]]; then
+    pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "live app role must not have CREATEDB (got ${createdb})"
+  fi
+  exts="$(foundation_keep_vault_up_psql_local "${live}/data/postgres" --dbname foundation -tAc "SELECT extname FROM pg_extension WHERE extname IN ('vector','pgcrypto','unaccent','pg_trgm') ORDER BY 1" | tr -d ' ')"
+  if ! grep -Fq -- 'pgcrypto' <<<"${exts}" || ! grep -Fq -- 'unaccent' <<<"${exts}" || ! grep -Fq -- 'pg_trgm' <<<"${exts}"; then
+    pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "live cluster must install pgcrypto, unaccent, and pg_trgm"
+  fi
+  if ! grep -Fq -- 'vector' <<<"${exts}"; then
+    pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "live cluster must install vector as the OS superuser"
+  fi
+  if ! foundation_keep_vault_up_ensure_app_database "${live}" "${live}/data"; then
+    pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "second ensure_app_database should succeed"
+  fi
+  if [[ "$(cksum "${hba}")" != "${hba_sum}" ]]; then
+    pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "second run must not rewrite a healthy pg_hba.conf"
+  fi
+  if [[ "$(cksum "${conf}")" != "${conf_sum}" ]]; then
+    pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "second run must not rewrite a pinned postgresql.conf"
+  fi
+  pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
 fi
 
 echo "keep-vault-up.test: ok"

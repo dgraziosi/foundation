@@ -1,21 +1,52 @@
 import { pingDb, type Pool } from "@foundation/db";
 import express, { type Express } from "express";
-import { headerApiKey, requireApiKey } from "./auth.js";
+import { AccessLog, logAccess } from "./access-log.js";
+import { healthKeyMatches, requireApiKey } from "./auth.js";
 import { sendBlob } from "./blobs-http.js";
 import type { AppBindings } from "./config.js";
 import { Keyring } from "./keyring.js";
 import { handleMcpRequest } from "./mcp.js";
-import { isAgentPath } from "./security.js";
-import { ViewDoor } from "./view-door.js";
+import { guardHostAndOrigin, hostPolicyOf, isAgentPath } from "./security.js";
+import { FailureLedger, ViewDoor, windowLockOf } from "./view-door.js";
+import { ViewSessions } from "./view-session.js";
 import { registerViewRoutes } from "./view.js";
 
-/** 20MB blob cap as base64 plus JSON-RPC envelope. */
-const JSON_BODY_LIMIT = "32mb";
+/** 20MB blob cap as base64 plus JSON-RPC envelope. Parsed only after the key check. */
+const MCP_BODY_LIMIT = "32mb";
 
 export type AppDoor = "mcp" | "view";
 
 function requestPath(req: express.Request): string {
   return (req.originalUrl.split("?")[0] ?? "").replace(/\/+$/, "") || "/";
+}
+
+/** Body-parse and route errors as JSON. Express's default page would print a stack. */
+function sendJsonError(
+  error: unknown,
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction,
+): void {
+  if (res.headersSent) {
+    next(error);
+    return;
+  }
+  const raw = error && typeof error === "object" && "status" in error ? Number(error.status) : 500;
+  const status = raw >= 400 && raw < 600 ? raw : 500;
+  if (status >= 500) {
+    console.error("Request failed", error);
+  }
+  const message =
+    status === 413 ? "Request body too large" : status >= 500 ? "Internal server error" : "Bad request";
+  if (isAgentPath(requestPath(req))) {
+    res.status(status).json({
+      jsonrpc: "2.0",
+      error: { code: status === 400 ? -32700 : -32000, message },
+      id: null,
+    });
+    return;
+  }
+  res.status(status).json({ error: message });
 }
 
 /** View publish must not serve write-capable agent routes, Host header or not. */
@@ -27,7 +58,24 @@ function refuseAgentPaths(req: express.Request, res: express.Response, next: exp
   next();
 }
 
-function registerHealth(app: Express, pool: Pool, config: AppBindings, keyring: Keyring): void {
+/** State both doors share in one process, so a ledger or session seen on one door holds on the other. */
+export type DoorShared = {
+  readonly viewDoor: ViewDoor;
+  readonly sessions: ViewSessions;
+  readonly headerLedger: FailureLedger;
+  readonly accessLog: AccessLog;
+};
+
+export function doorSharedOf(config: AppBindings): DoorShared {
+  return {
+    viewDoor: ViewDoor.fromBindings(config),
+    sessions: ViewSessions.open(config.FOUNDATION_DATA, windowLockOf(config)),
+    headerLedger: new FailureLedger(),
+    accessLog: AccessLog.open(config.FOUNDATION_DATA),
+  };
+}
+
+function registerHealth(app: Express, pool: Pool, config: AppBindings, keyring: Keyring, shared: DoorShared): void {
   app.get("/health", async (req, res) => {
     const db = await pingDb(pool);
     const body: Record<string, unknown> = {
@@ -35,7 +83,7 @@ function registerHealth(app: Express, pool: Pool, config: AppBindings, keyring: 
       service: "foundation",
       db: db ? "up" : "down",
     };
-    if (keyring.resolve(headerApiKey(req))) {
+    if (healthKeyMatches(req, keyring, shared.headerLedger)) {
       if (config.HOST !== undefined) {
         body.host = config.HOST;
       }
@@ -54,8 +102,15 @@ function registerHealth(app: Express, pool: Pool, config: AppBindings, keyring: 
   });
 }
 
-function registerMcpAndBlobs(app: Express, pool: Pool, config: AppBindings, keyring: Keyring): void {
-  app.get("/blobs/:id", requireApiKey(keyring), async (req, res) => {
+function registerMcpAndBlobs(
+  app: Express,
+  pool: Pool,
+  config: AppBindings,
+  keyring: Keyring,
+  shared: DoorShared,
+): void {
+  const gate = requireApiKey(keyring, shared.headerLedger);
+  app.get("/blobs/:id", gate, async (req, res) => {
     try {
       await sendBlob(pool, config, req, res);
     } catch (error) {
@@ -66,9 +121,9 @@ function registerMcpAndBlobs(app: Express, pool: Pool, config: AppBindings, keyr
     }
   });
 
-  app.use("/mcp", requireApiKey(keyring));
+  app.use("/mcp", gate);
 
-  app.post("/mcp", async (req, res) => {
+  app.post("/mcp", express.json({ limit: MCP_BODY_LIMIT }), async (req, res) => {
     try {
       const agent = req.agent;
       if (!agent) {
@@ -123,23 +178,22 @@ export function createApp(
   config: AppBindings,
   door: AppDoor = "mcp",
   keyring?: Keyring,
-  viewDoor?: ViewDoor,
+  shared?: DoorShared,
 ): Express {
   const ring = keyring ?? Keyring.fromBindings(config);
-  const window = viewDoor ?? ViewDoor.fromBindings(config, ring);
+  const state = shared ?? doorSharedOf(config);
   const app = express();
-  app.use(express.json({ limit: JSON_BODY_LIMIT }));
-  app.use(express.urlencoded({ extended: false }));
+  app.use(logAccess(state.accessLog));
+  app.use(guardHostAndOrigin(hostPolicyOf(config)));
 
   if (door === "view") {
     app.use(refuseAgentPaths);
-    registerHealth(app, pool, config, ring);
-    registerViewRoutes(app, pool, config, window);
-    return app;
   }
-
-  registerHealth(app, pool, config, ring);
-  registerViewRoutes(app, pool, config, window);
-  registerMcpAndBlobs(app, pool, config, ring);
+  registerHealth(app, pool, config, ring, state);
+  registerViewRoutes(app, pool, config, state);
+  if (door === "mcp") {
+    registerMcpAndBlobs(app, pool, config, ring, state);
+  }
+  app.use(sendJsonError);
   return app;
 }

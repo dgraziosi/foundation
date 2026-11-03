@@ -1,6 +1,7 @@
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { digestsMatch, secretDigest, secretDigestFromHex, type SecretDigest } from "./secret-compare.js";
 
 export const API_KEYS_FILE = "api-keys.json";
 export const BOOTSTRAP_KEY_NAME = "root";
@@ -35,24 +36,6 @@ export function mintApiKeySecret(): string {
 
 export function namedKeysPath(dataDir: string): string {
   return join(dataDir, API_KEYS_FILE);
-}
-
-function safeEqualHex(left: string, right: string): boolean {
-  const a = Buffer.from(left, "hex");
-  const b = Buffer.from(right, "hex");
-  if (a.length === 0 || a.length !== b.length) {
-    return false;
-  }
-  return timingSafeEqual(a, b);
-}
-
-function safeEqualUtf8(left: string, right: string): boolean {
-  const a = Buffer.from(left, "utf8");
-  const b = Buffer.from(right, "utf8");
-  if (a.length === 0 || a.length !== b.length) {
-    return false;
-  }
-  return timingSafeEqual(a, b);
 }
 
 function scopesOf(scopes: unknown): { ok: true; destructive: boolean } | { ok: false; error: string } {
@@ -164,19 +147,40 @@ export type MemoryKey = {
   destructive?: boolean;
 };
 
+type DigestKey = { digest: SecretDigest; principal: AgentPrincipal };
+
+function memoryKeyOf(key: MemoryKey): DigestKey {
+  return {
+    digest: secretDigest(key.secret),
+    principal: {
+      name: key.name,
+      actor: "agent",
+      actor_label: key.actor_label?.trim() || key.name,
+      destructive: key.destructive === true,
+    },
+  };
+}
+
 export class Keyring {
-  constructor(
-    private readonly bootstrapSecret: string,
+  private readonly bootstrapDigest: SecretDigest;
+  private readonly memory: DigestKey[];
+
+  private constructor(
+    bootstrapSecret: string,
     private readonly bootstrap: AgentPrincipal,
     private readonly dataDir: string | undefined,
-    private readonly memory: MemoryKey[] = [],
-  ) {}
+    memory: MemoryKey[],
+  ) {
+    this.bootstrapDigest = secretDigest(bootstrapSecret);
+    this.memory = memory.map(memoryKeyOf);
+  }
 
   static fromBindings(config: KeyringBindings): Keyring {
     return new Keyring(
       config.FOUNDATION_API_KEY,
       bootstrapPrincipal(config.FOUNDATION_API_KEY_LABEL),
       config.FOUNDATION_DATA,
+      [],
     );
   }
 
@@ -188,24 +192,20 @@ export class Keyring {
     if (!provided) {
       return undefined;
     }
-    if (safeEqualUtf8(provided, this.bootstrapSecret)) {
+    const digest = secretDigest(provided);
+    if (digestsMatch(digest, this.bootstrapDigest)) {
       return this.bootstrap;
     }
-    const digest = hashApiKey(provided);
     let match: AgentPrincipal | undefined;
     for (const key of this.memory) {
-      if (safeEqualUtf8(provided, key.secret)) {
-        match = {
-          name: key.name,
-          actor: "agent",
-          actor_label: key.actor_label?.trim() || key.name,
-          destructive: key.destructive === true,
-        };
+      if (digestsMatch(digest, key.digest)) {
+        match = key.principal;
       }
     }
     if (this.dataDir) {
       for (const key of loadNamedKeys(this.dataDir)) {
-        if (safeEqualHex(digest, key.secret_sha256)) {
+        const stored = secretDigestFromHex(key.secret_sha256);
+        if (stored && digestsMatch(digest, stored)) {
           match = {
             name: key.name,
             actor: "agent",
