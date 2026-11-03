@@ -77,12 +77,17 @@ Each live lane runs on its own cloud VM at the PR head. Drive Viewer through `.c
 - [ ] Edit `apps/server/src/config.test.ts`.
 - [ ] Edit `apps/server/src/index.ts`.
 - [ ] Edit `apps/server/src/app.ts`.
+- [ ] Edit `apps/server/src/security.ts`.
+- [ ] Edit `apps/server/src/security.test.ts`.
 - [ ] Edit `apps/server/src/auth.ts`.
 - [ ] Edit `apps/server/src/auth.test.ts`.
 - [ ] Edit `apps/server/src/view.ts`.
 - [ ] Edit `apps/server/src/view.test.ts`.
 - [ ] Edit `apps/server/src/view-door.ts`.
 - [ ] Edit `apps/server/src/view-door.test.ts`.
+- [ ] Edit `apps/server/src/view-write.test.ts`.
+- [ ] Edit `apps/server/src/view-journal.test.ts`.
+- [ ] Edit `apps/server/src/view-digest.test.ts`.
 - [ ] Edit `apps/server/src/keyring.ts`.
 - [ ] Edit `apps/server/src/keyring.test.ts`.
 - [ ] Edit `apps/server/src/mcp.ts`.
@@ -97,55 +102,53 @@ Each live lane runs on its own cloud VM at the PR head. Drive Viewer through `.c
 - [ ] Edit `docs/VAULT_HEALTH.md`.
 - [ ] Edit `.cursor/skills/verify-foundation/SKILL.md`.
 - [ ] Edit `.cursor/skills/verify-foundation/features/unlock.md`.
-- [ ] Edit `.agents/skills/foundation-mcp/SKILL.md`.
 - [ ] Create `apps/server/src/secret-compare.ts`.
-- [ ] Create `apps/server/src/host-guard.ts`.
 - [ ] Create `apps/server/src/access-log.ts`.
 - [ ] Create `apps/server/src/view-session.ts`.
-- [ ] Create `apps/server/src/host-guard.test.ts`.
 - [ ] Create `apps/server/src/access-log.test.ts`.
 - [ ] Create `apps/server/src/view-session.test.ts`.
 - [ ] Create `apps/server/src/secret-compare.test.ts`.
 
 **Build.**
 
-- [ ] Mint keys and a database password in keep-up, which init and cron already run. Replace a missing or published `FOUNDATION_API_KEY`. Mint `FOUNDATION_VIEW_KEY` when it is missing or published. Write `.env` mode 600. Do not chmod `FOUNDATION_DATA` 700 in this PR. `uploads/` is still a 1777 drop box until `harden-2`. Never print a key.
-- [ ] Refuse published placeholder strings in `loadConfig`. Refuse an API key or view key shorter than 32 characters. Do not put a length floor on the database password. CI uses `ci-verify`. The published example password must still not start the server.
+- [ ] Mint keys and a database password in keep-up, which init and cron already run. Replace a missing or published `FOUNDATION_API_KEY`. Mint `FOUNDATION_VIEW_KEY` when it is missing or published. Write `.env` mode 600. Do not chmod `FOUNDATION_DATA` 700 in this PR. In README, say the vault owner copies files into `uploads/`. `harden-2` changes the directory mode. Never print a key.
+- [ ] Refuse published placeholder strings in `loadConfig`. Refuse an API key or view key shorter than 32 characters when that key is set. Do not require `FOUNDATION_VIEW_KEY` in `loadConfig`. A missing view key must not take MCP down. Do not put a length floor on the database password. CI uses `ci-verify`. The published example password must still not start the server.
 - [ ] Run `initdb` with `--auth-local=peer --auth-host=scram-sha-256`. Pin `listen_addresses` to localhost in `postgresql.conf`. Keep the existing `pg_ctl` `-h 127.0.0.1` flag.
 - [ ] Create the app role as `LOGIN` without `SUPERUSER`. Grant it ownership of the app database. Do not grant `CREATEDB` or `CREATEROLE`. Do not `ALTER` the initdb OS bootstrap role to `NOSUPERUSER` when that role is the URL user.
 - [ ] Create `vector` as the OS superuser over the vault socket before migrate. On Postgres 16 here, `vector.control` has no `trusted` line and a non-superuser owner cannot create it. `pgcrypto`, `unaccent`, and `pg_trgm` are trusted. Still create all four as the OS superuser so the first migrate is a no-op `IF NOT EXISTS`. Leave the statements in the migration files.
 - [ ] Add an idempotent keep-up upgrade that rewrites every `trust` line in `pg_hba.conf`, including replication. Trust today accepts any password, so `foundation_keep_vault_up_ensure_app_database` returns early and never `ALTER ROLE`. Always set the role password through the peer socket, then write `DATABASE_URL` into `.env`, then reload. Drop app-role superuser only after extensions exist. Leave graph data in place. A second run that already sees peer, scram, and a non-superuser app role does nothing.
 - [ ] Start the app with `env -i` and this allowlist when set. `PATH`, `HOME`, `TMPDIR`, `LANG`, `LC_ALL`, `USER`, and the `EnvSchema` names. After `loadConfig`, drop every other key on `process.env` in `index.ts` so a direct `pnpm start` does not keep shell secrets.
 - [ ] Pass `DATABASE_URL` to `psql`, `python3`, and `pg_ctl` helpers on stdin or a mode-600 file, not argv. Restore drops the database and creates it again as the OS socket superuser. The app role does not get `CREATEDB`.
-- [ ] Compare secrets as SHA-256 digests of equal width in `secret-compare.ts`. Use that helper from `ViewDoor` and `Keyring`.
-- [ ] In `ViewDoor.tryUnlock`, return throttle before any compare when that source is locked. Count a failed header on `/mcp` and `/view/api` against the same kind of budget and return 429 before compare when locked.
-- [ ] Require `FOUNDATION_VIEW_KEY`. Delete the fallback lock that treats a bot key as the vault key. Keep Viewer writes on `VIEWER_WRITE` with destructive true, because the person who typed the vault key owns the vault.
-- [ ] Store a random session id in the `foundation_key` cookie. Persist hashed sessions under `FOUNDATION_DATA` mode 600. Set `Secure` when the request is TLS. Refuse `VIEW_HOST=0.0.0.0` unless the request is TLS or `VIEW_PUBLIC_ORIGIN` names the tunnel route.
-- [ ] Reject a `Host` that is not localhost or `127.0.0.1` unless `FOUNDATION_ALLOWED_HOSTS` lists it. Check `Origin` on browser-facing writes to `/view`.
-- [ ] Parse `/mcp` JSON after `requireApiKey` with a small limit. Drop the global 32 MB parse that runs before auth.
-- [ ] Write a rotated access log under `FOUNDATION_DATA/logs` mode 600, directory 700. Each line is time, source IP, key label, route, and status. Log auth and unlock failures. Never log a secret.
-- [ ] Upgrade `@modelcontextprotocol/sdk`, `express` (and its `body-parser`, `proxy-addr`, `qs`), `zod` if a patched release reaches runtime, and the other high or critical prod audit hits that reach the server or Viewer. Set `enableDnsRebindingProtection` on `StreamableHTTPServerTransport`.
-- [ ] Rewrite first-run copy in positive words. The clone starts locked to the person who ran init. Off-box is an explicit TLS or named-origin path, not a hint to bind every interface on plain HTTP.
+- [ ] Compare live secrets as SHA-256 digests of equal width in `secret-compare.ts`. Cache the digest when the key is loaded. File keys in `api-keys.json` already compare hex digests. Use one helper from `ViewDoor` and `Keyring`. Assert match and mismatch. Do not write a timing test.
+- [ ] In `ViewDoor.tryUnlock`, return throttle before any compare when that source is locked. Count a presented secret that fails on `/view/api` and on `/mcp`. Leave a missing credential out of the budget. Keep a separate ledger from unlock, so a bad bot key on loopback does not lock the window. Return 429 with `Retry-After`. A `/mcp` 429 keeps the current JSON-RPC unauthorized object.
+- [ ] Delete the fallback lock that treats a bot key as the vault key. When `FOUNDATION_VIEW_KEY` is unset, `/view` refuses every key and MCP still serves. Keep Viewer writes on `VIEWER_WRITE` with destructive true. Do not edit `view-write.ts`.
+- [ ] Store a random session id in the `foundation_key` cookie. Persist hashed sessions under `FOUNDATION_DATA` mode 600 so `Max-Age=2592000` outlives a restart. Keep that exact Max-Age. `verify-foundation.test.sh` greps it. Set `Secure` only when the request is HTTPS. Leave localhost HTTP without `Secure`. Keep accepting the view key on `Authorization` for `/view`.
+- [ ] Refuse a non-loopback bind unless `VIEW_PUBLIC_ORIGIN` names the Host the browser will send, and the request is TLS or the operator records a cleartext opt-in. `0.0.0.0` is the listen address, not a Host. Do not treat that string as an allowed Host.
+- [ ] Reject a `Host` that is not `localhost`, `127.0.0.1`, or `[::1]`, each with that door's port, unless `FOUNDATION_ALLOWED_HOSTS` lists it. Check `Origin` on browser-facing writes to `/view`. One middleware in `createApp` before routes. Do not set `trust proxy`. Leave the SDK DNS-rebinding flag at its default.
+- [ ] Drop the global 32 MB parse that runs before auth. Check the MCP key first, then parse `/mcp` at 32 MB so a 20 MB `bytes_base64` blob still fits. Parse the view door, including `POST /view/unlock`, at a small limit.
+- [ ] Write a rotated access log under `FOUNDATION_DATA/logs` mode 600, directory 700. Each line is time, `req.socket.remoteAddress`, key label, route, and status. MCP uses `req.agent.name`. The view door sets a non-secret label beside unlock and `requireViewAuth`. Never log the header, the cookie, or `api_key`.
+- [ ] Move the lockfile to `@modelcontextprotocol/sdk` `1.32.2`, `body-parser` `2.4.0`, `proxy-addr` `2.0.8`, `fast-uri` `3.1.8`, and `dompurify` `3.4.17`. Leave Zod 4 out of this program. Re-read `StreamableHTTPServerTransport` after the SDK bump.
+- [ ] Rewrite first-run copy in positive words. The clone starts locked to the person who ran init. Off-box names the tunnel Host. `docs/HARNESS.md` mentions `429` and `Retry-After`. Leave `.agents/skills/foundation-mcp/SKILL.md` unless `Host: 127.0.0.1:8787` is no longer allowed.
 
 **You see.**
 
 - [ ] A first-day `scripts/foundation-init.sh` produces a mode-600 `.env` with two minted keys and a random `DATABASE_URL` password, then a healthy `/health` of only `ok`, `service`, and `db`.
 - [ ] `psql` as a stranger on the same machine using trust fails. The app role is not a superuser. `listen_addresses` is localhost. `vector` exists. Restore recreate still works without `CREATEDB` on the app role.
 - [ ] `loadConfig` throws on `change-me-to-a-long-random-string` and on `change-me-to-a-password`.
-- [ ] Unlock with the house key returns 401. Unlock with the view key sets a cookie whose value is not the view key.
-- [ ] Five failed unlocks, then a sixth while locked, return 429 without a successful compare. A later correct key during cooldown also returns 429.
+- [ ] Unlock with the house key returns 401. Unlock with the view key sets a cookie whose value is not the view key. Five empty unlock posts do not 429.
+- [ ] Five failed unlocks, then a sixth while locked, return 429 without a successful compare. A later correct key during cooldown also returns 429. A bad MCP key does not lock Unlock.
 - [ ] `Host: evil.example` against `/mcp` or `/view` returns 400 or 403.
 - [ ] `GET /health` without a key still returns only `ok`, `service`, and `db`.
 - [ ] The access log names a key label and never contains the secret.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] `apps/server/src/config.test.ts` refuses published and short secrets, and requires `FOUNDATION_VIEW_KEY`. Run `pnpm --filter @foundation/server test`.
-- [ ] `apps/server/src/view-door.test.ts` throttles before compare and drops the fallback lock.
-- [ ] `apps/server/src/secret-compare.test.ts` shows equal-width digest compare.
-- [ ] `apps/server/src/auth.test.ts` and a new header-budget case return 429 before a compare.
-- [ ] `apps/server/src/view-session.test.ts` stores a session id, not the raw key, and sets `Secure` on TLS.
-- [ ] `apps/server/src/host-guard.test.ts` rejects a foreign Host and a foreign Origin on a view write.
+- [ ] `apps/server/src/config.test.ts` refuses published and short secrets and still boots without `FOUNDATION_VIEW_KEY`. Run `pnpm --filter @foundation/server test`.
+- [ ] `apps/server/src/view-door.test.ts` throttles before compare, drops the fallback lock, and does not count a missing secret.
+- [ ] `apps/server/src/secret-compare.test.ts` shows equal-width digest compare on match and mismatch.
+- [ ] `apps/server/src/auth.test.ts` returns 429 before a compare on a presented bad header and does not count a missing header.
+- [ ] `apps/server/src/view-session.test.ts` stores a session id, not the raw key, keeps `Max-Age=2592000`, and sets `Secure` only on HTTPS.
+- [ ] `apps/server/src/security.test.ts` rejects a foreign Host, accepts `127.0.0.1` with the door port, and rejects a foreign Origin on a view write.
 - [ ] `apps/server/src/access-log.test.ts` writes the five fields and redacts secrets.
 - [ ] `apps/server/src/health.test.ts` still asserts the public shape.
 - [ ] `scripts/foundation-init.test.sh` asserts mint, mode 600, and no key on stdout. It no longer expects a verbatim copy of `.env.example`.
@@ -160,9 +163,9 @@ Each live lane runs on its own cloud VM at the PR head. Drive Viewer through `.c
 - [ ] Lane 3. Inspect the throwaway cluster. Save `harden-1-pg-hba.png`. Pass when `pg_hba.conf` has no `trust` line, including replication, `listen_addresses` is localhost, the app role is not a superuser, and `\dx vector` is present.
 - [ ] Lane 4. POST `/view/unlock` with a foreign Host. Save `harden-1-host-reject.png`. Pass when the status is 400 or 403 and no session cookie is set.
 - [ ] Lane 5. Five wrong unlocks, then a sixth, then the correct view key while locked. Save `harden-1-unlock-429.png`. Pass when the locked tries are 429 with `Retry-After` and Unlock still shows **That key did not unlock.**
-- [ ] Lane 6. Five wrong `Authorization` headers on `/mcp`, then a sixth. Save `harden-1-mcp-429.png`. Pass when the locked try is 429 and the JSON-RPC body is unauthorized, not a tool result.
-- [ ] Lane 7. Unlock on localhost, then read `Set-Cookie`. Save `harden-1-session-cookie.png`. Pass when the cookie value is not the view key, `HttpOnly` and `SameSite=Strict` are set, and `/mcp` with that cookie is 401.
-- [ ] Lane 8. Off-box bind without TLS and without `VIEW_PUBLIC_ORIGIN`. Save `harden-1-offbox-refuse.png`. Pass when keep-up or boot refuses to publish `0.0.0.0` on plain HTTP.
+- [ ] Lane 6. Five wrong `Authorization` headers on `/mcp`, then a sixth, then an unlock with the view key. Save `harden-1-mcp-429.png`. Pass when the locked MCP try is 429 with the unauthorized JSON-RPC object and `Retry-After`, and Unlock still opens.
+- [ ] Lane 7. Unlock on localhost, then read `Set-Cookie`. Save `harden-1-session-cookie.png`. Pass when the cookie value is not the view key, `HttpOnly`, `SameSite=Strict`, and `Max-Age=2592000` are set, `Secure` is absent, and `/mcp` with that cookie is 401.
+- [ ] Lane 8. Off-box bind without TLS and without `VIEW_PUBLIC_ORIGIN`. Save `harden-1-offbox-refuse.png`. Pass when keep-up or boot refuses a non-loopback bind, and a request whose Host is `0.0.0.0` is not treated as allowed.
 - [ ] Lane 9. Unauthenticated `/health`, then a wrong key, then the API key. Save `harden-1-health-shape.png`. Pass when the first two bodies have only `ok`, `service`, and `db`, and the keyed body may add bind fields.
 - [ ] Lane 10. Existing-install upgrade. Start from a trunk trust cluster with people in the graph, run head keep-up, then open Viewer with the minted view key. Save `harden-1-upgrade.png`. Pass when node count is unchanged, `DATABASE_URL` has a non-published password, and Home shows a known title from the old graph.
 
@@ -193,36 +196,37 @@ Each live lane runs on its own cloud VM at the PR head. Drive Viewer through `.c
 **Files.**
 
 - [ ] Edit `packages/db/src/blobs.ts`.
-- [ ] Edit `packages/db` blob tests that assert `UPLOAD_DIR_MODE` or the realpath ingest path.
+- [ ] Edit `packages/db/src/blobs.test.ts`.
 - [ ] Edit `scripts/lib/foundation_portability.py`.
 - [ ] Edit `scripts/foundation-portability.test.sh`.
-- [ ] Edit `apps/server/src/graph.ts` only at the `manage_type` json_schema persist branches.
+- [ ] Edit `apps/server/src/graph.ts` only at `manageType` and `validateUpsertData`.
+- [ ] Edit `apps/server/src/search-filters.test.ts`.
 - [ ] Edit the `manage_type` tests that today allow a raw `json_schema` with an empty field list.
-- [ ] Edit `packages/schema/src/json-schema.ts` only if compile stays on field-built objects.
-- [ ] Edit `packages/schema/src/json-schema.test.ts`.
+- [ ] Edit `docs/MCP_TOOLS.md` only for the hand-written schema sentence.
 - [ ] Edit `.github/workflows/verify.yml`.
-- [ ] Do not edit any `harden-1` path.
+- [ ] Edit `.cursor/skills/verify-foundation/scripts/verify-foundation.test.sh`.
+- [ ] Do not edit any `harden-1` path. Leave `packages/schema/src/json-schema.ts`, `packages/db/src/seed.ts`, and `apps/server/src/undo.ts` alone.
 
 **Build.**
 
-- [ ] In `write_export`, accept a type slug only when it matches the type-name rule already used for fields (`^[a-z][a-z0-9_]*$` or the live type slug regex if one is stricter). Resolve each write path and refuse any path outside `--out`.
-- [ ] Change `UPLOAD_DIR_MODE` to `0o700`. Open upload and blob files with `O_NOFOLLOW` (and `O_NOFOLLOW` on the directory fd) so a realpath-then-read swap cannot follow a symlink.
-- [ ] Persist `json_schema` only from `compileJsonSchemaFromFields`. Refuse a raw `json_schema` on create and update, including the empty-fields branch in `manageType`.
-- [ ] Pin third-party GitHub Actions in `verify.yml` to full SHAs. Set top-level `permissions: contents: read`.
+- [ ] In `write_export`, accept a type slug only when it matches `SlugSchema` (`^[a-z][a-z0-9_]*$`). Resolve each write path and refuse it when the resolved path is outside the resolved `--out`. `--from-snapshot` is the live hole. A `manageType` slug cannot contain `..`.
+- [ ] Change `UPLOAD_DIR_MODE` to `0o700`. Reject a `source_path` that is not one segment after the `uploads/` prefix. Open that file with `fs.promises.open` and `O_RDONLY | O_NOFOLLOW`. `readFile` on this Node rejects a numeric flag. Open `uploads/` with `O_DIRECTORY | O_NOFOLLOW` and chmod the handle. `O_NOFOLLOW` on the final component still follows a symlinked parent. This Node has no `openat`.
+- [ ] Refuse a non-null raw `json_schema` on create and update inside `manageType`, including an empty field list. In `validateUpsertData`, compile from `type.fields` and pass that object to Ajv so an old column never reaches compile. Leave `json-schema.ts`, `seed.ts`, and `undo.ts` alone.
+- [ ] Pin `actions/checkout`, `pnpm/action-setup`, and `actions/setup-node` in `verify.yml` to full SHAs. Set top-level `permissions: contents: read`. Leave the `pgvector/pgvector:pg16` image tag. Replacing it with a digest breaks `verify-foundation.test.sh`. Add SHA and permissions asserts next to the existing `workflow_blob` checks.
 
 **You see.**
 
 - [ ] `write_export` with type `../../tmp` writes nothing outside `--out` and exits nonzero.
-- [ ] A new vault's `uploads/` is 0700. Ingest of a symlink under `uploads/` fails closed.
-- [ ] `manage_type` with a hostile Ajv schema and no fields returns `{ error, suggestion }` and stores no schema.
+- [ ] A new vault's `uploads/` is 0700. Ingest of a symlink, or of `nested/file`, fails closed. A regular file in `uploads/` still ingests.
+- [ ] `manage_type` with a hostile Ajv schema and no fields returns `{ error, suggestion }` and stores no schema. Upsert of an old row with a leftover column still validates from fields.
 - [ ] `verify.yml` has SHA-pinned `actions/checkout`, `pnpm/action-setup`, and `actions/setup-node`, plus `permissions: contents: read`.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
 - [ ] `scripts/foundation-portability.test.sh` adds a traversal type slug and an outside-`--out` case. Run `bash scripts/foundation-portability.test.sh`.
-- [ ] Blob tests assert mode 0700 and a symlink ingest miss. Run `pnpm --filter @foundation/server test` for the blob file.
-- [ ] `manage_type` tests refuse a raw schema. Field-compiled schemas still validate upsert. Run `pnpm --filter @foundation/schema test` and the graph manage_type cases.
-- [ ] A workflow test or `scripts/skills-layout.test.sh` sibling asserts SHA pins and `contents: read` if the repo already greps workflows. Otherwise add a small shell assert next to the existing verify-foundation workflow checks.
+- [ ] `packages/db/src/blobs.test.ts` asserts mode 0700, a symlink miss, and a nested `source_path` miss. Run `pnpm --filter @foundation/db test` with `DATABASE_URL` set. `pnpm --filter @foundation/server test` does not run that file.
+- [ ] `manageType` and `search-filters` tests refuse a raw schema. `labeled_fixture` gains a field list. Field-compiled schemas still validate upsert. Run `pnpm --filter @foundation/schema test` and `pnpm --filter @foundation/server test`.
+- [ ] `verify-foundation.test.sh` asserts SHA pins and `contents: read` next to the existing `workflow_blob` checks. Run `bash .cursor/skills/verify-foundation/scripts/verify-foundation.test.sh`.
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `grok-4.7-xhigh-fast` at the PR head, per the boot recipe.
 
@@ -230,7 +234,7 @@ Each live lane runs on its own cloud VM at the PR head. Drive Viewer through `.c
 - [ ] Lane 2. Export a snapshot whose type is `../../escape`. Save `harden-2-export-traverse.png`. Pass when the process exits nonzero and the parent of `--out` has no new file.
 - [ ] Lane 3. Export a legal slug and confirm every written path is inside `--out`. Save `harden-2-export-inside.png`. Pass when `realpath` of each file has the `--out` prefix.
 - [ ] Lane 4. Stat `uploads/` on a launched vault. Save `harden-2-uploads-mode.png`. Pass when the mode is 0700.
-- [ ] Lane 5. Place a symlink in `uploads/` and ingest it. Save `harden-2-nofollow.png`. Pass when ingest returns an error and `blobs/` gains no file.
+- [ ] Lane 5. Place a symlink in `uploads/`, then a file under a symlinked parent, then ingest `nested/file`. Save `harden-2-nofollow.png`. Pass when each ingest returns an error and `blobs/` gains no file.
 - [ ] Lane 6. Ingest a regular file under `uploads/`. Save `harden-2-blob-ok.png`. Pass when the blob GET with the API key returns the bytes.
 - [ ] Lane 7. `manage_type` create with empty fields and a large `$ref` loop schema. Save `harden-2-schema-refuse.png`. Pass when the tool returns an error and `inspect_ontology` shows no stored schema.
 - [ ] Lane 8. `manage_type` with a normal field list, then upsert that matches. Save `harden-2-schema-fields.png`. Pass when upsert succeeds.
@@ -267,18 +271,18 @@ Settled from the tree and the cluster.
 - Finding 1 is confirmed for trust and `SUPERUSER`. `foundation_keep_vault_up_init_postgres` calls `initdb` with no `--auth`. A stock `initdb` wrote `trust` for `local`, `127.0.0.1/32`, `::1/128`, and the matching replication lines. `--auth-local=peer --auth-host=scram-sha-256` wrote peer and scram on those same lines. `foundation_keep_vault_up_app_role_sql` creates `LOGIN SUPERUSER`. Under trust, `psql` as the app role with the wrong password still connected. `foundation_keep_vault_up_ensure_app_database` returns when `psql` of the URL succeeds, so a later password edit never reaches `ALTER ROLE`. Listen is already pinned at start by `foundation_keep_vault_up_postgres_listen_args` (`-h 127.0.0.1`). `SHOW listen_addresses` was `127.0.0.1`. `postgresql.conf` still comments `listen_addresses`. A start without `-h` uses the compiled default. The app uses TCP `DATABASE_URL`. keep-up talks to the OS superuser over the vault socket. Peer on that socket was measured. The OS user connected with no `-U` and was superuser. On this image, `vector.control` is `0.6.0` with no `trusted` line. `CREATE EXTENSION vector` as a non-superuser owner failed. After the superuser created it, `IF NOT EXISTS` as the owner succeeded. `pgcrypto`, `unaccent`, and `pg_trgm` are trusted. The owner created those three and ordinary migrate DDL. Runtime does not need `SUPERUSER`, `CREATEDB`, or `CREATEROLE`. `foundation_restore_recreate_database` drops as the URL role, then `CREATE DATABASE` fails without `CREATEDB`. Give recreate to the OS socket superuser. Do not grant the app role `CREATEDB`. Do not demote the initdb bootstrap role when it is the URL user.
 - Finding 2 is confirmed. `foundation_init_ensure_env` copies `.env.example` and does not mint. `loadConfig` accepts any nonempty `FOUNDATION_API_KEY`. `.env.example` ships `change-me-to-a-long-random-string` and `change-me-to-a-password`. Init copies both. Keep-up then sets the role password from that URL, so the published password works. A 32 character floor belongs on the API key and the view key, not on the database password. CI uses `ci-verify`.
 - Finding 3 is partial. `cp` writes `.env` at the umask, usually 644. `.env.example` is 644. There is no `keys/` directory. `mint-api-key.sh` already chmods `api-keys.json` to 600. `initdb` already makes `postgres/` 700. Do not chmod `FOUNDATION_DATA` 700 in `harden-1`. That would hide the 1777 uploads drop box before `harden-2` changes it.
-- Finding 4 is confirmed. `StreamableHTTPServerTransport` is constructed with only `sessionIdGenerator`. `security.ts` has no Host check. `view.test.ts` even unlocks with an off-box Host.
-- Finding 5 is confirmed. `ViewDoor.tryUnlock` compares, then checks cooldown. `view-door.test.ts` currently requires a correct key to open during cooldown. `requireViewAuth` uses `admit`, which has no budget. `requireApiKey` has no budget.
-- Finding 6 is confirmed as documented behavior, not a coding accident. `windowLockOf` falls back to the keyring. `VIEWER_WRITE` is always destructive. The fix is a dedicated view key, not a carry of the bot flag. Init mints the view key so first-run stays one command.
-- Finding 7 is confirmed. `apiKeyCookieHeader` stores the raw key for 2592000 seconds, HttpOnly, SameSite Strict, no Secure. README tells the operator to set `VIEW_HOST=0.0.0.0`.
-- Finding 8 is confirmed. There is no request access log. Graph `activity` is a different log.
-- Finding 9 is confirmed in part. `timingSafeEqual` is already used, but `safeEqualUtf8` returns early when lengths differ, so length leaks. Digest compare removes that.
+- Finding 4 is confirmed. Installed SDK `1.30.0` has `enableDnsRebindingProtection` and defaults it off. The type comment marks the flag deprecated and says to use external middleware. `handleMcpRequest` passes only `sessionIdGenerator`. `validateRequestHeaders` no-ops when the flag is false. No Host or Origin check exists in Foundation source. `view.test.ts` unlocks with `Host: 192.168.10.20:8788`. The view app is also mounted on the MCP door at `http://127.0.0.1:8787/view`.
+- Finding 5 is confirmed. `ViewDoor.tryUnlock` compares, then checks cooldown. `view-door.test.ts` requires a correct key to open during cooldown. `admit` does not touch the ledger. `requireViewAuth` uses `admit`. `requireApiKey` has no budget. `GET /view/api/session` on every locked page load has no Authorization header. Counting a missing credential would lock the person after five refreshes. Loopback is one address for every local account.
+- Finding 6 is confirmed as documented behavior. `windowLockOf` falls back to the keyring. `bootstrapPrincipal` is always destructive. `VIEWER_WRITE` is destructive for delete, undo, and restore. Journal and field writes do not need that flag. A non-destructive named key in fallback can still trash. Requiring the view key in `loadConfig` would refuse `pnpm start` and take MCP down on every current env. Mint the view key in keep-up. Delete fallback so a bot key never opens `/view`. Keep MCP up when the view key is still missing.
+- Finding 7 is confirmed. `apiKeyCookieHeader` stores the raw key for 2592000 seconds, HttpOnly, SameSite Strict, no Secure. There is no TLS listener. `0.0.0.0` is the bind address. The browser Host is the tunnel name or the LAN address. An in-memory session dies on restart while `verify-foundation.test.sh` requires the literal `Max-Age=2592000`. Persist the map. A `Secure` cookie on plain `http://127.0.0.1` can fail in a browser that does not treat loopback as a secure context.
+- Finding 8 is confirmed. There is no HTTP access log. `FOUNDATION_DATA/app.log` is `nohup` stdout. Graph `activity` is a different record. `createApp` never sets `trust proxy`. Log `req.socket.remoteAddress`. The view door has no `req.agent`, so the label is set beside unlock. Ship the log in the same PR as the session cookie, or the first logger would record the raw key.
+- Finding 9 is partial. `safeEqualUtf8` leaks length on the bootstrap secret, in-memory named secrets, and the view key. File keys already compare SHA-256 hex through `hashApiKey` and `safeEqualHex`. `parseNamedKeysFile` only accepts 64 hex chars.
 - Finding 10 is already done. `registerHealth` and `apps/server/src/health.test.ts` already keep the public body to `ok`, `service`, and `db`. Do not reopen it except as a regression lane.
-- Finding 11 is confirmed. `write_export` joins `node.type` into markdown folders and CSV names. `safe_filename` only sanitizes the title.
-- Finding 12 is confirmed. `UPLOAD_DIR_MODE` is `0o1777`. Ingest `realpath`s then `readFile`s.
-- Finding 13 is confirmed in part. `manageType` compiles from fields when a field list exists, and already refuses a raw schema in that case. An empty field list still persists `input.json_schema`. `validateDataAgainstJsonSchema` then `ajv.compile`s whatever was stored.
-- Finding 14 is confirmed. `createApp` runs `express.json({ limit: "32mb" })` before `requireApiKey`. `@modelcontextprotocol/sdk` is `^1.30.0`. `pnpm audit --prod` reports high or critical on that SDK, `express` then `body-parser` / `proxy-addr` / `qs`, `zod`, `ajv` then `fast-uri`, and Viewer `dompurify`.
-- Finding 15 is confirmed. `.github/workflows/verify.yml` uses `actions/checkout@v4`, `pnpm/action-setup@v4`, and `actions/setup-node@v4`, with no `permissions` block.
+- Finding 11 is confirmed. `write_export` joins `node.type` into markdown folders and CSV names. `safe_filename` only sanitizes the title. On this machine, `markdown / "../../escape"` resolved outside `--out`, and an absolute slug discarded `--out`. `SlugSchema` is `^[a-z][a-z0-9_]*$`. `node_types.slug` has no `CHECK`. `--from-snapshot` is raw JSON.
+- Finding 12 is confirmed. `UPLOAD_DIR_MODE` is `0o1777`. README documents that drop box. Ingest `realpath`s then `readFile`s. On Node 22.23.4 here, `O_NOFOLLOW` is `131072`. `fs.promises.open` with `O_RDONLY | O_NOFOLLOW` on a symlink returned `ELOOP`. `readFile` rejected that numeric flag. Opening a file through a symlinked parent with `O_NOFOLLOW` returned the outside bytes. There is no `openat` on `fs.promises`. `pnpm --filter @foundation/server test` does not run `packages/db/src/blobs.test.ts`.
+- Finding 13 is partial. `manageType` already compiles from fields when a field list exists. The hole is an empty field list. `validateDataAgainstJsonSchema` is the only `ajv.compile` call. `validateSchema` is false. The `catch` does not bound a compile that never returns. Ajv was not installed in that checkout, so a hang was not measured. `search-filters.test.ts` `labeled_fixture` and `docs/MCP_TOOLS.md` rely on a hand-written schema. Refusing new raw schemas without changing `validateUpsertData` leaves every old column on the Ajv path.
+- Finding 14 is confirmed. `createApp` runs `express.json({ limit: "32mb" })` before `requireApiKey`. That 32 MB matches `BLOB_MAX_BYTES` plus base64. `docs/MCP_TOOLS.md` says so. Installed SDK is `1.30.0`. `npm view` this turn reported SDK `1.32.2`, `body-parser` `2.4.0`, `express` `5.3.0`, `proxy-addr` `2.0.8`, `dompurify` `3.4.17`, and `zod` `4.6.7`. GHSA-f897-62hf-6gxq is the SDK body-size class. Express `5.2.1` already allows the patched `body-parser` and `proxy-addr`. Leave Zod 4 out.
+- Finding 15 is confirmed. `.github/workflows/verify.yml` uses `actions/checkout@v4`, `pnpm/action-setup@v4`, and `actions/setup-node@v4`, with no `permissions` block. `verify-foundation.test.sh` greps `pgvector/pgvector:pg16` and does not check SHAs.
 - Finding 16 is confirmed. `foundation_keep_vault_up_start_app` runs `nohup pnpm start` in a subshell that inherits the whole environment. An empty `env -i` breaks `pnpm` and breaks verify launch, which passes `DATABASE_URL` in the environment because dotenv will not override it. The planned allowlist is `PATH`, `HOME`, `TMPDIR`, `LANG`, `LC_ALL`, `USER`, and the `EnvSchema` names. Keep-up, restore, and `psql "${url}"` also put the URL on argv. Move those to stdin or a mode-600 file while this PR already edits those scripts. `scripts/mint-api-key.sh` still prints a new secret once. That is the documented mint.
 - Finding 17 is already done and stronger than the ask. `scripts/backup-vault.sh` already requires `BACKUP_AGE_RECIPIENT`, encrypts with age, writes mode 0600, and prunes with `BACKUP_KEEP_DAYS` (default 14). Blob files in the backup tree stay in the clear. A fresh clone with a commented recipient refuses the first dump. That is already the safe behavior. Do not add an off switch. Do not edit `scripts/backup-vault.sh` in this program.
 
@@ -297,7 +301,27 @@ Carry the bot's destructive flag into Viewer writes. That still lets any bot key
 
 Keep the house-key fallback and only document the risk. A fresh clone that copies `.env.example` would still open `/view` with a published key.
 
-Leave `FOUNDATION_VIEW_KEY` optional after a custom API key is already set. [Verify init DB env findings](bc-7d38682b-a83a-513b-a762-6673775bb371) recommended that so an existing vault keeps the house-key window. That leaves finding 6 open for every vault that skipped the mint. keep-up mints the view key into `.env` before `pnpm start` and does not print it.
+Leave `FOUNDATION_VIEW_KEY` optional after a custom API key is already set. [Verify init DB env findings](bc-7d38682b-a83a-513b-a762-6673775bb371) recommended that so an existing vault keeps the house-key window. That leaves finding 6 open. keep-up mints the view key into `.env` before `pnpm start` and does not print it. `loadConfig` still does not require the variable, so MCP stays up if someone starts without keep-up. `/view` then refuses every key.
+
+Require `FOUNDATION_VIEW_KEY` inside `loadConfig`. [Verify HTTP auth findings](bc-d4fc24b0-8e51-580d-bb74-aea39f1092fc) measured that this refuses `pnpm start` and takes MCP down on every current env.
+
+Parse `/mcp` at a small JSON limit. That breaks a 20 MB `bytes_base64` ingest. Auth first, then keep 32 MB on `/mcp`. Use the small limit on the view door.
+
+Turn on the SDK DNS-rebinding flag. The installed type marks it deprecated and says to use external middleware. The Host compare is an exact raw header match, port included, and it runs only inside `transport.handleRequest`.
+
+Set `trust proxy`. That wakes the critical `proxy-addr` bug. `createApp` does not set it today.
+
+Ship Zod 4 in this program. Tool handlers parse with Zod 3 after auth. The SDK still accepts Zod 3. That bump is its own slice.
+
+Count a missing unlock or header as a failure. Five loads of the unlock page would lock the person. `Gate` calls `GET /view/api/session` with cookies and no Authorization header.
+
+Share one failure ledger across Unlock and `/mcp`. A bad bot key from loopback would lock the human window. Every local account shares `127.0.0.1`.
+
+Rely on `O_NOFOLLOW` alone. [Verify FS schema CI findings](bc-12490eda-406c-5b87-9370-57826a6ce20c) opened a file through a symlinked parent and read the outside bytes. One path segment is the check that closes that.
+
+Pin the Postgres service image to a digest. `verify-foundation.test.sh` greps the tag `pgvector/pgvector:pg16`.
+
+Refuse new raw schemas and leave `validateUpsertData` on the stored column. Old rows and undo snapshots would still reach Ajv.
 
 Grant the app role `CREATEDB` so restore can recreate. Measured. The owner can drop the database and then fail the create, which writes `.restore-failed` and blocks keep-up. Recreate as the OS socket superuser.
 
@@ -319,8 +343,10 @@ Reopen `/health`. The public shape is already the one the audit asked for.
 - Lockout if the upgrade demotes the initdb bootstrap role. Skip `NOSUPERUSER` when the URL user is that OS user.
 - Lockout if restore drops the database as the app role and then cannot create it. Recreate on the vault socket as the OS superuser.
 - Lockout if scram is reloaded while the role password still differs from `DATABASE_URL`. Trust hid that drift. Always `ALTER ROLE` through the socket before reload.
-- Lockout from throttle-before-compare. Five failures lock that source for the budget cooldown, including a later correct key. That is the fail-closed choice. Unlock already shows **That key did not unlock.** and `Retry-After`.
-- Lockout for an owner who already binds `VIEW_HOST=0.0.0.0` on plain HTTP. Head refuses that bind until they set TLS or `VIEW_PUBLIC_ORIGIN`. Document the named-origin path in README with positive copy.
+- Lockout from throttle-before-compare. Five failures lock that source for the budget cooldown, including a later correct key. Loopback is one address. That is the fail-closed choice. Unlock already shows **That key did not unlock.** and `Retry-After`.
+- Lockout for an owner who already binds `VIEW_HOST=0.0.0.0` on plain HTTP. Head refuses a non-loopback bind until they name `VIEW_PUBLIC_ORIGIN`. Document the named-origin path in README with positive copy.
+- Lockout if `Secure` is set on localhost HTTP. Some browsers do not treat loopback as a secure context. Set `Secure` only on HTTPS.
+- Lockout if the session map is memory-only while the cookie lasts 30 days. Persist hashed sessions under `FOUNDATION_DATA`.
 - `env -i` drops a variable `pnpm` needs. The live lane starts from a dirty shell. If boot fails, add only the missing name to the allowlist.
 - pstack playbook paths under `origin/main:pstack/...` are not in this git tree. They live in the Cursor plugin. Owners read the plugin copies when `git show` misses. The control skill that is in this tree is `.cursor/skills/verify-foundation/SKILL.md`.
 - `harden-2` stacked on `harden-1` restacks when the parent moves. Keep patch-id stable.
@@ -329,11 +355,13 @@ Reopen `/health`. The public shape is already the one the audit asked for.
 
 Read before editing.
 
-- `scripts/keep-vault-up.sh`, `scripts/foundation-init.sh`, `scripts/restore-vault.sh`, `apps/server/src/config.ts`, `apps/server/src/index.ts`, `apps/server/src/view-door.ts`, `apps/server/src/auth.ts`, `apps/server/src/app.ts`, `apps/server/src/mcp.ts`, `apps/server/src/view-write.ts`, `packages/db/src/blobs.ts`, `scripts/lib/foundation_portability.py`, `apps/server/src/graph.ts` (`manageType`), `.github/workflows/verify.yml`, `scripts/backup-vault.sh`, `apps/server/src/health.test.ts`
+- `scripts/keep-vault-up.sh`, `scripts/foundation-init.sh`, `scripts/restore-vault.sh`, `apps/server/src/config.ts`, `apps/server/src/index.ts`, `apps/server/src/security.ts`, `apps/server/src/view-door.ts`, `apps/server/src/auth.ts`, `apps/server/src/app.ts`, `apps/server/src/mcp.ts`, `apps/server/src/view-write.ts`, `packages/db/src/blobs.ts`, `scripts/lib/foundation_portability.py`, `apps/server/src/graph.ts` (`manageType` and `validateUpsertData`), `.github/workflows/verify.yml`, `docs/MCP_TOOLS.md`, `scripts/backup-vault.sh`, `apps/server/src/health.test.ts`
 - `.cursor/skills/verify-foundation/SKILL.md` and `features/unlock.md`
 - `.agents/skills/foundation-mcp/SKILL.md`
 
 `harden-1` runs `pstack/skills/how/SKILL.md` before the Postgres role and session-cookie shapes, and `pstack/skills/interrogate/SKILL.md` before the view-key and off-box bind choices ship.
+
+[Verify HTTP auth findings](bc-d4fc24b0-8e51-580d-bb74-aea39f1092fc) and [Verify FS schema CI findings](bc-12490eda-406c-5b87-9370-57826a6ce20c) are the other two read-only reports this plan absorbed.
 
 `harden-2` does not need interrogate. It is mechanical guards.
 
