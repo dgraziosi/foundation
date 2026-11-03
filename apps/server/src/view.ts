@@ -13,6 +13,7 @@ import {
   readHomeLooked,
   viewSessionCookieHeader,
 } from "./auth.js";
+import { setAccessLabel } from "./access-log.js";
 import { sendBlob } from "./blobs-http.js";
 import type { AppBindings } from "./config.js";
 import { attemptSource, presentedSecret } from "./view-door.js";
@@ -116,6 +117,7 @@ function refuseView(res: Response, status: 401 | 429): void {
  */
 function requireViewAuth({ viewDoor, sessions, headerLedger }: DoorShared) {
   return (req: Request, res: Response, next: NextFunction): void => {
+    setAccessLabel(res, "window");
     const header = headerApiKey(req);
     if (header !== undefined) {
       const source = attemptSource(req);
@@ -209,6 +211,7 @@ export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings
   });
 
   app.post(`${VIEW_PATH}/unlock`, ...unlockBody, (req, res) => {
+    setAccessLabel(res, "window");
     const presented = presentedSecret(req.body?.api_key);
     const decision = viewDoor.tryUnlock(presented, attemptSource(req));
     if (decision.kind === "open") {

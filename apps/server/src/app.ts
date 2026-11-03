@@ -1,5 +1,6 @@
 import { pingDb, type Pool } from "@foundation/db";
 import express, { type Express } from "express";
+import { AccessLog, logAccess } from "./access-log.js";
 import { healthKeyMatches, requireApiKey } from "./auth.js";
 import { sendBlob } from "./blobs-http.js";
 import type { AppBindings } from "./config.js";
@@ -62,6 +63,7 @@ export type DoorShared = {
   readonly viewDoor: ViewDoor;
   readonly sessions: ViewSessions;
   readonly headerLedger: FailureLedger;
+  readonly accessLog: AccessLog;
 };
 
 export function doorSharedOf(config: AppBindings): DoorShared {
@@ -69,6 +71,7 @@ export function doorSharedOf(config: AppBindings): DoorShared {
     viewDoor: ViewDoor.fromBindings(config),
     sessions: ViewSessions.open(config.FOUNDATION_DATA, windowLockOf(config)),
     headerLedger: new FailureLedger(),
+    accessLog: AccessLog.open(config.FOUNDATION_DATA),
   };
 }
 
@@ -180,6 +183,7 @@ export function createApp(
   const ring = keyring ?? Keyring.fromBindings(config);
   const state = shared ?? doorSharedOf(config);
   const app = express();
+  app.use(logAccess(state.accessLog));
   app.use(guardHostAndOrigin(hostPolicyOf(config)));
 
   if (door === "view") {
