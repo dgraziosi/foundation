@@ -5,7 +5,7 @@ import { sendBlob } from "./blobs-http.js";
 import type { AppBindings } from "./config.js";
 import { Keyring } from "./keyring.js";
 import { handleMcpRequest } from "./mcp.js";
-import { isAgentPath } from "./security.js";
+import { guardHostAndOrigin, hostPolicyOf, isAgentPath } from "./security.js";
 import { FailureLedger, ViewDoor, windowLockOf } from "./view-door.js";
 import { ViewSessions } from "./view-session.js";
 import { registerViewRoutes } from "./view.js";
@@ -151,6 +151,7 @@ export function createApp(
   const ring = keyring ?? Keyring.fromBindings(config);
   const state = shared ?? doorSharedOf(config);
   const app = express();
+  app.use(guardHostAndOrigin(hostPolicyOf(config)));
   app.use(express.json({ limit: JSON_BODY_LIMIT }));
   app.use(express.urlencoded({ extended: false }));
 

@@ -14,6 +14,7 @@ import {
   type TypeField,
   type ViewDeclaration,
 } from "@foundation/schema";
+import { request as httpRequest, type IncomingHttpHeaders } from "node:http";
 import type { AddressInfo, Server } from "node:net";
 import { createApp } from "./app.js";
 import { getGraphNode, inspectOntology, linkGraphNodes, listGraphActivity, manageType, upsertGraphNode } from "./graph.js";
@@ -65,6 +66,34 @@ async function listenOrigin(server: Server): Promise<string> {
   return `http://127.0.0.1:${address.port}`;
 }
 
+/** Node's fetch replaces a Host header with the URL's host, so a real Host needs node:http. */
+async function sendWithHost(
+  origin: string,
+  path: string,
+  host: string,
+  init: { method?: string; headers?: Record<string, string>; body?: string } = {},
+): Promise<{ status: number; headers: IncomingHttpHeaders; body: Buffer }> {
+  const url = new URL(path, origin);
+  return new Promise((resolve, reject) => {
+    const req = httpRequest(
+      {
+        host: url.hostname,
+        port: url.port,
+        path: `${url.pathname}${url.search}`,
+        method: init.method ?? "GET",
+        headers: { ...init.headers, host },
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body: Buffer.concat(chunks) }));
+      },
+    );
+    req.on("error", reject);
+    req.end(init.body);
+  });
+}
+
 async function unlockCookie(origin: string): Promise<string> {
   const unlock = await fetch(`${origin}/view/unlock`, {
     method: "POST",
@@ -94,6 +123,7 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
     HOST: "127.0.0.1",
     VIEW_PORT: 0,
     VIEW_HOST: "0.0.0.0",
+    FOUNDATION_ALLOWED_HOSTS: ["192.168.10.20:8788"],
   };
   const mcpApp = createApp(pool, bindings, "mcp");
   const viewApp = createApp(pool, bindings, "view");
@@ -324,36 +354,34 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
 
     await t.test("off-box Host can unlock the view door and cannot use the cookie on /mcp", async () => {
       const offbox = "192.168.10.20:8788";
-      const denied = await fetch(`${viewOrigin}/view/api/session`, { headers: { host: offbox } });
+      const denied = await sendWithHost(viewOrigin, "/view/api/session", offbox);
       assert.equal(denied.status, 401);
 
-      const unlock = await fetch(`${viewOrigin}/view/unlock`, {
+      const unlock = await sendWithHost(viewOrigin, "/view/unlock", offbox, {
         method: "POST",
         headers: {
-          host: offbox,
           "content-type": "application/json",
           accept: "application/json",
+          origin: `http://${offbox}`,
         },
         body: JSON.stringify({ api_key: viewKey }),
       });
       assert.equal(unlock.status, 200);
-      const setCookie = unlock.headers.get("set-cookie") ?? "";
+      const setCookie = unlock.headers["set-cookie"]?.[0] ?? "";
       assert.match(setCookie, /Path=\/view/i);
+      assert.doesNotMatch(setCookie, /Secure/);
       const cookie = setCookie.split(";")[0];
       assert.ok(cookie);
 
-      const session = await fetch(`${viewOrigin}/view/api/session`, {
-        headers: { host: offbox, cookie },
-      });
+      const session = await sendWithHost(viewOrigin, "/view/api/session", offbox, { headers: { cookie } });
       assert.equal(session.status, 200);
 
-      const graph = await fetch(`${viewOrigin}/view/api/graph`, { headers: { host: offbox, cookie } });
+      const graph = await sendWithHost(viewOrigin, "/view/api/graph", offbox, { headers: { cookie } });
       assert.equal(graph.status, 200);
 
       const mcpOnView = await fetch(`${viewOrigin}/mcp`, {
         method: "POST",
         headers: {
-          host: "127.0.0.1",
           cookie,
           "content-type": "application/json",
           accept: "application/json, text/event-stream",
@@ -361,6 +389,12 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
         body: mcpUpsertBody("View door cookie must not write"),
       });
       assert.equal(mcpOnView.status, 403);
+      assert.deepEqual(await mcpOnView.json(), { error: "Not available on the view door" });
+
+      const unnamed = await sendWithHost(viewOrigin, "/view/api/session", "192.168.10.21:8788", {
+        headers: { cookie },
+      });
+      assert.equal(unnamed.status, 403);
 
       const mcpOnMcp = await fetch(`${origin}/mcp`, {
         method: "POST",
@@ -378,23 +412,25 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
       const { rows: countBefore } = await pool.query<{ n: string }>(
         "SELECT COUNT(*)::text AS n FROM nodes WHERE deleted_at IS NULL",
       );
-      for (const host of ["127.0.0.1", "localhost"]) {
-        const mcp = await fetch(`${viewOrigin}/mcp`, {
+      const viewPort = new URL(viewOrigin).port;
+      for (const host of [`127.0.0.1:${viewPort}`, `localhost:${viewPort}`]) {
+        const mcp = await sendWithHost(viewOrigin, "/mcp", host, {
           method: "POST",
           headers: {
             ...authHeader(),
-            host,
             "content-type": "application/json",
             accept: "application/json, text/event-stream",
           },
           body: mcpUpsertBody("View door must not write"),
         });
         assert.equal(mcp.status, 403);
+        assert.deepEqual(JSON.parse(mcp.body.toString("utf8")), { error: "Not available on the view door" });
 
-        const blob = await fetch(`${viewOrigin}/blobs/11111111-1111-4111-8111-111111111111`, {
-          headers: { ...authHeader(), host },
+        const blob = await sendWithHost(viewOrigin, "/blobs/11111111-1111-4111-8111-111111111111", host, {
+          headers: authHeader(),
         });
         assert.equal(blob.status, 403);
+        assert.deepEqual(JSON.parse(blob.body.toString("utf8")), { error: "Not available on the view door" });
       }
       const { rows: countAfter } = await pool.query<{ n: string }>(
         "SELECT COUNT(*)::text AS n FROM nodes WHERE deleted_at IS NULL",
@@ -746,12 +782,12 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
 
       const offbox = "192.168.10.20:8788";
       const offboxCookie = await unlockCookie(viewOrigin);
-      const offboxDownload = await fetch(`${viewOrigin}/view/blobs/${got.blob.id}`, {
-        headers: { host: offbox, cookie: offboxCookie },
+      const offboxDownload = await sendWithHost(viewOrigin, `/view/blobs/${got.blob.id}`, offbox, {
+        headers: { cookie: offboxCookie },
       });
       assert.equal(offboxDownload.status, 200);
-      assert.equal(offboxDownload.headers.get("content-type"), "application/pdf");
-      assert.deepEqual(Buffer.from(await offboxDownload.arrayBuffer()), pdf);
+      assert.equal(offboxDownload.headers["content-type"], "application/pdf");
+      assert.deepEqual(offboxDownload.body, pdf);
 
       const { rows: countBefore } = await pool.query<{ n: string }>(
         "SELECT COUNT(*)::text AS n FROM nodes WHERE deleted_at IS NULL",
@@ -791,17 +827,17 @@ test("read-only window: auth, search, node page, no writes", { skip: !databaseUr
 
       const offbox = "192.168.10.20:8788";
       const offboxCookie = await unlockCookie(viewOrigin);
-      const offboxDownload = await fetch(`${viewOrigin}/view/blobs/${got.blob.id}`, {
-        headers: { host: offbox, cookie: offboxCookie },
+      const offboxDownload = await sendWithHost(viewOrigin, `/view/blobs/${got.blob.id}`, offbox, {
+        headers: { cookie: offboxCookie },
       });
       assert.equal(offboxDownload.status, 200);
-      assert.match(offboxDownload.headers.get("content-disposition") ?? "", /attachment/i);
+      assert.match(offboxDownload.headers["content-disposition"] ?? "", /attachment/i);
 
-      for (const host of ["127.0.0.1", "localhost"]) {
-        const spoofed = await fetch(`${viewOrigin}/blobs/${got.blob.id}`, {
+      const viewPort = new URL(viewOrigin).port;
+      for (const host of [`127.0.0.1:${viewPort}`, `localhost:${viewPort}`]) {
+        const spoofed = await sendWithHost(viewOrigin, `/blobs/${got.blob.id}`, host, {
           headers: {
             cookie: offboxCookie,
-            host,
             ...authHeader(),
           },
         });

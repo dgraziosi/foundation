@@ -2,8 +2,14 @@ import { createPool, ensureBlobLayout, migrate, seedSystemOntology, waitForDb } 
 import { createApp, doorSharedOf } from "./app.js";
 import { loadConfig } from "./config.js";
 import { Keyring } from "./keyring.js";
+import { bindRefusal } from "./security.js";
 
 const config = loadConfig();
+const offBox = bindRefusal(config);
+if (offBox) {
+  console.error(offBox);
+  process.exit(1);
+}
 await ensureBlobLayout(config.FOUNDATION_DATA);
 
 const pool = createPool(config.DATABASE_URL);
