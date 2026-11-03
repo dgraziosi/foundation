@@ -66,11 +66,13 @@ test("digest window is last 24h on first visit and exclusive after a look", () =
 
 test("home looked cookie is Path=/view and parses an ISO stamp", () => {
   const iso = "2026-09-14T16:00:00.000Z";
-  const header = homeLookedCookieHeader(iso);
+  const header = homeLookedCookieHeader(iso, false);
   assert.match(header, new RegExp(`^${HOME_LOOKED_COOKIE}=`));
   assert.match(header, /Path=\/view/);
   assert.match(header, /HttpOnly/);
   assert.match(header, /SameSite=Strict/);
+  assert.doesNotMatch(header, /Secure/);
+  assert.match(homeLookedCookieHeader(iso, true), /; Secure$/);
   assert.equal(readHomeLooked(`${HOME_LOOKED_COOKIE}=${encodeURIComponent(iso)}`)?.toISOString(), iso);
   assert.equal(readHomeLooked(`${HOME_LOOKED_COOKIE}=nope`), undefined);
 });

@@ -6,12 +6,13 @@ import type { WriteContext } from "./write-context.js";
 /**
  * Authorization: ApiKey <key>
  * Bearer <key> is accepted as a documented equivalent.
- * Cookie `foundation_key` unlocks the `/view` window only (`Path=/view`).
- * `/mcp` and `/blobs` require the Authorization header — the cookie is not an MCP credential.
+ * Cookie `foundation_key` carries a view session id for the `/view` window only (`Path=/view`).
+ * `/mcp` and `/blobs` require the Authorization header. The cookie is not an MCP credential.
  */
 export const API_KEY_COOKIE = "foundation_key";
 export const HOME_LOOKED_COOKIE = "foundation_home_looked";
-const VIEW_COOKIE_MAX_AGE = 2592000;
+export const VIEW_COOKIE_MAX_AGE = 2592000;
+const VIEW_COOKIE_ATTRS = "Path=/view; HttpOnly; SameSite=Strict; Max-Age=2592000";
 
 export function cookieValue(cookieHeader: string, name: string): string | undefined {
   for (const part of cookieHeader.split(";")) {
@@ -42,12 +43,13 @@ export function headerApiKey(req: Request): string | undefined {
   return match?.[2];
 }
 
-export function apiKeyCookieHeader(key: string): string {
-  return `${API_KEY_COOKIE}=${encodeURIComponent(key)}; Path=/view; HttpOnly; SameSite=Strict; Max-Age=${VIEW_COOKIE_MAX_AGE}`;
+/** `Secure` only over HTTPS. Some browsers drop a Secure cookie on plain http://127.0.0.1. */
+export function viewSessionCookieHeader(sessionId: string, secure: boolean): string {
+  return `${API_KEY_COOKIE}=${encodeURIComponent(sessionId)}; ${VIEW_COOKIE_ATTRS}${secure ? "; Secure" : ""}`;
 }
 
-export function homeLookedCookieHeader(lookedAt: string): string {
-  return `${HOME_LOOKED_COOKIE}=${encodeURIComponent(lookedAt)}; Path=/view; HttpOnly; SameSite=Strict; Max-Age=${VIEW_COOKIE_MAX_AGE}`;
+export function homeLookedCookieHeader(lookedAt: string, secure: boolean): string {
+  return `${HOME_LOOKED_COOKIE}=${encodeURIComponent(lookedAt)}; ${VIEW_COOKIE_ATTRS}${secure ? "; Secure" : ""}`;
 }
 
 export function readHomeLooked(cookieHeader: string): Date | undefined {

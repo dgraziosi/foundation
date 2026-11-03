@@ -6,7 +6,8 @@ import type { AppBindings } from "./config.js";
 import { Keyring } from "./keyring.js";
 import { handleMcpRequest } from "./mcp.js";
 import { isAgentPath } from "./security.js";
-import { FailureLedger, ViewDoor } from "./view-door.js";
+import { FailureLedger, ViewDoor, windowLockOf } from "./view-door.js";
+import { ViewSessions } from "./view-session.js";
 import { registerViewRoutes } from "./view.js";
 
 /** 20MB blob cap as base64 plus JSON-RPC envelope. */
@@ -30,12 +31,14 @@ function refuseAgentPaths(req: express.Request, res: express.Response, next: exp
 /** State both doors share in one process, so a ledger or session seen on one door holds on the other. */
 export type DoorShared = {
   readonly viewDoor: ViewDoor;
+  readonly sessions: ViewSessions;
   readonly headerLedger: FailureLedger;
 };
 
 export function doorSharedOf(config: AppBindings): DoorShared {
   return {
     viewDoor: ViewDoor.fromBindings(config),
+    sessions: ViewSessions.open(config.FOUNDATION_DATA, windowLockOf(config)),
     headerLedger: new FailureLedger(),
   };
 }
@@ -154,12 +157,12 @@ export function createApp(
   if (door === "view") {
     app.use(refuseAgentPaths);
     registerHealth(app, pool, config, ring, state);
-    registerViewRoutes(app, pool, config, state.viewDoor, state.headerLedger);
+    registerViewRoutes(app, pool, config, state);
     return app;
   }
 
   registerHealth(app, pool, config, ring, state);
-  registerViewRoutes(app, pool, config, state.viewDoor, state.headerLedger);
+  registerViewRoutes(app, pool, config, state);
   registerMcpAndBlobs(app, pool, config, ring, state);
   return app;
 }

@@ -4,17 +4,19 @@ import { fileURLToPath } from "node:url";
 import type { Pool } from "@foundation/db";
 import type { Express, NextFunction, Request, Response } from "express";
 import express from "express";
+import type { DoorShared } from "./app.js";
 import {
   API_KEY_COOKIE,
-  apiKeyCookieHeader,
   cookieValue,
   headerApiKey,
   homeLookedCookieHeader,
   readHomeLooked,
+  viewSessionCookieHeader,
 } from "./auth.js";
 import { sendBlob } from "./blobs-http.js";
 import type { AppBindings } from "./config.js";
-import { attemptSource, presentedSecret, type FailureLedger, type ViewDoor } from "./view-door.js";
+import { attemptSource, presentedSecret } from "./view-door.js";
+import { browserIsHttps } from "./view-session.js";
 import {
   viewGraph,
   viewNode,
@@ -108,7 +110,7 @@ function refuseView(res: Response, status: 401 | 429): void {
  * A view key on Authorization spends the header ledger, never the Unlock one.
  * The cookie is checked without a ledger: Gate loads `/view/api/session` on every page.
  */
-function requireViewAuth(viewDoor: ViewDoor, headerLedger: FailureLedger) {
+function requireViewAuth({ viewDoor, sessions, headerLedger }: DoorShared) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const header = headerApiKey(req);
     if (header !== undefined) {
@@ -127,7 +129,7 @@ function requireViewAuth(viewDoor: ViewDoor, headerLedger: FailureLedger) {
       refuseView(res, 401);
       return;
     }
-    if (!viewDoor.admit(presentedSecret(cookieValue(req.header("cookie") ?? "", API_KEY_COOKIE)))) {
+    if (!sessions.resolve(cookieValue(req.header("cookie") ?? "", API_KEY_COOKIE))) {
       refuseView(res, 401);
       return;
     }
@@ -188,14 +190,9 @@ function sendWriteResult(res: Response, got: unknown): void {
   res.status(status).json({ error: message });
 }
 
-export function registerViewRoutes(
-  app: Express,
-  pool: Pool,
-  config: AppBindings,
-  viewDoor: ViewDoor,
-  headerLedger: FailureLedger,
-): void {
-  const gate = requireViewAuth(viewDoor, headerLedger);
+export function registerViewRoutes(app: Express, pool: Pool, config: AppBindings, shared: DoorShared): void {
+  const { viewDoor, sessions } = shared;
+  const gate = requireViewAuth(shared);
   const dist = viewerDistDir();
 
   app.get(`${VIEW_PATH}/unlock`, (_req, res) => {
@@ -206,7 +203,10 @@ export function registerViewRoutes(
     const presented = presentedSecret(req.body?.api_key);
     const decision = viewDoor.tryUnlock(presented, attemptSource(req));
     if (decision.kind === "open") {
-      res.setHeader("Set-Cookie", apiKeyCookieHeader(presented!));
+      res.setHeader(
+        "Set-Cookie",
+        viewSessionCookieHeader(sessions.mint(), browserIsHttps(req, config.VIEW_PUBLIC_ORIGIN)),
+      );
       if (wantsJson(req)) {
         res.json({ ok: true });
         return;
@@ -290,7 +290,10 @@ export function registerViewRoutes(
       const now = new Date();
       const lookedAt = readHomeLooked(req.header("cookie") ?? "");
       const digest = await viewHomeDigestWindow(pool, lookedAt, now);
-      res.append("Set-Cookie", homeLookedCookieHeader(digest.looked_at));
+      res.append(
+        "Set-Cookie",
+        homeLookedCookieHeader(digest.looked_at, browserIsHttps(req, config.VIEW_PUBLIC_ORIGIN)),
+      );
       res.json(digest);
     } catch (error) {
       console.error("View digest failed", error);
