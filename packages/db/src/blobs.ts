@@ -9,14 +9,17 @@ import {
   type ToolError,
 } from "@foundation/schema";
 import { createHash, randomUUID } from "node:crypto";
-import { chmod, mkdir, readFile, realpath, rename, stat, unlink, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { chmod, mkdir, open, readFile, realpath, rename, unlink, writeFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { iso, type Queryable } from "./tx.js";
 
 export const BLOB_DIR_MODE = 0o700;
 export const BLOB_FILE_MODE = 0o600;
-/** Host drop-box under FOUNDATION_DATA/uploads: sticky world-writable, not blobs/. */
-export const UPLOAD_DIR_MODE = 0o1777;
+/** Owner-only. O_NOFOLLOW on a file still follows a symlinked parent, so this directory is opened the same way and source_path is one filename. */
+export const UPLOAD_DIR_MODE = 0o700;
+const UPLOAD_DIR_FLAGS = constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW;
+const UPLOAD_FILE_FLAGS = constants.O_RDONLY | constants.O_NOFOLLOW;
 
 export type BlobIngestResult = {
   blob: Blob;
@@ -57,7 +60,12 @@ export async function ensureBlobLayout(dataDir: string): Promise<void> {
   await mkdir(blobs, { recursive: true, mode: BLOB_DIR_MODE });
   await mkdir(uploads, { recursive: true, mode: UPLOAD_DIR_MODE });
   await chmod(blobs, BLOB_DIR_MODE);
-  await chmod(uploads, UPLOAD_DIR_MODE);
+  const dir = await open(uploads, UPLOAD_DIR_FLAGS);
+  try {
+    await dir.chmod(UPLOAD_DIR_MODE);
+  } finally {
+    await dir.close();
+  }
 }
 
 export async function getBlobById(db: Queryable, id: string): Promise<Blob | undefined> {
@@ -94,8 +102,8 @@ export function decodeBytesBase64(value: string): Buffer | ToolError {
 }
 
 /**
- * Resolve a source_path to an absolute file under FOUNDATION_DATA/uploads.
- * Rejects traversal even when the path looks relative.
+ * Resolve source_path to one file directly under FOUNDATION_DATA/uploads.
+ * A nested segment would let O_NOFOLLOW follow a symlinked parent.
  */
 export function resolveUploadPath(dataDir: string, sourcePath: string): string | ToolError {
   const pathErr = validateUploadSourcePath(sourcePath);
@@ -110,14 +118,20 @@ export function resolveUploadPath(dataDir: string, sourcePath: string): string |
   if (!relativePart) {
     return toolError(
       "source_path is empty",
-      "Pass a filename under FOUNDATION_DATA/uploads.",
+      "Pass one filename under FOUNDATION_DATA/uploads.",
+    );
+  }
+  if (relativePart.includes("/") || relativePart === "." || relativePart === "..") {
+    return toolError(
+      "source_path must be one filename under uploads",
+      "Pass one filename under FOUNDATION_DATA/uploads.",
     );
   }
   const abs = resolve(uploadsRoot, relativePart);
   if (!isInsideDir(uploadsRoot, abs)) {
     return toolError(
       "source_path traversal is not allowed",
-      "Pass a relative path under FOUNDATION_DATA/uploads (no .., no absolute path).",
+      "Pass one filename under FOUNDATION_DATA/uploads.",
     );
   }
   return abs;
@@ -251,46 +265,47 @@ export async function ingestBlobFromUpload(
   if (typeof abs !== "string") {
     return abs;
   }
-  let fileStat;
+  const uploadMiss = toolError(
+    `Upload not found: ${input.sourcePath}`,
+    "Place one file under FOUNDATION_DATA/uploads and pass that filename.",
+  );
+  let dir;
   try {
-    fileStat = await stat(abs);
+    dir = await open(join(runtime.dataDir, "uploads"), UPLOAD_DIR_FLAGS);
   } catch {
-    return toolError(
-      `Upload not found: ${input.sourcePath}`,
-      "Place the file under FOUNDATION_DATA/uploads and pass a relative source_path.",
-    );
+    return uploadMiss;
   }
-  if (!fileStat.isFile()) {
-    return toolError(
-      `Upload is not a file: ${input.sourcePath}`,
-      "source_path must point at a file under FOUNDATION_DATA/uploads.",
-    );
-  }
-  if (fileStat.size > maxBytes) {
-    return formatBlobSizeCapError(maxBytes);
-  }
-  let realFile: string;
   try {
-    realFile = await realpath(abs);
-    const realRoot = await realpath(resolve(runtime.dataDir, "uploads"));
-    if (!isInsideDir(realRoot, realFile) && realFile !== realRoot) {
-      return toolError(
-        "source_path traversal is not allowed",
-        "Pass a relative path under FOUNDATION_DATA/uploads (no .., no absolute path).",
-      );
+    await dir.chmod(UPLOAD_DIR_MODE);
+    let file;
+    try {
+      file = await open(abs, UPLOAD_FILE_FLAGS);
+    } catch {
+      return uploadMiss;
     }
-  } catch {
-    return toolError(
-      `Upload not found: ${input.sourcePath}`,
-      "Place the file under FOUNDATION_DATA/uploads and pass a relative source_path.",
-    );
+    try {
+      const fileStat = await file.stat();
+      if (!fileStat.isFile()) {
+        return toolError(
+          `Upload is not a file: ${input.sourcePath}`,
+          "source_path must name one file under FOUNDATION_DATA/uploads.",
+        );
+      }
+      if (fileStat.size > maxBytes) {
+        return formatBlobSizeCapError(maxBytes);
+      }
+      const bytes = await file.readFile();
+      return await ingestBlobBytes(db, runtime, {
+        mediaType: input.mediaType,
+        bytes,
+        sourceAbs: abs,
+      });
+    } finally {
+      await file.close();
+    }
+  } finally {
+    await dir.close();
   }
-  const bytes = await readFile(realFile);
-  return ingestBlobBytes(db, runtime, {
-    mediaType: input.mediaType,
-    bytes,
-    sourceAbs: realFile,
-  });
 }
 
 export async function unlinkQuiet(path: string): Promise<void> {

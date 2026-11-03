@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { constants as fsConstants } from "node:fs";
-import { access, chmod, mkdtemp, mkdir, readFile, readdir, realpath, stat, writeFile } from "node:fs/promises";
+import { access, chmod, mkdtemp, mkdir, readFile, readdir, realpath, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -53,15 +53,88 @@ test("resolveUploadPath rejects traversal and absolute paths", () => {
   const ok = resolveUploadPath(root, "fixture.pdf");
   assert.equal(typeof ok, "string");
   assert.equal(ok, join(root, "uploads", "fixture.pdf"));
+  const prefixed = resolveUploadPath(root, "uploads/fixture.pdf");
+  assert.equal(prefixed, join(root, "uploads", "fixture.pdf"));
+  for (const nested of ["nested/file.pdf", "uploads/nested/file.pdf"]) {
+    const result = resolveUploadPath(root, nested);
+    assert.equal(typeof result, "object");
+    if (typeof result === "object") {
+      assert.match(result.error, /one filename/);
+    }
+  }
 });
 
-test("ensureBlobLayout uses 0700 on blobs and 1777 sticky on uploads", async () => {
+test("ensureBlobLayout uses 0700 on blobs and uploads", async () => {
   const root = await mkdtemp(join(tmpdir(), "foundation-blob-layout-"));
   await ensureBlobLayout(root);
   const blobs = await stat(join(root, "blobs"));
   const uploads = await stat(join(root, "uploads"));
   assert.equal(blobs.mode & 0o777, BLOB_DIR_MODE);
+  assert.equal(uploads.mode & 0o777, 0o700);
   assert.equal(uploads.mode & 0o7777, UPLOAD_DIR_MODE);
+});
+
+test("upload ingest misses a symlink, a nested path, and a symlinked uploads directory", { skip: !databaseUrl }, async () => {
+  if (!databaseUrl) {
+    return;
+  }
+  const pool = await poolForSchema("blobs_upload_open");
+  const pdf = tinyPdf();
+  const root = await mkdtemp(join(tmpdir(), "foundation-upload-open-"));
+  const outside = await mkdtemp(join(tmpdir(), "foundation-upload-outside-"));
+  const parentRoot = await mkdtemp(join(tmpdir(), "foundation-upload-parent-"));
+  try {
+    await ensureBlobLayout(root);
+    await writeFile(join(outside, "secret.pdf"), pdf);
+    await symlink(join(outside, "secret.pdf"), join(root, "uploads", "secret.pdf"));
+    await mkdir(join(root, "uploads", "nested"));
+    await writeFile(join(root, "uploads", "nested", "file.pdf"), pdf);
+
+    const linked = await ingestBlobFromUpload(
+      pool,
+      { dataDir: root },
+      { mediaType: "application/pdf", sourcePath: "secret.pdf" },
+    );
+    assert.equal("error" in linked, true);
+
+    const nested = await ingestBlobFromUpload(
+      pool,
+      { dataDir: root },
+      { mediaType: "application/pdf", sourcePath: "nested/file.pdf" },
+    );
+    assert.equal("error" in nested, true);
+    if ("error" in nested) {
+      assert.match(nested.error, /one filename/);
+    }
+
+    await symlink(outside, join(root, "uploads", "linked"));
+    const throughLinkedParent = await ingestBlobFromUpload(
+      pool,
+      { dataDir: root },
+      { mediaType: "application/pdf", sourcePath: "linked/secret.pdf" },
+    );
+    assert.equal("error" in throughLinkedParent, true);
+    if ("error" in throughLinkedParent) {
+      assert.match(throughLinkedParent.error, /one filename/);
+    }
+
+    const blobNames = (await readdir(join(root, "blobs"))).filter((name) => !name.endsWith(".tmp"));
+    for (const name of blobNames) {
+      const bytes = await readFile(join(root, "blobs", name));
+      assert.notDeepEqual(bytes, pdf);
+    }
+
+    await symlink(outside, join(parentRoot, "uploads"));
+    const throughParent = await ingestBlobFromUpload(
+      pool,
+      { dataDir: parentRoot },
+      { mediaType: "application/pdf", sourcePath: "secret.pdf" },
+    );
+    assert.equal("error" in throughParent, true);
+    await assert.rejects(() => readdir(join(parentRoot, "blobs")));
+  } finally {
+    await pool.end();
+  }
 });
 
 test("blob ingest round-trip, sha256 dedup, and path constraints", { skip: !databaseUrl }, async (t) => {
