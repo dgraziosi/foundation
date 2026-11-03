@@ -166,6 +166,16 @@ function mergedNodeData(
   return { ...(existing?.data ?? {}), ...patch };
 }
 
+function refuseRawJsonSchema(slug: string, jsonSchema: unknown): ToolError | null {
+  if (jsonSchema !== undefined && jsonSchema !== null) {
+    return toolError(
+      `Type "${slug}" refuses a raw json_schema`,
+      "Pass fields to manage_type. json_schema is compiled from fields.",
+    );
+  }
+  return null;
+}
+
 function validateUpsertData(type: NodeType, data: Record<string, unknown>): ToolError | null {
   const repo = repoFromData(data);
   if (isToolError(repo)) {
@@ -178,7 +188,11 @@ function validateUpsertData(type: NodeType, data: Record<string, unknown>): Tool
   if (dueKeyIsInvalid(data)) {
     return toolError("data.due must be an ISO date YYYY-MM-DD", DUE_DATE_SUGGESTION);
   }
-  return validateDataAgainstJsonSchema(data, type.json_schema, type.slug);
+  return validateDataAgainstJsonSchema(
+    data,
+    compileJsonSchemaFromFields(type.fields ?? []),
+    type.slug,
+  );
 }
 
 async function validateRefFields(
@@ -1513,6 +1527,12 @@ export async function manageType(
   ctx?: WriteContext,
 ): Promise<{ type: NodeType; activity_id: string } | ToolError> {
   const writer = writerFrom(ctx);
+  if (input.action !== "retire") {
+    const rawSchema = refuseRawJsonSchema(input.slug, input.json_schema);
+    if (rawSchema) {
+      return rawSchema;
+    }
+  }
   const existing = await getNodeType(pool, input.slug);
 
   if (input.action === "create") {
@@ -1536,16 +1556,8 @@ export async function manageType(
     if (!fieldsParsed.ok) {
       return toolError(fieldsParsed.error, fieldsParsed.suggestion);
     }
-    if (input.json_schema !== undefined && input.json_schema !== null && fieldsParsed.fields.length > 0) {
-      return toolError(
-        `Type "${input.slug}" has a field template; edit fields, not json_schema`,
-        "Pass fields to manage_type. json_schema is compiled from fields.",
-      );
-    }
     const jsonSchema =
-      fieldsParsed.fields.length > 0
-        ? compileJsonSchemaFromFields(fieldsParsed.fields)
-        : (input.json_schema ?? null);
+      fieldsParsed.fields.length > 0 ? compileJsonSchemaFromFields(fieldsParsed.fields) : null;
     const identity = parseTypeIdentity({ hue: input.hue, glyph: input.glyph });
     if (!identity.ok) {
       return toolError(identity.error, identity.suggestion);
@@ -1618,12 +1630,6 @@ export async function manageType(
     return toolError(fieldsParsed.error, fieldsParsed.suggestion);
   }
   const nextFields = fieldsParsed.fields;
-  if (input.json_schema !== undefined && nextFields.length > 0) {
-    return toolError(
-      `Type "${input.slug}" has a field template; edit fields, not json_schema`,
-      "Pass fields to manage_type. json_schema is compiled from fields.",
-    );
-  }
 
   const locked = assertSystemTypePatch(existing, {
     slug: input.slug,
@@ -1660,7 +1666,7 @@ export async function manageType(
       ? compileJsonSchemaFromFields(nextFields)
       : input.json_schema === undefined
         ? existing.json_schema
-        : input.json_schema;
+        : null;
 
   const identity = parseTypeIdentity({ hue: input.hue, glyph: input.glyph });
   if (!identity.ok) {
