@@ -52,6 +52,15 @@ fi
 if ! grep -Eq -- 'CREATE DATABASE|createdb' "${restore_script}"; then
   fail "in-place restore must recreate this vault's app database before load"
 fi
+if grep -Eq -- 'CREATEDB|createdb' "${restore_script}" && grep -Eq -- 'ALTER ROLE|GRANT' "${restore_script}"; then
+  fail "restore-vault.sh must not grant the app role a create-database flag"
+fi
+if grep -Fq -- 'psql "${maint}"' "${restore_script}" || grep -Fq -- 'psql "${url}"' "${restore_script}"; then
+  fail "restore-vault.sh must not pass DATABASE_URL on the psql argv"
+fi
+if ! grep -Fq -- 'foundation_keep_vault_up_psql_local' "${restore_script}"; then
+  fail "restore-vault.sh must recreate through the vault socket as the OS superuser"
+fi
 
 if [[ ! -f "${backup_doc}" ]]; then
   fail "missing docs/BACKUP.md"

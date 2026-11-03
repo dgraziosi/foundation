@@ -99,27 +99,48 @@ fi
 tmp_root="$(mktemp -d)"
 trap 'rm -rf -- "${tmp_root}"' EXIT
 
-# Copy .env.example when .env is missing. Do not overwrite an existing .env.
+# Copy .env.example when .env is missing, then mint. Do not print a key.
 env_clone="${tmp_root}/env-clone"
 mkdir -p "${env_clone}"
-printf '%s\n' 'FOUNDATION_API_KEY=from-example' >"${env_clone}/.env.example"
+printf '%s\n' \
+  'FOUNDATION_API_KEY=change-me-to-a-long-random-string' \
+  'DATABASE_URL=postgres://foundation:change-me-to-a-password@127.0.0.1:5432/foundation' \
+  >"${env_clone}/.env.example"
+mint_log="${tmp_root}/init-mint.log"
 (
   foundation_keep_vault_up_repo_root() { printf '%s\n' "${env_clone}"; }
   foundation_init_ensure_env "${env_clone}"
-)
+) >"${mint_log}" 2>&1
 if [[ ! -f "${env_clone}/.env" ]]; then
   fail "init must copy .env.example when .env is missing"
 fi
-if ! grep -Fq -- 'FOUNDATION_API_KEY=from-example' "${env_clone}/.env"; then
-  fail "copied .env must match .env.example"
+if [[ "$(stat -c '%a' "${env_clone}/.env")" != "600" ]]; then
+  fail "init .env must be mode 600"
 fi
-printf '%s\n' 'FOUNDATION_API_KEY=already-set' >"${env_clone}/.env"
+init_api="$(foundation_keep_vault_up_env_value "${env_clone}" FOUNDATION_API_KEY)"
+init_view="$(foundation_keep_vault_up_env_value "${env_clone}" FOUNDATION_VIEW_KEY)"
+init_url="$(foundation_keep_vault_up_env_value "${env_clone}" DATABASE_URL)"
+if [[ "${init_api}" == "change-me-to-a-long-random-string" || "${#init_api}" -lt 32 ]]; then
+  fail "init must mint a vault API key"
+fi
+if [[ "${init_view}" == "change-me-to-a-long-random-string" || "${#init_view}" -lt 32 ]]; then
+  fail "init must mint a view key"
+fi
+if printf '%s\n' "${init_url}" | foundation_keep_vault_up_url_password | grep -Fxq -- 'change-me-to-a-password'; then
+  fail "init must mint a database password"
+fi
+if grep -F -- "${init_api}" "${mint_log}" || grep -F -- "${init_view}" "${mint_log}"; then
+  fail "init must not print a minted key"
+fi
+keep_api="${init_api}"
+printf '%s\n' "FOUNDATION_API_KEY=${keep_api}" "FOUNDATION_VIEW_KEY=${init_view}" "DATABASE_URL=${init_url}" >"${env_clone}/.env"
+chmod 600 -- "${env_clone}/.env"
 printf '%s\n' 'FOUNDATION_API_KEY=from-example-changed' >"${env_clone}/.env.example"
 (
   foundation_init_ensure_env "${env_clone}"
 )
-if ! grep -Fq -- 'FOUNDATION_API_KEY=already-set' "${env_clone}/.env"; then
-  fail "init must not overwrite an existing .env"
+if [[ "$(foundation_keep_vault_up_env_value "${env_clone}" FOUNDATION_API_KEY)" != "${keep_api}" ]]; then
+  fail "init must keep an existing 32+ custom API key"
 fi
 
 # Missing .env.example: refuse.

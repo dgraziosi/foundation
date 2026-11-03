@@ -7,7 +7,8 @@
 #                           scripts/keep-vault-up.sh under the clone.
 #
 # Copies .env.example to .env when .env is missing. Does not overwrite
-# .env. Does not invent an API key or a password. mkdir the data folder
+# .env. Mints missing, published, or short door keys and a published
+# database password into .env (mode 600). mkdir the data folder
 # (keep-up still refuses a missing folder). Then runs keep-up, which
 # may initdb an empty first-day folder and start Postgres plus
 # `pnpm start`. Refuses postgres/ without PG_VERSION. Does not write
@@ -26,17 +27,19 @@ foundation_init_nag() {
   echo "foundation-init: $*" >&2
 }
 
-# Copy .env.example when .env is missing. Leave an existing .env alone.
+# Copy .env.example when .env is missing. Leave an existing .env alone,
+# then mint published or missing secrets. Mode 600. Never print a key.
 foundation_init_ensure_env() {
   local repo_root="$1"
-  if [[ -f "${repo_root}/.env" ]]; then
-    return 0
+  if [[ ! -f "${repo_root}/.env" ]]; then
+    if [[ ! -f "${repo_root}/.env.example" ]]; then
+      foundation_init_nag ".env.example is missing. Run init from a Foundation clone."
+      return 1
+    fi
+    cp -- "${repo_root}/.env.example" "${repo_root}/.env"
   fi
-  if [[ ! -f "${repo_root}/.env.example" ]]; then
-    foundation_init_nag ".env.example is missing. Run init from a Foundation clone."
-    return 1
-  fi
-  cp -- "${repo_root}/.env.example" "${repo_root}/.env"
+  chmod 600 -- "${repo_root}/.env"
+  foundation_keep_vault_up_ensure_env_secrets "${repo_root}"
 }
 
 # First-day mkdir. Does not mkdir postgres/. Does not mkdir over a miss.

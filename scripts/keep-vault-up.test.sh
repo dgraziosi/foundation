@@ -83,6 +83,24 @@ fi
 if ! grep -Fq -- 'CREATE ROLE' "${keep_script}"; then
   fail "keep-vault-up.sh must create the app database role after initdb"
 fi
+if ! grep -Fq -- '--auth-local=peer' "${keep_script}"; then
+  fail "keep-vault-up.sh must initdb with peer local auth"
+fi
+if ! grep -Fq -- '--auth-host=scram-sha-256' "${keep_script}"; then
+  fail "keep-vault-up.sh must initdb with scram host auth"
+fi
+if grep -Fq -- 'LOGIN SUPERUSER' "${keep_script}"; then
+  fail "keep-vault-up.sh must not create the app role as SUPERUSER"
+fi
+if grep -Fq -- 'psql "${url}"' "${keep_script}"; then
+  fail "keep-vault-up.sh must not pass DATABASE_URL on the psql argv"
+fi
+if ! grep -Fq -- 'env -i' "${keep_script}"; then
+  fail "keep-vault-up.sh must start the app with env -i"
+fi
+if ! grep -Fq -- 'listen_addresses' "${keep_script}"; then
+  fail "keep-vault-up.sh must pin listen_addresses"
+fi
 if ! grep -Fq -- 'pg_ctl' "${keep_script}"; then
   fail "keep-vault-up.sh must start Postgres with pg_ctl"
 fi
@@ -191,7 +209,7 @@ chmod u+r -- "${dump_bad}"
   fi
 )
 
-if role_sql="$(foundation_keep_vault_up_app_role_sql 'postgres://foundation@localhost:5432/foundation' role 2>/dev/null)"; then
+if role_sql="$(printf '%s\n' 'postgres://foundation@localhost:5432/foundation' | foundation_keep_vault_up_app_role_sql role 2>/dev/null)"; then
   fail "role SQL must refuse a URL with no password (got: ${role_sql})"
 fi
 if grep -Fq -- "PASSWORD 'foundation'" <<<"${role_sql:-}"; then
@@ -208,20 +226,23 @@ if ! grep -Fq -- '.env.example' "${empty_clone}/nag"; then
 fi
 export DATABASE_URL="postgres://foundation:foundation@127.0.0.1:1/foundation"
 
-role_sql="$(foundation_keep_vault_up_app_role_sql 'postgres://foundation:foundation@localhost:5432/foundation' role)"
+role_sql="$(printf '%s\n' 'postgres://foundation:foundation@localhost:5432/foundation' | foundation_keep_vault_up_app_role_sql role)"
 if ! grep -Fq -- 'CREATE ROLE "foundation"' <<<"${role_sql}"; then
   fail "app role SQL must CREATE ROLE foundation (got: ${role_sql})"
+fi
+if grep -Fq -- 'SUPERUSER' <<<"${role_sql}"; then
+  fail "app role SQL must not grant SUPERUSER (got: ${role_sql})"
 fi
 if ! grep -Fq -- 'DO $do$' <<<"${role_sql}"; then
   fail "default role SQL should use \$do\$ (got: ${role_sql})"
 fi
 if ! grep -Fq -- 'CREATE DATABASE "foundation" OWNER "foundation"' \
-  <<<"$(foundation_keep_vault_up_app_role_sql 'postgres://foundation:foundation@localhost:5432/foundation' createdb)"; then
+  <<<"$(printf '%s\n' 'postgres://foundation:foundation@localhost:5432/foundation' | foundation_keep_vault_up_app_role_sql createdb)"; then
   fail "app role SQL must CREATE DATABASE foundation"
 fi
 
 # Password (or user) containing $do$ must pick $do1$, not a broken quote.
-odd_sql="$(foundation_keep_vault_up_app_role_sql 'postgres://foundation:pass$do$word@localhost:5432/foundation' role)"
+odd_sql="$(printf '%s\n' 'postgres://foundation:pass$do$word@localhost:5432/foundation' | foundation_keep_vault_up_app_role_sql role)"
 if grep -Fq -- 'DO $do$' <<<"${odd_sql}"; then
   fail "role SQL must not use \$do\$ when the password contains that tag (got: ${odd_sql})"
 fi
@@ -231,7 +252,7 @@ fi
 if ! grep -Fq -- "PASSWORD 'pass\$do\$word'" <<<"${odd_sql}"; then
   fail "role SQL must keep a \$do\$ password intact (got: ${odd_sql})"
 fi
-odd_user_sql="$(foundation_keep_vault_up_app_role_sql 'postgres://user$do$1:foundation@localhost:5432/foundation' role)"
+odd_user_sql="$(printf '%s\n' 'postgres://user$do$1:foundation@localhost:5432/foundation' | foundation_keep_vault_up_app_role_sql role)"
 if grep -Fq -- 'DO $do$' <<<"${odd_user_sql}"; then
   fail "role SQL must not use \$do\$ when the user contains that tag (got: ${odd_user_sql})"
 fi
@@ -1224,6 +1245,124 @@ if [[ -s "${start_log}" ]]; then
 fi
 if [[ ! -e "${crashed_drop}/.restore-failed" ]]; then
   fail "keep-up must not remove .restore-failed"
+fi
+
+# Mint replaces published and short keys. A 32+ custom key stays.
+mint_clone="${tmp_root}/mint-clone"
+mkdir -p "${mint_clone}"
+printf '%s\n' \
+  'FOUNDATION_API_KEY=change-me-to-a-long-random-string' \
+  'DATABASE_URL=postgres://foundation:change-me-to-a-password@127.0.0.1:5432/foundation' \
+  >"${mint_clone}/.env"
+chmod 600 -- "${mint_clone}/.env"
+mint_out="$(foundation_keep_vault_up_ensure_env_secrets "${mint_clone}" 2>&1)"
+if [[ -n "${mint_out}" ]]; then
+  fail "mint must write nothing to stdout or stderr (got: ${mint_out})"
+fi
+minted_api="$(foundation_keep_vault_up_env_value "${mint_clone}" FOUNDATION_API_KEY)"
+minted_view="$(foundation_keep_vault_up_env_value "${mint_clone}" FOUNDATION_VIEW_KEY)"
+minted_url="$(foundation_keep_vault_up_env_value "${mint_clone}" DATABASE_URL)"
+if [[ "${minted_api}" == "${FOUNDATION_PUBLISHED_API_KEY}" || "${#minted_api}" -lt 32 ]]; then
+  fail "mint must replace the published API key"
+fi
+if [[ "${minted_view}" == "${FOUNDATION_PUBLISHED_API_KEY}" || "${#minted_view}" -lt 32 ]]; then
+  fail "mint must set a view key"
+fi
+if [[ "${minted_view}" == "${minted_api}" ]]; then
+  fail "minted view key must differ from the API key"
+fi
+if printf '%s\n' "${minted_url}" | foundation_keep_vault_up_url_password | grep -Fxq -- "${FOUNDATION_PUBLISHED_DB_PASSWORD}"; then
+  fail "mint must replace the published database password"
+fi
+if [[ "$(stat -c '%a' "${mint_clone}/.env")" != "600" ]]; then
+  fail "minted .env must be mode 600"
+fi
+keep_api="${minted_api}"
+foundation_keep_vault_up_ensure_env_secrets "${mint_clone}"
+if [[ "$(foundation_keep_vault_up_env_value "${mint_clone}" FOUNDATION_API_KEY)" != "${keep_api}" ]]; then
+  fail "a second mint must keep a 32+ custom API key"
+fi
+
+# Live cluster: peer + scram, listen pin, non-superuser, extensions, second run is a no-op.
+PATH="/usr/lib/postgresql/16/bin:${PATH}"
+if command -v initdb >/dev/null 2>&1 && command -v pg_ctl >/dev/null 2>&1 && command -v psql >/dev/null 2>&1; then
+  live="${tmp_root}/live-cluster"
+  mkdir -p "${live}"
+  unset FOUNDATION_API_KEY FOUNDATION_VIEW_KEY DATABASE_URL
+  printf '%s\n' \
+    'FOUNDATION_DATA=./data' \
+    'DATABASE_URL=postgres://foundation:change-me-to-a-password@127.0.0.1:5432/foundation' \
+    >"${live}/.env"
+  chmod 600 -- "${live}/.env"
+  mkdir -p "${live}/data"
+  foundation_keep_vault_up_ensure_env_secrets "${live}"
+  if ! foundation_keep_vault_up_init_postgres "${live}/data"; then
+    fail "live initdb should succeed"
+  fi
+  if ! foundation_keep_vault_up_start_postgres "${live}/data"; then
+    fail "live pg_ctl start should succeed"
+  fi
+  if ! foundation_keep_vault_up_ensure_app_database "${live}" "${live}/data"; then
+    foundation_keep_vault_up_pg_running "${live}/data/postgres" && pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "live ensure_app_database should succeed"
+  fi
+  hba="${live}/data/postgres/pg_hba.conf"
+  conf="${live}/data/postgres/postgresql.conf"
+  if ! grep -E '^[[:space:]]*local[[:space:]].*[[:space:]]peer' "${hba}" >/dev/null; then
+    pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "live pg_hba must use peer for local"
+  fi
+  if ! grep -E '^[[:space:]]*host[[:space:]].*[[:space:]]scram-sha-256' "${hba}" >/dev/null; then
+    pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "live pg_hba must use scram-sha-256 for host"
+  fi
+  if grep -E '^[[:space:]]*(local|host)[[:space:]].*[[:space:]]trust' "${hba}" >/dev/null; then
+    pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "live pg_hba must not leave an uncommented trust line"
+  fi
+  if ! grep -E '^[[:space:]]*host[[:space:]]+replication[[:space:]].*[[:space:]]scram-sha-256' "${hba}" >/dev/null \
+    && ! grep -E '^[[:space:]]*local[[:space:]]+replication[[:space:]].*[[:space:]]peer' "${hba}" >/dev/null; then
+    pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "live pg_hba must rewrite replication auth"
+  fi
+  if ! grep -Eq "^listen_addresses = '127.0.0.1'" "${conf}"; then
+    pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "live postgresql.conf must pin listen_addresses"
+  fi
+  hba_sum="$(cksum "${hba}")"
+  conf_sum="$(cksum "${conf}")"
+  super="$(foundation_keep_vault_up_psql_local "${live}/data/postgres" -tAc "SELECT CASE WHEN rolsuper THEN 't' ELSE 'f' END FROM pg_roles WHERE rolname = 'foundation'" | tr -d '[:space:]')"
+  createdb="$(foundation_keep_vault_up_psql_local "${live}/data/postgres" -tAc "SELECT CASE WHEN rolcreatedb THEN 't' ELSE 'f' END FROM pg_roles WHERE rolname = 'foundation'" | tr -d '[:space:]')"
+  if [[ "${super}" != "f" ]]; then
+    pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "live app role must not be SUPERUSER (got ${super})"
+  fi
+  if [[ "${createdb}" != "f" ]]; then
+    pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "live app role must not have CREATEDB (got ${createdb})"
+  fi
+  exts="$(foundation_keep_vault_up_psql_local "${live}/data/postgres" --dbname foundation -tAc "SELECT extname FROM pg_extension WHERE extname IN ('vector','pgcrypto','unaccent','pg_trgm') ORDER BY 1" | tr -d ' ')"
+  if ! grep -Fq -- 'pgcrypto' <<<"${exts}" || ! grep -Fq -- 'unaccent' <<<"${exts}" || ! grep -Fq -- 'pg_trgm' <<<"${exts}"; then
+    pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "live cluster must install pgcrypto, unaccent, and pg_trgm"
+  fi
+  if ! grep -Fq -- 'vector' <<<"${exts}"; then
+    pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "live cluster must install vector as the OS superuser"
+  fi
+  if ! foundation_keep_vault_up_ensure_app_database "${live}" "${live}/data"; then
+    pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "second ensure_app_database should succeed"
+  fi
+  if [[ "$(cksum "${hba}")" != "${hba_sum}" ]]; then
+    pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "second run must not rewrite a healthy pg_hba.conf"
+  fi
+  if [[ "$(cksum "${conf}")" != "${conf_sum}" ]]; then
+    pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
+    fail "second run must not rewrite a pinned postgresql.conf"
+  fi
+  pg_ctl -D "${live}/data/postgres" stop -m fast >/dev/null 2>&1 || true
 fi
 
 echo "keep-vault-up.test: ok"

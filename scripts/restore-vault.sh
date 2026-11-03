@@ -62,29 +62,20 @@ foundation_restore_database_name() {
   python3 -c '
 from urllib.parse import urlparse, unquote
 import sys
-u = urlparse(sys.argv[1])
+u = urlparse(sys.stdin.read().strip())
 database = unquote((u.path or "").lstrip("/") or "foundation")
 database = database.split("?", 1)[0].split("/", 1)[0] or "foundation"
 print(database)
-' "$1"
+'
 }
 
 foundation_restore_role_name() {
   python3 -c '
 from urllib.parse import urlparse, unquote
 import sys
-u = urlparse(sys.argv[1])
+u = urlparse(sys.stdin.read().strip())
 print(unquote(u.username or "foundation"))
-' "$1"
-}
-
-foundation_restore_maintenance_url() {
-  python3 -c '
-from urllib.parse import urlparse, urlunparse
-import sys
-u = urlparse(sys.argv[1])
-print(urlunparse((u.scheme, u.netloc, "/postgres", "", "", "")))
-' "$1"
+'
 }
 
 foundation_restore_ident() {
@@ -106,8 +97,9 @@ print(q + s.replace(q, q + q) + q)
 
 foundation_restore_recreate_database() {
   local url="$1"
-  local name owner maint ident_db ident_role lit_db
-  name="$(foundation_restore_database_name "${url}")" || return 1
+  local data_dir="${2:-}"
+  local name owner ident_db ident_role lit_db postgres
+  name="$(printf '%s\n' "${url}" | foundation_restore_database_name)" || return 1
   case "${name}" in
     postgres|template0|template1|"")
       echo "restore-vault: will not drop system database ${name:-empty}" >&2
@@ -118,24 +110,36 @@ foundation_restore_recreate_database() {
     echo "restore-vault: psql is required to recreate this vault's database" >&2
     return 1
   fi
-  owner="$(foundation_restore_role_name "${url}")" || return 1
-  maint="$(foundation_restore_maintenance_url "${url}")" || return 1
+  owner="$(printf '%s\n' "${url}" | foundation_restore_role_name)" || return 1
   ident_db="$(foundation_restore_ident "${name}")"
   ident_role="$(foundation_restore_ident "${owner}")"
   lit_db="$(foundation_restore_literal "${name}")"
-  psql "${maint}" -v ON_ERROR_STOP=1 -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = ${lit_db} AND pid <> pg_backend_pid();" >/dev/null
-  psql "${maint}" -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS ${ident_db};"
-  psql "${maint}" -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${ident_db} OWNER ${ident_role};"
+  if [[ -z "${data_dir}" ]]; then
+    data_dir="$(foundation_keep_vault_up_data_dir "$(foundation_keep_vault_up_repo_root)")"
+  fi
+  postgres="${data_dir%/}/postgres"
+  # OS socket superuser. The app role does not create databases.
+  foundation_keep_vault_up_psql_local "${postgres}" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = ${lit_db} AND pid <> pg_backend_pid();" >/dev/null
+  foundation_keep_vault_up_psql_local "${postgres}" -c "DROP DATABASE IF EXISTS ${ident_db};"
+  foundation_keep_vault_up_psql_local "${postgres}" -c "CREATE DATABASE ${ident_db} OWNER ${ident_role};"
 }
 
 foundation_restore_load_sql() {
   local url="$1"
   local sql="$2"
+  local url_file
   if ! command -v psql >/dev/null 2>&1; then
     echo "restore-vault: psql is required to load the dump" >&2
     return 1
   fi
-  psql "${url}" -v ON_ERROR_STOP=1 -f "${sql}"
+  url_file="$(mktemp)"
+  chmod 600 -- "${url_file}"
+  printf '%s\n' "${url}" >"${url_file}"
+  if ! foundation_keep_vault_up_psql_app "${url_file}" -f "${sql}"; then
+    rm -f -- "${url_file}"
+    return 1
+  fi
+  rm -f -- "${url_file}"
 }
 
 foundation_restore_stage_blobs() {
@@ -244,7 +248,7 @@ foundation_restore_main() {
     fi
     failed="$(foundation_restore_failed_path "${data_abs}")"
     printf '%s\n' "in-place restore did not finish" >"${failed}"
-    if ! foundation_restore_recreate_database "${url}"; then
+    if ! foundation_restore_recreate_database "${url}" "${data_abs}"; then
       echo "restore-vault: recreate failed" >&2
       exit 1
     fi
