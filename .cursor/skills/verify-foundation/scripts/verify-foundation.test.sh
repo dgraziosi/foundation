@@ -650,6 +650,21 @@ grep -Fq '159 characters plus an ellipsis' "${map_root}/features/home.md" \
   || fail "home map must say a first line longer than 160 characters becomes 159 plus an ellipsis."
 grep -Fq 'Max-Age=2592000' "${map_root}/features/unlock.md" \
   || fail "unlock map must name Max-Age=2592000 on foundation_key."
+grep -Fq 'Localhost omits `Secure`' "${map_root}/features/unlock.md" \
+  || fail "unlock map must say localhost omits Secure."
+grep -Fq 'Host not allowed' "${map_root}/features/unlock.md" \
+  || fail "unlock map must name Host not allowed."
+grep -Fq 'Origin not allowed' "${map_root}/features/unlock.md" \
+  || fail "unlock map must name Origin not allowed."
+grep -Fq 'FOUNDATION_ALLOW_CLEARTEXT=1' "${map_root}/SKILL.md" \
+  || fail "SKILL Launch must name FOUNDATION_ALLOW_CLEARTEXT=1 for off-box http."
+grep -Fq 'VIEW_PUBLIC_ORIGIN' "${map_root}/SKILL.md" \
+  || fail "SKILL Launch must name VIEW_PUBLIC_ORIGIN for off-box."
+if grep -Fq 'Off-box is `VIEW_HOST=0.0.0.0`' "${map_root}/SKILL.md"; then
+  fail "SKILL Launch must not treat off-box as VIEW_HOST=0.0.0.0 alone"
+fi
+grep -Fq 'foundation.show_completed' "${map_root}/features/collection.md" \
+  || fail "collection map must name the Show completed sessionStorage key."
 grep -Fq 'Button **Today** (link-styled).' "${map_root}/features/journal-write.md" \
   || fail "journal map must name collection Today as a link-styled button."
 grep -Fq 'Prove `collection-filtered` on **List**, not Board.' "${map_root}/features/collection.md" \

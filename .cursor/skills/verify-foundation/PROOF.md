@@ -1,5 +1,36 @@
 # Proofs
 
+## Maintain run (20261104Tmaintain)
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20261104Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20261104Tmaintain`. Evidence stayed.
+
+Map corrections this run (source + live HTTP and the JS the live window served):
+
+- Off-box bind names the tunnel Host as `VIEW_PUBLIC_ORIGIN` (https, or http with `FOUNDATION_ALLOW_CLEARTEXT=1`) and may set `VIEW_HOST=0.0.0.0`. The skill had said off-box is `VIEW_HOST=0.0.0.0` alone. Live `Host: evil.example` on `POST /view/unlock` was `403` `{"error":"Host not allowed"}`. Live `Origin: https://evil.example` was `403` `{"error":"Origin not allowed"}`.
+- Localhost accept `Set-Cookie` is `Path=/view`, `HttpOnly`, `SameSite=Strict`, `Max-Age=2592000`, and omits `Secure`. After the unlock throttle, the right view key on `:8787/view/unlock` was also `429`.
+- **Show completed** is `sessionStorage` key `foundation.show_completed`. It does not write the vault. The same tab keeps the toggle across reload and other type collections. Live `/view/assets/index-DSLAcfel.js` contains that key.
+
+What that run drove:
+
+- Source readers for Unlock, Home, Collection, Detail, Edit any node, Activity, Trash, Search, and Journal write.
+- Viewer routes still match the map (`/`, `/recents`, `/trash`, `/journal/today`, `/types/:slug`, `/nodes/:id`, `/nodes/:id/activity`). Search stays overlay-only.
+- `verify-foundation.test.sh` exited 0 after this PROOF line.
+- Viewer build succeeded. Doctor: health `{ ok: true, service: foundation, db: up }`, Viewer GET 200, dist present, live `/view/assets/index-DSLAcfel.js` is JavaScript.
+- `verify-http-drive.sh` exited 0 (Unlock reject, MCP key before accept, accept, cookie does not open MCP, sixth wrong unlock 429, Home empty peek, first-day digest `rows` `[]`). Accept headers omitted `Secure`.
+- `verify-mcp-drive.sh` exited 0 (`POST /mcp` `tools/list`).
+- HTTP Collection: `GET /view/api/types/task` `type.label` Task, view ids board/list/calendar/timeline/outline, `parent_types` `["goal","project"]`, first-day `nodes` `[]`. After Today, journal collection listed that live id.
+- HTTP Detail: `GET /view/api/nodes/00000000-0000-4000-8000-000000000000` 404 `{"error":"Not found"}`.
+- HTTP Search: idle `{ searched: false, hits: [] }`; `q=zzzxnever`, `type=note`, and `status=active` `{ searched: true, hits: [] }`. Leftover `q=zzzxnever&type=note` `{ searched: true, hits: [] }`. After journal write, `q=Morning` `{ searched: true }`.
+- HTTP Journal write: `POST /view/api/journals/today` same live id twice. `PATCH` title/body 200. Stale `base_updated_at` 409.
+- HTTP Edit any node / Activity update Undo / Trash: `verify-edit-any-node.sh` exited 0.
+- HTTP Activity **Created** Undo: MCP upsert of a person titled "Create undo fixture". Stale if-match 409 left the record live. Undo `200` body keys `ok`, `activity_id` only. Live GET 404. Trash listed that id. Tombstone activity still 200.
+- HTTP journal Restore: `DELETE` then live GET 404. Restore `200` type `journal`, storage `inline`.
+- Built dist `index-DSLAcfel.js` contains Unlock copy, **Write today**, **Opening the page**, **May hang under**, **Targets**, **Keep a title**, **Restore**, `journal-page`, `detail-page`, `search-overlay`, `collection-preview`, `weekday:"long"`, `foundation.show_completed`, and **No date field on this type.**
+- Browser chrome was not clicked. Same-path HTTP plus the JS the live window served was the drive.
+- GitHub `verify` gates on this machine: schema tests pass; viewer tests + build pass; `skills-layout`, `drift-read`, `foundation-portability`, `foundation-init`, `mint-api-key`, `require-database-url` ok; `verify-http-drive`, `verify-mcp-drive`, and `verify-export-import-45.sh` ok on throwaway `VERIFY_RUN_ID=20261104Tgates`. Full `@foundation/server` suite on the throwaway `DATABASE_URL` had the known host-cluster FTS headline miss (`fiancée` not in the payload snippet). That miss is not this slice.
+
+Evidence: `.cursor/skills/verify-foundation/evidence/20261104Tmaintain/` (gitignored).
+
 ## Maintain run (20261102Tunlock)
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20261102Tunlock`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20261102Tunlock`. Evidence stayed.

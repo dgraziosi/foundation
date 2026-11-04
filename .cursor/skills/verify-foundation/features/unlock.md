@@ -11,7 +11,7 @@ Unlock is the door to the Viewer. The person types the vault key (`FOUNDATION_VI
 
 ## How to get to it (user POV)
 
-- Open `http://127.0.0.1:8788/view` with no session cookie. Off-box names the tunnel Host as `VIEW_PUBLIC_ORIGIN` and may set `VIEW_HOST=0.0.0.0`.
+- Open `http://127.0.0.1:8788/view` with no session cookie. Off-box names the tunnel Host as `VIEW_PUBLIC_ORIGIN` (https, or http with `FOUNDATION_ALLOW_CLEARTEXT=1`) and may set `VIEW_HOST=0.0.0.0`.
 - Open any `/view/...` route while the session is missing; the gate is the same door.
 - Submit the form labeled **Unlock**, password field `name="api_key"` labeled **Vault key**, button **Unlock**.
 
@@ -30,7 +30,7 @@ Preconditions:
 - **Unlock URL.** Open `/view/unlock` with no cookie. Unlock. Home appears. `/unlock` is not a mapped route.
 - **HTTP reject.** `curl -sS -o /tmp/unlock-bad.json -w "%{http_code}" http://127.0.0.1:8788/view/unlock -H "content-type: application/json" -H "accept: application/json" -d '{"api_key":"wrong"}'`. Status `401`. Body `{"error":"That key did not unlock."}`.
 - **MCP key does not unlock.** `API_KEY_FILE="$(.cursor/skills/verify-foundation/scripts/verify-foundation.sh key-file)"`. POST `/view/unlock` with that file's secret. Status `401`. Same copy: `That key did not unlock.` The house key never opens the window, including when no view key is set. Do this *before* accept so the peer ledger stays empty for the rate-limit burst.
-- **HTTP accept.** `KEY_FILE="$(.cursor/skills/verify-foundation/scripts/verify-foundation.sh view-key-file)"`. If that file is missing, stop — the house key does not open the window. `curl -sS -D - http://127.0.0.1:8788/view/unlock -H "content-type: application/json" -H "accept: application/json" -d "{\"api_key\":\"$(cat "${KEY_FILE}")\"}"`. Status `200`. Body `{"ok":true}`. `Set-Cookie` includes `foundation_key=` (a session id, not the vault key), `Path=/view`, `HttpOnly`, and `Max-Age=2592000`. Redact the cookie value in evidence. A successful accept clears that peer's failure bucket.
+- **HTTP accept.** `KEY_FILE="$(.cursor/skills/verify-foundation/scripts/verify-foundation.sh view-key-file)"`. If that file is missing, stop — the house key does not open the window. `curl -sS -D - http://127.0.0.1:8788/view/unlock -H "content-type: application/json" -H "accept: application/json" -d "{\"api_key\":\"$(cat "${KEY_FILE}")\"}"`. Status `200`. Body `{"ok":true}`. `Set-Cookie` includes `foundation_key=` (a session id, not the vault key), `Path=/view`, `HttpOnly`, and `Max-Age=2592000`. Localhost omits `Secure`. An https `VIEW_PUBLIC_ORIGIN` Host sets `Secure`. Redact the cookie value in evidence. A successful accept clears that peer's failure bucket.
 - **Session.** `curl -sS http://127.0.0.1:8788/view/api/session -H "Authorization: ApiKey $(cat "${KEY_FILE}")"`. Status `200`. Body `{"ok":true}`.
 - **Rate limit.** After that accept, six consecutive wrong unlocks with no other `POST /view/unlock` in between: the fifth is `401`, the sixth is `429` with `Retry-After`. Same copy. While that peer is locked, the right key is still `429`. A refused MCP-key unlock after accept is failure 1, so the fifth later wrong is already `429`.
 - **Cookie scope.** Use the `Set-Cookie` name=value pair from HTTP accept (first `;` segment; redact it in evidence). `curl -sS -o /tmp/mcp-cookie.json -w "%{http_code}" -X POST http://127.0.0.1:8787/mcp -H "content-type: application/json" -H "Cookie: foundation_key=<from-accept>" -d '{}'`. Status `401`. `GET http://127.0.0.1:8787/blobs/<id>` with only that cookie is also `401`. MCP still needs `Authorization: ApiKey ...` with the API key file. That header still opens `/mcp`. Do not use `GET /mcp` — that is never a tools call (405 even with a good header).
@@ -38,7 +38,8 @@ Preconditions:
 
 ## Gotchas
 
-- MCP bind is `127.0.0.1:8787`. Viewer bind is `127.0.0.1:8788` by default. Off-box is `VIEW_HOST=0.0.0.0`. Unlock on `:8787/view` is the wrong door.
+- MCP bind is `127.0.0.1:8787`. Viewer bind is `127.0.0.1:8788` by default. Off-box names the tunnel Host as `VIEW_PUBLIC_ORIGIN` (https, or http with `FOUNDATION_ALLOW_CLEARTEXT=1`) and may set `VIEW_HOST=0.0.0.0`. Unlock on `:8787/view` is the wrong window. Both doors share the unlock ledger, so a lock on `:8788` is also `429` on `:8787`.
+- A foreign `Host` is `403` `{"error":"Host not allowed"}` before the key is read. A foreign `Origin` on a `/view` write is `403` `{"error":"Origin not allowed"}`. The React door still shows **That key did not unlock.** for any thrown error.
 - Without `apps/viewer/dist`, `:8788/view` still shows the unlock fallback HTML. That is enough to prove `unlock-door` and the form POST. It is not a React Home proof.
 - `Authorization: Bearer <key>` is accepted as an equivalent of `ApiKey`. The cookie is Viewer-only.
 - Do not write the key into evidence, git, or chat.
