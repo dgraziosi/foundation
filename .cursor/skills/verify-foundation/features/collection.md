@@ -8,7 +8,7 @@ Collection is one type's records in the layouts that type declared. The user ope
 - `collection-empty` shows **Nothing yet.** when the type has no live records.
 - `collection-filtered` shows **Nothing matches your filters.** when records exist but the active view filter hides them.
 - `collection-views` lists only the view names that type declared (`aria-label="View"`).
-- `collection-show-completed` toggles **Show completed** for this window only. It does not write. It does not change Home, Recents, or Search.
+- `collection-show-completed` toggles **Show completed** for this browser tab (`sessionStorage` key `foundation.show_completed`). It does not write the vault. The same tab keeps the toggle across reload and other type collections. It does not change Home, Recents, or Search.
 - `collection-open-record` opens a row, card, cell, board card, calendar item, timeline item, outline row, or graph node on `/view/nodes/<uuid>`. A journal with inline markdown opens the write page (`[data-surface="journal-page"]`). Any other live record opens `[data-surface="detail-page"]`.
 - `collection-no-views` shows **No views declared for this type.** when `views` is empty.
 
@@ -29,7 +29,7 @@ Preconditions:
 - **Open tasks.** From Home, choose Open tasks **View all**, or go to `/view/types/task`. Heading includes **Task**. `[data-surface="view-strip"]` has a Task tab. Seed `task` default is **Board** (`[data-surface="board"]`). First-day Active column copy **Nothing yet.** First-day `task` also shows **May hang under** Goal, Project (`data-constraint="parent_types"`). Types with empty `parent_types` (seed `journal`) omit that line.
 - **Empty.** On a type with no live records, page copy is **Nothing yet.** On Board that copy lives inside `[data-surface="board"]` columns, not as a page-level Quiet.
 - **View switcher.** `aria-label="View"` lists only declared layouts by label (task seed: Board, List, Calendar, Timeline, Outline. No Graph). Choosing **List** keeps the same type and changes the layout, not the route. List hover or focus on a visible row shows `[data-surface="collection-preview"]` with the title. Subtitle chips appear only when those values are present. Due appears only when the row has a due. A seed task with no date is title only. That aside is not `[data-surface="detail-page"]`. Empty or fully filtered List has no preview.
-- **Show completed.** `aria-label="Show completed"` is a toggle. It widens an active status filter for this window. Home Open tasks must not change.
+- **Show completed.** `aria-label="Show completed"` is a toggle. It widens an active status filter for this tab. Reload or open another type in the same tab and the toggle stays. Home Open tasks must not change.
 - **Graph.** First-day seed `task` and `journal` do not declare `graph`. If a type names `graph`, that layout uses `[data-surface="graph"]` (floor 460px). Click a node: the same `/view/nodes/<uuid>` door as `collection-open-record` (inline markdown journal is the write page). Right-click a node: local graph, depth 1–4, default 2.
 - **HTTP.** `GET /view/api/types/task` with the vault key (view-key-file when present). Body has `type.label`, `type.views` (declaration objects with `id`, not a bare id array), `type.parent_types`, `nodes`. First-day: `nodes` is `[]`. Seed `task` views are `board`, `list`, `calendar`, `timeline`, `outline`. Seed `task` `parent_types` is `["goal","project"]` (labels Goal, Project). Seed `journal` `parent_types` is `[]`.
 - **Proof.** Screenshot the collection heading and empty copy, or save the type JSON. Feature id `collection-empty` or `collection-open`.
@@ -43,3 +43,4 @@ Preconditions:
 - Default task **board** (`[data-surface="board"]`) columns hardcode **Nothing yet.** even when the page-level empty string is **Nothing matches your filters.** Prove `collection-filtered` on **List**, not Board. Graph ignores the active view filter and also hardcodes **Nothing yet.** Do not prove `collection-filtered` on Graph.
 - `[data-surface="collection-preview"]` is List hover chrome. It is not a detail page and not a route.
 - **May hang under** is ontology chrome from `parent_types`. First-day `task` shows it with an empty list. It is not a load error and not a live record.
+- **Show completed** is `sessionStorage`, not a vault write. A new tab starts off.
