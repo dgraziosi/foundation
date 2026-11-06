@@ -30,11 +30,10 @@ Journal write is on this branch. Home always offers **Today**, even at journal c
 Official start on the machine that runs a vault (from the clone root):
 
 ```bash
-cp .env.example .env
-# the human sets FOUNDATION_API_KEY to a long random string; do not commit .env
-# empty first-day folder at FOUNDATION_DATA (default ./data) may init
-./scripts/keep-vault-up.sh
+./scripts/foundation-init.sh
 ```
+
+Init copies `.env` when it is missing, mints the door keys and a published database password into `.env` (mode 600), mkdir the data folder, then keep-up. Do not commit `.env`. Keep-up also mints missing, published, or short keys if you start that way. Empty first-day folder at `FOUNDATION_DATA` (default `./data`) may init.
 
 `keep-vault-up.sh` starts Postgres from that data folder's `postgres/` tree, then `pnpm start` (wait for the database, migrate, seed). Ready when:
 

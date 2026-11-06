@@ -51,7 +51,8 @@ verify_http_drive() {
   local helper evidence key_file view_key_file unlock_dir home_dir key view_key
   local unlock_raw unlock_headers unlock_body session_body recents_body tasks_body today_body digest_body digest_again_body
   local reject_raw reject_headers reject_body mcp_unlock_raw mcp_unlock_headers mcp_unlock_body
-  local cookie mcp_cookie_code mcp_none_code mcp_key_code throttle_raw throttle_headers throttle_body
+  local cookie mcp_cookie_code mcp_none_code mcp_key_code blob_cookie_code throttle_raw throttle_headers throttle_body
+  local locked_raw locked_headers locked_body
   local digest_raw digest_headers digest_jar
   local i refuse_code
 
@@ -101,6 +102,8 @@ verify_http_drive() {
   grep -Fq 'foundation_key=<redacted>' "${unlock_dir}/accept.headers" || verify_http_drive_fail "unlock evidence did not redact the cookie"
   grep -Fiq 'Path=/view' "${unlock_dir}/accept.headers" || verify_http_drive_fail "unlock cookie Path is not /view"
   grep -Fiq 'HttpOnly' "${unlock_dir}/accept.headers" || verify_http_drive_fail "unlock cookie is not HttpOnly"
+  grep -Fiq 'SameSite=Strict' "${unlock_dir}/accept.headers" || verify_http_drive_fail "unlock cookie is not SameSite=Strict"
+  grep -Fq 'Max-Age=2592000' "${unlock_dir}/accept.headers" || verify_http_drive_fail "unlock cookie missing Max-Age=2592000"
   if grep -Fq -- "${view_key}" "${unlock_dir}/accept.headers" "${unlock_dir}/accept.json"; then
     verify_http_drive_fail "unlock evidence contains the vault key"
   fi
@@ -175,6 +178,15 @@ verify_http_drive() {
   printf '%s\n' "${mcp_cookie_code}" >"${unlock_dir}/mcp-cookie.status"
   [[ "${mcp_cookie_code}" == "401" ]] || verify_http_drive_fail "cookie on POST /mcp was ${mcp_cookie_code}, want 401"
 
+  blob_cookie_code="$(
+    curl -sS -o /tmp/foundation-verify-blob-cookie.$$ -w "%{http_code}" \
+      "http://127.0.0.1:8787/blobs/00000000-0000-4000-8000-000000000000" \
+      -H "Cookie: ${cookie}" || true
+  )"
+  rm -f /tmp/foundation-verify-blob-cookie.$$
+  printf '%s\n' "${blob_cookie_code}" >"${unlock_dir}/blob-cookie.status"
+  [[ "${blob_cookie_code}" == "401" ]] || verify_http_drive_fail "cookie on GET /blobs/:id was ${blob_cookie_code}, want 401"
+
   mcp_key_code="$(
     curl -sS -o /tmp/foundation-verify-mcp-key.$$ -w "%{http_code}" \
       -X POST http://127.0.0.1:8787/mcp \
@@ -208,8 +220,17 @@ verify_http_drive() {
   [[ "${throttle_body}" == *'"That key did not unlock."'* ]] || verify_http_drive_fail "429 copy is wrong"
   rm -f /tmp/foundation-verify-refuse.$$
 
+  locked_raw="$(verify_http_unlock_post "${view_key}")"
+  locked_headers="$(verify_http_split_headers "${locked_raw}")"
+  locked_body="$(verify_http_split_body "${locked_raw}")"
+  printf '%s\n' "${locked_headers}" | verify_http_redact_set_cookie >"${unlock_dir}/right-key-locked.headers"
+  printf '%s\n' "${locked_body}" >"${unlock_dir}/right-key-locked.json"
+  grep -Eq '^HTTP/[0-9.]+ 429' <<<"${locked_headers}" || verify_http_drive_fail "right key while locked was not HTTP 429"
+  grep -Fiq 'Retry-After:' "${unlock_dir}/right-key-locked.headers" || verify_http_drive_fail "right-key 429 missing Retry-After"
+  [[ "${locked_body}" == *'"That key did not unlock."'* ]] || verify_http_drive_fail "right-key 429 copy is wrong"
+
   printf '%s\n' "viewer-credential-36b" >"${unlock_dir}/feature-id"
-  printf '%s\n' "HTTP reject 401. MCP key does not unlock. View key accept 200. Cookie does not open MCP. API key still opens MCP. Sixth wrong unlock 429." \
+  printf '%s\n' "HTTP reject 401. MCP key does not unlock. View key accept 200. Cookie does not open MCP or GET /blobs/:id. API key still opens MCP. Sixth wrong unlock 429. Right key while locked 429." \
     >"${unlock_dir}/result.txt"
   echo "verify-http-drive: unlock accept and Home empty copy wrote ${evidence}"
 }

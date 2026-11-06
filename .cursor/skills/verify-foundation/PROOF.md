@@ -1,5 +1,37 @@
 # Proofs
 
+## Maintain run (20261106Tmaintain)
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20261106Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20261106Tmaintain`. Evidence stayed. Changed harness re-proved on `VERIFY_RUN_ID=20261106Treproof`.
+
+Map and harness corrections this run (source + live HTTP and the JS the live window served):
+
+- Official start is `./scripts/foundation-init.sh` (copies `.env` when missing, mints door keys, mkdir the data folder, then keep-up). The skill had said copy `.env.example` and set `FOUNDATION_API_KEY` by hand. Keep-up still mints missing, published, or short keys.
+- Unlock HTTP drive now GETs agent `/blobs/:id` with the accept cookie (`401`), asserts `Max-Age=2592000` and `SameSite=Strict`, and proves the right view key stays `429` while that peer is locked (`Retry-After` `900`).
+- Home Recents card stays **Nothing yet.** until a title or body autosave. A leave flush stores the body and does not invalidate Recents. Open tasks picks 5 from the `list_limit_default` newest tasks (seed 200) after the default filter.
+- Collection calendar and timeline show **No date field on this type.** when the type has neither a date nor start field. Seed task has `due`. First-day those layouts still show **Nothing yet.**
+
+What that run drove:
+
+- Source readers for Unlock, Home, Collection, Detail, Edit any node, Activity, Trash, Search, and Journal write.
+- Viewer routes still match the map (`/`, `/recents`, `/trash`, `/journal/today`, `/types/:slug`, `/nodes/:id`, `/nodes/:id/activity`). Search stays overlay-only.
+- `verify-foundation.test.sh` exited 0 after this PROOF line.
+- Viewer build succeeded. Doctor: health `{ ok: true, service: foundation, db: up }`, Viewer GET 200, dist present, live `/view/assets/index-DSLAcfel.js` is JavaScript.
+- `verify-http-drive.sh` exited 0 on `20261106Tmaintain` and again on `20261106Treproof` (Unlock reject, MCP key before accept, accept, cookie does not open MCP or GET `/blobs/:id`, sixth wrong unlock 429, right key while locked 429, Home empty peek, first-day digest `rows` `[]`). Accept headers included `Max-Age=2592000` and omitted `Secure`.
+- `verify-mcp-drive.sh` exited 0 (`POST /mcp` `tools/list`).
+- HTTP Collection: `GET /view/api/types/task` `type.label` Task, view ids board/list/calendar/timeline/outline, `parent_types` `["goal","project"]`, first-day `nodes` `[]`. After Today, journal collection listed that live id.
+- HTTP Detail: `GET /view/api/nodes/00000000-0000-4000-8000-000000000000` 404 `{"error":"Not found"}`.
+- HTTP Search: idle `{ searched: false, hits: [] }`; `q=zzzxnever`, `type=note`, and `status=active` `{ searched: true, hits: [] }`. Leftover `q=zzzxnever&type=note` `{ searched: true, hits: [] }`. After journal write, `q=Morning` `{ searched: true }`.
+- HTTP Journal write: `POST /view/api/journals/today` same live id twice. First create title `November 6, 2026`. `PATCH` title/body 200. Stale `base_updated_at` 409.
+- HTTP Edit any node / Activity update Undo / Trash: `verify-edit-any-node.sh` exited 0.
+- HTTP Activity **Created** Undo: MCP upsert of a person titled "Create undo fixture". Stale if-match 409 left the record live. Undo `200` body keys `ok`, `activity_id` only. Live GET 404. Trash listed that id. Tombstone activity still 200.
+- HTTP journal Restore: `DELETE` then live GET 404. Restore `200` type `journal`, storage `inline`.
+- Built dist `index-DSLAcfel.js` contains Unlock copy, **Write today**, **Opening the page**, **May hang under**, **Targets**, **Keep a title**, **Restore**, `journal-page`, `detail-page`, `search-overlay`, `collection-preview`, `weekday:"long"`, `foundation.show_completed`, and **No date field on this type.**
+- Browser chrome was not clicked. Same-path HTTP plus the JS the live window served was the drive.
+- GitHub `verify` gates on this machine: schema 239 pass including `generate-mcp-docs --check`; viewer 78 pass; viewer build; `skills-layout`, `drift-read`, `foundation-portability`, `foundation-init`, `mint-api-key`, `require-database-url` ok; `verify-http-drive`, `verify-mcp-drive`, and `verify-export-import-45.sh` ok on throwaway `VERIFY_RUN_ID=20261106Treproof`. Full `@foundation/server` suite on the throwaway `DATABASE_URL` had the known host-cluster FTS headline miss (`fiancée` not in the payload snippet). That miss is not this slice.
+
+Evidence: `.cursor/skills/verify-foundation/evidence/20261106Tmaintain/` and `.cursor/skills/verify-foundation/evidence/20261106Treproof/` (gitignored).
+
 ## Maintain run (20261104Tmaintain)
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20261104Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20261104Tmaintain`. Evidence stayed.

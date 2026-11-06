@@ -29,7 +29,7 @@ Preconditions:
 
 - **Land.** After Unlock, `[data-surface="home"]` is in the page. **Today** is visible. Headings **Since you last looked**, **Recents**, and **Open tasks** are visible. Rail has **Home**, **Trash**, and **Search**.
 - **Digest empty.** First-day: Since you last looked shows **Nothing new.** `GET /view/api/digest` returns `rows` `[]` and sets `foundation_home_looked` (`Path=/view`). A second GET with that cookie stays empty until a bot writes.
-- **Empty Recents.** When there are no non-task live records, Recents shows **Nothing yet.** Record this before choosing Today. Today creates a journal. `GET /view/api/recents` includes that row at once. The Home Recents card can still show **Nothing yet.** until a body save, because create does not refresh that query.
+- **Empty Recents.** When there are no non-task live records, Recents shows **Nothing yet.** Record this before choosing Today. Today creates a journal. `GET /view/api/recents` includes that row at once. The Home Recents card can still show **Nothing yet.** until a title or body autosave, because create does not refresh that query. A leave flush stores the body and does not invalidate Recents.
 - **Empty tasks.** When the `task` default view filter has no rows, Open tasks shows **No open tasks.**
 - **Today at count 0.** First-day: Today shows **Write today** and the calendar day. Choose Today. Path `/view/journal/today`. The strip adds **Today**. `[data-surface="journal-page"]`.
 - **Recents View all.** Choose Recents **View all**. The strip adds **Recents**. The page heading is `Recents`. Path `/view/recents`. Home's card still asks for 5. This page calls `GET /view/api/recents` with no limit (server cap 500). A sixth live non-task row here is the page working.
@@ -42,7 +42,7 @@ Preconditions:
 ## Gotchas
 
 - Recents excludes tasks (open and completed). Open tasks is not Recents. The Home Recents card asks for 5. Recents **View all** is not that cap.
-- Open tasks reads the `task` type's `default_view` filter (seed: `status = active`). Completed tasks on that widget while the type still declares that filter is a bug.
+- Open tasks reads the `task` type's `default_view` filter (seed: `status = active`). Completed tasks on that widget while the type still declares that filter is a bug. The 5 rows are then the most urgent of the `list_limit_default` newest tasks (seed 200, by `updated_at`) after that filter. An older active task outside that window is missing.
 - Show completed lives on collection, not Home.
 - Theme Light / Dark / System is rail chrome. It is not a Home feature. **Trash** is also rail chrome; prove it under [Trash](./trash.md).
 - The Types heading can show while ontology is loading. After that request lands, an ontology with zero live records hides the Types section. That is not a load error. Today still shows.
