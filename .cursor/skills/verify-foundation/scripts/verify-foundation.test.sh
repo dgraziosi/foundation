@@ -806,6 +806,21 @@ workflow_blob="$(cat "${workflow}")"
 grep -Fq 'view-key-file' "${drive}" || fail "HTTP drive must unlock with the view key file"
 grep -Fq 'Retry-After' "${drive}" || fail "HTTP drive must prove 429 Retry-After"
 grep -Fq -- '-X POST http://127.0.0.1:8787/mcp' "${drive}" || fail "HTTP drive must POST /mcp for cookie-scope"
+grep -Fq '/blobs/' "${drive}" || fail "HTTP drive must GET agent /blobs/:id for cookie-scope"
+grep -Fq 'Max-Age=2592000' "${drive}" || fail "HTTP drive must prove unlock Max-Age=2592000"
+grep -Fq 'right key while locked' "${drive}" || fail "HTTP drive must prove the right key stays 429 while locked"
+grep -Fq 'foundation-init.sh' "${map_root}/SKILL.md" || fail "SKILL official start must name foundation-init.sh"
+if grep -Fq 'the human sets FOUNDATION_API_KEY' "${map_root}/SKILL.md"; then
+  fail "SKILL official start must not tell the human to set FOUNDATION_API_KEY"
+fi
+grep -Fq 'foundation-init.sh' "${map_root}/features/README.md" \
+  || fail "feature README official start must name foundation-init.sh"
+grep -Fq 'No date field on this type.' "${map_root}/features/collection.md" \
+  || fail "collection map must name No date field on this type."
+grep -Fq 'title or body autosave' "${map_root}/features/home.md" \
+  || fail "home map must say a title or body autosave refreshes Recents"
+grep -Fq 'list_limit_default' "${map_root}/features/home.md" \
+  || fail "home map must name the Open tasks list_limit_default window"
 
 redacted="$(printf '%s\n' "Set-Cookie: foundation_key=super-secret; Path=/view; HttpOnly" | verify_http_redact_set_cookie)"
 [[ "${redacted}" == *"foundation_key=<redacted>"* ]] || fail "HTTP drive must redact Set-Cookie values"

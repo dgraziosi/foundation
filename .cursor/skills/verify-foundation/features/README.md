@@ -6,7 +6,7 @@ Foundation is a life graph. Viewer is the human window on one vault. Journal kee
 
 ## Baseline preconditions
 
-- Official start: clone root, `FOUNDATION_API_KEY` set, empty first-day `FOUNDATION_DATA` (or the user's existing vault on that machine), then `./scripts/keep-vault-up.sh`. Ready: `GET http://127.0.0.1:8787/health` returns `{ "ok": true, "service": "foundation", "db": "up" }`.
+- Official start: clone root, `./scripts/foundation-init.sh` (copies `.env` when missing, mints door keys, mkdir the data folder, then keep-up). Empty first-day `FOUNDATION_DATA` (or the user's existing vault on that machine). Ready: `GET http://127.0.0.1:8787/health` returns `{ "ok": true, "service": "foundation", "db": "up" }`.
 - Viewer: `http://127.0.0.1:8788/view`. MCP / health / agent blobs: `http://127.0.0.1:8787`.
 - Verification runs use `.cursor/skills/verify-foundation/scripts/verify-foundation.sh launch` so the data dir and `BACKUP_ROOT` are disposable. Do not invent a live personal vault. Do not seed a fake life. Later `doctor` / `cleanup` / Unlock use `run-id`, `view-key-file`, and `key-file` from that launch.
 - Build Viewer (`pnpm --filter @foundation/viewer build`) before launch so the process mounts `apps/viewer/dist`. A later build needs a restart. Doctor: health green, Viewer GET 200, and (for a full window drive) that HTML's `/view/assets/…js` is JavaScript.
