@@ -47,3 +47,4 @@ Preconditions:
 - Theme Light / Dark / System is rail chrome. It is not a Home feature. **Trash** is also rail chrome; prove it under [Trash](./trash.md).
 - The Types heading can show while ontology is loading. After that request lands, an ontology with zero live records hides the Types section. That is not a load error. Today still shows.
 - Today is on Home at journal count 0. Journal write also starts from the journal collection **Today** or `/view/journal/today`.
+- Digest HTTP uses `Authorization: ApiKey` and a cookie jar. The watermark cookie is set on the digest GET. Do not POST `/view/unlock` for that proof. A locked peer from the Unlock rate-limit drive is `429`.

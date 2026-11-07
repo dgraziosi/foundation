@@ -1,5 +1,37 @@
 # Proofs
 
+## Maintain run (20261107Tmaintain)
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20261107Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20261107Tmaintain`. Evidence stayed. Changed harness re-proved on `VERIFY_RUN_ID=20261107Treproof`.
+
+Map and harness corrections this run (source + live HTTP and the JS the live window served):
+
+- With Viewer dist mounted, GET `/view` without a trailing slash is `301` `Location: /view/`. Doctor already follows it with `curl -L`. curl without `-L` sees the redirect body, not Unlock. GET `/view/` is `200` with title `Foundation`.
+- Home digest HTTP uses `Authorization: ApiKey` and a cookie jar. The watermark cookie is set on the digest GET. `verify-home-digest.sh` no longer POSTs `/view/unlock`, so it still runs after the Unlock rate-limit drive locks that peer.
+
+What that run drove:
+
+- Source readers for Unlock, Home, Collection, Detail, Edit any node, Activity, Trash, Search, and Journal write.
+- Viewer routes still match the map (`/`, `/recents`, `/trash`, `/journal/today`, `/types/:slug`, `/nodes/:id`, `/nodes/:id/activity`). Search stays overlay-only.
+- `verify-foundation.test.sh` exited 0 after this PROOF line.
+- Viewer build succeeded. Doctor: health `{ ok: true, service: foundation, db: up }`, Viewer GET 200 after `-L`, dist present, live `/view/assets/index-DSLAcfel.js` is JavaScript.
+- `verify-http-drive.sh` exited 0 on `20261107Tmaintain` and again on `20261107Treproof` (Unlock reject, MCP key before accept, accept, cookie does not open MCP or GET `/blobs/:id`, sixth wrong unlock 429, right key while locked 429, Home empty peek, first-day digest `rows` `[]`). Accept headers included `Max-Age=2592000` and omitted `Secure`.
+- `verify-mcp-drive.sh` exited 0 (`POST /mcp` `tools/list`).
+- HTTP Collection: `GET /view/api/types/task` `type.label` Task, view ids board/list/calendar/timeline/outline, `parent_types` `["goal","project"]`, first-day `nodes` `[]`. After Today, journal collection listed that live id.
+- HTTP Detail: `GET /view/api/nodes/00000000-0000-4000-8000-000000000000` 404 `{"error":"Not found"}`.
+- HTTP Search: idle `{ searched: false, hits: [] }`; `q=zzzxnever`, `type=note`, and `status=active` `{ searched: true, hits: [] }`. Leftover `q=zzzxnever&type=note` `{ searched: true, hits: [] }`. After journal write, `q=Morning` `{ searched: true }`.
+- HTTP Journal write: `POST /view/api/journals/today` same live id twice. First create title `November 7, 2026`. `PATCH` title/body 200. Stale `base_updated_at` 409.
+- HTTP Edit any node / Activity update Undo / Trash: `verify-edit-any-node.sh` exited 0. Empty title 400. `body` on a non-journal 403 `Journal writes only.`
+- HTTP Activity **Created** Undo: MCP upsert of a person titled "Create undo fixture". Stale if-match 409 left the record live. Undo `200` body keys `ok`, `activity_id` only. Live GET 404. Trash listed that id. Tombstone activity still 200.
+- HTTP journal Restore: `DELETE` then live GET 404. Restore `200` type `journal`, storage `inline`.
+- Home digest later bot title "Digest later bot 20261107" listed with a cookie jar and no unlock POST. Second look empty. Watermark cookie `foundation_home_looked`.
+- On `20261107Treproof`, `verify-http-drive.sh` then `verify-home-digest.sh` both exited 0 while that peer was still `429` on `/view/unlock`.
+- Built dist `index-DSLAcfel.js` contains Unlock copy, **Write today**, **Opening the page**, **May hang under**, **Targets**, **Keep a title**, **Restore**, `journal-page`, `detail-page`, `search-overlay`, `collection-preview`, `weekday:"long"`, `foundation.show_completed`, and **No date field on this type.**
+- Named host proofs: `verify-export-import-45.sh` and `verify-receipt-model-calendar.sh` exited 0.
+- Browser chrome was not clicked. Same-path HTTP plus the JS the live window served was the drive.
+
+Evidence: `.cursor/skills/verify-foundation/evidence/20261107Tmaintain/` and `.cursor/skills/verify-foundation/evidence/20261107Treproof/` (gitignored).
+
 ## Maintain run (20261106Tmaintain)
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20261106Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20261106Tmaintain`. Evidence stayed. Changed harness re-proved on `VERIFY_RUN_ID=20261106Treproof`.

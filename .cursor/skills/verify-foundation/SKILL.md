@@ -83,7 +83,7 @@ Worth driving only when all of these hold:
 | Check | Expect |
 | --- | --- |
 | `GET http://127.0.0.1:8787/health` | HTTP 200 and `{ "ok": true, "service": "foundation", "db": "up" }` |
-| `GET http://127.0.0.1:8788/view` | HTTP 200 HTML. Body contains `Foundation` (built app) or `Unlock.` / `Vault key` (fallback or unlock gate) |
+| `GET http://127.0.0.1:8788/view` | HTTP 200 HTML after the slash redirect a browser follows. With dist mounted, `/view` without a slash is `301` `Location: /view/`. Doctor uses `curl -L`. Body contains `Foundation` (built app) or `Unlock.` / `Vault key` (fallback or unlock gate) |
 | Ports | MCP/health on `8787`, Viewer on `8788`. If this run launched, the state file names the data dir and app pid we started |
 | Auth | `FOUNDATION_API_KEY` is set in the environment, else this run's key file (`verify-foundation.sh key-file`), else the clone `.env`. Do not print the key. Doctor also says whether the view key is set, without printing it. A missing view key closes the window; the house key does not open it |
 | Build | For a full window drive: `apps/viewer/dist/index.html` exists, and GET of the `/view/assets/…js` from that HTML is JavaScript (not the HTML shell) |
