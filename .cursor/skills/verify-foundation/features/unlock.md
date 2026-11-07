@@ -40,7 +40,7 @@ Preconditions:
 
 - MCP bind is `127.0.0.1:8787`. Viewer bind is `127.0.0.1:8788` by default. Off-box names the tunnel Host as `VIEW_PUBLIC_ORIGIN` (https, or http with `FOUNDATION_ALLOW_CLEARTEXT=1`) and may set `VIEW_HOST=0.0.0.0`. Unlock on `:8787/view` is the wrong window. Both doors share the unlock ledger, so a lock on `:8788` is also `429` on `:8787`.
 - A foreign `Host` is `403` `{"error":"Host not allowed"}` before the key is read. A foreign `Origin` on a `/view` write is `403` `{"error":"Origin not allowed"}`. The React door still shows **That key did not unlock.** for any thrown error.
-- Without `apps/viewer/dist`, `:8788/view` still shows the unlock fallback HTML. That is enough to prove `unlock-door` and the form POST. It is not a React Home proof.
+- Without `apps/viewer/dist`, `:8788/view` still shows the unlock fallback HTML. That is enough to prove `unlock-door` and the form POST. It is not a React Home proof. With dist mounted, GET `/view` without a trailing slash is `301` `Location: /view/`. Doctor uses `curl -L`. curl without `-L` sees the redirect body, not Unlock.
 - `Authorization: Bearer <key>` is accepted as an equivalent of `ApiKey`. The cookie is Viewer-only.
 - Do not write the key into evidence, git, or chat.
 - A 401 on `/view/api/session` without a key is expected. It is the gate, not a down vault. Confirm `/health` separately.

@@ -93,15 +93,6 @@ write("tools-list.json", {"tool_count": len(names), "names": names})
 if len(names) != 16 or "merge" not in names:
     raise SystemExit(f"tools/list count {len(names)} names={names}")
 
-unlock_status, unlock = http(
-    "http://127.0.0.1:8788/view/unlock",
-    method="POST",
-    headers={"content-type": "application/json", "accept": "application/json"},
-    body=json.dumps({"api_key": view_key}).encode(),
-)
-if unlock_status != 200 or unlock.get("ok") is not True:
-    raise SystemExit(f"unlock was {unlock_status}: {unlock}")
-
 view_auth = {"Authorization": f"ApiKey {view_key}", "accept": "application/json"}
 status, first = http("http://127.0.0.1:8788/view/api/digest", headers=view_auth)
 write("digest-first.json", first)

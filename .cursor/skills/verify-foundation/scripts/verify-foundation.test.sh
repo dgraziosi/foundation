@@ -742,6 +742,15 @@ if grep -Fq 'KEY_FILE="$(.cursor/skills/verify-foundation/scripts/verify-foundat
   fail "SKILL Drive must not fall back to key-file for Viewer unlock"
 fi
 grep -Fq -- 'curl -sS -L --max-redirs 3' "${helper}" || fail "doctor must follow the /view redirect a browser follows"
+grep -Fq -- '`301` `Location: /view/`' "${map_root}/SKILL.md" \
+  || fail "SKILL doctor table must name the /view slash 301"
+grep -Fq -- '`301` `Location: /view/`' "${map_root}/features/unlock.md" \
+  || fail "unlock map must name the /view slash 301"
+if grep -Fq '/view/unlock' "${script_dir}/verify-home-digest.sh"; then
+  fail "home digest harness must not POST /view/unlock"
+fi
+grep -Fq 'Do not POST `/view/unlock` for that proof.' "${map_root}/features/home.md" \
+  || fail "home map must say digest HTTP must not POST unlock"
 grep -Fq -- '/view/assets/' "${helper}" || fail "doctor must GET the window script from /view HTML"
 grep -Fq -- 'window script is JavaScript' "${helper}" || fail "doctor must say when /view/assets is JavaScript"
 grep -Fq -- 'Build Viewer before launch' "${helper}" || fail "doctor must say to build before launch when the script is the HTML shell"
