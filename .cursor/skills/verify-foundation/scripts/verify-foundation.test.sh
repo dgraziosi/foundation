@@ -830,6 +830,13 @@ grep -Fq 'title or body autosave' "${map_root}/features/home.md" \
   || fail "home map must say a title or body autosave refreshes Recents"
 grep -Fq 'list_limit_default' "${map_root}/features/home.md" \
   || fail "home map must name the Open tasks list_limit_default window"
+grep -Fq 'The `relations` entry with `slug` `about` has `target_types`' "${map_root}/features/detail.md" \
+  || fail "detail map must prove about target_types on the ontology relations entry."
+if grep -Fq 'Prove seed `about.target_types` on `GET /view/api/ontology`' "${map_root}/features/detail.md"; then
+  fail "detail map must not treat about.target_types as a top-level ontology path"
+fi
+grep -Fq 'at most 200 rows' "${map_root}/features/trash.md" \
+  || fail "trash map must name the 200-row cap."
 
 redacted="$(printf '%s\n' "Set-Cookie: foundation_key=super-secret; Path=/view; HttpOnly" | verify_http_redact_set_cookie)"
 [[ "${redacted}" == *"foundation_key=<redacted>"* ]] || fail "HTTP drive must redact Set-Cookie values"

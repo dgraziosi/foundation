@@ -31,3 +31,4 @@ Preconditions:
 - Blob bytes are not purged.
 - Restore prefers undo-of-delete when that activity row is still reversible.
 - Inline markdown journals have no **Move to trash**. Soft-delete them only over HTTP, not from the write page. Restore of that journal is the write page, not Properties.
+- Trash lists at most 200 rows (newest `deleted_at` first). A row just moved to trash is inside that window. Older tombstones past 200 are omitted.
