@@ -1,5 +1,37 @@
 # Proofs
 
+## Maintain run (20261110Tmaintain)
+
+Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20261110Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20261110Tmaintain`. Evidence stayed. Helper-test locks re-proved on this tree. Named first-day digest harness re-proved on `VERIFY_RUN_ID=20261110Treproof`.
+
+Map corrections this run (source + live HTTP and the window):
+
+- Journal loaded-page scoring. The pre-POST shell is `[data-surface="journal-page"]` with **Opening the page…** and no Title field. After the POST, Title `aria-label="Title"` can appear while the editor still shows **Opening the page…**. Waiting for Title alone is not enough. Score the loaded page only after **Opening the page…** is gone and `[data-editor="live-markdown"]` is present. The map had said wait for the Title field.
+
+What that run drove:
+
+- Source readers for Unlock, Home, Collection, Detail, Edit any node, Activity, Trash, Search, and Journal write.
+- Viewer routes still match the map (`/`, `/recents`, `/trash`, `/journal/today`, `/types/:slug`, `/nodes/:id`, `/nodes/:id/activity`). Search stays overlay-only.
+- `verify-foundation.test.sh` exited 0 after this PROOF line.
+- Viewer build succeeded. Doctor: health `{ ok: true, service: foundation, db: up }`, Viewer GET 200 after `-L`, dist present, live `/view/assets/index-DSLAcfel.js` is JavaScript.
+- `verify-http-drive.sh` exited 0 on `20261110Tmaintain` (Unlock reject, MCP key before accept, accept, cookie does not open MCP or GET `/blobs/:id`, sixth wrong unlock 429, right key while locked 429, Home empty peek, first-day digest `rows` `[]`). Accept headers included `Max-Age=2592000` and omitted `Secure`. GET `/view` without a slash is `301` `Location: /view/`. Foreign Host `403` `Host not allowed`. Foreign Origin `403` `Origin not allowed`.
+- `verify-mcp-drive.sh` exited 0 (`POST /mcp` `tools/list`).
+- HTTP Collection: `GET /view/api/types/task` `type.label` Task, view ids board/list/calendar/timeline/outline, `parent_types` `["goal","project"]`, first-day `nodes` `[]`. After Today, journal collection listed that live id.
+- HTTP Detail: `GET /view/api/nodes/00000000-0000-4000-8000-000000000000` 404 `{"error":"Not found"}`. `GET /view/api/ontology` top-level keys `types`, `relations`. Relation `slug` `about` `target_types` `["person"]`. Seed `relates_to` `target_types` `[]`.
+- HTTP Search: idle `{ searched: false, hits: [] }`; `q=zzzxnever`, `type=note`, and `status=active` `{ searched: true, hits: [] }`. Leftover `q=zzzxnever&type=note` `{ searched: true, hits: [] }`. After journal write, `q=Morning` `{ searched: true }`.
+- HTTP Journal write: `POST /view/api/journals/today` same live id twice. First create title `November 10, 2026`. `PATCH` title/body 200. Stale `base_updated_at` 409. Note `body` 403 `Journal writes only.`
+- HTTP Edit any node / Activity update Undo / Trash: `verify-edit-any-node.sh` exited 0. Empty title 400. `body` on a non-journal 403 `Journal writes only.`
+- HTTP Activity **Created** Undo: MCP upsert of a person titled "Create undo fixture". Stale if-match 409 left the record live. Undo `200` body keys `ok`, `activity_id` only. Live GET 404. Trash listed that id. Tombstone activity still 200.
+- HTTP journal Restore: `DELETE` then live GET 404. Restore `200` type `journal`, storage `inline`.
+- Home digest first-day empty in `verify-http-drive`. Later bot title "Digest later bot 20261110" listed with a cookie jar and no unlock POST. Second look empty. Watermark cookie `foundation_home_looked`.
+- Built dist `index-DSLAcfel.js` contains Unlock copy, **Write today**, **Opening the page**, **May hang under**, **Targets**, **Keep a title**, **Restore**, `journal-page`, `detail-page`, `search-overlay`, `collection-preview`, `weekday:"long"`, `foundation.show_completed`, and **No date field on this type.**
+- Named host proofs: `verify-export-import-45.sh` and `verify-receipt-model-calendar.sh` exited 0.
+- Browser: unlocked the throwaway window after the Unlock rate-limit window, opened `/view/journal/today`. Loaded page showed day label `Tuesday, November 10, 2026`, title **Proof morning**, body **Wrote today.**, no **Opening the page…**. Title can share the screen with that copy until the editor chunk mounts; localhost was too fast to photograph the overlap.
+
+Product gap (not this PR): detail **Reload** after a clash does not hold `writesInFlight` the way the journal page does. The map still describes intended Reload (keep the draft, retry with a fresh `updated_at`). Do not paper over it in the map.
+
+Evidence: `.cursor/skills/verify-foundation/evidence/20261110Tmaintain/` and `.cursor/skills/verify-foundation/evidence/20261110Treproof/` (gitignored).
+
 ## Maintain run (20261109Tmaintain)
 
 Throwaway vault via `verify-foundation.sh launch` (`VERIFY_RUN_ID=20261109Tmaintain`). Host Postgres 16 bins were at `/usr/lib/postgresql/16/bin`. Not a personal vault. Doctor green. Viewer dist built. Cleanup removes `/tmp/foundation-verify-20261109Tmaintain`. Evidence stayed. Helper-test locks re-proved on this tree. Named first-day digest harness re-proved on `VERIFY_RUN_ID=20261109Treproof`.

@@ -646,6 +646,10 @@ if grep -Eq '[A-Z][a-z]+day, (January|February|March|April|May|June|July|August|
 fi
 grep -Fq 'Opening the page' "${map_root}/features/journal-write.md" \
   || fail "journal map must say the loading shell shows Opening the page before Title."
+grep -Fq 'and no Title field' "${map_root}/features/journal-write.md" \
+  || fail "journal map must say the loading shell has Opening the page and no Title field."
+grep -Fq 'Score the loaded page only after' "${map_root}/features/journal-write.md" \
+  || fail "journal map must say not to score the loaded page until Opening the page is gone and live-markdown is present."
 grep -Fq '159 characters plus an ellipsis' "${map_root}/features/home.md" \
   || fail "home map must say a first line longer than 160 characters becomes 159 plus an ellipsis."
 grep -Fq 'Max-Age=2592000' "${map_root}/features/unlock.md" \

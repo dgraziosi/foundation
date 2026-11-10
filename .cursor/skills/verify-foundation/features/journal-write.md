@@ -28,7 +28,7 @@ Preconditions:
 
 - **Home door.** Open Home. Today is visible at journal count 0. Choose **Today**.
 - **Collection door.** Open `/view/types/journal`. Heading includes **Journal**. First-day: **Nothing yet.** Button **Today** (link-styled).
-- **Today.** Choose **Today** (or open `/view/journal/today`). `[data-surface="journal-page"]`. Day label includes the weekday (New York form of that journal's `created_at`). Title `aria-label="Title"` (first create: that vault day's title without the weekday). Editor placeholder **Write a first sentence.** The loading shell also uses `[data-surface="journal-page"]` with **Opening the page…** Wait for the Title field before scoring the loaded page.
+- **Today.** Choose **Today** (or open `/view/journal/today`). `[data-surface="journal-page"]`. The loading shell also uses `[data-surface="journal-page"]` with **Opening the page…** and no Title field. After the POST, Title `aria-label="Title"` can appear while the editor still shows **Opening the page…**. Score the loaded page only after **Opening the page…** is gone and `[data-editor="live-markdown"]` is present. Day label includes the weekday (New York form of that journal's `created_at`). Title (first create: that vault day's title without the weekday). Editor placeholder **Write a first sentence.**
 - **Keep a title.** Clear the title. The page shows **Keep a title**. The write still uses that journal's calendar day, not wall-clock today on a past entry.
 - **Save.** Change the title and a sentence. Wait about a second. Reload the node or POST Today again. Title and body persisted.
 - **Leave flush.** Type, then leave before the debounce lands. Reopen. The flushed body is on the page when the person has not typed again. A clash or failed leave still shows the draft with **Couldn't save**, and a clash offers **Reload**.
@@ -44,3 +44,4 @@ Preconditions:
 - The cookie unlocks this write. It still does not unlock `/mcp` or agent `/blobs/:id`.
 - An empty title shows **Keep a title** and writes that journal's calendar day.
 - Server Today create/lookup follows `vault_settings.timezone` (seed `America/New_York`). Viewer chrome — Home's day, the page day label, and the empty-title fallback — still formats `America/New_York`. A first-day vault still matches New York.
+- Waiting for the Title field is enough to leave the pre-POST shell, not enough to score the loaded page. Title can share the screen with **Opening the page…** until `[data-editor="live-markdown"]` mounts.
