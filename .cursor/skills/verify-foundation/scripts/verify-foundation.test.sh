@@ -654,6 +654,8 @@ grep -Fq '159 characters plus an ellipsis' "${map_root}/features/home.md" \
   || fail "home map must say a first line longer than 160 characters becomes 159 plus an ellipsis."
 grep -Fq 'Max-Age=2592000' "${map_root}/features/unlock.md" \
   || fail "unlock map must name Max-Age=2592000 on foundation_key."
+grep -Fq '`Path=/view`, `HttpOnly`, `SameSite=Strict`, and `Max-Age=2592000`' "${map_root}/features/unlock.md" \
+  || fail "unlock HTTP accept must name SameSite=Strict with Path, HttpOnly, and Max-Age."
 grep -Fq 'Localhost omits `Secure`' "${map_root}/features/unlock.md" \
   || fail "unlock map must say localhost omits Secure."
 grep -Fq 'Host not allowed' "${map_root}/features/unlock.md" \
@@ -823,7 +825,13 @@ grep -Fq 'Retry-After' "${drive}" || fail "HTTP drive must prove 429 Retry-After
 grep -Fq -- '-X POST http://127.0.0.1:8787/mcp' "${drive}" || fail "HTTP drive must POST /mcp for cookie-scope"
 grep -Fq '/blobs/' "${drive}" || fail "HTTP drive must GET agent /blobs/:id for cookie-scope"
 grep -Fq 'Max-Age=2592000' "${drive}" || fail "HTTP drive must prove unlock Max-Age=2592000"
+grep -Fq 'SameSite=Strict' "${drive}" || fail "HTTP drive must prove unlock SameSite=Strict"
 grep -Fq 'right key while locked' "${drive}" || fail "HTTP drive must prove the right key stays 429 while locked"
+edit_drive="${script_dir}/verify-edit-any-node.sh"
+grep -Fq '"title": "   "' "${edit_drive}" || fail "edit-any-node harness must PATCH a whitespace title"
+grep -Fq 'empty title was' "${edit_drive}" || fail "edit-any-node harness must refuse empty title as HTTP 400"
+grep -Fq '"body": "no"' "${edit_drive}" || fail "edit-any-node harness must PATCH body on a non-journal"
+grep -Fq 'Journal writes only.' "${edit_drive}" || fail "edit-any-node harness must refuse non-journal body"
 grep -Fq 'foundation-init.sh' "${map_root}/SKILL.md" || fail "SKILL official start must name foundation-init.sh"
 if grep -Fq 'the human sets FOUNDATION_API_KEY' "${map_root}/SKILL.md"; then
   fail "SKILL official start must not tell the human to set FOUNDATION_API_KEY"
