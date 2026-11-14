@@ -142,6 +142,46 @@ status, still = http(
 if still["node"]["title"] != "Ada Lovelace":
     raise SystemExit("clash clobbered the title")
 
+status, empty_title = http(
+    f"http://127.0.0.1:8788/view/api/nodes/{node_id}",
+    method="PATCH",
+    headers=auth,
+    body=json.dumps({"title": "   ", "base_updated_at": saved["node"]["updated_at"]}).encode(),
+)
+write("empty-title.json", empty_title)
+if status != 400:
+    raise SystemExit(f"empty title was {status}, want 400")
+if "Keep a title" in json.dumps(empty_title):
+    raise SystemExit("empty title HTTP body taught window copy")
+status, still_titled = http(
+    f"http://127.0.0.1:8788/view/api/nodes/{node_id}",
+    headers={"Authorization": f"ApiKey {view_key}"},
+)
+if still_titled["node"]["title"] != "Ada Lovelace":
+    raise SystemExit("empty title changed the prior title")
+
+status, gated = http(
+    f"http://127.0.0.1:8788/view/api/nodes/{node_id}",
+    method="PATCH",
+    headers=auth,
+    body=json.dumps(
+        {
+            "title": "Hijack",
+            "body": "no",
+            "base_updated_at": saved["node"]["updated_at"],
+        }
+    ).encode(),
+)
+write("journal-body-gate.json", gated)
+if status != 403 or gated.get("error") != "Journal writes only.":
+    raise SystemExit(f"journal-body gate was {status}: {gated}")
+status, still_titled = http(
+    f"http://127.0.0.1:8788/view/api/nodes/{node_id}",
+    headers={"Authorization": f"ApiKey {view_key}"},
+)
+if still_titled["node"]["title"] != "Ada Lovelace":
+    raise SystemExit("journal-body gate changed the title")
+
 status, activity = http(
     f"http://127.0.0.1:8788/view/api/nodes/{node_id}/activity",
     headers={"Authorization": f"ApiKey {view_key}"},
@@ -220,7 +260,7 @@ if status != 200 or journal["node"]["title"] != "Proof morning":
 write("feature-id", "edit-any-node-31")
 write(
     "result.txt",
-    "HTTP any-node edit, clash, activity undo, trash restore, journal Today, tools/list 16 including merge.",
+    "HTTP any-node edit, clash, empty title 400, non-journal body 403, activity undo, trash restore, journal Today, tools/list 16 including merge.",
 )
 print("verify-edit-any-node: ok")
 PY
