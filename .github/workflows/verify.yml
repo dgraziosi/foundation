@@ -9,7 +9,8 @@ permissions:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    # ubuntu-latest is 26.04. Its apt has no postgresql-16 or postgresql-16-pgvector.
+    runs-on: ubuntu-24.04
     services:
       postgres:
         # Official postgres:16 does not ship vector.
