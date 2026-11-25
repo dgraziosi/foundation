@@ -749,6 +749,11 @@ skill_blob="$(cat "${map_root}/SKILL.md")"
 if grep -Fq 'KEY_FILE="$(.cursor/skills/verify-foundation/scripts/verify-foundation.sh key-file)"' "${map_root}/SKILL.md"; then
   fail "SKILL Drive must not fall back to key-file for Viewer unlock"
 fi
+if grep -Fq 'Doctor and Unlock read that file' "${map_root}/SKILL.md"; then
+  fail "SKILL launch must not say Unlock reads the API key file"
+fi
+grep -Fq 'Unlock does not — the window uses `view-key-file`' "${map_root}/SKILL.md" \
+  || fail "SKILL launch must say Unlock uses view-key-file, not the API key file"
 grep -Fq -- 'curl -sS -L --max-redirs 3' "${helper}" || fail "doctor must follow the /view redirect a browser follows"
 grep -Fq -- '`301` `Location: /view/`' "${map_root}/SKILL.md" \
   || fail "SKILL doctor table must name the /view slash 301"
