@@ -1,10 +1,10 @@
 # Activity
 
-From a non-journal detail page, Activity lists that record's writes. A reversible row the person may undo offers Undo. Undo uses the same if-match family as MCP `undo`.
+From a non-journal detail page, Activity lists that record's newest writes (cap 50). A reversible row the person may undo offers Undo. Undo uses the same if-match family as MCP `undo`.
 
 ## Sub-features
 
-- `activity-list` GET `/view/api/nodes/<id>/activity` returns `rows` with action, actor, actor_label, `created_at`, `summary`, `can_undo`, and `base_updated_at` when Undo is offered.
+- `activity-list` GET `/view/api/nodes/<id>/activity` returns `{ "rows": [...] }` only (no cursor). Each row has action, actor, actor_label, `created_at`, `summary`, `can_undo`, and `base_updated_at` when Undo is offered. Newest 50.
 - `activity-undo` POST `/view/api/activity/<id>/undo` with `base_updated_at` inverts a reversible row when `can_undo` is true. The window button is gated on `can_undo` plus `base_updated_at`, not `reversible` alone. A Viewer **update** is the usual proof: the `200` body is the live node with title, status, and data back at the prior snapshot. A **Created** row can also offer Undo. That invert soft-deletes the record. The `200` body is `{ "ok": true, "activity_id": "…" }` with no live `node`. Live GET is then `404`.
 - `activity-undo-clash` a stale or missing if-match refuses and does not invert.
 
@@ -29,3 +29,4 @@ Preconditions:
 
 - Undo of a delete is Restore from Trash when the person starts from a soft-deleted row. Undo of **Created** is the same soft-delete family: the record leaves Recents and appears in Trash. `/view/nodes/:id/activity` on a tombstone shows **Not found** because live GET is 404. HTTP `GET /view/api/nodes/:id/activity` still returns `200` and `{ "rows": [...] }` for that same tombstone.
 - Missing or stale if-match is `409`, not a silent overwrite.
+- Activity lists at most 50 rows (newest first). A write you just made is inside that window. Older rows past 50, including **Created**, are omitted.
